@@ -12,19 +12,26 @@ using Volo.Abp.Account;
 using Volo.Abp.Account.Web;
 using Volo.Abp.Identity;
 using Volo.Abp.Security.Claims;
+using CampusFlow.Students;
+using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Guids;
 
 namespace CampusFlow.Web.Pages.Account;
 
 public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
 {
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _studentLookups;
+    private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
+    private readonly IGuidGenerator _guidGenerator;
 
     public RegisterModel(
         IAccountAppService accountAppService,
         IAuthenticationSchemeProvider schemeProvider,
         IOptions<AbpAccountOptions> accountOptions,
         IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
-        IEnumerable<IStudentInformationSystemStudentLookup> studentLookups)
+        IEnumerable<IStudentInformationSystemStudentLookup> studentLookups,
+        IRepository<StudentProfile, Guid> studentProfileRepository,
+        IGuidGenerator guidGenerator)
         : base(
             accountAppService,
             schemeProvider,
@@ -32,6 +39,8 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
             identityDynamicClaimsPrincipalContributorCache)
     {
         _studentLookups = studentLookups.ToArray();
+        _studentProfileRepository = studentProfileRepository;
+        _guidGenerator = guidGenerator;
     }
 
     public override async Task<IActionResult> OnGetAsync()
@@ -83,8 +92,18 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
 
         await RegisterExternalUserAsync(
             externalLogin,
-            $"student-{result.Student.ExternalStudentId}",
+            result.Student.Email,
             result.Student.Email);
+
+        var user = await UserManager.FindByEmailAsync(result.Student.Email);
+        if (user is not null)
+        {
+            await _studentProfileRepository.InsertAsync(new StudentProfile(
+                _guidGenerator.Create(),
+                CurrentTenant.Id,
+                user.Id,
+                result.Student));
+        }
 
         return await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash);
     }

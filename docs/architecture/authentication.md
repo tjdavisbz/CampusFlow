@@ -39,8 +39,12 @@ hosting platform's secret store.
 The initial Thesis Elements student identity lookup reads
 `dbo.CAMS_StudentAddressList_View` and requires one record whose trimmed `Email1` matches
 the verified Microsoft email, `ActiveFlag` is `Yes`, and `AddressType` is `Local`.
-`StudentUID` becomes CampusFlow's external student identifier. Zero or multiple matches
-are denied; CampusFlow does not ask the user to choose or disclose matching records.
+`StudentUID` becomes CampusFlow's private external student identifier. CampusFlow stores a
+tenant-scoped student profile keyed one-to-one to the ABP user, including the student-facing
+`StudentID`, verified email, and display-name fields from `dbo.CAMS_Student_View`. Zero or
+multiple matches are denied; CampusFlow does not ask the user to choose or disclose matching
+records. The profile prevents routine page rendering from depending on a live SIS query and
+avoids storing SIS profile data in cookies or server session state.
 
 ## Tenant branding
 

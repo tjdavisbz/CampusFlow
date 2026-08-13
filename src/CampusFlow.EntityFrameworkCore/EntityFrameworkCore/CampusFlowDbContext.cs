@@ -14,6 +14,7 @@ using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.OpenIddict.EntityFrameworkCore;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
+using CampusFlow.Students;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -25,8 +26,7 @@ public class CampusFlowDbContext :
     ITenantManagementDbContext,
     IIdentityDbContext
 {
-    /* Add DbSet properties for your Aggregate Roots / Entities here. */
-
+    public DbSet<StudentProfile> StudentProfiles { get; set; }
 
     #region Entities from the modules
 
@@ -80,6 +80,24 @@ public class CampusFlowDbContext :
         builder.ConfigureBlobStoring();
 
         /* Configure your own tables/entities inside here */
+
+        builder.Entity<StudentProfile>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "StudentProfiles", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            b.Property(x => x.FirstName).IsRequired().HasMaxLength(128);
+            b.Property(x => x.PreferredName).HasMaxLength(128);
+            b.Property(x => x.LastName).IsRequired().HasMaxLength(128);
+            b.HasOne<IdentityUser>()
+                .WithOne()
+                .HasForeignKey<StudentProfile>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasIndex(x => x.UserId).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.Provider, x.ExternalStudentId }).IsUnique();
+        });
 
         //builder.Entity<YourEntity>(b =>
         //{

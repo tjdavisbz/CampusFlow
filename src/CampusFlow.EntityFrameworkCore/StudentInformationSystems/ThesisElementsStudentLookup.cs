@@ -38,11 +38,19 @@ public sealed class ThesisElementsStudentLookup :
         }
 
         const string sql = """
-            SELECT TOP (2) StudentUID, Email1
-            FROM [dbo].[CAMS_StudentAddressList_View]
-            WHERE ActiveFlag = @ActiveFlag
-              AND AddressType = @AddressType
-              AND LTRIM(RTRIM(Email1)) = @Email
+            SELECT TOP (2)
+                student.StudentUID,
+                student.StudentID,
+                address.Email1,
+                student.FirstName,
+                student.PreferredName,
+                student.LastName
+            FROM [dbo].[CAMS_StudentAddressList_View] address
+            INNER JOIN [dbo].[CAMS_Student_View] student
+                ON student.StudentUID = address.StudentUID
+            WHERE address.ActiveFlag = @ActiveFlag
+              AND address.AddressType = @AddressType
+              AND LTRIM(RTRIM(address.Email1)) = @Email
             """;
 
         await using var connection = new SqlConnection(connectionString);
@@ -58,8 +66,13 @@ public sealed class ThesisElementsStudentLookup :
         while (await reader.ReadAsync(cancellationToken))
         {
             matches.Add(new StudentInformationSystemStudent(
+                StudentInformationSystemProvider.ThesisElements,
                 Convert.ToString(reader.GetValue(0))!,
-                reader.GetString(1).Trim()));
+                reader.GetString(1).Trim(),
+                reader.GetString(2).Trim(),
+                reader.GetString(3).Trim(),
+                reader.IsDBNull(4) ? null : reader.GetString(4).Trim(),
+                reader.GetString(5).Trim()));
         }
 
         return matches.Count switch
