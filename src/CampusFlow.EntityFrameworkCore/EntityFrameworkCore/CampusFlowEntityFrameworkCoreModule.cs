@@ -14,6 +14,7 @@ using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.BlobStoring.Database.EntityFrameworkCore;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using Volo.Abp.Studio;
+using CampusFlow.StudentInformationSystems;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -42,6 +43,10 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
 
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
+        context.Services.AddTransient<
+            IStudentInformationSystemStudentLookup,
+            ThesisElementsStudentLookup>();
+
         context.Services.AddAbpDbContext<CampusFlowDbContext>(options =>
         {
                 /* Remove "includeAllEntities: true" to create

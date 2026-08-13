@@ -37,9 +37,15 @@ using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using Volo.Abp.TenantManagement.Web;
 using System;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Validators;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Volo.Abp.Account.Web;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.Toolbars;
@@ -149,6 +155,7 @@ public class CampusFlowWebModule : AbpModule
         ConfigureUrls(configuration);
         ConfigureHealthChecks(context);
         ConfigureAuthentication(context);
+        ConfigureMicrosoftIdentity(context, configuration);
         ConfigureVirtualFileSystem(hostingEnvironment);
         ConfigureNavigationServices();
         ConfigureAutoApiControllers();
@@ -218,6 +225,76 @@ public class CampusFlowWebModule : AbpModule
         {
             options.IsDynamicClaimsEnabled = true;
         });
+    }
+
+    private static void ConfigureMicrosoftIdentity(
+        ServiceConfigurationContext context,
+        IConfiguration configuration)
+    {
+        var authorityTenant = configuration["MicrosoftIdentity:AuthorityTenant"];
+        var clientId = configuration["MicrosoftIdentity:ClientId"];
+        var clientSecret = configuration["MicrosoftIdentity:ClientSecret"];
+
+        if (string.IsNullOrWhiteSpace(authorityTenant) ||
+            string.IsNullOrWhiteSpace(clientId) ||
+            string.IsNullOrWhiteSpace(clientSecret))
+        {
+            return;
+        }
+
+        context.Services
+            .AddAuthentication()
+            .AddOpenIdConnect("MicrosoftEntra", "Sign in with Microsoft", options =>
+            {
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+                options.Authority = $"https://login.microsoftonline.com/{authorityTenant}/v2.0";
+                options.ClientId = clientId;
+                options.ClientSecret = clientSecret;
+                options.CallbackPath = configuration["MicrosoftIdentity:CallbackPath"] ?? "/signin-oidc";
+                options.SignedOutCallbackPath = configuration["MicrosoftIdentity:SignedOutCallbackPath"] ?? "/signout-callback-oidc";
+                options.ResponseType = OpenIdConnectResponseType.Code;
+                options.UsePkce = true;
+                options.SaveTokens = true;
+                options.GetClaimsFromUserInfoEndpoint = false;
+                options.Scope.Add("email");
+                options.TokenValidationParameters.ValidateIssuer = true;
+                options.TokenValidationParameters.IssuerValidator =
+                    AadIssuerValidator.GetAadIssuerValidator(options.Authority).Validate;
+                options.Events = new OpenIdConnectEvents
+                {
+                    OnTokenValidated = context =>
+                    {
+                        if (context.Principal?.Identity is not ClaimsIdentity identity)
+                        {
+                            return Task.CompletedTask;
+                        }
+
+                        var tenantId = context.Principal.FindFirstValue("tid") ??
+                                       context.Principal.FindFirstValue(
+                                           "http://schemas.microsoft.com/identity/claims/tenantid");
+                        var objectId = context.Principal.FindFirstValue("oid") ??
+                                      context.Principal.FindFirstValue(
+                                          "http://schemas.microsoft.com/identity/claims/objectidentifier");
+                        if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(objectId))
+                        {
+                            context.Fail("The Microsoft identity is missing its tenant or object identifier.");
+                            return Task.CompletedTask;
+                        }
+
+                        var existingIdentifier = identity.FindFirst(ClaimTypes.NameIdentifier);
+                        if (existingIdentifier is not null)
+                        {
+                            identity.RemoveClaim(existingIdentifier);
+                        }
+
+                        identity.AddClaim(new Claim(
+                            ClaimTypes.NameIdentifier,
+                            $"{tenantId}:{objectId}"));
+
+                        return Task.CompletedTask;
+                    }
+                };
+            });
     }
 
     private void ConfigureVirtualFileSystem(IWebHostEnvironment hostingEnvironment)

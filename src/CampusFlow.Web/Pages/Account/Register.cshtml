@@ -1,0 +1,20 @@
+@page
+@model CampusFlow.Web.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Unable to access CampusFlow";
+}
+
+<div class="card shadow-sm">
+    <div class="card-body p-4">
+        <h2 class="card-title">We couldn't connect your account</h2>
+        <p class="card-text">
+            The Microsoft account you used could not be connected to an eligible student record.
+            Confirm that you signed in with the Microsoft account associated with your university record.
+        </p>
+        <p class="card-text">
+            If you still need help, contact your university's student services office. Please do not create
+            another account; CampusFlow access is linked automatically.
+        </p>
+        <a class="btn btn-primary" asp-page="./Login">Return to sign in</a>
+    </div>
+</div>
