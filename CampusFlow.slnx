@@ -1,0 +1,24 @@
+<Solution>
+    <Configurations>
+        <Platform Name="Any CPU" />
+    </Configurations>
+    <Folder Name="/src/">
+        <Project Path="src/CampusFlow.Domain/CampusFlow.Domain.csproj" />
+        <Project Path="src/CampusFlow.Application/CampusFlow.Application.csproj" />
+        <Project Path="src/CampusFlow.EntityFrameworkCore/CampusFlow.EntityFrameworkCore.csproj" />
+        <Project Path="src/CampusFlow.Web/CampusFlow.Web.csproj" />
+        <Project Path="src/CampusFlow.Domain.Shared/CampusFlow.Domain.Shared.csproj" />
+        <Project Path="src/CampusFlow.Application.Contracts/CampusFlow.Application.Contracts.csproj" />
+        <Project Path="src/CampusFlow.HttpApi/CampusFlow.HttpApi.csproj" />
+        <Project Path="src/CampusFlow.HttpApi.Client/CampusFlow.HttpApi.Client.csproj" />
+        <Project Path="src/CampusFlow.DbMigrator/CampusFlow.DbMigrator.csproj" />
+    </Folder>
+    <Folder Name="/test/">
+        <Project Path="test/CampusFlow.Application.Tests/CampusFlow.Application.Tests.csproj" />
+        <Project Path="test/CampusFlow.Web.Tests/CampusFlow.Web.Tests.csproj" />
+        <Project Path="test/CampusFlow.EntityFrameworkCore.Tests/CampusFlow.EntityFrameworkCore.Tests.csproj" />
+        <Project Path="test/CampusFlow.TestBase/CampusFlow.TestBase.csproj" />
+        <Project Path="test/CampusFlow.Domain.Tests/CampusFlow.Domain.Tests.csproj" />
+        <Project Path="test/CampusFlow.HttpApi.Client.ConsoleTestApp/CampusFlow.HttpApi.Client.ConsoleTestApp.csproj" />
+    </Folder>
+</Solution>

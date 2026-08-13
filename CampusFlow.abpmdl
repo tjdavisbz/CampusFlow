@@ -1,0 +1,118 @@
+{
+  "template": "app",
+  "imports": {
+    "Volo.Abp.LeptonXLiteTheme": {
+      "version": "5.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.Account": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.OpenIddict": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.Identity": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.TenantManagement": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.SettingManagement": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.PermissionManagement": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.FeatureManagement": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    },
+    "Volo.Abp.BlobStoring.Database": {
+      "version": "10.5.0",
+      "isInstalled": true,
+      "creationTime": "08/13/2026 20:40:59 +00:00"
+    }
+  },
+  "folders": {
+    "items": {
+      "src": {},
+      "test": {}
+    }
+  },
+  "packages": {
+    "CampusFlow.Application": {
+      "path": "src/CampusFlow.Application/CampusFlow.Application.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.Application.Tests": {
+      "path": "test/CampusFlow.Application.Tests/CampusFlow.Application.Tests.abppkg",
+      "folder": "test"
+    },
+    "CampusFlow.Domain.Shared": {
+      "path": "src/CampusFlow.Domain.Shared/CampusFlow.Domain.Shared.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.Application.Contracts": {
+      "path": "src/CampusFlow.Application.Contracts/CampusFlow.Application.Contracts.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.HttpApi": {
+      "path": "src/CampusFlow.HttpApi/CampusFlow.HttpApi.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.HttpApi.Client": {
+      "path": "src/CampusFlow.HttpApi.Client/CampusFlow.HttpApi.Client.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.Web": {
+      "path": "src/CampusFlow.Web/CampusFlow.Web.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.Web.Tests": {
+      "path": "test/CampusFlow.Web.Tests/CampusFlow.Web.Tests.abppkg",
+      "folder": "test"
+    },
+    "CampusFlow.EntityFrameworkCore.Tests": {
+      "path": "test/CampusFlow.EntityFrameworkCore.Tests/CampusFlow.EntityFrameworkCore.Tests.abppkg",
+      "folder": "test"
+    },
+    "CampusFlow.EntityFrameworkCore": {
+      "path": "src/CampusFlow.EntityFrameworkCore/CampusFlow.EntityFrameworkCore.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.TestBase": {
+      "path": "test/CampusFlow.TestBase/CampusFlow.TestBase.abppkg",
+      "folder": "test"
+    },
+    "CampusFlow.Domain.Tests": {
+      "path": "test/CampusFlow.Domain.Tests/CampusFlow.Domain.Tests.abppkg",
+      "folder": "test"
+    },
+    "CampusFlow.HttpApi.Client.ConsoleTestApp": {
+      "path": "test/CampusFlow.HttpApi.Client.ConsoleTestApp/CampusFlow.HttpApi.Client.ConsoleTestApp.abppkg",
+      "folder": "test"
+    },
+    "CampusFlow.DbMigrator": {
+      "path": "src/CampusFlow.DbMigrator/CampusFlow.DbMigrator.abppkg",
+      "folder": "src"
+    },
+    "CampusFlow.Domain": {
+      "path": "src/CampusFlow.Domain/CampusFlow.Domain.abppkg",
+      "folder": "src"
+    }
+  }
+}
