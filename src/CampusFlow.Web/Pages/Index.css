@@ -1,166 +1,134 @@
-/* Getting-Started */
-.starting-content {
-    position: relative;
-    z-index: 2;
+.student-dashboard {
+    --dashboard-ink: #172033;
+    --dashboard-muted: #667085;
+    --dashboard-border: #e5e9f2;
+    display: grid;
+    gap: 1.5rem;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-bottom: 2rem;
 }
 
-
-.getting-started-hero-card .card-body {
-    position: relative;
+.dashboard-welcome {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 2.5rem;
+    border-radius: 1.25rem;
+    color: #fff;
+    background: linear-gradient(125deg, #172554 0%, #274690 58%, #3b82f6 100%);
+    box-shadow: 0 18px 45px rgba(30, 64, 175, .18);
 }
 
-.card-bg-image {
-    pointer-events: none;
+.dashboard-eyebrow,
+.portal-card-kicker,
+.summary-label {
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+
+.dashboard-eyebrow { color: #bfdbfe; }
+.dashboard-welcome h1 { margin: .5rem 0 .65rem; font-size: clamp(1.8rem, 3vw, 2.65rem); }
+.dashboard-welcome p { max-width: 670px; margin: 0; color: #dbeafe; font-size: 1.05rem; }
+
+.student-identity {
+    min-width: 150px;
+    padding: 1rem 1.25rem;
+    border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, .12);
+    backdrop-filter: blur(8px);
+}
+
+.student-identity span { display: block; color: #bfdbfe; font-size: .78rem; }
+.student-identity strong { display: block; margin-top: .2rem; font-size: 1.35rem; }
+
+.semester-summary,
+.support-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.35rem 1.5rem;
+    border: 1px solid var(--dashboard-border);
+    border-radius: 1rem;
+    background: var(--lpx-card-bg, #fff);
+}
+
+.summary-label,
+.portal-card-kicker { color: #667eea; }
+.semester-summary h2 { margin: .25rem 0 0; color: var(--dashboard-ink); font-size: 1.12rem; }
+.status-pill,
+.availability-label { border-radius: 999px; font-size: .78rem; font-weight: 700; }
+.status-neutral { padding: .45rem .75rem; color: #475467; background: #f2f4f7; }
+
+.portal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+}
+
+.portal-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.25rem;
+    min-height: 240px;
+    padding: 1.75rem;
+    overflow: hidden;
+    border: 1px solid var(--dashboard-border);
+    border-radius: 1.15rem;
+    background: var(--lpx-card-bg, #fff);
+    box-shadow: 0 8px 24px rgba(16, 24, 40, .06);
+}
+
+.portal-card::after {
     position: absolute;
-    width: 630px;
-    max-width: 100%;
-    height: auto;
-    bottom: 0;
-    right: 0;
-    z-index: 1;
+    right: -45px;
+    bottom: -60px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: currentColor;
+    content: "";
+    opacity: .055;
 }
 
-@media (min-width: 1199px) {
-    .h-lg-100 {
-        height: 100% !important;
-    }
+.portal-card-icon,
+.support-icon {
+    display: grid;
+    place-items: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: .9rem;
+    font-size: 1.35rem;
 }
 
-@media (min-width: 768px) {
-    .h-md-100 {
-        height: 100% !important;
-    }
+.registration-card { color: #1d4ed8; }
+.registration-card .portal-card-icon { color: #1d4ed8; background: #dbeafe; }
+.billing-card { color: #047857; }
+.billing-card .portal-card-icon { color: #047857; background: #d1fae5; }
+.portal-card-content h2 { margin: .4rem 0 .65rem; color: var(--dashboard-ink); font-size: 1.45rem; }
+.portal-card-content p { margin: 0; color: var(--dashboard-muted); line-height: 1.65; }
+.availability-label { position: absolute; left: 1.75rem; bottom: 1.5rem; padding: .4rem .7rem; color: #475467; background: #f2f4f7; }
+
+.support-card { justify-content: flex-start; }
+.support-icon { flex: 0 0 auto; color: #475467; background: #f2f4f7; }
+.support-card h2 { margin: 0 0 .2rem; color: var(--dashboard-ink); font-size: 1rem; }
+.support-card p { margin: 0; color: var(--dashboard-muted); }
+
+.lpx-theme-dark .student-dashboard {
+    --dashboard-ink: #f8fafc;
+    --dashboard-muted: #aab4c4;
+    --dashboard-border: #354052;
 }
 
-.abp-support {
-    width: 178px;
-    height: 30px;
-    background-image: url('/images/getting-started/abp-support.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
+@media (max-width: 767.98px) {
+    .dashboard-welcome { align-items: flex-start; flex-direction: column; padding: 1.75rem; }
+    .student-identity { width: 100%; }
+    .portal-actions { grid-template-columns: 1fr; }
+    .portal-card { min-height: 250px; }
 }
-
-.abp-community {
-    width: 215px;
-    height: 30px;
-    background-image: url('/images/getting-started/abp-community.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.abp-blog {
-    width: 142px;
-    height: 30px;
-    background-image: url('/images/getting-started/abp-blog.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.abp-studio {
-    width: 146px;
-    height: 30px;
-    background-image: url('/images/getting-started/abp-studio.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.abp-suite {
-    width: 132px;
-    height: 30px;
-    background-image: url('/images/getting-started/abp-suite.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.logo-x {
-    width: 20px;
-    height: 20px;
-    background-image: url('/images/getting-started/x.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.entity-famework-core {
-    width: 84px;
-    height: 24px;
-    background-image: url('/images/getting-started/entity-famework-core-dark.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.mongo-db {
-    width: 85px;
-    height: 24px;
-    background-image: url('/images/getting-started/mongo-db-dark.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.blazor {
-    width: 65px;
-    height: 20px;
-    background-image: url('/images/getting-started/blazor-dark.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.angular {
-    width: 82px;
-    height: 20px;
-    background-image: url('/images/getting-started/angular-dark.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.mvc-razor-pages {
-    width: 95px;
-    height: 20px;
-    background-image: url('/images/getting-started/mvc-razor-pages-dark.svg');
-    background-size: contain;
-    background-repeat: no-repeat;
-}
-
-.lpx-theme-dark .abp-support {
-    background-image: url('/images/getting-started/abp-support-white.svg');
-}
-
-.lpx-theme-dark .abp-community {
-    background-image: url('/images/getting-started/abp-community-white.svg');
-}
-
-.lpx-theme-dark .abp-blog {
-    background-image: url('/images/getting-started/abp-blog-white.svg');
-}
-
-.lpx-theme-dark .logo-x {
-    background-image: url('/images/getting-started/x-white.svg');
-}
-
-.lpx-theme-dark .abp-studio {
-    background-image: url('/images/getting-started/abp-studio-white.svg');
-}
-
-.lpx-theme-dark .abp-suite {
-    background-image: url('/images/getting-started/abp-suite-white.svg');
-}
-
-.lpx-theme-dark .entity-famework-core {
-    background-image: url('/images/getting-started/entity-famework-core.svg');
-}
-
-.lpx-theme-dark .mongo-db {
-    background-image: url('/images/getting-started/mongo-db.svg');
-}
-
-.lpx-theme-dark .blazor {
-    background-image: url('/images/getting-started/blazor.svg');
-}
-
-.lpx-theme-dark .angular {
-    background-image: url('/images/getting-started/angular.svg');
-}
-
-.lpx-theme-dark .mvc-razor-pages {
-    background-image: url('/images/getting-started/mvc-razor-pages.svg');
-}
-/* Getting-Started End */
