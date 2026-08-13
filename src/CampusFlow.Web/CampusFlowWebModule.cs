@@ -57,6 +57,8 @@ using Volo.Abp.Security.Claims;
 using Volo.Abp.SettingManagement.Web;
 using Volo.Abp.Studio.Client.AspNetCore;
 using CampusFlow.Web.Portals;
+using CampusFlow.Branding;
+using CampusFlow.Web.Branding;
 
 namespace CampusFlow.Web;
 
@@ -122,6 +124,8 @@ public class CampusFlowWebModule : AbpModule
     {
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
+
+        context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
 
         if (!configuration.GetValue<bool>("App:DisablePII"))
         {

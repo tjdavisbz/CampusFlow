@@ -12,6 +12,16 @@
 
 @section styles {
     <abp-style src="/Pages/Index.css" />
+    <style>
+        :root {
+            --tenant-primary: @Model.Theme.PrimaryColor;
+            --tenant-primary-dark: @Model.Theme.PrimaryDarkColor;
+            --tenant-accent: @Model.Theme.AccentColor;
+            --tenant-neutral: @Model.Theme.NeutralColor;
+            --tenant-surface: @Model.Theme.SurfaceColor;
+            --tenant-text: @Model.Theme.TextColor;
+        }
+    </style>
 }
 
 <main class="student-dashboard">

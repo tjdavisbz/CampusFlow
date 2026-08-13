@@ -41,3 +41,10 @@ The initial Thesis Elements student identity lookup reads
 the verified Microsoft email, `ActiveFlag` is `Yes`, and `AddressType` is `Local`.
 `StudentUID` becomes CampusFlow's external student identifier. Zero or multiple matches
 are denied; CampusFlow does not ask the user to choose or disclose matching records.
+
+## Tenant branding
+
+The UI consumes semantic tenant theme values through `ITenantThemeProvider`; pages do not
+contain Nelson-specific color values. `ConfigurationTenantThemeProvider` supplies bootstrap
+values during early development. It will be replaced by a database-backed provider when the
+admin branding screen is implemented, without requiring dashboard or shell CSS changes.
