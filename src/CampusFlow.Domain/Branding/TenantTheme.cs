@@ -9,4 +9,7 @@ public sealed record TenantTheme(
     string SurfaceColor,
     string TextColor,
     string? LogoUrl,
-    string? LogoReverseUrl);
+    string? LogoReverseUrl,
+    string HeadingFontFamily,
+    string BodyFontFamily,
+    string? FontStylesheetUrl);

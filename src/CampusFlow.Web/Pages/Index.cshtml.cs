@@ -20,7 +20,8 @@ public class IndexModel : CampusFlowPageModel
     public string? TenantName { get; private set; }
     public PortalType? Portal { get; private set; }
     public TenantTheme Theme { get; private set; } = new(
-        "CampusFlow", "#274690", "#172554", "#667eea", "#A1A8AE", "#F7F8FA", "#172033", null, null);
+        "CampusFlow", "#274690", "#172554", "#667eea", "#A1A8AE", "#F7F8FA", "#172033",
+        null, null, "system-ui, sans-serif", "system-ui, sans-serif", null);
     public string InstitutionName => Theme.OrganizationName;
     public string StudentIdentifier { get; private set; } = "Unavailable";
 

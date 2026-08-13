@@ -30,6 +30,9 @@ public sealed class ConfigurationTenantThemeProvider : ITenantThemeProvider, ITr
             Value("SurfaceColor", "#f7f8fa"),
             Value("TextColor", "#172033"),
             section["LogoUrl"] ?? fallback["LogoUrl"],
-            section["LogoReverseUrl"] ?? fallback["LogoReverseUrl"]);
+            section["LogoReverseUrl"] ?? fallback["LogoReverseUrl"],
+            Value("HeadingFontFamily", "system-ui, sans-serif"),
+            Value("BodyFontFamily", "system-ui, sans-serif"),
+            section["FontStylesheetUrl"] ?? fallback["FontStylesheetUrl"]);
     }
 }

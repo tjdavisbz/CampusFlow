@@ -11,6 +11,10 @@
 }
 
 @section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl))
+    {
+        <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" />
+    }
     <abp-style src="/Pages/Index.css" />
     <style>
         :root {
@@ -20,6 +24,8 @@
             --tenant-neutral: @Model.Theme.NeutralColor;
             --tenant-surface: @Model.Theme.SurfaceColor;
             --tenant-text: @Model.Theme.TextColor;
+            --tenant-heading-font: @Model.Theme.HeadingFontFamily;
+            --tenant-body-font: @Model.Theme.BodyFontFamily;
         }
     </style>
 }

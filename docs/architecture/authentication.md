@@ -49,3 +49,5 @@ contain Nelson-specific color values. `ConfigurationTenantThemeProvider` supplie
 values during early development. It will be replaced by a database-backed provider when the
 admin branding screen is implemented, without requiring dashboard or shell CSS changes.
 The same provider supplies the ABP shell's application name, standard logo, and reverse logo.
+Heading and body font stacks, plus an optional font stylesheet URL, are tenant theme values as
+well. Nelson uses the brand guide's free alternatives: Noto Serif and Nunito Sans.
