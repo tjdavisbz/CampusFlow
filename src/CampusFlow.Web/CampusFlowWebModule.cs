@@ -50,6 +50,7 @@ using Volo.Abp.OpenIddict;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.SettingManagement.Web;
 using Volo.Abp.Studio.Client.AspNetCore;
+using CampusFlow.Web.Portals;
 
 namespace CampusFlow.Web;
 
@@ -297,6 +298,8 @@ public class CampusFlowWebModule : AbpModule
         app.UseAbpSecurityHeaders();
         app.UseAuthentication();
         app.UseAbpOpenIddictValidation();
+
+        app.UseMiddleware<DevelopmentPortalContextMiddleware>();
 
         if (MultiTenancyConsts.IsEnabled)
         {
