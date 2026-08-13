@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using CampusFlow.Branding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -21,14 +20,14 @@ public class IndexModel : CampusFlowPageModel
     public string? TenantName { get; private set; }
     public PortalType? Portal { get; private set; }
     public TenantTheme Theme { get; private set; } = new(
-        "CampusFlow", "#274690", "#172554", "#667eea", "#A1A8AE", "#F7F8FA", "#172033");
+        "CampusFlow", "#274690", "#172554", "#667eea", "#A1A8AE", "#F7F8FA", "#172033", null, null);
     public string InstitutionName => Theme.OrganizationName;
     public string StudentIdentifier { get; private set; } = "Unavailable";
 
-    public async Task OnGetAsync()
+    public void OnGet()
     {
         TenantName = CurrentTenant.Name;
-        Theme = await _tenantThemeProvider.GetAsync(TenantName);
+        Theme = _tenantThemeProvider.Get(TenantName);
         Portal = HttpContext.Items[DevelopmentPortalContextMiddleware.PortalItemKey] as PortalType?;
         const string prefix = "student-";
         var userName = CurrentUser.UserName;

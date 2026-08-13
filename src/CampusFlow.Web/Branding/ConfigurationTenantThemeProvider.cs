@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using CampusFlow.Branding;
 using Microsoft.Extensions.Configuration;
 using Volo.Abp.DependencyInjection;
@@ -14,7 +13,7 @@ public sealed class ConfigurationTenantThemeProvider : ITenantThemeProvider, ITr
         _configuration = configuration;
     }
 
-    public Task<TenantTheme> GetAsync(string? tenantName)
+    public TenantTheme Get(string? tenantName)
     {
         var section = _configuration.GetSection($"TenantThemes:{tenantName ?? "Default"}");
         var fallback = _configuration.GetSection("TenantThemes:Default");
@@ -22,13 +21,15 @@ public sealed class ConfigurationTenantThemeProvider : ITenantThemeProvider, ITr
         string Value(string key, string defaultValue) =>
             section[key] ?? fallback[key] ?? defaultValue;
 
-        return Task.FromResult(new TenantTheme(
+        return new TenantTheme(
             Value("OrganizationName", tenantName ?? "CampusFlow"),
             Value("PrimaryColor", "#274690"),
             Value("PrimaryDarkColor", "#172554"),
             Value("AccentColor", "#667eea"),
             Value("NeutralColor", "#a1a8ae"),
             Value("SurfaceColor", "#f7f8fa"),
-            Value("TextColor", "#172033")));
+            Value("TextColor", "#172033"),
+            section["LogoUrl"] ?? fallback["LogoUrl"],
+            section["LogoReverseUrl"] ?? fallback["LogoReverseUrl"]);
     }
 }

@@ -130,6 +130,15 @@
     background: linear-gradient(180deg, var(--tenant-primary-dark), var(--tenant-primary)) !important;
 }
 
+.lpx-sidebar-container .lpx-brand-logo {
+    width: 210px !important;
+    max-width: calc(100% - 2rem);
+    height: 44px !important;
+    background-size: contain !important;
+    background-position: left center !important;
+    background-repeat: no-repeat !important;
+}
+
 .lpx-sidebar-container .lpx-nav-menu .lpx-menu-item-link.selected,
 .lpx-sidebar-container .lpx-nav-menu .lpx-menu-item-link:hover {
     background-color: color-mix(in srgb, white, transparent 84%) !important;

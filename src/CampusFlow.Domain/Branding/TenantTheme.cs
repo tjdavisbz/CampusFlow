@@ -7,4 +7,6 @@ public sealed record TenantTheme(
     string AccentColor,
     string NeutralColor,
     string SurfaceColor,
-    string TextColor);
+    string TextColor,
+    string? LogoUrl,
+    string? LogoReverseUrl);

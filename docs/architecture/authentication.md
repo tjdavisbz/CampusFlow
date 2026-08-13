@@ -48,3 +48,4 @@ The UI consumes semantic tenant theme values through `ITenantThemeProvider`; pag
 contain Nelson-specific color values. `ConfigurationTenantThemeProvider` supplies bootstrap
 values during early development. It will be replaced by a database-backed provider when the
 admin branding screen is implemented, without requiring dashboard or shell CSS changes.
+The same provider supplies the ABP shell's application name, standard logo, and reverse logo.
