@@ -32,11 +32,20 @@ public class CampusFlowMenuContributor : IMenuContributor
         );
         context.Menu.AddItem(
             new ApplicationMenuItem(
+                CampusFlowMenus.Schedule,
+                "Schedule",
+                "~/Schedule",
+                icon: "fa fa-calendar-days",
+                order: 2
+            )
+        );
+        context.Menu.AddItem(
+            new ApplicationMenuItem(
                 CampusFlowMenus.Billing,
                 "Billing",
                 "~/Billing",
                 icon: "fa fa-file-invoice-dollar",
-                order: 2
+                order: 3
             )
         );
         //Administration
