@@ -13,8 +13,11 @@ using Volo.Abp.Account.Web;
 using Volo.Abp.Identity;
 using Volo.Abp.Security.Claims;
 using CampusFlow.Students;
+using CampusFlow.Permissions;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Guids;
+using Volo.Abp.PermissionManagement;
+using Volo.Abp;
 
 namespace CampusFlow.Web.Pages.Account;
 
@@ -23,6 +26,9 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _studentLookups;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly IGuidGenerator _guidGenerator;
+    private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
+    private readonly IdentityRoleManager _roleManager;
+    private readonly IPermissionManager _permissionManager;
 
     public RegisterModel(
         IAccountAppService accountAppService,
@@ -31,7 +37,10 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         IdentityDynamicClaimsPrincipalContributorCache identityDynamicClaimsPrincipalContributorCache,
         IEnumerable<IStudentInformationSystemStudentLookup> studentLookups,
         IRepository<StudentProfile, Guid> studentProfileRepository,
-        IGuidGenerator guidGenerator)
+        IGuidGenerator guidGenerator,
+        IStudentInformationSystemAdvisorLookup advisorLookup,
+        IdentityRoleManager roleManager,
+        IPermissionManager permissionManager)
         : base(
             accountAppService,
             schemeProvider,
@@ -41,6 +50,9 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         _studentLookups = studentLookups.ToArray();
         _studentProfileRepository = studentProfileRepository;
         _guidGenerator = guidGenerator;
+        _advisorLookup = advisorLookup;
+        _roleManager = roleManager;
+        _permissionManager = permissionManager;
     }
 
     public override async Task<IActionResult> OnGetAsync()
@@ -82,30 +94,82 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
             return Page();
         }
 
-        if (result.Status != StudentLookupStatus.Matched || result.Student is null)
+        if (result.Status == StudentLookupStatus.Matched && result.Student is not null)
+        {
+            await RegisterExternalUserAsync(externalLogin, result.Student.Email, result.Student.Email);
+
+            var studentUser = await UserManager.FindByEmailAsync(result.Student.Email);
+            if (studentUser is not null)
+            {
+                await _studentProfileRepository.InsertAsync(new StudentProfile(
+                    _guidGenerator.Create(), CurrentTenant.Id, studentUser.Id, result.Student));
+            }
+
+            return await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash);
+        }
+
+        AdvisorLookupResult? advisor;
+        try
+        {
+            advisor = await _advisorLookup.FindAsync(email, HttpContext.RequestAborted);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Advisor lookup failed during Microsoft account linking.");
+            return Page();
+        }
+
+        if (advisor is null)
         {
             Logger.LogWarning(
-                "Microsoft account could not be linked to exactly one active local student record. Status: {Status}",
+                "Microsoft account matched neither an eligible student nor an active Elements user. Student status: {Status}",
                 result.Status);
             return Page();
         }
 
-        await RegisterExternalUserAsync(
-            externalLogin,
-            result.Student.Email,
-            result.Student.Email);
+        await RegisterExternalUserAsync(externalLogin, advisor.UserName, email);
+        var user = await UserManager.FindByEmailAsync(email);
+        if (user is null) return Page();
+        user.Name = advisor.FirstName;
+        user.Surname = advisor.LastName;
+        EnsureIdentitySucceeded(await UserManager.UpdateAsync(user));
 
-        var user = await UserManager.FindByEmailAsync(result.Student.Email);
-        if (user is not null)
+        const string advisorRoleName = "advisor";
+        await EnsureRoleAsync(user, advisorRoleName);
+        await _permissionManager.SetForRoleAsync(
+            advisorRoleName, CampusFlowPermissions.AdvisorPortal.Default, true);
+        if (advisor.CanViewAll)
         {
-            await _studentProfileRepository.InsertAsync(new StudentProfile(
-                _guidGenerator.Create(),
-                CurrentTenant.Id,
-                user.Id,
-                result.Student));
+            const string globalReviewerRoleName = "advisor-global-reviewer";
+            await EnsureRoleAsync(user, globalReviewerRoleName);
+            await _permissionManager.SetForRoleAsync(
+                globalReviewerRoleName, CampusFlowPermissions.AdvisorPortal.Default, true);
+            await _permissionManager.SetForRoleAsync(
+                globalReviewerRoleName, CampusFlowPermissions.AdvisorPortal.ViewAll, true);
         }
 
         return await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash);
+    }
+
+    private async Task EnsureRoleAsync(IdentityUser user, string roleName)
+    {
+        var role = await _roleManager.FindByNameAsync(roleName);
+        if (role is null)
+        {
+            role = new IdentityRole(_guidGenerator.Create(), roleName, CurrentTenant.Id);
+            EnsureIdentitySucceeded(await _roleManager.CreateAsync(role));
+        }
+
+        if (!await UserManager.IsInRoleAsync(user, roleName))
+        {
+            EnsureIdentitySucceeded(await UserManager.AddToRoleAsync(user, roleName));
+        }
+    }
+
+    private static void EnsureIdentitySucceeded(Microsoft.AspNetCore.Identity.IdentityResult result)
+    {
+        if (result.Succeeded) return;
+        throw new UserFriendlyException(string.Join(" ", result.Errors.Select(x => x.Description)));
     }
 
     public override Task<IActionResult> OnPostAsync() => Task.FromResult<IActionResult>(Page());

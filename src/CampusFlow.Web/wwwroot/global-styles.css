@@ -78,3 +78,17 @@ body .lpx-sidebar-container .lpx-sidebar-header {
     opacity: 1 !important;
     color: var(--tenant-primary-dark, #321b50) !important;
 }
+
+/* Nested role links should read as part of the tenant navigation, not as a black bar. */
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link.selected,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link.selected {
+    color: #fff !important;
+    background: color-mix(in srgb, var(--tenant-primary, #502d7f) 72%, white 28%) !important;
+}
+
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link.selected .lpx-menu-item-icon,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link.selected .lpx-menu-item-text,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link.selected .lpx-menu-item-icon,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link.selected .lpx-menu-item-text {
+    color: #fff !important;
+}

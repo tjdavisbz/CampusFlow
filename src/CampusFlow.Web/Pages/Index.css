@@ -65,6 +65,25 @@
     background: var(--lpx-card-bg, #fff);
 }
 
+.advisor-dashboard-summary {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto auto auto;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--dashboard-border);
+    border-radius: 1rem;
+    background: var(--lpx-card-bg, #fff);
+}
+
+.advisor-summary-copy h2 { margin: .25rem 0; font-size: 1.3rem; }
+.advisor-summary-copy p { margin: 0; color: var(--dashboard-muted); }
+.advisor-metric { min-width: 110px; padding: .8rem 1rem; border-radius: .85rem; background: #f5f2fa; text-align: center; }
+.advisor-metric strong,.advisor-metric span { display: block; }
+.advisor-metric strong { color: var(--tenant-primary); font-size: 1.7rem; }
+.advisor-metric span { color: var(--dashboard-muted); font-size: .75rem; }
+.advisor-dashboard-summary > a { padding: .7rem .9rem; border-radius: .7rem; color: #fff; background: var(--tenant-primary); font-weight: 750; text-decoration: none; white-space: nowrap; }
+
 .summary-label,
 .portal-card-kicker { color: var(--tenant-primary); }
 .semester-summary h2 { margin: .25rem 0 0; color: var(--dashboard-ink); font-size: 1.12rem; }
@@ -145,4 +164,7 @@
     .student-identity { width: 100%; }
     .portal-actions { grid-template-columns: 1fr; }
     .portal-card { min-height: 250px; }
+    .advisor-dashboard-summary { grid-template-columns: repeat(2, 1fr); }
+    .advisor-summary-copy,.advisor-dashboard-summary > a { grid-column: 1 / -1; }
+    .advisor-dashboard-summary > a { text-align: center; }
 }

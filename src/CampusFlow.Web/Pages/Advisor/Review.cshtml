@@ -1,0 +1,113 @@
+@page "/Advisor/Review"
+@model CampusFlow.Web.Pages.Advisor.ReviewModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Review courses";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.AdvisorQueue;
+}
+
+@section styles {
+    <abp-style src="/Pages/Advisor/Advisor.css" />
+    <style>:root { --advisor-primary: @Model.Theme.PrimaryColor; --advisor-dark: @Model.Theme.PrimaryDarkColor; --advisor-accent: @Model.Theme.AccentColor; }</style>
+}
+
+<main class="advisor-shell">
+    <a class="back-link" asp-page="/Advisor/Index"><i class="fa-solid fa-arrow-left"></i> Back to review queue</a>
+    <header class="review-hero">
+        <div><span>Course review</span><h1>@Model.Review.StudentName</h1><p>ID @Model.Review.StudentId · @Model.Review.AttendanceType</p></div>
+        <div class="queue-count"><strong>@Model.Review.Courses.Count</strong><span>pending courses</span></div>
+    </header>
+
+    <form method="post" id="advisorReviewForm">
+        <input asp-for="Input.StudentProfileId" type="hidden" />
+        <input asp-for="Input.ExternalTermId" type="hidden" />
+        <section class="advisor-card">
+            <div class="card-heading"><div><span>Selected schedule</span><h2>Review each course</h2></div><p>You may decide some courses now and leave the others pending.</p></div>
+            <div class="review-list">
+                @for (var i = 0; i < Model.Review.Courses.Count; i++)
+                {
+                    var course = Model.Review.Courses[i];
+                    <article class="review-course">
+                        <input asp-for="Input.Courses[i].ReviewId" type="hidden" value="@course.ReviewId" />
+                        <div class="course-heading">
+                            <div><span>@course.CourseCode-@course.Section</span><h3>@course.CourseName</h3></div>
+                            <strong>@course.Credits.ToString("0.##") credits</strong>
+                        </div>
+                        <div class="course-meta">
+                            @if (!string.IsNullOrWhiteSpace(course.InstructorName)) { <span><i class="fa-regular fa-user"></i> @course.InstructorName</span> }
+                            @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(course.LastRemovalError))
+                        {
+                            <div class="retry-warning"><i class="fa-solid fa-triangle-exclamation"></i> A previous removal attempt failed. You can reject again to retry.</div>
+                        }
+                        <fieldset class="decision-control">
+                            <legend>Decision</legend>
+                            <label><input asp-for="Input.Courses[i].Decision" type="radio" value="" checked /> Decide later</label>
+                            <label class="approve"><input asp-for="Input.Courses[i].Decision" type="radio" value="Approve" /> Approve</label>
+                            <label class="reject"><input asp-for="Input.Courses[i].Decision" type="radio" value="Reject" /> Reject</label>
+                        </fieldset>
+                        <label class="comment-field">Comment for this course <span>Optional</span><textarea asp-for="Input.Courses[i].Comment" rows="2" maxlength="4000" placeholder="Add context for the student"></textarea></label>
+                    </article>
+                }
+            </div>
+        </section>
+        <section class="advisor-card overall-card">
+            <div><span>Overall comment</span><h2>Message to the student</h2><p>This will be saved with this review submission. Email delivery will be added later.</p></div>
+            <textarea asp-for="Input.OverallComment" rows="4" maxlength="4000" placeholder="Add an overall note about the student's schedule"></textarea>
+        </section>
+        <div class="submit-bar"><a asp-page="/Advisor/Index">Cancel</a><button type="submit"><i class="fa-solid fa-check"></i> Submit review</button></div>
+    </form>
+</main>
+
+<div class="advisor-processing" id="advisorProcessing" hidden><div><span></span><h2>Recording your review</h2><p>Please wait while course decisions are completed.</p></div></div>
+
+<div class="advisor-confirm" id="rejectConfirmation" hidden role="dialog" aria-modal="true" aria-labelledby="rejectTitle">
+    <div class="advisor-confirm-card">
+        <div class="confirm-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div><span>Confirm course rejection</span><h2 id="rejectTitle">Remove rejected courses?</h2><p>Rejected courses will be removed from the student's Elements schedule. Courses left undecided will remain in the queue.</p></div>
+        <div class="confirm-actions"><button type="button" id="keepReview">Go back</button><button type="button" class="danger" id="confirmReview">Yes, submit review</button></div>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        (() => {
+            const form = document.getElementById('advisorReviewForm');
+            const confirmation = document.getElementById('rejectConfirmation');
+            const processing = document.getElementById('advisorProcessing');
+            let confirmed = false;
+            form?.addEventListener('submit', event => {
+                if (confirmed) {
+                    processing.hidden = false;
+                    form.querySelector('button[type="submit"]').disabled = true;
+                    return;
+                }
+            const rejected = [...document.querySelectorAll('input[type="radio"][value="Reject"]:checked')];
+                if (!rejected.length) {
+                    processing.hidden = false;
+                    form.querySelector('button[type="submit"]').disabled = true;
+                    return;
+                }
+                event.preventDefault();
+                confirmation.hidden = false;
+                document.body.classList.add('modal-open');
+                document.getElementById('keepReview').focus();
+            });
+            document.getElementById('keepReview')?.addEventListener('click', () => {
+                confirmation.hidden = true;
+                document.body.classList.remove('modal-open');
+            });
+            document.getElementById('confirmReview')?.addEventListener('click', () => {
+                confirmed = true;
+                confirmation.hidden = true;
+                document.body.classList.remove('modal-open');
+                form.requestSubmit();
+            });
+        })();
+    </script>
+}

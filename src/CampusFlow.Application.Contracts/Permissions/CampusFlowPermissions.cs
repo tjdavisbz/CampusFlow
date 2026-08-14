@@ -4,8 +4,10 @@ public static class CampusFlowPermissions
 {
     public const string GroupName = "CampusFlow";
 
-
-    
-    //Add your own permission names. Example:
-    //public const string MyPermission1 = GroupName + ".MyPermission1";
+    public static class AdvisorPortal
+    {
+        public const string Default = GroupName + ".AdvisorPortal";
+        public const string ViewAll = Default + ".ViewAll";
+        public const string ManageRouting = Default + ".ManageRouting";
+    }
 }
