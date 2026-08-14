@@ -1,0 +1,68 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Volo.Abp.DependencyInjection;
+
+namespace CampusFlow.StudentInformationSystems;
+
+public sealed class ThesisElementsTermLookup :
+    IStudentInformationSystemTermLookup,
+    ITransientDependency
+{
+    private const string ConnectionStringName = "ThesisElementsReadOnly";
+
+    private readonly IConfiguration _configuration;
+
+    public ThesisElementsTermLookup(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public StudentInformationSystemProvider Provider =>
+        StudentInformationSystemProvider.ThesisElements;
+
+    public async Task<StudentInformationSystemTerm?> GetCurrentTermAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var connectionString = _configuration.GetConnectionString(ConnectionStringName);
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                $"Connection string '{ConnectionStringName}' is not configured.");
+        }
+
+        const string sql = """
+            SELECT TOP (1)
+                TermCalendarID,
+                Term,
+                TextTerm,
+                TermStartDate,
+                TermEndDate
+            FROM [dbo].[TermCalendar]
+            WHERE TermStartDate <= @Today
+            ORDER BY Term DESC
+            """;
+
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Today", DateTime.Today);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new StudentInformationSystemTerm(
+            StudentInformationSystemProvider.ThesisElements,
+            Convert.ToString(reader.GetValue(0))!,
+            reader.GetString(1).Trim(),
+            reader.GetString(2).Trim(),
+            reader.GetDateTime(3),
+            reader.GetDateTime(4));
+    }
+}

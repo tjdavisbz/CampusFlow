@@ -46,9 +46,14 @@
     <section class="semester-summary" aria-labelledby="semester-heading">
         <div>
             <span class="summary-label">Current term</span>
-            <h2 id="semester-heading">Term information coming soon</h2>
+            <h2 id="semester-heading">@(Model.CurrentTerm?.DisplayName ?? "Term information unavailable")</h2>
         </div>
-        <span class="status-pill status-neutral">Setup in progress</span>
+        @if (Model.CurrentTerm is not null)
+        {
+            <span class="status-pill status-neutral">
+                @Model.CurrentTerm.StartDate.ToString("MMM d")–@Model.CurrentTerm.EndDate.ToString("MMM d, yyyy")
+            </span>
+        }
     </section>
 
     <section class="portal-actions" aria-label="Student services">

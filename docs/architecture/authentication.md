@@ -46,6 +46,12 @@ multiple matches are denied; CampusFlow does not ask the user to choose or discl
 records. The profile prevents routine page rendering from depending on a live SIS query and
 avoids storing SIS profile data in cookies or server session state.
 
+The dashboard resolves its current academic term through a separate SIS abstraction. The
+Thesis Elements implementation selects the most recent `TermCalendar` row whose
+`TermStartDate` is on or before today, ordered by `Term` descending. This is display context,
+not a user-specific portal term selection. A future tenant administration setting can replace
+the default resolver without changing dashboard consumers.
+
 ## Tenant branding
 
 The UI consumes semantic tenant theme values through `ITenantThemeProvider`; pages do not
