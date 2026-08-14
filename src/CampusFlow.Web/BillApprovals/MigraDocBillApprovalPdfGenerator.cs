@@ -10,6 +10,7 @@ using CampusFlow.StudentInformationSystems;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.Rendering;
+using Microsoft.AspNetCore.Hosting;
 using PdfSharp.Fonts;
 
 namespace CampusFlow.Web.BillApprovals;
@@ -17,6 +18,12 @@ namespace CampusFlow.Web.BillApprovals;
 public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
 {
     private static readonly object FontLock = new();
+    private readonly string _logoPath;
+
+    public MigraDocBillApprovalPdfGenerator(IWebHostEnvironment environment)
+    {
+        _logoPath = Path.Combine(environment.WebRootPath, "images", "tenants", "nelson", "logo-reverse.png");
+    }
 
     public byte[] Generate(BillApproval approval)
     {
@@ -31,7 +38,7 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         section.PageSetup.LeftMargin = Unit.FromInch(.62);
         section.PageSetup.RightMargin = Unit.FromInch(.62);
 
-        AddHeader(section, approval, snapshot);
+        AddHeader(section, approval, snapshot, _logoPath);
         AddSummary(section, approval);
         AddCourses(section, snapshot);
         AddTransactions(section, snapshot);
@@ -51,16 +58,18 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
     {
         var normal = document.Styles[StyleNames.Normal]!;
         normal.Font.Name = CampusFlowFontResolver.FamilyName;
-        normal.Font.Size = 9;
-        normal.Font.Color = Color.FromRgb(30, 30, 42);
-        normal.ParagraphFormat.SpaceAfter = Unit.FromPoint(4);
+        normal.Font.Size = 8.5;
+        normal.Font.Color = Color.FromRgb(35, 35, 51);
+        normal.ParagraphFormat.SpaceAfter = Unit.FromPoint(4.5);
         var heading1 = document.Styles[StyleNames.Heading1]!;
         heading1.Font.Name = CampusFlowFontResolver.FamilyName;
-        heading1.Font.Size = 16;
+        heading1.Font.Size = 14;
         heading1.Font.Bold = true;
         heading1.Font.Color = Color.FromRgb(80, 45, 127);
-        heading1.ParagraphFormat.SpaceBefore = Unit.FromPoint(12);
-        heading1.ParagraphFormat.SpaceAfter = Unit.FromPoint(6);
+        heading1.ParagraphFormat.SpaceBefore = Unit.FromPoint(15);
+        heading1.ParagraphFormat.SpaceAfter = Unit.FromPoint(7);
+        heading1.ParagraphFormat.Borders.Bottom.Width = Unit.FromPoint(.7);
+        heading1.ParagraphFormat.Borders.Bottom.Color = Color.FromRgb(221, 215, 233);
         var heading2 = document.Styles[StyleNames.Heading2]!;
         heading2.Font.Name = CampusFlowFontResolver.FamilyName;
         heading2.Font.Size = 11;
@@ -70,40 +79,60 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         heading2.ParagraphFormat.SpaceAfter = Unit.FromPoint(4);
     }
 
-    private static void AddHeader(Section section, BillApproval approval, BillApprovalReviewSnapshot snapshot)
+    private static void AddHeader(Section section, BillApproval approval, BillApprovalReviewSnapshot snapshot, string logoPath)
     {
         var table = section.AddTable();
-        table.AddColumn(Unit.FromInch(4.7));
-        table.AddColumn(Unit.FromInch(2.0));
+        table.AddColumn(Unit.FromInch(4.65));
+        table.AddColumn(Unit.FromInch(2.55));
         var row = table.AddRow();
+        row.Shading.Color = Color.FromRgb(67, 35, 105);
+        row.TopPadding = Unit.FromPoint(13);
+        row.BottomPadding = Unit.FromPoint(13);
         var brand = row.Cells[0].AddParagraph();
-        brand.AddFormattedText("NELSON UNIVERSITY", TextFormat.Bold);
-        brand.Format.Font.Size = 17;
-        brand.Format.Font.Color = Color.FromRgb(80, 45, 127);
+        brand.Format.LeftIndent = Unit.FromPoint(11);
+        if (File.Exists(logoPath))
+        {
+            var logo = brand.AddImage(logoPath);
+            logo.Width = Unit.FromInch(2.75);
+            logo.LockAspectRatio = true;
+        }
+        else
+        {
+            brand.AddFormattedText("NELSON UNIVERSITY", TextFormat.Bold);
+            brand.Format.Font.Size = 17;
+            brand.Format.Font.Color = Colors.White;
+        }
         brand.AddLineBreak();
-        brand.AddFormattedText("APPROVED BILL & REGISTRATION SCHEDULE", TextFormat.NotBold).Font.Size = 8;
+        var subtitle = brand.AddFormattedText("APPROVED BILL & REGISTRATION SCHEDULE", TextFormat.NotBold);
+        subtitle.Font.Size = 7.5;
+        subtitle.Font.Color = Color.FromRgb(221, 211, 235);
         var identity = row.Cells[1].AddParagraph();
         identity.Format.Alignment = ParagraphAlignment.Right;
-        identity.AddFormattedText(snapshot.StudentName.Length == 0 ? approval.StudentId : snapshot.StudentName, TextFormat.Bold);
+        identity.Format.RightIndent = Unit.FromPoint(11);
+        identity.Format.Font.Color = Colors.White;
+        identity.Format.Font.Size = 8;
+        var student = identity.AddFormattedText(snapshot.StudentName.Length == 0 ? approval.StudentId : snapshot.StudentName, TextFormat.Bold);
+        student.Font.Size = 11;
         identity.AddLineBreak();
         identity.AddText($"Student ID {approval.StudentId}");
         identity.AddLineBreak();
         identity.AddText(approval.TermName);
-        var divider = section.AddParagraph();
-        divider.Format.Borders.Bottom.Width = Unit.FromPoint(1);
-        divider.Format.Borders.Bottom.Color = Color.FromRgb(197, 192, 224);
+        section.AddParagraph().Format.SpaceAfter = Unit.FromPoint(2);
     }
 
     private static void AddSummary(Section section, BillApproval approval)
     {
         section.AddParagraph("Account summary", StyleNames.Heading1);
-        var table = CreateTable(section, 2.4, 1.3, 1.6, 1.4);
-        AddHeaderRow(table, "Charges", "Credits", "Anticipated aid", "Remaining");
+        var table = section.AddTable();
+        foreach (var width in new[] { 1.65, .18, 1.65, .18, 1.65, .18, 1.65 })
+            table.AddColumn(Unit.FromInch(width));
         var row = table.AddRow();
-        AddMoney(row.Cells[0], approval.ChargesTotal);
-        AddMoney(row.Cells[1], -approval.CreditsTotal);
-        AddMoney(row.Cells[2], -approval.AnticipatedAidTotal);
-        AddMoney(row.Cells[3], approval.RemainingBalance, true);
+        row.TopPadding = Unit.FromPoint(8);
+        row.BottomPadding = Unit.FromPoint(8);
+        AddSummaryCard(row.Cells[0], "CHARGES", approval.ChargesTotal);
+        AddSummaryCard(row.Cells[2], "CREDITS", -approval.CreditsTotal);
+        AddSummaryCard(row.Cells[4], "ANTICIPATED AID", -approval.AnticipatedAidTotal);
+        AddSummaryCard(row.Cells[6], "REMAINING", approval.RemainingBalance, true);
     }
 
     private static void AddCourses(Section section, BillApprovalReviewSnapshot snapshot)
@@ -175,15 +204,16 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         section.AddPageBreak();
         section.AddParagraph("Terms and conditions", StyleNames.Heading1);
         var accepted = section.AddParagraph();
-        accepted.AddFormattedText("Electronically accepted", TextFormat.Bold);
+        accepted.AddFormattedText("ACCEPTED ELECTRONICALLY", TextFormat.Bold).Font.Color = Color.FromRgb(80, 45, 127);
+        accepted.AddLineBreak();
         accepted.AddText($" by Student ID {approval.StudentId} on {approval.AcceptedAt:MMMM d, yyyy 'at' h:mm tt} Central Time.");
-        accepted.Format.Shading.Color = Color.FromRgb(243, 240, 248);
+        accepted.Format.Shading.Color = Color.FromRgb(247, 244, 251);
         accepted.Format.Borders.Color = Color.FromRgb(197, 192, 224);
-        accepted.Format.Borders.Width = Unit.FromPoint(.7);
-        accepted.Format.LeftIndent = Unit.FromPoint(8);
-        accepted.Format.RightIndent = Unit.FromPoint(8);
-        accepted.Format.SpaceBefore = Unit.FromPoint(5);
-        accepted.Format.SpaceAfter = Unit.FromPoint(10);
+        accepted.Format.Borders.Width = Unit.FromPoint(.8);
+        accepted.Format.LeftIndent = Unit.FromPoint(12);
+        accepted.Format.RightIndent = Unit.FromPoint(12);
+        accepted.Format.SpaceBefore = Unit.FromPoint(7);
+        accepted.Format.SpaceAfter = Unit.FromPoint(13);
         foreach (var block in HtmlToBlocks(approval.RenderedAgreementSnapshot ?? ""))
             section.AddParagraph(block.Text, block.IsHeading ? StyleNames.Heading2 : StyleNames.Normal);
         var fingerprint = section.AddParagraph();
@@ -206,8 +236,9 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
     private static Table CreateTable(Section section, params double[] widths)
     {
         var table = section.AddTable();
-        table.Borders.Color = Color.FromRgb(224, 224, 230);
-        table.Borders.Width = Unit.FromPoint(.45);
+        table.Borders.Color = Color.FromRgb(225, 222, 231);
+        table.Borders.Width = Unit.FromPoint(.4);
+        table.Rows.LeftIndent = Unit.Zero;
         foreach (var width in widths) table.AddColumn(Unit.FromInch(width));
         return table;
     }
@@ -215,13 +246,33 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
     private static void AddHeaderRow(Table table, params string[] labels)
     {
         var row = table.AddRow();
-        row.Shading.Color = Color.FromRgb(80, 45, 127);
+        row.Shading.Color = Color.FromRgb(241, 237, 247);
+        row.TopPadding = Unit.FromPoint(3.5);
+        row.BottomPadding = Unit.FromPoint(3.5);
         for (var index = 0; index < labels.Length; index++)
         {
             var paragraph = row.Cells[index].AddParagraph(labels[index]);
             paragraph.Format.Font.Bold = true;
-            paragraph.Format.Font.Color = Colors.White;
+            paragraph.Format.Font.Size = 7.5;
+            paragraph.Format.Font.Color = Color.FromRgb(80, 45, 127);
         }
+    }
+
+    private static void AddSummaryCard(Cell cell, string label, decimal amount, bool emphasized = false)
+    {
+        cell.Shading.Color = emphasized ? Color.FromRgb(80, 45, 127) : Color.FromRgb(247, 245, 250);
+        cell.Borders.Color = emphasized ? Color.FromRgb(80, 45, 127) : Color.FromRgb(226, 221, 234);
+        cell.Borders.Width = Unit.FromPoint(.6);
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.LeftIndent = Unit.FromPoint(6);
+        paragraph.Format.RightIndent = Unit.FromPoint(6);
+        var labelText = paragraph.AddFormattedText(label, TextFormat.Bold);
+        labelText.Font.Size = 6.5;
+        labelText.Font.Color = emphasized ? Color.FromRgb(222, 211, 236) : Color.FromRgb(105, 94, 122);
+        paragraph.AddLineBreak();
+        var value = paragraph.AddFormattedText(Money(amount), TextFormat.Bold);
+        value.Font.Size = emphasized ? 13 : 11;
+        value.Font.Color = emphasized ? Colors.White : Color.FromRgb(37, 30, 48);
     }
 
     private static void AddMoney(Cell cell, decimal amount, bool bold = false)

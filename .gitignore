@@ -291,3 +291,7 @@ tempkey.jwk
 # Legacy portal source retained for read-only implementation reference.
 /eStudent/
 /Student_MRP/
+
+# Local development utilities and generated previews.
+/tools/local/
+/output/
