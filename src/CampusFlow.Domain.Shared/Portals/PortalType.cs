@@ -4,5 +4,5 @@ public enum PortalType
 {
     Student,
     Admin,
-    Scheduler
+    Advisor
 }

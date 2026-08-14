@@ -22,3 +22,6 @@ The page uses the same term-context rule as Billing: the configured/current term
 terms appear in Current & Upcoming Schedules; earlier terms appear as collapsed history. Only
 the current term opens automatically. This is display organization and does not create a
 global user-selected term.
+
+Student course selection and the separate advisor review workflow are documented in
+[`registration-and-advisor-review.md`](registration-and-advisor-review.md).

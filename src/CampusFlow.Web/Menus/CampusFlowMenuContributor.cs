@@ -41,11 +41,20 @@ public class CampusFlowMenuContributor : IMenuContributor
         );
         context.Menu.AddItem(
             new ApplicationMenuItem(
+                CampusFlowMenus.CourseSelection,
+                "Course Selection",
+                "~/CourseSelection",
+                icon: "fa fa-list-check",
+                order: 3
+            )
+        );
+        context.Menu.AddItem(
+            new ApplicationMenuItem(
                 CampusFlowMenus.Billing,
                 "Billing",
                 "~/Billing",
                 icon: "fa fa-file-invoice-dollar",
-                order: 3
+                order: 4
             )
         );
         context.Menu.AddItem(
@@ -54,7 +63,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                 "Financial Aid",
                 "~/FinancialAid",
                 icon: "fa fa-graduation-cap",
-                order: 4
+                order: 5
             )
         );
         context.Menu.AddItem(
@@ -63,12 +72,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                 "Bill Approval",
                 "~/BillApproval",
                 icon: "fa fa-file-signature",
-                order: 5
+                order: 6
             )
         );
         //Administration
         var administration = context.Menu.GetAdministration();
-        administration.Order = 6;
+        administration.Order = 7;
         //Administration->Identity
         administration.SetSubItemOrder(IdentityMenuNames.GroupName, 1);
 

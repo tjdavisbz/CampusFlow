@@ -287,3 +287,7 @@ src/CampusFlow.Blazor.Server.Tiered/Logs/*
 # IdentityServer temp files
 tempkey.rsa
 tempkey.jwk
+
+# Legacy portal source retained for read-only implementation reference.
+/eStudent/
+/Student_MRP/

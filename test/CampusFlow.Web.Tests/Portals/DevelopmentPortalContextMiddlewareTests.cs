@@ -14,7 +14,8 @@ public class DevelopmentPortalContextMiddlewareTests
     [Theory]
     [InlineData("student", PortalType.Student)]
     [InlineData("admin", PortalType.Admin)]
-    [InlineData("scheduler", PortalType.Scheduler)]
+    [InlineData("advisor", PortalType.Advisor)]
+    [InlineData("scheduler", PortalType.Advisor)]
     public async Task Should_Resolve_Development_Tenant_And_Portal(
         string portal,
         PortalType expectedPortal)

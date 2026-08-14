@@ -56,6 +56,12 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
             IStudentInformationSystemScheduleLookup,
             ThesisElementsScheduleLookup>();
         context.Services.AddTransient<
+            IStudentInformationSystemCourseSelectionLookup,
+            ThesisElementsCourseSelectionLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemCourseRegistrationService,
+            ThesisElementsCourseRegistrationService>();
+        context.Services.AddTransient<
             IStudentInformationSystemFinancialAidLookup,
             ThesisElementsFinancialAidLookup>();
         context.Services.AddTransient<

@@ -7,6 +7,7 @@ public class CampusFlowMenus
     public const string Home = Prefix + ".Home";
     public const string Billing = Prefix + ".Billing";
     public const string Schedule = Prefix + ".Schedule";
+    public const string CourseSelection = Prefix + ".CourseSelection";
     public const string FinancialAid = Prefix + ".FinancialAid";
     public const string BillApproval = Prefix + ".BillApproval";
 }

@@ -20,7 +20,9 @@ The app registration accepts organizational accounts from any Microsoft Entra te
 
 Email is used only to locate a student during first-time linking. CampusFlow then stores the immutable Entra tenant and object identifiers (`tid` and `oid`) and uses that pair for later authorization. Ambiguous or missing email matches are rejected.
 
-Admin and Scheduler portals will use separate record-matching policies when their authentication milestones are implemented.
+Admin and Advisor portals will use separate record-matching policies when their authentication milestones are implemented.
+Advisor identity and assignment requirements are recorded in
+[`registration-and-advisor-review.md`](registration-and-advisor-review.md).
 
 ## Student information system boundary
 

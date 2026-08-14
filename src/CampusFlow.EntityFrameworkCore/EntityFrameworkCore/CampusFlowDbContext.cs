@@ -16,6 +16,7 @@ using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using CampusFlow.Students;
 using CampusFlow.BillApprovals;
+using CampusFlow.CourseSelections;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -32,6 +33,12 @@ public class CampusFlowDbContext :
     public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
     public DbSet<BillApproval> BillApprovals { get; set; }
     public DbSet<BillApprovalArtifact> BillApprovalArtifacts { get; set; }
+    public DbSet<CourseSelectionPolicy> CourseSelectionPolicies { get; set; }
+    public DbSet<AdvisorAssignment> AdvisorAssignments { get; set; }
+    public DbSet<CourseReview> CourseReviews { get; set; }
+    public DbSet<CourseReviewSubmission> CourseReviewSubmissions { get; set; }
+    public DbSet<CourseSelectionOperation> CourseSelectionOperations { get; set; }
+    public DbSet<CourseSectionAttendanceTypeMapping> CourseSectionAttendanceTypeMappings { get; set; }
 
     #region Entities from the modules
 
@@ -161,6 +168,87 @@ public class CampusFlowDbContext :
             b.Property(x => x.LastError).HasMaxLength(4000);
             b.HasIndex(x => x.BillApprovalId).IsUnique();
             b.HasOne<BillApproval>().WithOne().HasForeignKey<BillApprovalArtifact>(x => x.BillApprovalId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<CourseSelectionPolicy>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CourseSelectionPolicies", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Name).IsRequired().HasMaxLength(160);
+            b.Property(x => x.AttendanceTypeMappingsJson).IsRequired();
+            b.Property(x => x.EligibleTermRulesJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<AdvisorAssignment>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "AdvisorAssignments", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.AttendanceType).IsRequired().HasMaxLength(160);
+            b.Property(x => x.ExternalAdvisorId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.AdvisorEmail).IsRequired().HasMaxLength(256);
+            b.Property(x => x.AdvisorDisplayName).IsRequired().HasMaxLength(256);
+            b.HasIndex(x => new { x.TenantId, x.AttendanceType, x.EffectiveFrom });
+            b.HasIndex(x => new { x.TenantId, x.AdvisorEmail, x.IsActive });
+        });
+
+        builder.Entity<CourseSectionAttendanceTypeMapping>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CourseSectionAttendanceTypeMappings", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.AttendanceType).IsRequired().HasMaxLength(160);
+            b.HasIndex(x => new { x.TenantId, x.SectionStart, x.SectionEnd, x.AttendanceType });
+            b.HasIndex(x => new { x.TenantId, x.IsActive, x.EffectiveFrom });
+        });
+
+        builder.Entity<CourseReview>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CourseReviews", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalCourseOfferingId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalCourseRegistrationId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.AttendanceType).IsRequired().HasMaxLength(160);
+            b.Property(x => x.CourseSnapshotJson).IsRequired();
+            b.Property(x => x.ExternalAdvisorId).HasMaxLength(64);
+            b.Property(x => x.AdvisorEmail).HasMaxLength(256);
+            b.Property(x => x.AdvisorComment).HasMaxLength(4000);
+            b.Property(x => x.LastRemovalError).HasMaxLength(4000);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.TenantId, x.ExternalCourseRegistrationId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.ExternalAdvisorId, x.ExternalTermId, x.NeedsReview });
+            b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.ExternalTermId, x.NeedsReview });
+        });
+
+        builder.Entity<CourseReviewSubmission>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CourseReviewSubmissions", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.AdvisorEmail).IsRequired().HasMaxLength(256);
+            b.Property(x => x.OverallComment).HasMaxLength(4000);
+            b.Property(x => x.DecisionsSnapshotJson).IsRequired();
+            b.Property(x => x.LastEmailError).HasMaxLength(4000);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.ExternalTermId, x.SubmittedAt });
+        });
+
+        builder.Entity<CourseSelectionOperation>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CourseSelectionOperations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalCourseOfferingId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(128);
+            b.Property(x => x.CourseSnapshotJson).IsRequired();
+            b.Property(x => x.ExternalCourseRegistrationId).HasMaxLength(64);
+            b.Property(x => x.LastError).HasMaxLength(4000);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.Status, x.LastAttemptAt });
         });
 
         //builder.Entity<YourEntity>(b =>

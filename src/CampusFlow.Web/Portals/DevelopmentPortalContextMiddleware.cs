@@ -50,6 +50,13 @@ public class DevelopmentPortalContextMiddleware
             context.Request.QueryString = QueryString.Create(query);
         }
 
+        // Keep the legacy development URL working while the product-facing name moves
+        // from Scheduler Portal to Advisor Portal.
+        if (portal.Equals("scheduler", StringComparison.OrdinalIgnoreCase))
+        {
+            portal = nameof(PortalType.Advisor);
+        }
+
         if (Enum.TryParse<PortalType>(portal, ignoreCase: true, out var portalType))
         {
             context.Items[PortalItemKey] = portalType;

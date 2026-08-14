@@ -3,6 +3,7 @@ using System;
 using CampusFlow.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Volo.Abp.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace CampusFlow.Migrations
 {
     [DbContext(typeof(CampusFlowDbContext))]
-    partial class CampusFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260814151712_AddCourseSelectionWorkflow")]
+    partial class AddCourseSelectionWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -777,89 +780,6 @@ namespace CampusFlow.Migrations
                     b.HasIndex("TenantId", "StudentProfileId", "ExternalTermId", "SubmittedAt");
 
                     b.ToTable("AppCourseReviewSubmissions", (string)null);
-                });
-
-            modelBuilder.Entity("CampusFlow.CourseSelections.CourseSectionAttendanceTypeMapping", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AttendanceType")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("ConcurrencyStamp");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("CreationTime");
-
-                    b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("CreatorId");
-
-                    b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("DeleterId");
-
-                    b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("DeletionTime");
-
-                    b.Property<DateTime>("EffectiveFrom")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime?>("EffectiveTo")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("ExternalAttendanceTypeId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ExtraProperties")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ExtraProperties");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("IsDeleted");
-
-                    b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("LastModificationTime");
-
-                    b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("LastModifierId");
-
-                    b.Property<int>("SectionEnd")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SectionStart")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("TenantId");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "IsActive", "EffectiveFrom");
-
-                    b.HasIndex("TenantId", "SectionStart", "SectionEnd", "AttendanceType");
-
-                    b.ToTable("AppCourseSectionAttendanceTypeMappings", (string)null);
                 });
 
             modelBuilder.Entity("CampusFlow.CourseSelections.CourseSelectionOperation", b =>
