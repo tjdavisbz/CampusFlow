@@ -4,7 +4,9 @@
 @using Volo.Abp.AspNetCore.Mvc.UI.Layout
 @inject IPageLayout PageLayout
 @{
-    PageLayout.Content.Title = "Student Dashboard";
+    PageLayout.Content.Title = Model.HasStudentAccess && !Model.HasAdvisorAccess
+        ? "Student Dashboard"
+        : Model.HasAdvisorAccess && !Model.HasStudentAccess ? "Advisor Dashboard" : "Dashboard";
     PageLayout.Content.BreadCrumb.ShowCurrent = false;
     PageLayout.Content.ShowToolbar = false;
     PageLayout.Content.MenuItemName = CampusFlowMenus.Home;
@@ -35,52 +37,82 @@
         <div>
             <div class="dashboard-eyebrow">@Model.InstitutionName</div>
             <h1>Welcome, @Model.StudentDisplayName</h1>
-            <p>Registration, billing, and the information you need for the semester—all in one place.</p>
+            @if (Model.HasAdvisorAccess && !Model.HasStudentAccess)
+            {
+                <p>Review student course selections and keep registration moving forward.</p>
+            }
+            else if (Model.HasAdvisorAccess)
+            {
+                <p>Your student services and advisor responsibilities—all in one place.</p>
+            }
+            else
+            {
+                <p>Registration, billing, and the information you need for the semester—all in one place.</p>
+            }
         </div>
         <div class="student-identity" aria-label="Student identity">
-            <span>Student ID</span>
-            <strong>@Model.StudentIdentifier</strong>
+            @if (Model.HasStudentAccess)
+            {
+                <span>Student ID</span><strong>@Model.StudentIdentifier</strong>
+            }
+            else
+            {
+                <span>Current role</span><strong>Advisor</strong>
+            }
         </div>
     </section>
 
-    <section class="semester-summary" aria-labelledby="semester-heading">
-        <div>
-            <span class="summary-label">Current term</span>
-            <h2 id="semester-heading">@(Model.CurrentTerm?.DisplayName ?? "Term information unavailable")</h2>
-        </div>
-        @if (Model.CurrentTerm is not null)
-        {
-            <span class="status-pill status-neutral">
-                @Model.CurrentTerm.StartDate.ToString("MMM d")–@Model.CurrentTerm.EndDate.ToString("MMM d, yyyy")
-            </span>
-        }
-    </section>
+    @if (Model.HasAdvisorAccess)
+    {
+        <section class="advisor-dashboard-summary" aria-labelledby="advisor-work-heading">
+            <div class="advisor-summary-copy"><span class="summary-label">Advisor work</span><h2 id="advisor-work-heading">Course review queue</h2><p>Students remain here until every selected course has a final decision.</p></div>
+            <div class="advisor-metric"><strong>@Model.AdvisorStudentCount</strong><span>Students waiting</span></div>
+            <div class="advisor-metric"><strong>@Model.AdvisorCourseCount</strong><span>Courses pending</span></div>
+            <a href="/Advisor">Open review queue <i class="fa-solid fa-arrow-right"></i></a>
+        </section>
+    }
 
-    <section class="portal-actions" aria-label="Student services">
-        <article class="portal-card registration-card">
-            <div class="portal-card-icon" aria-hidden="true">
-                <i class="fa-solid fa-calendar-check"></i>
+    @if (Model.HasStudentAccess)
+    {
+        <section class="semester-summary" aria-labelledby="semester-heading">
+            <div>
+                <span class="summary-label">Current term</span>
+                <h2 id="semester-heading">@(Model.CurrentTerm?.DisplayName ?? "Term information unavailable")</h2>
             </div>
-            <div class="portal-card-content">
-                <span class="portal-card-kicker">Plan your semester</span>
-                <h2>Online Registration</h2>
-                <p>Select courses and choose the meal plan available for your attendance type.</p>
-            </div>
-            <span class="availability-label">Coming soon</span>
-        </article>
+            @if (Model.CurrentTerm is not null)
+            {
+                <span class="status-pill status-neutral">
+                    @Model.CurrentTerm.StartDate.ToString("MMM d")–@Model.CurrentTerm.EndDate.ToString("MMM d, yyyy")
+                </span>
+            }
+        </section>
 
-        <a class="portal-card billing-card" href="/Billing">
-            <div class="portal-card-icon" aria-hidden="true">
-                <i class="fa-solid fa-file-invoice-dollar"></i>
-            </div>
-            <div class="portal-card-content">
-                <span class="portal-card-kicker">Complete your clearance</span>
-                <h2>Billing &amp; Payments</h2>
-                <p>Review your schedule, charges, financial aid, balance, and available payment options.</p>
-            </div>
-            <span class="availability-label">View account</span>
-        </a>
-    </section>
+        <section class="portal-actions" aria-label="Student services">
+            <article class="portal-card registration-card">
+                <div class="portal-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-calendar-check"></i>
+                </div>
+                <div class="portal-card-content">
+                    <span class="portal-card-kicker">Plan your semester</span>
+                    <h2>Online Registration</h2>
+                    <p>Select courses and choose the meal plan available for your attendance type.</p>
+                </div>
+                <span class="availability-label">Coming soon</span>
+            </article>
+
+            <a class="portal-card billing-card" href="/Billing">
+                <div class="portal-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                </div>
+                <div class="portal-card-content">
+                    <span class="portal-card-kicker">Complete your clearance</span>
+                    <h2>Billing &amp; Payments</h2>
+                    <p>Review your schedule, charges, financial aid, balance, and available payment options.</p>
+                </div>
+                <span class="availability-label">View account</span>
+            </a>
+        </section>
+    }
 
     <section class="support-card">
         <div class="support-icon" aria-hidden="true"><i class="fa-regular fa-circle-question"></i></div>

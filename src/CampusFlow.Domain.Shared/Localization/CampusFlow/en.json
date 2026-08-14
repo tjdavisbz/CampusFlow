@@ -4,6 +4,9 @@
     "AppName": "CampusFlow",
     "Menu:Home": "Home",
     "LongWelcomeMessage": "Welcome to the application. This is a startup project based on the ABP framework. For more information visit",
-    "Welcome": "Welcome"
+    "Welcome": "Welcome",
+    "Permission:AdvisorPortal": "Access the Advisor Portal",
+    "Permission:AdvisorPortal.ViewAll": "View every advisor review queue",
+    "Permission:AdvisorPortal.ManageRouting": "Manage advisor routing"
   }
 }

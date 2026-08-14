@@ -13,6 +13,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Guids;
+using CampusFlow.AdvisorPortal;
+using CampusFlow.Permissions;
+using Volo.Abp.Authorization.Permissions;
+using Volo.Abp.Identity;
 
 namespace CampusFlow.Web.Pages;
 
@@ -25,6 +29,10 @@ public class IndexModel : CampusFlowPageModel
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ILogger<IndexModel> _logger;
+    private readonly IAdvisorPortalAppService _advisorPortal;
+    private readonly IPermissionChecker _permissionChecker;
+    private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
+    private readonly IdentityUserManager _userManager;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -32,7 +40,11 @@ public class IndexModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemStudentLookup> studentLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         IGuidGenerator guidGenerator,
-        ILogger<IndexModel> logger)
+        ILogger<IndexModel> logger,
+        IAdvisorPortalAppService advisorPortal,
+        IPermissionChecker permissionChecker,
+        IStudentInformationSystemAdvisorLookup advisorLookup,
+        IdentityUserManager userManager)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -40,6 +52,10 @@ public class IndexModel : CampusFlowPageModel
         _termLookups = termLookups.ToArray();
         _guidGenerator = guidGenerator;
         _logger = logger;
+        _advisorPortal = advisorPortal;
+        _permissionChecker = permissionChecker;
+        _advisorLookup = advisorLookup;
+        _userManager = userManager;
     }
 
     public string? TenantName { get; private set; }
@@ -51,6 +67,10 @@ public class IndexModel : CampusFlowPageModel
     public string StudentIdentifier { get; private set; } = "Unavailable";
     public string StudentDisplayName { get; private set; } = "Student";
     public StudentInformationSystemTerm? CurrentTerm { get; private set; }
+    public bool HasStudentAccess { get; private set; }
+    public bool HasAdvisorAccess { get; private set; }
+    public int AdvisorStudentCount { get; private set; }
+    public int AdvisorCourseCount { get; private set; }
 
     public async Task OnGetAsync()
     {
@@ -58,24 +78,13 @@ public class IndexModel : CampusFlowPageModel
         Theme = _tenantThemeProvider.Get(TenantName);
         Portal = HttpContext.Items[DevelopmentPortalContextMiddleware.PortalItemKey] as PortalType?;
 
-        var termLookup = _termLookups.SingleOrDefault(x =>
-            x.Provider == StudentInformationSystemProvider.ThesisElements);
-        if (termLookup is not null)
-        {
-            try
-            {
-                CurrentTerm = await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
-            }
-            catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
-            {
-                _logger.LogWarning(exception, "Unable to resolve the current academic term.");
-            }
-        }
-
         if (CurrentUser.Id is null)
         {
             return;
         }
+
+        HasAdvisorAccess = await _permissionChecker.IsGrantedAsync(
+            CampusFlowPermissions.AdvisorPortal.Default);
 
         var profile = await _studentProfileRepository.FindAsync(x => x.UserId == CurrentUser.Id.Value);
         if (!string.IsNullOrWhiteSpace(CurrentUser.Email))
@@ -107,8 +116,62 @@ public class IndexModel : CampusFlowPageModel
 
         if (profile is not null)
         {
+            HasStudentAccess = true;
             StudentIdentifier = profile.StudentId;
             StudentDisplayName = profile.DisplayName;
+
+            var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+            if (termLookup is not null)
+            {
+                try
+                {
+                    CurrentTerm = await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+                }
+                catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+                {
+                    _logger.LogWarning(exception, "Unable to resolve the current academic term.");
+                }
+            }
+        }
+        else
+        {
+            StudentDisplayName = CurrentUser.Name ?? CurrentUser.UserName ?? "Advisor";
+        }
+
+        if (HasAdvisorAccess)
+        {
+            if (!string.IsNullOrWhiteSpace(CurrentUser.Email))
+            {
+                try
+                {
+                    var advisor = await _advisorLookup.FindAsync(
+                        CurrentUser.Email, HttpContext.RequestAborted);
+                    if (advisor is not null)
+                    {
+                        StudentDisplayName = advisor.DisplayName;
+                        var user = await _userManager.GetByIdAsync(CurrentUser.Id.Value);
+                        if (!string.Equals(user.Name, advisor.FirstName, StringComparison.Ordinal) ||
+                            !string.Equals(user.Surname, advisor.LastName, StringComparison.Ordinal))
+                        {
+                            user.Name = advisor.FirstName;
+                            user.Surname = advisor.LastName;
+                            var update = await _userManager.UpdateAsync(user);
+                            if (!update.Succeeded)
+                            {
+                                _logger.LogWarning("Unable to refresh the advisor's display name from Elements.");
+                            }
+                        }
+                    }
+                }
+                catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+                {
+                    _logger.LogWarning(exception, "Unable to refresh the advisor identity from Elements.");
+                }
+            }
+
+            var queue = await _advisorPortal.GetQueueAsync();
+            AdvisorStudentCount = queue.Count;
+            AdvisorCourseCount = queue.Sum(x => x.PendingCourseCount);
         }
     }
 }

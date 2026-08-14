@@ -9,10 +9,13 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
 {
     public override void Define(IPermissionDefinitionContext context)
     {
-        var myGroup = context.AddGroup(CampusFlowPermissions.GroupName);
-
-        //Define your own permissions here. Example:
-        //myGroup.AddPermission(CampusFlowPermissions.MyPermission1, L("Permission:MyPermission1"));
+        var group = context.AddGroup(CampusFlowPermissions.GroupName);
+        var advisorPortal = group.AddPermission(CampusFlowPermissions.AdvisorPortal.Default,
+            L("Permission:AdvisorPortal"), MultiTenancySides.Tenant);
+        advisorPortal.AddChild(CampusFlowPermissions.AdvisorPortal.ViewAll,
+            L("Permission:AdvisorPortal.ViewAll"), MultiTenancySides.Tenant);
+        advisorPortal.AddChild(CampusFlowPermissions.AdvisorPortal.ManageRouting,
+            L("Permission:AdvisorPortal.ManageRouting"), MultiTenancySides.Tenant);
     }
 
     private static LocalizableString L(string name)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CampusFlow.Portals;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 namespace CampusFlow.Web.Portals;
@@ -10,14 +11,20 @@ namespace CampusFlow.Web.Portals;
 public class DevelopmentPortalContextMiddleware
 {
     public const string PortalItemKey = "CampusFlow.PortalType";
+    private const string TenantCookieName = "CampusFlow.DevelopmentTenant";
 
     private readonly RequestDelegate _next;
     private readonly IHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
 
-    public DevelopmentPortalContextMiddleware(RequestDelegate next, IHostEnvironment environment)
+    public DevelopmentPortalContextMiddleware(
+        RequestDelegate next,
+        IHostEnvironment environment,
+        IConfiguration configuration)
     {
         _next = next;
         _environment = environment;
+        _configuration = configuration;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -30,9 +37,32 @@ public class DevelopmentPortalContextMiddleware
         await _next(context);
     }
 
-    private static void ApplyDevelopmentContext(HttpContext context)
+    private void ApplyDevelopmentContext(HttpContext context)
     {
         var tenant = context.Request.Query["tenant"].ToString();
+        if (string.IsNullOrWhiteSpace(tenant))
+        {
+            tenant = context.Request.Query["__tenant"].ToString();
+        }
+        if (string.IsNullOrWhiteSpace(tenant))
+        {
+            tenant = context.Request.Cookies[TenantCookieName] ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(tenant))
+        {
+            tenant = _configuration["DevelopmentPortal:DefaultTenant"] ?? string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(tenant))
+        {
+            context.Response.Cookies.Append(TenantCookieName, tenant, new CookieOptions
+            {
+                HttpOnly = true,
+                IsEssential = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = context.Request.IsHttps
+            });
+        }
         var portal = context.Request.Query["portal"].ToString();
 
         if (!string.IsNullOrWhiteSpace(tenant))
@@ -46,7 +76,10 @@ public class DevelopmentPortalContextMiddleware
                 }
             }
 
-            query.Add(new KeyValuePair<string, string?>("__tenant", tenant));
+            if (!context.Request.Query.ContainsKey("__tenant"))
+            {
+                query.Add(new KeyValuePair<string, string?>("__tenant", tenant));
+            }
             context.Request.QueryString = QueryString.Create(query);
         }
 

@@ -3,6 +3,7 @@ using CampusFlow.Portals;
 using CampusFlow.Web.Portals;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using Shouldly;
 using Xunit;
@@ -24,7 +25,7 @@ public class DevelopmentPortalContextMiddlewareTests
         environment.EnvironmentName.Returns("Development");
         var context = new DefaultHttpContext();
         context.Request.QueryString = new QueryString($"?tenant=nelson&portal={portal}");
-        var middleware = new DevelopmentPortalContextMiddleware(_ => Task.CompletedTask, environment);
+        var middleware = CreateMiddleware(environment);
 
         await middleware.InvokeAsync(context);
 
@@ -39,11 +40,50 @@ public class DevelopmentPortalContextMiddlewareTests
         environment.EnvironmentName.Returns("Production");
         var context = new DefaultHttpContext();
         context.Request.QueryString = new QueryString("?tenant=nelson&portal=student");
-        var middleware = new DevelopmentPortalContextMiddleware(_ => Task.CompletedTask, environment);
+        var middleware = CreateMiddleware(environment);
 
         await middleware.InvokeAsync(context);
 
         context.Request.Query.ContainsKey("__tenant").ShouldBeFalse();
         context.Items.ContainsKey(DevelopmentPortalContextMiddleware.PortalItemKey).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Should_Use_Configured_Default_Tenant_In_Development()
+    {
+        var environment = Substitute.For<IWebHostEnvironment>();
+        environment.EnvironmentName.Returns("Development");
+        var context = new DefaultHttpContext();
+        var middleware = CreateMiddleware(environment);
+
+        await middleware.InvokeAsync(context);
+
+        context.Request.Query["__tenant"].ToString().ShouldBe("nelson");
+    }
+
+    [Fact]
+    public async Task Should_Preserve_Abp_Tenant_Query_Parameter()
+    {
+        var environment = Substitute.For<IWebHostEnvironment>();
+        environment.EnvironmentName.Returns("Development");
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString("?__tenant=nelson");
+        var middleware = CreateMiddleware(environment);
+
+        await middleware.InvokeAsync(context);
+
+        context.Request.Query["__tenant"].ToString().ShouldBe("nelson");
+    }
+
+    private static DevelopmentPortalContextMiddleware CreateMiddleware(IWebHostEnvironment environment)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new System.Collections.Generic.Dictionary<string, string?>
+            {
+                ["DevelopmentPortal:DefaultTenant"] = "nelson"
+            })
+            .Build();
+
+        return new DevelopmentPortalContextMiddleware(_ => Task.CompletedTask, environment, configuration);
     }
 }
