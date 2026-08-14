@@ -48,6 +48,15 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 3
             )
         );
+        context.Menu.AddItem(
+            new ApplicationMenuItem(
+                CampusFlowMenus.FinancialAid,
+                "Financial Aid",
+                "~/FinancialAid",
+                icon: "fa fa-graduation-cap",
+                order: 4
+            )
+        );
         //Administration
         var administration = context.Menu.GetAdministration();
         administration.Order = 6;
