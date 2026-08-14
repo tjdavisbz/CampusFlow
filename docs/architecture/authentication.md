@@ -52,6 +52,10 @@ Thesis Elements implementation selects the most recent `TermCalendar` row whose
 not a user-specific portal term selection. A future tenant administration setting can replace
 the default resolver without changing dashboard consumers.
 
+Student billing follows the same SIS boundary. Its transaction sources, visibility rules,
+balance math, future bill-approval requirements, and payment boundary are documented in
+[`student-billing.md`](student-billing.md).
+
 ## Tenant branding
 
 The UI consumes semantic tenant theme values through `ITenantThemeProvider`; pages do not

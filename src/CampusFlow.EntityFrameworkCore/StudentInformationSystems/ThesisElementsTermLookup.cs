@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -33,7 +34,10 @@ public sealed class ThesisElementsTermLookup :
                 $"Connection string '{ConnectionStringName}' is not configured.");
         }
 
-        const string sql = """
+        var currentTermOverride = _configuration[
+            "StudentInformationSystems:Providers:ThesisElements:CurrentTermOverride"];
+        var sql = string.IsNullOrWhiteSpace(currentTermOverride)
+            ? """
             SELECT TOP (1)
                 TermCalendarID,
                 Term,
@@ -43,13 +47,30 @@ public sealed class ThesisElementsTermLookup :
             FROM [dbo].[TermCalendar]
             WHERE TermStartDate <= @Today
             ORDER BY Term DESC
+            """
+            : """
+            SELECT TOP (1)
+                TermCalendarID,
+                Term,
+                TextTerm,
+                TermStartDate,
+                TermEndDate
+            FROM [dbo].[TermCalendar]
+            WHERE Term = @Term
             """;
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
         await using var command = new SqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@Today", DateTime.Today);
+        if (string.IsNullOrWhiteSpace(currentTermOverride))
+        {
+            command.Parameters.Add("@Today", SqlDbType.DateTime2).Value = DateTime.Today;
+        }
+        else
+        {
+            command.Parameters.Add("@Term", SqlDbType.VarChar, 20).Value = currentTermOverride.Trim();
+        }
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))

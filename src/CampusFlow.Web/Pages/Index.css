@@ -90,6 +90,13 @@
     border-radius: 1.15rem;
     background: var(--lpx-card-bg, #fff);
     box-shadow: 0 8px 24px rgba(16, 24, 40, .06);
+    text-decoration: none;
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.portal-card[href]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(16, 24, 40, .1);
 }
 
 .portal-card::after {
@@ -131,94 +138,6 @@
     --dashboard-ink: #f8fafc;
     --dashboard-muted: #aab4c4;
     --dashboard-border: #354052;
-}
-
-body .lpx-sidebar,
-body .lpx-sidebar-container,
-body .lpx-sidebar .lpx-sidebar-container,
-body .lpx-sidebar-header,
-body .lpx-logo-container,
-body #desktop-sidebar {
-    background: linear-gradient(180deg, var(--tenant-primary-dark), var(--tenant-primary)) !important;
-}
-
-body #desktop-sidebar {
-    min-height: calc(100vh - 112px);
-}
-
-body .lpx-sidebar-container > .lpx-sidebar {
-    min-height: calc(100vh - 112px);
-    margin-top: 112px;
-}
-
-body .lpx-sidebar .lpx-sidebar-header,
-body .lpx-sidebar-container .lpx-sidebar-header {
-    min-height: 112px;
-    padding: 1.25rem 1.75rem !important;
-    border-bottom: 1px solid color-mix(in srgb, white, transparent 88%);
-}
-
-.lpx-sidebar-container .lpx-brand-logo,
-.lpx-sidebar .lpx-brand-logo {
-    flex: 0 0 245px !important;
-    width: 245px !important;
-    max-width: calc(100% - 3rem) !important;
-    height: 58px !important;
-    background-size: contain !important;
-    background-position: left center !important;
-    background-repeat: no-repeat !important;
-}
-
-.lpx-sidebar-container .lpx-brand-name,
-.lpx-sidebar-container .lpx-brand-text,
-.lpx-sidebar-container .lpx-brand > span,
-.lpx-sidebar .lpx-brand-name,
-.lpx-sidebar .lpx-brand-text,
-.lpx-sidebar .lpx-brand > span {
-    display: none !important;
-}
-
-#desktop-sidebar > .outer-menu-item > .lpx-menu-item-link {
-    color: #fff !important;
-}
-
-#desktop-sidebar > .outer-menu-item > .lpx-menu-item-link .lpx-menu-item-icon {
-    color: var(--tenant-accent) !important;
-}
-
-#desktop-sidebar > .outer-menu-item > .lpx-menu-item-link:hover:not(.selected) {
-    background-color: color-mix(in srgb, white, transparent 86%) !important;
-}
-
-#desktop-sidebar > .outer-menu-item > .lpx-menu-item-link.selected {
-    display: flex !important;
-    align-items: center;
-    gap: .75rem;
-    width: calc(100% - 2rem);
-    min-height: 44px;
-    margin: .35rem 1rem;
-    padding: .55rem .9rem;
-    border-radius: .625rem;
-    color: var(--tenant-primary-dark) !important;
-    background: color-mix(in srgb, var(--tenant-accent) 88%, transparent) !important;
-}
-
-#desktop-sidebar > .outer-menu-item > .lpx-menu-item-link.selected .lpx-menu-item-icon {
-    display: inline-flex !important;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    visibility: visible !important;
-    opacity: 1 !important;
-    color: var(--tenant-primary-dark) !important;
-}
-
-#desktop-sidebar > .outer-menu-item > .lpx-menu-item-link.selected .lpx-menu-item-text {
-    display: block !important;
-    flex: 1 1 auto;
-    visibility: visible !important;
-    opacity: 1 !important;
-    color: var(--tenant-primary-dark) !important;
 }
 
 @media (max-width: 767.98px) {

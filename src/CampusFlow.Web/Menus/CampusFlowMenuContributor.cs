@@ -30,6 +30,15 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 1
             )
         );
+        context.Menu.AddItem(
+            new ApplicationMenuItem(
+                CampusFlowMenus.Billing,
+                "Billing",
+                "~/Billing",
+                icon: "fa fa-file-invoice-dollar",
+                order: 2
+            )
+        );
         //Administration
         var administration = context.Menu.GetAdministration();
         administration.Order = 6;

@@ -49,6 +49,9 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
         context.Services.AddTransient<
             IStudentInformationSystemTermLookup,
             ThesisElementsTermLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemBillingLookup,
+            ThesisElementsBillingLookup>();
 
         context.Services.AddAbpDbContext<CampusFlowDbContext>(options =>
         {
