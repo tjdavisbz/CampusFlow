@@ -15,6 +15,7 @@ using Volo.Abp.OpenIddict.EntityFrameworkCore;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using CampusFlow.Students;
+using CampusFlow.BillApprovals;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -27,6 +28,10 @@ public class CampusFlowDbContext :
     IIdentityDbContext
 {
     public DbSet<StudentProfile> StudentProfiles { get; set; }
+    public DbSet<AgreementTemplate> AgreementTemplates { get; set; }
+    public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
+    public DbSet<BillApproval> BillApprovals { get; set; }
+    public DbSet<BillApprovalArtifact> BillApprovalArtifacts { get; set; }
 
     #region Entities from the modules
 
@@ -97,6 +102,65 @@ public class CampusFlowDbContext :
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasIndex(x => x.UserId).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Provider, x.ExternalStudentId }).IsUnique();
+        });
+
+        builder.Entity<AgreementTemplate>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "AgreementTemplates", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Name).IsRequired().HasMaxLength(160);
+            b.Property(x => x.ContentHtml).IsRequired();
+            b.Property(x => x.AllowedMergeFieldsJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<PaymentPlanPolicy>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "PaymentPlanPolicies", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Name).IsRequired().HasMaxLength(160);
+            b.Property(x => x.EnrollmentFee).HasPrecision(18, 2);
+            b.Property(x => x.PartTimeBalanceDivisor).HasPrecision(18, 2);
+            b.Property(x => x.ResidentialMinimumPayment).HasPrecision(18, 2);
+            b.Property(x => x.StandardMinimumPayment).HasPrecision(18, 2);
+            b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<BillApproval>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "BillApprovals", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TermCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.ChargesTotal).HasPrecision(18, 2);
+            b.Property(x => x.CreditsTotal).HasPrecision(18, 2);
+            b.Property(x => x.AnticipatedAidTotal).HasPrecision(18, 2);
+            b.Property(x => x.RemainingBalance).HasPrecision(18, 2);
+            b.Property(x => x.PaymentPlanFee).HasPrecision(18, 2);
+            b.Property(x => x.SourceIp).HasMaxLength(64);
+            b.Property(x => x.UserAgent).HasMaxLength(1024);
+            b.Property(x => x.ReviewSnapshotJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.UserId, x.ExternalTermId }).IsUnique();
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<AgreementTemplate>().WithMany().HasForeignKey(x => x.AgreementTemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<BillApprovalArtifact>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "BillApprovalArtifacts", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.PdfFileName).HasMaxLength(256);
+            b.Property(x => x.PdfSha256).HasMaxLength(64);
+            b.Property(x => x.PdfBlobName).HasMaxLength(512);
+            b.Property(x => x.ElementsDocumentTrackingId).HasMaxLength(64);
+            b.Property(x => x.LastError).HasMaxLength(4000);
+            b.HasIndex(x => x.BillApprovalId).IsUnique();
+            b.HasOne<BillApproval>().WithOne().HasForeignKey<BillApprovalArtifact>(x => x.BillApprovalId).OnDelete(DeleteBehavior.Cascade);
         });
 
         //builder.Entity<YourEntity>(b =>

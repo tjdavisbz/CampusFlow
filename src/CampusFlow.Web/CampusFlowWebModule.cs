@@ -12,6 +12,7 @@ using CampusFlow.MultiTenancy;
 using CampusFlow.Permissions;
 using CampusFlow.Web.Menus;
 using CampusFlow.Web.HealthChecks;
+using CampusFlow.Web.BillApprovals;
 using Microsoft.OpenApi;
 using Volo.Abp;
 using Volo.Abp.Studio;
@@ -126,6 +127,7 @@ public class CampusFlowWebModule : AbpModule
         var configuration = context.Services.GetConfiguration();
 
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
+        context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
 
         if (!configuration.GetValue<bool>("App:DisablePII"))
         {

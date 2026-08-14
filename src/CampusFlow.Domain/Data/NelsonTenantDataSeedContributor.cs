@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
@@ -22,8 +24,9 @@ public class NelsonTenantDataSeedContributor : IDataSeedContributor, ITransientD
 
     public async Task SeedAsync(DataSeedContext context)
     {
-        if (context.TenantId.HasValue ||
-            await _tenantRepository.FindByNameAsync(TenantName) is not null)
+        var existingTenants = context.TenantId.HasValue ? [] : await _tenantRepository.GetListAsync();
+        if (context.TenantId.HasValue || existingTenants.Any(x =>
+                string.Equals(x.Name, TenantName, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }

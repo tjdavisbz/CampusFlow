@@ -1,0 +1,30 @@
+.plan-preview { margin-top: 1rem; padding: 1rem; border: 1px solid color-mix(in srgb, var(--tenant-primary), white 68%); border-radius: .85rem; background: color-mix(in srgb, var(--tenant-accent), white 91%); }
+.plan-preview > div:first-child { display: flex; justify-content: space-between; gap: 1rem; }
+.plan-preview span { color: #667085; font-size: .78rem; }
+.installments { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .55rem; margin-top: .8rem; }
+.installments article { padding: .7rem; border-radius: .65rem; background: #fff; }
+.installments b, .installments strong, .installments span { display: block; }
+.installments b { font-size: .72rem; }
+.installments strong { margin: .18rem 0; color: var(--tenant-primary); }
+.stepper.no-payment { grid-template-columns: repeat(3, 1fr); }
+.notice.success { border-color: #a6d8b8; background: #f0fdf4; }
+.notice.success i { color: #16803c; }
+.validation-summary:empty { display: none; }
+.validation-summary { padding: .9rem 1rem; border: 1px solid #f2b8b5; border-radius: .75rem; color: #b42318; background: #fff5f5; }
+.validation-summary ul { margin: 0; }
+.agreement-version { margin-top: 1.2rem; color: #667085; font-size: .75rem; }
+.document-download { display: inline-flex; align-items: center; gap: .45rem; width: auto; margin-top: .75rem; text-decoration: none; }
+.document-download i { font-size: .9rem; }
+.primary.document-download i { color: #fff !important; }
+.approval-complete { padding: 3rem 2rem; border: 1px solid #a6d8b8; border-radius: 1rem; background: #fff; box-shadow: 0 10px 28px rgba(16,24,40,.05); text-align: center; }
+.approval-complete h2 { margin: .45rem 0; font-size: 1.8rem; }
+.approval-complete p { margin: 0 auto; color: #667085; }
+.processing-modal { position: fixed; z-index: 2000; inset: 0; display: grid; place-items: center; padding: 1.5rem; background: rgba(20, 13, 31, .58); backdrop-filter: blur(3px); }
+.processing-modal[hidden] { display: none; }
+.processing-card { width: min(430px, 100%); padding: 2.2rem; border-radius: 1rem; background: #fff; box-shadow: 0 24px 70px rgba(0,0,0,.24); text-align: center; }
+.processing-card h2 { margin: 1rem 0 .45rem; }
+.processing-card p { margin: 0; color: #667085; line-height: 1.5; }
+.processing-spinner { display: block; width: 3rem; height: 3rem; margin: 0 auto; border: .28rem solid color-mix(in srgb,var(--tenant-accent),white 55%); border-top-color: var(--tenant-primary); border-radius: 50%; animation: approval-spin .8s linear infinite; }
+.is-processing-agreement { overflow: hidden; }
+@keyframes approval-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .processing-spinner { animation-duration: 1.8s; } }

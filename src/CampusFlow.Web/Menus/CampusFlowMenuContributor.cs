@@ -57,6 +57,15 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 4
             )
         );
+        context.Menu.AddItem(
+            new ApplicationMenuItem(
+                CampusFlowMenus.BillApproval,
+                "Bill Approval",
+                "~/BillApproval",
+                icon: "fa fa-file-signature",
+                order: 5
+            )
+        );
         //Administration
         var administration = context.Menu.GetAdministration();
         administration.Order = 6;

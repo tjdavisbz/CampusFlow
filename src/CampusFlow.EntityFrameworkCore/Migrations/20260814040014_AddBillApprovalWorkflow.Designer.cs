@@ -3,6 +3,7 @@ using System;
 using CampusFlow.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Volo.Abp.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace CampusFlow.Migrations
 {
     [DbContext(typeof(CampusFlowDbContext))]
-    partial class CampusFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260814040014_AddBillApprovalWorkflow")]
+    partial class AddBillApprovalWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -206,10 +209,6 @@ namespace CampusFlow.Migrations
                     b.Property<string>("RenderedAgreementSnapshot")
                         .HasColumnType("text");
 
-                    b.Property<string>("ReviewSnapshotJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("SourceIp")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -312,10 +311,6 @@ namespace CampusFlow.Migrations
                     b.Property<Guid?>("LastModifierId")
                         .HasColumnType("uuid")
                         .HasColumnName("LastModifierId");
-
-                    b.Property<string>("PdfBlobName")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("PdfFileName")
                         .HasMaxLength(256)
