@@ -18,6 +18,7 @@ public class FinancialAidModel : CampusFlowPageModel
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidLookup> _awardLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidDecisionService> _decisionServices;
+    private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly ILogger<FinancialAidModel> _logger;
 
     public FinancialAidModel(
@@ -25,12 +26,14 @@ public class FinancialAidModel : CampusFlowPageModel
         IRepository<StudentProfile, Guid> studentProfileRepository,
         IEnumerable<IStudentInformationSystemFinancialAidLookup> awardLookups,
         IEnumerable<IStudentInformationSystemFinancialAidDecisionService> decisionServices,
+        IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         ILogger<FinancialAidModel> logger)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
         _awardLookups = awardLookups.ToArray();
         _decisionServices = decisionServices.ToArray();
+        _termLookups = termLookups.ToArray();
         _logger = logger;
     }
 
@@ -41,7 +44,12 @@ public class FinancialAidModel : CampusFlowPageModel
     public string StudentIdentifier { get; private set; } = "Unavailable";
     public bool IsUnavailable { get; private set; }
     public IReadOnlyList<AwardTermGroup> Terms { get; private set; } = [];
-    public decimal TotalAwards => Terms.Sum(x => x.TotalAmount);
+    public IReadOnlyList<AwardTermGroup> CurrentAndUpcomingTerms { get; private set; } = [];
+    public IReadOnlyList<AwardTermGroup> HistoricalTerms { get; private set; } = [];
+    public string? CurrentTermCode { get; private set; }
+    public string? CurrentTermName { get; private set; }
+    public decimal CurrentTermAwards =>
+        Terms.SingleOrDefault(x => x.TermCode == CurrentTermCode)?.TotalAmount ?? 0m;
     [Microsoft.AspNetCore.Mvc.TempData]
     public string? StatusMessage { get; set; }
     [Microsoft.AspNetCore.Mvc.TempData]
@@ -73,6 +81,13 @@ public class FinancialAidModel : CampusFlowPageModel
 
         try
         {
+            var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+            var currentTerm = termLookup is null
+                ? null
+                : await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+            CurrentTermCode = currentTerm?.TermCode;
+            CurrentTermName = currentTerm?.DisplayName;
+
             var awards = await lookup.GetAwardsAsync(profile.ExternalStudentId, HttpContext.RequestAborted);
             var decisionService = _decisionServices.SingleOrDefault(x => x.Provider == profile.Provider);
             if (decisionService is not null)
@@ -100,6 +115,12 @@ public class FinancialAidModel : CampusFlowPageModel
                     group.Sum(x => x.Amount),
                     group.OrderByDescending(x => x.AwardDate).ThenBy(x => x.Description).ToArray()))
                 .ToArray();
+            CurrentAndUpcomingTerms = currentTerm is null
+                ? []
+                : Terms.Where(x => string.CompareOrdinal(x.TermCode, currentTerm.TermCode) >= 0).ToArray();
+            HistoricalTerms = currentTerm is null
+                ? Terms
+                : Terms.Where(x => string.CompareOrdinal(x.TermCode, currentTerm.TermCode) < 0).ToArray();
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {

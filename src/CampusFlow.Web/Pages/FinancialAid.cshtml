@@ -96,56 +96,43 @@
     else
     {
         <section class="aid-summary">
-            <div><span>Total awards</span><strong>@FinancialAidModel.FormatCurrency(Model.TotalAwards)</strong></div>
-            <p>Across all terms currently shown</p>
+            <div><span>Current term awards</span><strong>@FinancialAidModel.FormatCurrency(Model.CurrentTermAwards)</strong></div>
+            <p>@(Model.CurrentTermName ?? "Current academic term")</p>
         </section>
 
-        <section class="aid-awards" aria-labelledby="awards-heading">
-            <div class="aid-section-heading"><div><span>Awards &amp; scholarships</span><h2 id="awards-heading">My financial aid</h2></div></div>
-            @foreach (var term in Model.Terms)
-            {
-                <details class="aid-term" open>
-                    <summary>
-                        <div><strong>@term.TermName</strong><span>@term.Awards.Count award@(term.Awards.Count == 1 ? "" : "s")</span></div>
-                        <div class="aid-term-total"><strong>@FinancialAidModel.FormatCurrency(term.TotalAmount)</strong><i class="fa-solid fa-chevron-down"></i></div>
-                    </summary>
-                    <div class="award-grid">
-                        @foreach (var award in term.Awards)
-                        {
-                            <article class="award-card">
-                                <div class="award-topline"><span>@award.AwardType</span><strong>@FinancialAidModel.FormatCurrency(award.Amount)</strong></div>
-                                <h3>@award.Description</h3>
-                                <div class="award-meta">
-                                    <span><i class="fa-regular fa-calendar"></i>@(award.AwardDate?.ToString("MMM d, yyyy") ?? "Date unavailable")</span>
-                                    <span><i class="fa-regular fa-circle-check"></i>@award.AwardStatus</span>
-                                </div>
-                                <div class="award-footer">
-                                    <span class="billing-status @(award.IsSentToBilling ? "sent" : "anticipated")">
-                                        <i class="fa-solid @(award.IsSentToBilling ? "fa-building-columns" : "fa-clock")"></i>
-                                        @(award.IsSentToBilling ? "Sent to student accounts" : "Anticipated aid")
-                                    </span>
-                                    <div class="award-actions" aria-label="Award decision">
-                                        @if (award.Amount <= 0 || award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            <span class="decision-recorded unavailable"><i class="fa-solid fa-ban"></i> Not available</span>
-                                        }
-                                        else if (award.StudentAccepted is 0 or 1)
-                                        {
-                                            <span class="decision-recorded"><i class="fa-solid fa-lock"></i> @(award.StudentAccepted == 1 ? "Accepted" : "Declined")</span>
-                                        }
-                                        else
-                                        {
-                                            <button type="button" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Accept</button>
-                                            <button type="button" class="decline" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Decline</button>
-                                        }
-                                    </div>
-                                </div>
-                            </article>
-                        }
-                    </div>
-                </details>
-            }
-        </section>
+        @if (Model.CurrentAndUpcomingTerms.Count > 0)
+        {
+            <section class="aid-awards active-aid-awards" aria-labelledby="current-awards-heading">
+                <div class="aid-section-heading">
+                    <div><span>Now and next</span><h2 id="current-awards-heading">Current &amp; upcoming awards</h2></div>
+                    <p>Awards available for the current and future terms.</p>
+                </div>
+                @foreach (var term in Model.CurrentAndUpcomingTerms)
+                {
+                    @await Html.PartialAsync("_FinancialAidTerm", term, new ViewDataDictionary(ViewData)
+                    {
+                        ["Open"] = term.TermCode == Model.CurrentTermCode
+                    })
+                }
+            </section>
+        }
+
+        @if (Model.HistoricalTerms.Count > 0)
+        {
+            <section class="aid-awards" aria-labelledby="historical-awards-heading">
+                <div class="aid-section-heading">
+                    <div><span>Award history</span><h2 id="historical-awards-heading">Earlier financial aid</h2></div>
+                    <p>Expand a term to review previous awards and decisions.</p>
+                </div>
+                @foreach (var term in Model.HistoricalTerms)
+                {
+                    @await Html.PartialAsync("_FinancialAidTerm", term, new ViewDataDictionary(ViewData)
+                    {
+                        ["Open"] = false
+                    })
+                }
+            </section>
+        }
         <p class="aid-note"><i class="fa-solid fa-circle-info"></i> Awards already accepted or declined can only be changed by the Financial Aid Office.</p>
     }
 
