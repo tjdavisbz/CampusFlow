@@ -49,7 +49,14 @@ parameter. Billing data is read-only.
   display but do not contribute to posted, term, running, or overall balances.
 - Overall balance equals posted balance plus pending balance across all terms.
 - A term balance and its running balance are calculated from that term's reportable,
-  non-voided transactions in transaction-date order.
+  non-voided transactions in transaction-date order, beginning with the previous term's
+  closing balance.
+- For display only, terms are processed from oldest to newest. Each term after the oldest
+  receives a synthetic **Balance Carried Forward** row equal to the preceding term's closing
+  balance. Completed historical terms display a zero footer balance after their closing
+  amount is carried into the next term; the configured current term displays the actual
+  cumulative balance. No transaction is written back to Thesis Elements, and the synthetic
+  row must never be treated as a real charge, credit, payment, or approval item.
 - Negative balances are credit balances and use accounting notation, for example
   `($223.96)`.
 

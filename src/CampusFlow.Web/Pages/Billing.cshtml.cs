@@ -94,11 +94,7 @@ public class BillingModel : CampusFlowPageModel
             PostedBalance = activeTransactions.Where(x => !x.IsPending).Sum(x => x.BalanceChange);
             PendingBalance = activeTransactions.Where(x => x.IsPending).Sum(x => x.BalanceChange);
 
-            Terms = transactions
-                .GroupBy(x => new { x.TermCode, x.TermName })
-                .OrderByDescending(group => group.Key.TermCode)
-                .Select(group => CreateTermGroup(group.Key.TermCode, group.Key.TermName, group))
-                .ToArray();
+            Terms = CreateTermGroups(transactions);
 
             CurrentAndUpcomingTerms = currentTerm is null
                 ? []
@@ -114,32 +110,67 @@ public class BillingModel : CampusFlowPageModel
         }
     }
 
+    private static IReadOnlyList<BillingTermGroup> CreateTermGroups(
+        IEnumerable<StudentBillingTransaction> transactions)
+    {
+        var groupedTransactions = transactions
+                .GroupBy(x => new { x.TermCode, x.TermName })
+                .OrderBy(group => group.Key.TermCode)
+                .ToArray();
+        var terms = new List<BillingTermGroup>(groupedTransactions.Length);
+        decimal carriedBalance = 0;
+        var isFirstTerm = true;
+
+        foreach (var group in groupedTransactions)
+        {
+            var term = CreateTermGroup(
+                group.Key.TermCode,
+                group.Key.TermName,
+                group,
+                carriedBalance,
+                !isFirstTerm);
+            terms.Add(term);
+            carriedBalance = term.Balance;
+            isFirstTerm = false;
+        }
+
+        terms.Reverse();
+        return terms;
+    }
+
     private static BillingTermGroup CreateTermGroup(
         string termCode,
         string termName,
-        IEnumerable<StudentBillingTransaction> transactions)
+        IEnumerable<StudentBillingTransaction> transactions,
+        decimal previousTermBalance,
+        bool includeCarryForward)
     {
-        decimal runningBalance = 0;
-        var rows = transactions
-            .OrderBy(x => x.TransactionDate)
-            .ThenBy(x => x.ExternalTransactionId)
-            .Select(transaction =>
-            {
-                if (!transaction.IsVoided)
-                {
-                    runningBalance += transaction.BalanceChange;
-                }
+        var runningBalance = previousTermBalance;
+        var rows = new List<BillingTransactionRow>();
+        if (includeCarryForward && previousTermBalance != 0)
+        {
+            rows.Add(new BillingTransactionRow(null, previousTermBalance, true));
+        }
 
-                return new BillingTransactionRow(transaction, runningBalance);
-            })
-            .Reverse()
-            .ToArray();
+        foreach (var transaction in transactions
+                     .OrderBy(x => x.TransactionDate)
+                     .ThenBy(x => x.ExternalTransactionId))
+        {
+            if (!transaction.IsVoided)
+            {
+                runningBalance += transaction.BalanceChange;
+            }
+
+            rows.Add(new BillingTransactionRow(transaction, runningBalance, false));
+        }
+
+        rows.Reverse();
 
         return new BillingTermGroup(
             termCode,
             termName,
             runningBalance,
-            rows.Count(x => x.Transaction.IsPending && !x.Transaction.IsVoided),
+            rows.Count(x => x.Transaction is { IsPending: true, IsVoided: false }),
             rows);
     }
 
@@ -151,6 +182,7 @@ public class BillingModel : CampusFlowPageModel
         IReadOnlyList<BillingTransactionRow> Transactions);
 
     public sealed record BillingTransactionRow(
-        StudentBillingTransaction Transaction,
-        decimal RunningBalance);
+        StudentBillingTransaction? Transaction,
+        decimal RunningBalance,
+        bool IsCarryForward);
 }

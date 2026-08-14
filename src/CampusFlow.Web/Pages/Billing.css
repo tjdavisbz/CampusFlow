@@ -159,6 +159,7 @@
 .status-pending { color: #7a4e00; background: #fff3d6; }
 .status-posted { color: #166534; background: #dcfce7; }
 .status-voided { color: #475467; background: #f2f4f7; }
+.status-carried { color: var(--tenant-primary-dark); background: color-mix(in srgb, var(--tenant-accent), white 55%); }
 
 .transaction-table-wrap { overflow-x: auto; }
 .transaction-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
@@ -170,6 +171,7 @@
 .transaction-table .money { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .transaction-table td:nth-child(2) { min-width: 220px; }
 .voided-row { color: var(--billing-muted); text-decoration: line-through; }
+.carry-forward-row td { color: var(--tenant-primary-dark); background: color-mix(in srgb, var(--tenant-accent), white 87%); font-weight: 700; }
 
 .billing-message {
     display: flex;
