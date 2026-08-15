@@ -111,7 +111,7 @@
                 <div class="catalog-tools">
                     @if (Model.Selection.DegreeAuditAvailable)
                     {
-                        <label class="degree-filter"><input id="degreeRequirementFilter" type="checkbox" /><span>Degree requirements only</span></label>
+                        <label class="degree-filter"><input id="degreeRequirementFilter" type="checkbox" checked /><span>Degree requirements only</span></label>
                     }
                     <label class="degree-filter"><input id="excludeCompletedFilter" type="checkbox" checked /><span>Exclude already taken</span></label>
                     <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
@@ -217,6 +217,28 @@
             const search = document.getElementById('courseSearch');
             const degreeFilter = document.getElementById('degreeRequirementFilter');
             const excludeCompletedFilter = document.getElementById('excludeCompletedFilter');
+            const filterCookieName = 'campusflow_course_filters_@Model.FilterPreferenceKey';
+            const readFilterCookie = () => {
+                const prefix = `${filterCookieName}=`;
+                const cookie = document.cookie.split('; ').find(value => value.startsWith(prefix));
+                if (!cookie) return null;
+                try { return JSON.parse(decodeURIComponent(cookie.substring(prefix.length))); }
+                catch { return null; }
+            };
+            const saveFilterCookie = () => {
+                const settings = {
+                    degreeOnly: degreeFilter?.checked ?? true,
+                    excludeCompleted: excludeCompletedFilter?.checked ?? true
+                };
+                document.cookie = `${filterCookieName}=${encodeURIComponent(JSON.stringify(settings))}; path=/; max-age=31536000; SameSite=Lax; Secure`;
+            };
+            const savedFilters = readFilterCookie();
+            if (savedFilters) {
+                if (degreeFilter && typeof savedFilters.degreeOnly === 'boolean')
+                    degreeFilter.checked = savedFilters.degreeOnly;
+                if (excludeCompletedFilter && typeof savedFilters.excludeCompleted === 'boolean')
+                    excludeCompletedFilter.checked = savedFilters.excludeCompleted;
+            }
             const errorDialog = document.getElementById('courseErrorDialog');
             const acknowledgeError = document.getElementById('acknowledgeCourseError');
             const degreeAuditRefreshOverlay = document.getElementById('degreeAuditRefreshOverlay');
@@ -274,8 +296,14 @@
                 }
             };
             search?.addEventListener('input', applyCatalogFilters);
-            degreeFilter?.addEventListener('change', applyCatalogFilters);
-            excludeCompletedFilter?.addEventListener('change', applyCatalogFilters);
+            degreeFilter?.addEventListener('change', () => {
+                saveFilterCookie();
+                applyCatalogFilters();
+            });
+            excludeCompletedFilter?.addEventListener('change', () => {
+                saveFilterCookie();
+                applyCatalogFilters();
+            });
             applyCatalogFilters();
             document.querySelectorAll('.add-course-form').forEach(form => form.addEventListener('submit', () => {
                 const overlay = document.getElementById('processingOverlay');
