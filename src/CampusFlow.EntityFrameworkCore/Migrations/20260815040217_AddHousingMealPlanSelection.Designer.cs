@@ -3,6 +3,7 @@ using System;
 using CampusFlow.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Volo.Abp.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace CampusFlow.Migrations
 {
     [DbContext(typeof(CampusFlowDbContext))]
-    partial class CampusFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260815034554_AddHousingMealPlanSelection")]
+    partial class AddHousingMealPlanSelection
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1247,22 +1250,11 @@ namespace CampusFlow.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");
 
-                    b.Property<DateTime?>("TermEndDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("TermName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<DateTime?>("TermStartDate")
-                        .HasColumnType("timestamp without time zone");
-
                     b.HasKey("Id");
 
                     b.HasIndex("StudentProfileId");
 
-                    b.HasIndex("TenantId", "StudentProfileId", "TermName")
+                    b.HasIndex("TenantId", "StudentProfileId")
                         .IsUnique();
 
                     b.HasIndex("TenantId", "SyncedToStudentInformationSystem", "SubmittedAt");
