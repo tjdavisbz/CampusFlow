@@ -113,13 +113,14 @@
                     {
                         <label class="degree-filter"><input id="degreeRequirementFilter" type="checkbox" /><span>Degree requirements only</span></label>
                     }
+                    <label class="degree-filter"><input id="excludeCompletedFilter" type="checkbox" checked /><span>Exclude already taken</span></label>
                     <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
                 </div>
             </div>
             <div class="offering-grid" id="offeringGrid">
                 @foreach (var course in Model.Selection.Offerings.Where(x => x.CanSelect))
                 {
-                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())" data-degree-required="@course.FulfillsDegreeRequirement.ToString().ToLowerInvariant()">
+                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())" data-degree-required="@course.FulfillsDegreeRequirement.ToString().ToLowerInvariant()" data-attempt-outcome="@course.PreviousAttemptOutcome">
                         <div class="offering-top"><span>@course.CourseCode-@course.Section</span><span>@course.Credits.ToString("0.##") credits</span></div>
                         <h3>@course.CourseName</h3>
                         @if (course.FulfillsDegreeRequirement)
@@ -128,9 +129,12 @@
                         }
                         @if (course.WasPreviouslyTaken)
                         {
+                            var attemptLabel = string.IsNullOrWhiteSpace(course.PreviousGrade)
+                                ? "Already taken"
+                                : $"Already taken · Grade {course.PreviousGrade}";
                             <div class="course-attempt-badge @course.PreviousAttemptOutcome">
                                 <i class="fa-solid @(course.PreviousAttemptOutcome == "successful" ? "fa-circle-check" : course.PreviousAttemptOutcome == "unsuccessful" ? "fa-circle-exclamation" : "fa-clock")"></i>
-                                <span>Already taken@if (!string.IsNullOrWhiteSpace(course.PreviousGrade)) { <strong> · Grade @course.PreviousGrade</strong> }</span>
+                                <span>@attemptLabel</span>
                             </div>
                         }
                         <div class="offering-details">
@@ -198,6 +202,7 @@
         (() => {
             const search = document.getElementById('courseSearch');
             const degreeFilter = document.getElementById('degreeRequirementFilter');
+            const excludeCompletedFilter = document.getElementById('excludeCompletedFilter');
             const errorDialog = document.getElementById('courseErrorDialog');
             const acknowledgeError = document.getElementById('acknowledgeCourseError');
             if (errorDialog) {
@@ -213,22 +218,26 @@
             const applyCatalogFilters = () => {
                 const value = search.value.trim().toLowerCase();
                 const degreeOnly = degreeFilter?.checked === true;
+                const excludeCompleted = excludeCompletedFilter?.checked === true;
                 let visible = 0;
                 cards.forEach(card => {
                     const show = card.dataset.search.includes(value) &&
-                        (!degreeOnly || card.dataset.degreeRequired === 'true');
+                        (!degreeOnly || card.dataset.degreeRequired === 'true') &&
+                        (!excludeCompleted || card.dataset.attemptOutcome !== 'successful');
                     card.hidden = !show;
                     if (show) visible++;
                 });
                 if (none) {
                     none.textContent = degreeOnly
-                        ? 'No available courses match your outstanding degree requirements.'
-                        : 'No courses match your search.';
+                        ? 'No available courses match your outstanding degree requirements and current filters.'
+                        : 'No courses match your current filters.';
                     none.hidden = visible !== 0;
                 }
             };
             search?.addEventListener('input', applyCatalogFilters);
             degreeFilter?.addEventListener('change', applyCatalogFilters);
+            excludeCompletedFilter?.addEventListener('change', applyCatalogFilters);
+            applyCatalogFilters();
             document.querySelectorAll('.add-course-form').forEach(form => form.addEventListener('submit', () => {
                 const overlay = document.getElementById('processingOverlay');
                 const title = document.getElementById('processingTitle');
