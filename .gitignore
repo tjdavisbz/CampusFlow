@@ -196,6 +196,9 @@ orleans.codegen.cs
 # Local ABP configuration containing developer secrets
 **/appsettings.secrets.json
 
+# Legacy Elements PortalAgent binaries and tenant configuration (reference only)
+/PortalAgent/
+
 # Logs created when applications are launched from the repository root
 /Logs/
 
@@ -296,3 +299,6 @@ tempkey.jwk
 # Local development utilities and generated previews.
 /tools/local/
 /output/
+
+# macOS metadata
+.DS_Store

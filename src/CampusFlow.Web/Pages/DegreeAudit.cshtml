@@ -1,0 +1,137 @@
+@page
+@model CampusFlow.Web.Pages.DegreeAuditModel
+@using CampusFlow.Web.Pages
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Degree Audit";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.DegreeAudit;
+}
+
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl)) { <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" /> }
+    <abp-style src="/Pages/DegreeAudit.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
+}
+
+<main class="audit-page">
+    <header class="audit-hero">
+        <div><span>Academic progress</span><h1>Degree Audit</h1><p>See how your completed and in-progress courses apply toward your degree.</p></div>
+        <div class="audit-student"><strong>@Model.StudentDisplayName</strong><span>ID @Model.StudentIdentifier</span></div>
+    </header>
+
+    @if (Model.IsUnavailable)
+    {
+        <section class="audit-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Your degree audit is temporarily unavailable</h2><p>Please try again shortly.</p></div></section>
+    }
+    else if (Model.Audits.Count == 0)
+    {
+        <section class="audit-message"><i class="fa-solid fa-graduation-cap"></i><div><h2>No degree audit is available</h2><p>Contact your advisor if you believe a program should appear here.</p></div></section>
+    }
+    else if (Model.SelectedAudit is not null)
+    {
+        @if (Model.Audits.Count > 1)
+        {
+            <nav class="audit-switcher" aria-label="Degree programs">
+                @foreach (var audit in Model.Audits)
+                {
+                    <a class="@(audit.AuditProgramId == Model.AuditProgramId ? "selected" : "")" asp-page="/DegreeAudit" asp-route-revisionTermId="@audit.RevisionTermId" asp-route-auditDegreeId="@audit.AuditDegreeId" asp-route-auditProgramId="@audit.AuditProgramId"><strong>@audit.Program</strong><span>@audit.RevisionTerm</span></a>
+                }
+            </nav>
+        }
+
+        var summary = Model.SelectedAudit.Summary;
+        <section class="audit-overview">
+            <div class="audit-overview-copy"><span>Selected program</span><h2>@summary.Degree</h2><p>@summary.Program · @summary.RevisionTerm catalog</p></div>
+            <div class="audit-progress" style="--progress:@Model.CompletionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"><div><strong>@Model.CompletionPercent.ToString("0")%</strong><span>complete</span></div></div>
+            <dl>
+                <div><dt>Credits completed</dt><dd>@DegreeAuditModel.Number(summary.CreditsCompleted) of @DegreeAuditModel.Number(summary.CreditsRequired)</dd></div>
+                <div><dt>Credits remaining</dt><dd>@DegreeAuditModel.Number(Math.Max(0, summary.CreditsRequired-summary.CreditsCompleted))</dd></div>
+                <div><dt>Degree audit GPA</dt><dd>@summary.GpaAttained.ToString("0.00")</dd></div>
+                <div><dt>Overall GPA</dt><dd>@(Model.SelectedAudit.CumulativeGpa?.ToString("0.00") ?? "—")</dd></div>
+            </dl>
+        </section>
+
+        @if (summary.NeedsUpdate && !Model.RefreshComplete)
+        {
+            <section class="audit-notice"><i class="fa-solid fa-arrows-rotate"></i><div><strong>Your audit is awaiting an Elements refresh</strong><span>The information below reflects the latest calculated audit currently available.</span></div></section>
+        }
+
+        <section class="audit-requirements">
+            <div class="audit-section-title"><div><span>Program requirements</span><h2>Degree requirements</h2></div><p>Expand a section to see how courses apply.</p></div>
+            @foreach (var requirement in Model.Requirements)
+            {
+                <details class="requirement" open="@(requirement.Status.Equals("Remaining", StringComparison.OrdinalIgnoreCase))">
+                    <summary><div><span class="status-dot @DegreeAuditModel.StatusClass(requirement.Status)"></span><strong>@requirement.Name</strong><small>@DegreeAuditModel.Number(requirement.CreditsCompleted) of @DegreeAuditModel.Number(requirement.CreditsRequired) credits</small></div><span class="status-pill @DegreeAuditModel.StatusClass(requirement.Status)">@DegreeAuditModel.StatusLabel(requirement.Status)</span><i class="fa-solid fa-chevron-down"></i></summary>
+                    <div class="requirement-body">
+                        @foreach (var group in requirement.Groups)
+                        {
+                            <article class="audit-group">
+                                <header><div><h3>@group.Name</h3><span>@DegreeAuditModel.Number(group.CreditsCompleted) of @DegreeAuditModel.Number(group.CreditsRequired) credits · Minimum GPA @group.MinimumGpa.ToString("0.00")</span></div><span class="status-pill @DegreeAuditModel.StatusClass(group.Status)">@DegreeAuditModel.StatusLabel(group.Status)</span></header>
+                                <div class="course-list">
+                                    @foreach (var course in group.Courses)
+                                    {
+                                        <div class="audit-course"><div><strong>@(string.IsNullOrWhiteSpace(course.CourseCode) ? "Course requirement" : course.CourseCode)</strong><span>@course.CourseName</span></div><div class="course-facts"><span>@(string.IsNullOrWhiteSpace(course.Term) ? "Not yet completed" : course.Term)</span><span>@DegreeAuditModel.Number(course.Credits) credits</span>@if (!string.IsNullOrWhiteSpace(course.Grade)){<span>Grade @course.Grade</span>}<span class="status-pill @DegreeAuditModel.StatusClass(course.CourseStatus)">@DegreeAuditModel.StatusLabel(course.CourseStatus)</span></div></div>
+                                    }
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </details>
+            }
+        </section>
+    }
+</main>
+
+@if (Model.SelectedAudit is not null && !Model.RefreshComplete)
+{
+    <form id="audit-refresh-token" class="audit-refresh-token">
+        @Html.AntiForgeryToken()
+    </form>
+    <div id="audit-refresh-modal" class="audit-refresh-modal" role="dialog" aria-modal="true" aria-labelledby="audit-refresh-title">
+        <div class="audit-refresh-card">
+            <div class="audit-refresh-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+            <span>Degree Audit</span>
+            <h2 id="audit-refresh-title">Refreshing your degree audit</h2>
+            <p id="audit-refresh-message">Elements is applying your latest coursework and academic progress. This may take a moment.</p>
+            <div class="audit-refresh-progress" aria-hidden="true"><span></span></div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    @if (Model.SelectedAudit is not null && !Model.RefreshComplete)
+    {
+        <script>
+            (() => {
+                const modal = document.getElementById('audit-refresh-modal');
+                const message = document.getElementById('audit-refresh-message');
+                const token = document.querySelector('#audit-refresh-token input[name="__RequestVerificationToken"]');
+                const body = new FormData();
+                body.append('__RequestVerificationToken', token.value);
+                body.append('revisionTermId', '@Model.RevisionTermId');
+                body.append('auditDegreeId', '@Model.AuditDegreeId');
+                body.append('auditProgramId', '@Model.AuditProgramId');
+
+                fetch('@Url.Page("/DegreeAudit", "Refresh")', {
+                    method: 'POST',
+                    body,
+                    credentials: 'same-origin'
+                }).then(response => {
+                    if (!response.ok) throw new Error('Degree audit refresh failed.');
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('refreshComplete', 'true');
+                    window.location.replace(url);
+                }).catch(() => {
+                    modal.classList.add('refresh-failed');
+                    document.getElementById('audit-refresh-title').textContent = 'Your current audit is ready';
+                    message.textContent = 'We could not check for newer information right now. Showing the latest audit currently available.';
+                    window.setTimeout(() => modal.remove(), 1800);
+                });
+            })();
+        </script>
+    }
+}
