@@ -19,6 +19,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly IRepository<StudentProfile, Guid> _profiles;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
+    private readonly IReadOnlyCollection<IStudentInformationSystemDegreeAuditLookup> _degreeAuditLookups;
     private readonly ICourseSelectionAppService _courseSelection;
     private readonly ILogger<CourseSelectionModel> _logger;
 
@@ -26,12 +27,14 @@ public class CourseSelectionModel : CampusFlowPageModel
         ITenantThemeProvider tenantThemeProvider,
         IRepository<StudentProfile, Guid> profiles,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
+        IEnumerable<IStudentInformationSystemDegreeAuditLookup> degreeAuditLookups,
         ICourseSelectionAppService courseSelection,
         ILogger<CourseSelectionModel> logger)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _profiles = profiles;
         _termLookups = termLookups.ToArray();
+        _degreeAuditLookups = degreeAuditLookups.ToArray();
         _courseSelection = courseSelection;
         _logger = logger;
     }
@@ -46,6 +49,9 @@ public class CourseSelectionModel : CampusFlowPageModel
     public bool IsUnavailable { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string ErrorTitle { get; private set; } = "Course not added";
+
+    [BindProperty(SupportsGet = true)]
+    public bool RefreshComplete { get; set; }
 
     [BindProperty]
     public string ExternalTermId { get; set; } = string.Empty;
@@ -63,6 +69,37 @@ public class CourseSelectionModel : CampusFlowPageModel
     public string? SuccessMessage { get; set; }
 
     public async Task OnGetAsync(string? term = null) => await LoadAsync(term);
+
+    public async Task<IActionResult> OnPostRefreshDegreeAuditAsync()
+    {
+        if (CurrentUser.Id is null)
+            return Unauthorized();
+
+        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var lookup = profile is null
+            ? null
+            : _degreeAuditLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+        if (profile is null || lookup is null)
+            return new JsonResult(new { refreshed = false }) { StatusCode = 404 };
+
+        try
+        {
+            var audit = (await lookup.GetAuditsAsync(
+                profile.ExternalStudentId, HttpContext.RequestAborted)).FirstOrDefault();
+            if (audit is null)
+                return new JsonResult(new { refreshed = false }) { StatusCode = 404 };
+
+            await lookup.RefreshAuditAsync(profile.ExternalStudentId, audit.RevisionTermId,
+                audit.AuditDegreeId, audit.AuditProgramId, HttpContext.RequestAborted);
+            return new JsonResult(new { refreshed = true });
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception,
+                "Unable to refresh the current student's degree audit from Course Selection.");
+            return new JsonResult(new { refreshed = false }) { StatusCode = 502 };
+        }
+    }
 
     public async Task<IActionResult> OnPostAddAsync()
     {

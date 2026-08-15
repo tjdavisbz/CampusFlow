@@ -160,6 +160,20 @@
     }
 </main>
 
+@if (Model.Selection?.DegreeAuditAvailable == true && !Model.RefreshComplete && string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <form id="course-audit-refresh-token" hidden>
+        @Html.AntiForgeryToken()
+    </form>
+    <div class="processing-overlay" id="degreeAuditRefreshOverlay" role="status" aria-live="polite">
+        <div>
+            <span class="processing-spinner"></span>
+            <h2 id="degreeAuditRefreshTitle">Refreshing your degree audit</h2>
+            <p id="degreeAuditRefreshMessage">Checking which available courses apply to your remaining degree requirements.</p>
+        </div>
+    </div>
+}
+
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
     <div class="course-error-modal" id="courseErrorDialog" role="alertdialog" aria-modal="true" aria-labelledby="courseErrorTitle" aria-describedby="courseErrorDescription">
@@ -205,6 +219,31 @@
             const excludeCompletedFilter = document.getElementById('excludeCompletedFilter');
             const errorDialog = document.getElementById('courseErrorDialog');
             const acknowledgeError = document.getElementById('acknowledgeCourseError');
+            const degreeAuditRefreshOverlay = document.getElementById('degreeAuditRefreshOverlay');
+            if (degreeAuditRefreshOverlay) {
+                document.body.classList.add('modal-open');
+                const token = document.querySelector('#course-audit-refresh-token input[name="__RequestVerificationToken"]');
+                const body = new FormData();
+                body.append('__RequestVerificationToken', token.value);
+                fetch('@Url.Page("/CourseSelection", "RefreshDegreeAudit")', {
+                    method: 'POST',
+                    body,
+                    credentials: 'same-origin'
+                }).then(response => {
+                    if (!response.ok) throw new Error('Degree audit refresh failed.');
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('refreshComplete', 'true');
+                    window.location.replace(url);
+                }).catch(() => {
+                    document.getElementById('degreeAuditRefreshTitle').textContent = 'Using your latest degree audit';
+                    document.getElementById('degreeAuditRefreshMessage').textContent =
+                        'We could not check for newer information right now. The available course list is still ready to use.';
+                    window.setTimeout(() => {
+                        degreeAuditRefreshOverlay.remove();
+                        document.body.classList.remove('modal-open');
+                    }, 1800);
+                });
+            }
             if (errorDialog) {
                 document.body.classList.add('modal-open');
                 acknowledgeError?.focus();
