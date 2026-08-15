@@ -108,14 +108,24 @@
         <section class="available-courses" aria-labelledby="available-heading">
             <div class="section-heading">
                 <div><span>Course catalog</span><h2 id="available-heading">Available courses</h2></div>
-                <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
+                <div class="catalog-tools">
+                    @if (Model.Selection.DegreeAuditAvailable)
+                    {
+                        <label class="degree-filter"><input id="degreeRequirementFilter" type="checkbox" /><span>Degree requirements only</span></label>
+                    }
+                    <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
+                </div>
             </div>
             <div class="offering-grid" id="offeringGrid">
                 @foreach (var course in Model.Selection.Offerings.Where(x => x.CanSelect))
                 {
-                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())">
+                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())" data-degree-required="@course.FulfillsDegreeRequirement.ToString().ToLowerInvariant()">
                         <div class="offering-top"><span>@course.CourseCode-@course.Section</span><span>@course.Credits.ToString("0.##") credits</span></div>
                         <h3>@course.CourseName</h3>
+                        @if (course.FulfillsDegreeRequirement)
+                        {
+                            <div class="degree-requirement-badge" title="@course.DegreeRequirementName"><i class="fa-solid fa-circle-check"></i> Fulfills degree requirement</div>
+                        }
                         <div class="offering-details">
                             <span><i class="fa-regular fa-user"></i> @(course.InstructorName ?? "Instructor to be announced")</span>
                             @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }
@@ -180,6 +190,7 @@
     <script>
         (() => {
             const search = document.getElementById('courseSearch');
+            const degreeFilter = document.getElementById('degreeRequirementFilter');
             const errorDialog = document.getElementById('courseErrorDialog');
             const acknowledgeError = document.getElementById('acknowledgeCourseError');
             if (errorDialog) {
@@ -192,16 +203,25 @@
             }
             const cards = [...document.querySelectorAll('.offering-card')];
             const none = document.getElementById('noSearchResults');
-            search?.addEventListener('input', () => {
+            const applyCatalogFilters = () => {
                 const value = search.value.trim().toLowerCase();
+                const degreeOnly = degreeFilter?.checked === true;
                 let visible = 0;
                 cards.forEach(card => {
-                    const show = card.dataset.search.includes(value);
+                    const show = card.dataset.search.includes(value) &&
+                        (!degreeOnly || card.dataset.degreeRequired === 'true');
                     card.hidden = !show;
                     if (show) visible++;
                 });
-                if (none) none.hidden = visible !== 0;
-            });
+                if (none) {
+                    none.textContent = degreeOnly
+                        ? 'No available courses match your outstanding degree requirements.'
+                        : 'No courses match your search.';
+                    none.hidden = visible !== 0;
+                }
+            };
+            search?.addEventListener('input', applyCatalogFilters);
+            degreeFilter?.addEventListener('change', applyCatalogFilters);
             document.querySelectorAll('.add-course-form').forEach(form => form.addEventListener('submit', () => {
                 const overlay = document.getElementById('processingOverlay');
                 const title = document.getElementById('processingTitle');
