@@ -126,6 +126,13 @@
                         {
                             <div class="degree-requirement-badge" title="@course.DegreeRequirementName"><i class="fa-solid fa-circle-check"></i> Fulfills degree requirement</div>
                         }
+                        @if (course.WasPreviouslyTaken)
+                        {
+                            <div class="course-attempt-badge @course.PreviousAttemptOutcome">
+                                <i class="fa-solid @(course.PreviousAttemptOutcome == "successful" ? "fa-circle-check" : course.PreviousAttemptOutcome == "unsuccessful" ? "fa-circle-exclamation" : "fa-clock")"></i>
+                                <span>Already taken@if (!string.IsNullOrWhiteSpace(course.PreviousGrade)) { <strong> · Grade @course.PreviousGrade</strong> }</span>
+                            </div>
+                        }
                         <div class="offering-details">
                             <span><i class="fa-regular fa-user"></i> @(course.InstructorName ?? "Instructor to be announced")</span>
                             @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }

@@ -241,6 +241,51 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
         return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
     }
 
+    public async Task<IReadOnlyList<StudentCourseAttempt>> GetCourseAttemptsAsync(
+        string externalStudentId, CancellationToken cancellationToken = default)
+    {
+        if (!int.TryParse(externalStudentId, out var studentUid))
+            throw new ArgumentException("The Thesis Elements student identifier is invalid.", nameof(externalStudentId));
+
+        const string sql = """
+            WITH RankedAttempts AS
+            (
+                SELECT
+                    LTRIM(RTRIM(academic.Department)) AS Department,
+                    LTRIM(RTRIM(CONVERT(varchar(30), academic.CourseID))) AS CourseCode,
+                    LTRIM(RTRIM(academic.CourseType)) AS CourseType,
+                    LTRIM(RTRIM(COALESCE(academic.Grade, ''))) AS Grade,
+                    CASE WHEN academic.EffectiveWithdrawDate IS NULL THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS WasWithdrawn,
+                    ROW_NUMBER() OVER
+                    (
+                        PARTITION BY academic.Department, academic.CourseID, academic.CourseType
+                        ORDER BY COALESCE(academic.EffectiveWithdrawDate, academic.EffectiveAddDate) DESC,
+                                 academic.TermCalendarID DESC,
+                                 academic.SRAcademicID DESC
+                    ) AS AttemptRank
+                FROM dbo.SRAcademic academic
+                WHERE academic.StudentUID = @StudentUID
+                  AND academic.SROfferID <> 0
+            )
+            SELECT Department, CourseCode, CourseType, Grade, WasWithdrawn
+            FROM RankedAttempts
+            WHERE AttemptRank = 1
+            """;
+
+        var attempts = new List<StudentCourseAttempt>();
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@StudentUID", SqlDbType.Int).Value = studentUid;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            attempts.Add(new StudentCourseAttempt(
+                reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(4)));
+        }
+
+        return attempts;
+    }
+
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         var connectionString = _configuration.GetConnectionString(ConnectionStringName);

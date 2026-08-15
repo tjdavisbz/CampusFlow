@@ -26,6 +26,10 @@ public interface IStudentInformationSystemCourseSelectionLookup
         string externalTermId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<StudentCourseAttempt>> GetCourseAttemptsAsync(
+        string externalStudentId,
+        CancellationToken cancellationToken = default);
+
     Task<bool> HasNonWithdrawnCourseAttemptAsync(
         string externalStudentId,
         string department,

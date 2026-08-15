@@ -19,6 +19,9 @@ public sealed class CourseSelectionOfferingDto
     public bool CanSelect { get; set; }
     public bool FulfillsDegreeRequirement { get; set; }
     public string? DegreeRequirementName { get; set; }
+    public bool WasPreviouslyTaken { get; set; }
+    public string? PreviousGrade { get; set; }
+    public string? PreviousAttemptOutcome { get; set; }
 }
 
 public sealed class CourseSelectionRegistrationDto
