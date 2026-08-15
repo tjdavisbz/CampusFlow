@@ -67,11 +67,20 @@ public class CampusFlowMenuContributor : IMenuContributor
             );
             student.AddItem(
             new ApplicationMenuItem(
+                CampusFlowMenus.DegreeAudit,
+                "Degree Audit",
+                "~/DegreeAudit",
+                icon: "fa fa-chart-pie",
+                order: 4
+            )
+            );
+            student.AddItem(
+            new ApplicationMenuItem(
                 CampusFlowMenus.Billing,
                 "Billing",
                 "~/Billing",
                 icon: "fa fa-file-invoice-dollar",
-                order: 4
+                order: 5
             )
             );
             student.AddItem(
@@ -80,7 +89,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                 "Financial Aid",
                 "~/FinancialAid",
                 icon: "fa fa-graduation-cap",
-                order: 5
+                order: 6
             )
             );
             student.AddItem(
@@ -89,7 +98,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                 "Bill Approval",
                 "~/BillApproval",
                 icon: "fa fa-file-signature",
-                order: 6
+                order: 7
             )
             );
             context.Menu.AddItem(student);
