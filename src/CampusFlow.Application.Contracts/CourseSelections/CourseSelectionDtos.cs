@@ -17,6 +17,11 @@ public sealed class CourseSelectionOfferingDto
     public TimeSpan? StartTime { get; set; }
     public TimeSpan? EndTime { get; set; }
     public bool CanSelect { get; set; }
+    public bool FulfillsDegreeRequirement { get; set; }
+    public string? DegreeRequirementName { get; set; }
+    public bool WasPreviouslyTaken { get; set; }
+    public string? PreviousGrade { get; set; }
+    public string? PreviousAttemptOutcome { get; set; }
 }
 
 public sealed class CourseSelectionRegistrationDto
@@ -39,6 +44,7 @@ public sealed class CourseSelectionDto
     public string AttendanceType { get; set; } = null!;
     public decimal MaximumAllowedCredits { get; set; }
     public decimal SelectedCredits { get; set; }
+    public bool DegreeAuditAvailable { get; set; }
     public List<CourseSelectionOfferingDto> Offerings { get; set; } = [];
     public List<CourseSelectionRegistrationDto> Registrations { get; set; } = [];
 }

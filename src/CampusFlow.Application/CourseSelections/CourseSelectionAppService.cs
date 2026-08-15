@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
@@ -23,7 +24,9 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     private readonly IRepository<CourseSectionAttendanceTypeMapping, Guid> _sectionMappings;
     private readonly IStudentInformationSystemCourseSelectionLookup _lookup;
     private readonly IStudentInformationSystemCourseRegistrationService _registration;
+    private readonly IReadOnlyCollection<IStudentInformationSystemDegreeAuditLookup> _degreeAuditLookups;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly ILogger<CourseSelectionAppService> _logger;
 
     public CourseSelectionAppService(
         IRepository<StudentProfile, Guid> profiles,
@@ -34,7 +37,9 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         IRepository<CourseSectionAttendanceTypeMapping, Guid> sectionMappings,
         IStudentInformationSystemCourseSelectionLookup lookup,
         IStudentInformationSystemCourseRegistrationService registration,
-        IUnitOfWorkManager unitOfWorkManager)
+        IEnumerable<IStudentInformationSystemDegreeAuditLookup> degreeAuditLookups,
+        IUnitOfWorkManager unitOfWorkManager,
+        ILogger<CourseSelectionAppService> logger)
     {
         _profiles = profiles;
         _policies = policies;
@@ -44,7 +49,9 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         _sectionMappings = sectionMappings;
         _lookup = lookup;
         _registration = registration;
+        _degreeAuditLookups = degreeAuditLookups.ToList();
         _unitOfWorkManager = unitOfWorkManager;
+        _logger = logger;
     }
 
     public async Task<CourseSelectionDto> GetAsync(string externalTermId)
@@ -56,9 +63,11 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var offerings = await _lookup.GetAvailableOfferingsAsync(externalTermId);
         var sectionMappings = await GetSectionMappingsAsync();
         var registrations = await _lookup.GetRegistrationsAsync(profile.ExternalStudentId, externalTermId);
+        var courseAttempts = await GetCourseAttemptsAsync(profile);
         var reviewQuery = await _reviews.GetQueryableAsync();
         var reviews = await AsyncExecuter.ToListAsync(reviewQuery.Where(x =>
             x.StudentProfileId == profile.Id && x.ExternalTermId == externalTermId));
+        var degreeRequirements = await GetOutstandingDegreeRequirementsAsync(profile);
 
         return new CourseSelectionDto
         {
@@ -67,8 +76,12 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             AttendanceType = context.AttendanceType,
             MaximumAllowedCredits = context.MaximumAllowedCredits,
             SelectedCredits = registrations.Sum(x => x.Credits),
-            Offerings = offerings.Select(x => new CourseSelectionOfferingDto
+            DegreeAuditAvailable = degreeRequirements is not null,
+            Offerings = offerings.Select(x =>
             {
+                var previousAttempt = FindPreviousAttempt(x, courseAttempts);
+                return new CourseSelectionOfferingDto
+                {
                 ExternalOfferingId = x.ExternalOfferingId,
                 CourseCode = x.CourseCode,
                 Section = x.Section,
@@ -80,8 +93,16 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 MeetingDays = x.MeetingDays,
                 StartTime = x.StartTime,
                 EndTime = x.EndTime,
+                FulfillsDegreeRequirement = TryGetDegreeRequirement(x, degreeRequirements, out _),
+                DegreeRequirementName = TryGetDegreeRequirement(x, degreeRequirements, out var requirementName)
+                    ? requirementName
+                    : null,
+                WasPreviouslyTaken = previousAttempt is not null,
+                PreviousGrade = GetPreviousGrade(previousAttempt),
+                PreviousAttemptOutcome = GetPreviousAttemptOutcome(previousAttempt),
                 CanSelect = CanSelect(policy, context, x, sectionMappings) &&
                     registrations.All(r => r.ExternalOfferingId != x.ExternalOfferingId)
+                };
             }).ToList(),
             Registrations = registrations.Select(x => new CourseSelectionRegistrationDto
             {
@@ -97,6 +118,127 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                     r.ExternalCourseRegistrationId == x.ExternalRegistrationId && r.NeedsReview)
             }).ToList()
         };
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>?> GetOutstandingDegreeRequirementsAsync(
+        StudentProfile profile)
+    {
+        var lookup = _degreeAuditLookups.FirstOrDefault(x => x.Provider == profile.Provider);
+        if (lookup is null)
+            return null;
+
+        try
+        {
+            var audit = (await lookup.GetAuditsAsync(profile.ExternalStudentId)).FirstOrDefault();
+            if (audit is null)
+                return null;
+
+            var detail = await lookup.GetAuditAsync(profile.ExternalStudentId, audit.RevisionTermId,
+                audit.AuditDegreeId, audit.AuditProgramId);
+            if (detail is null)
+                return null;
+
+            return detail.Courses
+                .Where(IsOutstandingDegreeCourse)
+                .Where(x => !string.IsNullOrWhiteSpace(x.CourseCode))
+                .GroupBy(x => NormalizeCourseCode(x.CourseCode))
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.Select(course => !string.IsNullOrWhiteSpace(course.GroupName)
+                            ? course.GroupName
+                            : course.RequirementName)
+                        .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "Degree requirement");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Degree audit requirements could not be loaded for course selection student {ExternalStudentId}.",
+                profile.ExternalStudentId);
+            return null;
+        }
+    }
+
+    private static bool IsOutstandingDegreeCourse(StudentDegreeAuditCourse course)
+    {
+        var courseIsRemaining = string.Equals(course.CourseStatus, "R", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(course.CourseStatus, "MR", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(course.CourseStatus, "TR", StringComparison.OrdinalIgnoreCase);
+        var groupIsRemaining = course.GroupCreditsCompleted < course.GroupCreditsRequired &&
+                               !string.Equals(course.GroupStatus, "C", StringComparison.OrdinalIgnoreCase) &&
+                               !string.Equals(course.GroupStatus, "MC", StringComparison.OrdinalIgnoreCase) &&
+                               !string.Equals(course.GroupStatus, "TC", StringComparison.OrdinalIgnoreCase) &&
+                               !string.Equals(course.GroupStatus, "NN", StringComparison.OrdinalIgnoreCase);
+        var requirementIsRemaining = course.RequirementCreditsCompleted < course.RequirementCreditsRequired &&
+                                     !string.Equals(course.RequirementStatus, "C", StringComparison.OrdinalIgnoreCase) &&
+                                     !string.Equals(course.RequirementStatus, "MC", StringComparison.OrdinalIgnoreCase) &&
+                                     !string.Equals(course.RequirementStatus, "TC", StringComparison.OrdinalIgnoreCase) &&
+                                     !string.Equals(course.RequirementStatus, "NN", StringComparison.OrdinalIgnoreCase);
+        return courseIsRemaining && groupIsRemaining && requirementIsRemaining;
+    }
+
+    private static bool TryGetDegreeRequirement(
+        CourseSelectionOffering offering,
+        IReadOnlyDictionary<string, string>? requirements,
+        out string? requirementName)
+    {
+        requirementName = null;
+        if (requirements is null)
+            return false;
+
+        var fullCourseCode = NormalizeCourseCode($"{offering.Department}{offering.CourseCode}{offering.CourseType}");
+        return requirements.TryGetValue(fullCourseCode, out requirementName);
+    }
+
+    private static string NormalizeCourseCode(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
+
+    private async Task<IReadOnlyList<StudentCourseAttempt>> GetCourseAttemptsAsync(StudentProfile profile)
+    {
+        try
+        {
+            return await _lookup.GetCourseAttemptsAsync(profile.ExternalStudentId);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Prior course attempts could not be loaded for course selection student {ExternalStudentId}.",
+                profile.ExternalStudentId);
+            return [];
+        }
+    }
+
+    private static StudentCourseAttempt? FindPreviousAttempt(
+        CourseSelectionOffering offering,
+        IReadOnlyList<StudentCourseAttempt> attempts) =>
+        attempts.FirstOrDefault(x =>
+            string.Equals(x.Department.Trim(), offering.Department.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(x.CourseCode.Trim(), offering.CourseCode.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(x.CourseType.Trim(), offering.CourseType.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static string? GetPreviousGrade(StudentCourseAttempt? attempt)
+    {
+        if (attempt is null)
+            return null;
+        if (!string.IsNullOrWhiteSpace(attempt.Grade))
+            return attempt.Grade.Trim();
+        return attempt.WasWithdrawn ? "W" : null;
+    }
+
+    private static string GetPreviousAttemptOutcome(StudentCourseAttempt? attempt)
+    {
+        if (attempt is null)
+            return "none";
+        if (attempt.WasWithdrawn)
+            return "unsuccessful";
+
+        var grade = attempt.Grade.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(grade))
+            return "pending";
+        if (grade is "F" or "WF" or "W" or "WP" or "WD" or "AW" or "U" or "NC" or "NP")
+            return "unsuccessful";
+        if (grade is "I" or "IP" or "INP")
+            return "pending";
+        return "successful";
     }
 
     public async Task<List<CourseSelectionTermDto>> GetEligibleTermsAsync()

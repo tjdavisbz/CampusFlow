@@ -1,0 +1,104 @@
+@page
+@model CampusFlow.Web.Pages.HousingModel
+@using CampusFlow.Housing
+@using CampusFlow.Web.Pages
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Housing & Meal Plan";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.Housing;
+}
+
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl)) { <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" /> }
+    <abp-style src="/Pages/Housing.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
+}
+
+<main class="housing-page">
+    <header class="housing-hero">
+        <div><span>Campus living</span><h1>Housing & Meal Plan</h1><p>Tell us where you’ll live and choose the dining plan that fits your semester.</p></div>
+        @if (Model.Selection is not null) { <div class="housing-student"><strong>@Model.Selection.StudentName</strong><span>ID @Model.Selection.StudentId</span></div> }
+    </header>
+
+    @if (Model.IsUnavailable || Model.Selection is null)
+    {
+        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Housing selection is temporarily unavailable</h2><p>Please try again shortly.</p></div></section>
+    }
+    else
+    {
+        @if (Model.Selection.SelectedHousingChoice.HasValue)
+        {
+            <section class="housing-success"><i class="fa-solid fa-circle-check"></i><div><strong>Your selection has been recorded.</strong></div></section>
+        }
+        <section class="housing-term"><div><span>Selection period</span><strong>@(string.IsNullOrWhiteSpace(Model.Selection.TermName) ? "Upcoming term" : Model.Selection.TermName)</strong></div>@if(Model.Selection.TermStartDate.HasValue){<span>@Model.Selection.TermStartDate.Value.ToString("MMM d")–@Model.Selection.TermEndDate?.ToString("MMM d, yyyy")</span>}</section>
+
+        @if (Model.Selection.SelectedHousingChoice.HasValue)
+        {
+            <section class="housing-selection-summary">
+                <div><span>Housing</span><strong>@HousingModel.ChoiceName(Model.Selection.SelectedHousingChoice.Value)</strong></div>
+                <div><span>Meal plan</span><strong>@(Model.Selection.SelectedMealPlanName ?? "No meal plan")</strong></div>
+            </section>
+        }
+        else
+        {
+        <form method="post" id="housing-form">
+            <section class="housing-section">
+                <div class="section-heading"><span>Step 1</span><h2>Where will you live?</h2><p>Your housing choice determines which meal plans are available.</p></div>
+                <div class="choice-grid">
+                    @foreach (var choice in Enum.GetValues<HousingChoice>())
+                    {
+                        <label class="choice-card"><input type="radio" asp-for="Input.HousingChoice" value="@choice" /><span class="choice-check"><i class="fa-solid fa-check"></i></span><i class="choice-icon fa-solid @(choice == HousingChoice.Commuter ? "fa-house" : choice == HousingChoice.SeniorHousing ? "fa-building-user" : "fa-building")"></i><strong>@HousingModel.ChoiceName(choice)</strong><small>@HousingModel.ChoiceDescription(choice)</small></label>
+                    }
+                </div>
+            </section>
+
+            <section class="housing-section">
+                <div class="section-heading"><span>Step 2</span><h2>Choose your meal plan</h2><p>Prices shown include applicable taxes.</p></div>
+                <div asp-validation-summary="All" class="housing-errors"></div>
+                @foreach (var choice in Enum.GetValues<HousingChoice>())
+                {
+                    <div class="plan-grid" data-choice="@choice">
+                        @foreach (var plan in Model.Selection.Options[choice])
+                        {
+                            var value = plan.ExternalMealPlanId?.ToString() ?? "";
+                            <label class="plan-card"><input type="radio" asp-for="Input.ExternalMealPlanId" value="@value" /><span class="plan-check"><i class="fa-solid fa-check"></i></span><div><strong>@plan.Name</strong><p>@plan.Description</p></div><span class="plan-price">@(plan.Price is null ? "Contact Student Services" : plan.Price == 0 ? "No charge" : $"${plan.Price.Value:N2}")</span></label>
+                        }
+                    </div>
+                }
+                <button type="submit" class="housing-submit"><span>Record selection</span><i class="fa-solid fa-arrow-right"></i></button>
+            </section>
+        </form>
+        }
+    }
+</main>
+
+<div id="housing-processing" class="housing-processing" aria-hidden="true"><div><i class="fa-solid fa-utensils"></i><span>Housing & Meal Plan</span><h2>Recording your selection</h2><p>We’re updating your student record. This may take a few seconds.</p><div class="processing-bar"><span></span></div></div></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('housing-form');
+  if (!form) return;
+  const choices = [...form.querySelectorAll('input[name="Input.HousingChoice"]')];
+  const planGroups = [...form.querySelectorAll('.plan-grid')];
+  function updatePlans() {
+    const selected = choices.find(x => x.checked)?.value;
+    planGroups.forEach(group => {
+      const visible = group.dataset.choice === selected;
+      group.hidden = !visible;
+      group.querySelectorAll('input').forEach(input => input.disabled = !visible);
+    });
+    const visibleChecked = form.querySelector('.plan-grid:not([hidden]) input:checked');
+    if (!visibleChecked) form.querySelector('.plan-grid:not([hidden]) input')?.click();
+  }
+  choices.forEach(x => x.addEventListener('change', updatePlans));
+  updatePlans();
+  form.addEventListener('submit', () => {
+    const modal = document.getElementById('housing-processing');
+    modal.classList.add('visible'); modal.setAttribute('aria-hidden', 'false');
+  });
+});
+</script>

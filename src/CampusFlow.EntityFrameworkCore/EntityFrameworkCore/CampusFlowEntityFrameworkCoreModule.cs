@@ -79,6 +79,9 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
         context.Services.AddTransient<
             IStudentInformationSystemDocumentTrackingService,
             ThesisElementsDocumentTrackingService>();
+        context.Services.AddTransient<
+            IStudentInformationSystemMealPlanService,
+            ThesisElementsMealPlanService>();
         context.Services.AddMemoryCache();
 
         context.Services.AddAbpDbContext<CampusFlowDbContext>(options =>

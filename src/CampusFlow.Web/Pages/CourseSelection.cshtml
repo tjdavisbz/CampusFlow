@@ -108,14 +108,35 @@
         <section class="available-courses" aria-labelledby="available-heading">
             <div class="section-heading">
                 <div><span>Course catalog</span><h2 id="available-heading">Available courses</h2></div>
-                <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
+                <div class="catalog-tools">
+                    @if (Model.Selection.DegreeAuditAvailable)
+                    {
+                        <label class="degree-filter"><input id="degreeRequirementFilter" type="checkbox" checked /><span>Degree requirements only</span></label>
+                    }
+                    <label class="degree-filter"><input id="excludeCompletedFilter" type="checkbox" checked /><span>Exclude already taken</span></label>
+                    <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
+                </div>
             </div>
             <div class="offering-grid" id="offeringGrid">
                 @foreach (var course in Model.Selection.Offerings.Where(x => x.CanSelect))
                 {
-                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())">
+                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())" data-degree-required="@course.FulfillsDegreeRequirement.ToString().ToLowerInvariant()" data-attempt-outcome="@course.PreviousAttemptOutcome">
                         <div class="offering-top"><span>@course.CourseCode-@course.Section</span><span>@course.Credits.ToString("0.##") credits</span></div>
                         <h3>@course.CourseName</h3>
+                        @if (course.FulfillsDegreeRequirement)
+                        {
+                            <div class="degree-requirement-badge" title="@course.DegreeRequirementName"><i class="fa-solid fa-circle-check"></i> Fulfills degree requirement</div>
+                        }
+                        @if (course.WasPreviouslyTaken)
+                        {
+                            var attemptLabel = string.IsNullOrWhiteSpace(course.PreviousGrade)
+                                ? "Already taken"
+                                : $"Already taken · Grade {course.PreviousGrade}";
+                            <div class="course-attempt-badge @course.PreviousAttemptOutcome">
+                                <i class="fa-solid @(course.PreviousAttemptOutcome == "successful" ? "fa-circle-check" : course.PreviousAttemptOutcome == "unsuccessful" ? "fa-circle-exclamation" : "fa-clock")"></i>
+                                <span>@attemptLabel</span>
+                            </div>
+                        }
                         <div class="offering-details">
                             <span><i class="fa-regular fa-user"></i> @(course.InstructorName ?? "Instructor to be announced")</span>
                             @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }
@@ -138,6 +159,20 @@
         </section>
     }
 </main>
+
+@if (Model.Selection?.DegreeAuditAvailable == true && !Model.RefreshComplete && string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <form id="course-audit-refresh-token" hidden>
+        @Html.AntiForgeryToken()
+    </form>
+    <div class="processing-overlay" id="degreeAuditRefreshOverlay" role="status" aria-live="polite">
+        <div>
+            <span class="processing-spinner"></span>
+            <h2 id="degreeAuditRefreshTitle">Refreshing your degree audit</h2>
+            <p id="degreeAuditRefreshMessage">Checking which available courses apply to your remaining degree requirements.</p>
+        </div>
+    </div>
+}
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
@@ -180,8 +215,57 @@
     <script>
         (() => {
             const search = document.getElementById('courseSearch');
+            const degreeFilter = document.getElementById('degreeRequirementFilter');
+            const excludeCompletedFilter = document.getElementById('excludeCompletedFilter');
+            const filterCookieName = 'campusflow_course_filters_@Model.FilterPreferenceKey';
+            const readFilterCookie = () => {
+                const prefix = `${filterCookieName}=`;
+                const cookie = document.cookie.split('; ').find(value => value.startsWith(prefix));
+                if (!cookie) return null;
+                try { return JSON.parse(decodeURIComponent(cookie.substring(prefix.length))); }
+                catch { return null; }
+            };
+            const saveFilterCookie = () => {
+                const settings = {
+                    degreeOnly: degreeFilter?.checked ?? true,
+                    excludeCompleted: excludeCompletedFilter?.checked ?? true
+                };
+                document.cookie = `${filterCookieName}=${encodeURIComponent(JSON.stringify(settings))}; path=/; max-age=31536000; SameSite=Lax; Secure`;
+            };
+            const savedFilters = readFilterCookie();
+            if (savedFilters) {
+                if (degreeFilter && typeof savedFilters.degreeOnly === 'boolean')
+                    degreeFilter.checked = savedFilters.degreeOnly;
+                if (excludeCompletedFilter && typeof savedFilters.excludeCompleted === 'boolean')
+                    excludeCompletedFilter.checked = savedFilters.excludeCompleted;
+            }
             const errorDialog = document.getElementById('courseErrorDialog');
             const acknowledgeError = document.getElementById('acknowledgeCourseError');
+            const degreeAuditRefreshOverlay = document.getElementById('degreeAuditRefreshOverlay');
+            if (degreeAuditRefreshOverlay) {
+                document.body.classList.add('modal-open');
+                const token = document.querySelector('#course-audit-refresh-token input[name="__RequestVerificationToken"]');
+                const body = new FormData();
+                body.append('__RequestVerificationToken', token.value);
+                fetch('@Url.Page("/CourseSelection", "RefreshDegreeAudit")', {
+                    method: 'POST',
+                    body,
+                    credentials: 'same-origin'
+                }).then(response => {
+                    if (!response.ok) throw new Error('Degree audit refresh failed.');
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('refreshComplete', 'true');
+                    window.location.replace(url);
+                }).catch(() => {
+                    document.getElementById('degreeAuditRefreshTitle').textContent = 'Using your latest degree audit';
+                    document.getElementById('degreeAuditRefreshMessage').textContent =
+                        'We could not check for newer information right now. The available course list is still ready to use.';
+                    window.setTimeout(() => {
+                        degreeAuditRefreshOverlay.remove();
+                        document.body.classList.remove('modal-open');
+                    }, 1800);
+                });
+            }
             if (errorDialog) {
                 document.body.classList.add('modal-open');
                 acknowledgeError?.focus();
@@ -192,16 +276,35 @@
             }
             const cards = [...document.querySelectorAll('.offering-card')];
             const none = document.getElementById('noSearchResults');
-            search?.addEventListener('input', () => {
+            const applyCatalogFilters = () => {
                 const value = search.value.trim().toLowerCase();
+                const degreeOnly = degreeFilter?.checked === true;
+                const excludeCompleted = excludeCompletedFilter?.checked === true;
                 let visible = 0;
                 cards.forEach(card => {
-                    const show = card.dataset.search.includes(value);
+                    const show = card.dataset.search.includes(value) &&
+                        (!degreeOnly || card.dataset.degreeRequired === 'true') &&
+                        (!excludeCompleted || card.dataset.attemptOutcome !== 'successful');
                     card.hidden = !show;
                     if (show) visible++;
                 });
-                if (none) none.hidden = visible !== 0;
+                if (none) {
+                    none.textContent = degreeOnly
+                        ? 'No available courses match your outstanding degree requirements and current filters.'
+                        : 'No courses match your current filters.';
+                    none.hidden = visible !== 0;
+                }
+            };
+            search?.addEventListener('input', applyCatalogFilters);
+            degreeFilter?.addEventListener('change', () => {
+                saveFilterCookie();
+                applyCatalogFilters();
             });
+            excludeCompletedFilter?.addEventListener('change', () => {
+                saveFilterCookie();
+                applyCatalogFilters();
+            });
+            applyCatalogFilters();
             document.querySelectorAll('.add-course-form').forEach(form => form.addEventListener('submit', () => {
                 const overlay = document.getElementById('processingOverlay');
                 const title = document.getElementById('processingTitle');

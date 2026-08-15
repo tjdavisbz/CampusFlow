@@ -17,6 +17,7 @@ using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using CampusFlow.Students;
 using CampusFlow.BillApprovals;
 using CampusFlow.CourseSelections;
+using CampusFlow.Housing;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -39,6 +40,8 @@ public class CampusFlowDbContext :
     public DbSet<CourseReviewSubmission> CourseReviewSubmissions { get; set; }
     public DbSet<CourseSelectionOperation> CourseSelectionOperations { get; set; }
     public DbSet<CourseSectionAttendanceTypeMapping> CourseSectionAttendanceTypeMappings { get; set; }
+    public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
+    public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
 
     #region Entities from the modules
 
@@ -249,6 +252,33 @@ public class CampusFlowDbContext :
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Status, x.LastAttemptAt });
+        });
+
+        builder.Entity<MealPlanConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "MealPlanConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalMealPlanName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.DisplayName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.Description).IsRequired().HasMaxLength(2000);
+            b.Property(x => x.HousingChoicesJson).IsRequired();
+            b.Property(x => x.EligibleAttendanceTypesJson).IsRequired();
+            b.Property(x => x.DisplayPrice).HasPrecision(18, 2);
+            b.HasIndex(x => new { x.TenantId, x.ExternalMealPlanName }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsActive, x.SortOrder });
+        });
+
+        builder.Entity<StudentHousingSelection>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "StudentHousingSelections", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.MealPlanName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.LastSyncError).HasMaxLength(4000);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.TermName }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.SyncedToStudentInformationSystem, x.SubmittedAt });
         });
 
         //builder.Entity<YourEntity>(b =>
