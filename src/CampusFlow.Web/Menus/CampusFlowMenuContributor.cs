@@ -12,6 +12,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using CampusFlow.Web.Portals;
 namespace CampusFlow.Web.Menus;
 public class CampusFlowMenuContributor : IMenuContributor
 {
@@ -128,6 +129,23 @@ public class CampusFlowMenuContributor : IMenuContributor
                 icon: "fa fa-list-check",
                 order: 1));
             context.Menu.AddItem(advisor);
+        }
+
+        var adminAccess = context.ServiceProvider.GetRequiredService<AdminPortalAccessService>();
+        if (await adminAccess.EnsureAccessAsync("PaymentPlans"))
+        {
+            var admin = new ApplicationMenuItem(
+                CampusFlowMenus.Admin,
+                "Admin",
+                icon: "fa fa-user-shield",
+                order: 3);
+            admin.AddItem(new ApplicationMenuItem(
+                CampusFlowMenus.AdminPaymentPlans,
+                "Payment Plans",
+                "~/Admin/PaymentPlans",
+                icon: "fa fa-calendar-check",
+                order: 1));
+            context.Menu.AddItem(admin);
         }
         //Administration
         var administration = context.Menu.GetAdministration();

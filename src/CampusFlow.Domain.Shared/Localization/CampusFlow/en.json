@@ -7,6 +7,8 @@
     "Welcome": "Welcome",
     "Permission:AdvisorPortal": "Access the Advisor Portal",
     "Permission:AdvisorPortal.ViewAll": "View every advisor review queue",
-    "Permission:AdvisorPortal.ManageRouting": "Manage advisor routing"
+    "Permission:AdvisorPortal.ManageRouting": "Manage advisor routing",
+    "Permission:AdminPortal": "Access the Admin Portal",
+    "Permission:AdminPortal.PaymentPlans": "Manage payment plan setup"
   }
 }

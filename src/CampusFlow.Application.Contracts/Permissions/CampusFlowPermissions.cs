@@ -10,4 +10,10 @@ public static class CampusFlowPermissions
         public const string ViewAll = Default + ".ViewAll";
         public const string ManageRouting = Default + ".ManageRouting";
     }
+
+    public static class AdminPortal
+    {
+        public const string Default = GroupName + ".AdminPortal";
+        public const string PaymentPlans = Default + ".PaymentPlans";
+    }
 }

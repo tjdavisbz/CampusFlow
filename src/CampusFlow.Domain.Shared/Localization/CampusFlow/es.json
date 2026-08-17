@@ -13,6 +13,8 @@
     "Permission:AdvisorPortal": "Acceder al portal de asesores",
     "Permission:AdvisorPortal.ViewAll": "Ver todas las colas de revisión",
     "Permission:AdvisorPortal.ManageRouting": "Administrar el enrutamiento de asesores",
+    "Permission:AdminPortal": "Acceder al portal administrativo",
+    "Permission:AdminPortal.PaymentPlans": "Administrar la configuración de planes de pago",
     "Menu:Dashboard": "Panel de control",
     "Menu:HomePage": "Página de inicio",
     "Dashboard": "Panel de control",

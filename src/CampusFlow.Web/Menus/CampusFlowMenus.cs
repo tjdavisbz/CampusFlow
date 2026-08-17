@@ -6,6 +6,7 @@ public class CampusFlowMenus
 
     public const string Student = Prefix + ".Student";
     public const string Advisor = Prefix + ".Advisor";
+    public const string Admin = Prefix + ".Admin";
     public const string Home = Prefix + ".Home";
     public const string Billing = Prefix + ".Billing";
     public const string Schedule = Prefix + ".Schedule";
@@ -15,4 +16,5 @@ public class CampusFlowMenus
     public const string FinancialAid = Prefix + ".FinancialAid";
     public const string BillApproval = Prefix + ".BillApproval";
     public const string AdvisorQueue = Prefix + ".AdvisorQueue";
+    public const string AdminPaymentPlans = Prefix + ".AdminPaymentPlans";
 }

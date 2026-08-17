@@ -1,0 +1,69 @@
+@page "/Admin/PaymentPlans"
+@model CampusFlow.Web.Pages.Admin.PaymentPlansModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Payment Plan Setup";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.AdminPaymentPlans;
+}
+
+@section styles {
+    <abp-style src="/Pages/Admin/PaymentPlans.css" />
+    <style>:root { --admin-primary: @Model.Theme.PrimaryColor; --admin-dark: @Model.Theme.PrimaryDarkColor; --admin-accent: @Model.Theme.AccentColor; }</style>
+}
+
+<main class="admin-shell">
+    <header class="admin-hero">
+        <div><span>Admin portal</span><h1>Payment plan setup</h1><p>Control how deferred payment plans are calculated and when installments are due.</p></div>
+        <div class="version-card"><span>Active version</span><strong>@(Model.CurrentVersion == 0 ? "New" : $"v{Model.CurrentVersion}")</strong>@if (Model.CurrentEffectiveFrom.HasValue) { <small>Since @Model.CurrentEffectiveFrom.Value.ToString("MMM d, yyyy")</small> }</div>
+    </header>
+
+    @if (Model.Saved)
+    {
+        <div class="success-banner"><i class="fa-solid fa-circle-check"></i><div><strong>Payment plan settings published</strong><span>Students will use this version the next time their bill is calculated.</span></div></div>
+    }
+
+    <form method="post" class="setup-form" id="payment-plan-form">
+        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+        <section class="admin-card overview-card">
+            <div class="section-heading"><div><span>Plan details</span><h2>Calculation rules</h2></div><p>These values drive the estimate shown during Bill Approval.</p></div>
+            <div class="form-grid">
+                <label class="wide"><span>Plan name</span><input asp-for="Input.Name" /><span asp-validation-for="Input.Name" class="field-error"></span></label>
+                <label><span>Enrollment fee</span><div class="input-prefix"><b>$</b><input asp-for="Input.EnrollmentFee" type="number" step="0.01" /></div></label>
+                <label><span>Part-time balance divisor</span><input asp-for="Input.PartTimeBalanceDivisor" type="number" step="0.01" /><small>Balance is divided by this value.</small></label>
+                <label><span>Residential minimum payment</span><div class="input-prefix"><b>$</b><input asp-for="Input.ResidentialMinimumPayment" type="number" step="0.01" /></div></label>
+                <label><span>Standard minimum payment</span><div class="input-prefix"><b>$</b><input asp-for="Input.StandardMinimumPayment" type="number" step="0.01" /></div></label>
+            </div>
+        </section>
+
+        <section class="admin-card">
+            <div class="section-heading"><div><span>Eligibility</span><h2>Residential attendance types</h2></div><p>One Elements attendance type per line.</p></div>
+            <textarea asp-for="Input.ResidentialAttendanceTypes" rows="6"></textarea>
+        </section>
+
+        <section class="admin-card schedule-card">
+            <div class="section-heading"><div><span>Installment schedule</span><h2>Due dates by term</h2></div><p>Enter one student-facing due date per line, in payment order.</p></div>
+            <div class="term-grid">
+                <label><span><i class="fa-regular fa-leaf"></i> Fall</span><textarea asp-for="Input.FallDueDates" rows="5"></textarea></label>
+                <label><span><i class="fa-regular fa-snowflake"></i> Spring</span><textarea asp-for="Input.SpringDueDates" rows="5"></textarea></label>
+                <label><span><i class="fa-regular fa-sun"></i> Summer</span><textarea asp-for="Input.SummerDueDates" rows="5"></textarea></label>
+            </div>
+        </section>
+
+        <div class="publish-bar"><div><strong>Ready to publish?</strong><span>Saving creates a new version and preserves the previous configuration.</span></div><button type="submit"><i class="fa-solid fa-cloud-arrow-up"></i> Publish settings</button></div>
+    </form>
+</main>
+
+<div class="admin-processing" id="admin-processing" hidden><div><span></span><h2>Publishing payment plan settings</h2><p>Creating the new active version…</p></div></div>
+
+@section scripts {
+    <script>
+        document.getElementById('payment-plan-form')?.addEventListener('submit', () => {
+            document.getElementById('admin-processing').hidden = false;
+        });
+    </script>
+}
