@@ -1270,6 +1270,44 @@ namespace CampusFlow.Migrations
                     b.ToTable("AppStudentHousingSelections", (string)null);
                 });
 
+            modelBuilder.Entity("CampusFlow.Payments.PayflowPayment", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid");
+                    b.Property<decimal>("Amount").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
+                    b.Property<string>("ConcurrencyStamp").IsConcurrencyToken().IsRequired().HasMaxLength(40).HasColumnType("character varying(40)").HasColumnName("ConcurrencyStamp");
+                    b.Property<DateTime>("CreationTime").HasColumnType("timestamp without time zone").HasColumnName("CreationTime");
+                    b.Property<Guid?>("CreatorId").HasColumnType("uuid").HasColumnName("CreatorId");
+                    b.Property<string>("Currency").IsRequired().HasMaxLength(3).HasColumnType("character varying(3)");
+                    b.Property<Guid?>("DeleterId").HasColumnType("uuid").HasColumnName("DeleterId");
+                    b.Property<DateTime?>("DeletionTime").HasColumnType("timestamp without time zone").HasColumnName("DeletionTime");
+                    b.Property<int?>("ElementsBatchMasterId").HasColumnType("integer");
+                    b.Property<int?>("ElementsBillingBatchId").HasColumnType("integer");
+                    b.Property<int>("ElementsPostingAttempts").HasColumnType("integer");
+                    b.Property<string>("ElementsPostingError").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.Property<int>("ElementsPostingStatus").HasColumnType("integer");
+                    b.Property<DateTime?>("ElementsPostedAt").HasColumnType("timestamp without time zone");
+                    b.Property<string>("ExternalStudentId").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<string>("ExtraProperties").IsRequired().HasColumnType("text").HasColumnName("ExtraProperties");
+                    b.Property<string>("GatewayMessage").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.Property<int?>("GatewayResult").HasColumnType("integer");
+                    b.Property<bool>("IsDeleted").ValueGeneratedOnAdd().HasColumnType("boolean").HasDefaultValue(false).HasColumnName("IsDeleted");
+                    b.Property<bool>("IsTest").HasColumnType("boolean");
+                    b.Property<DateTime?>("LastModificationTime").HasColumnType("timestamp without time zone").HasColumnName("LastModificationTime");
+                    b.Property<Guid?>("LastModifierId").HasColumnType("uuid").HasColumnName("LastModifierId");
+                    b.Property<string>("PayflowReference").HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<string>("SecureToken").HasMaxLength(256).HasColumnType("character varying(256)");
+                    b.Property<string>("SecureTokenId").IsRequired().HasMaxLength(36).HasColumnType("character varying(36)");
+                    b.Property<int>("Status").HasColumnType("integer");
+                    b.Property<Guid>("StudentProfileId").HasColumnType("uuid");
+                    b.Property<Guid?>("TenantId").HasColumnType("uuid").HasColumnName("TenantId");
+                    b.Property<Guid>("UserId").HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasIndex("ElementsPostingStatus");
+                    b.HasIndex("StudentProfileId");
+                    b.HasIndex("TenantId", "SecureTokenId").IsUnique();
+                    b.ToTable("AppPayflowPayments", (string)null);
+                });
+
             modelBuilder.Entity("CampusFlow.Students.StudentProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3374,6 +3412,15 @@ namespace CampusFlow.Migrations
                 });
 
             modelBuilder.Entity("CampusFlow.Housing.StudentHousingSelection", b =>
+                {
+                    b.HasOne("CampusFlow.Students.StudentProfile", null)
+                        .WithMany()
+                        .HasForeignKey("StudentProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CampusFlow.Payments.PayflowPayment", b =>
                 {
                     b.HasOne("CampusFlow.Students.StudentProfile", null)
                         .WithMany()

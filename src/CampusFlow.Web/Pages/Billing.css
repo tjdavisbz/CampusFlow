@@ -86,7 +86,8 @@
     border-left: 1px solid color-mix(in srgb, var(--tenant-primary), transparent 82%);
 }
 
-.balance-payment button {
+.balance-payment button,
+.balance-payment .payment-link {
     display: inline-flex;
     align-items: center;
     gap: .45rem;
@@ -99,6 +100,7 @@
     font-weight: 700;
     opacity: .58;
 }
+.balance-payment .payment-link { opacity: 1; text-decoration: none; }
 
 .balance-payment small { line-height: 1.35; }
 

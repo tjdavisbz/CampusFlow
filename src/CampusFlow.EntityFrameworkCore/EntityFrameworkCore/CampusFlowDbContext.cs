@@ -18,6 +18,7 @@ using CampusFlow.Students;
 using CampusFlow.BillApprovals;
 using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
+using CampusFlow.Payments;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -42,6 +43,7 @@ public class CampusFlowDbContext :
     public DbSet<CourseSectionAttendanceTypeMapping> CourseSectionAttendanceTypeMappings { get; set; }
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
+    public DbSet<PayflowPayment> PayflowPayments { get; set; }
 
     #region Entities from the modules
 
@@ -112,6 +114,23 @@ public class CampusFlowDbContext :
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasIndex(x => x.UserId).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Provider, x.ExternalStudentId }).IsUnique();
+        });
+
+        builder.Entity<PayflowPayment>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "PayflowPayments", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).IsRequired().HasMaxLength(3);
+            b.Property(x => x.SecureTokenId).IsRequired().HasMaxLength(36);
+            b.Property(x => x.SecureToken).HasMaxLength(256);
+            b.Property(x => x.PayflowReference).HasMaxLength(64);
+            b.Property(x => x.GatewayMessage).HasMaxLength(1000);
+            b.Property(x => x.ElementsPostingError).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.SecureTokenId }).IsUnique();
+            b.HasIndex(x => x.ElementsPostingStatus);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<AgreementTemplate>(b =>

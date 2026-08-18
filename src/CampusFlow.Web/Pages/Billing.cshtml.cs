@@ -7,6 +7,8 @@ using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using CampusFlow.Web.Payments;
 using Volo.Abp.Domain.Repositories;
 
 namespace CampusFlow.Web.Pages;
@@ -20,6 +22,7 @@ public class BillingModel : CampusFlowPageModel
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly ILogger<BillingModel> _logger;
+    private readonly PayflowOptions _payflow;
 
     public BillingModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -27,7 +30,7 @@ public class BillingModel : CampusFlowPageModel
         ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
-        ILogger<BillingModel> logger)
+        ILogger<BillingModel> logger, IOptions<PayflowOptions> payflow)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -35,6 +38,7 @@ public class BillingModel : CampusFlowPageModel
         _billingLookups = billingLookups.ToArray();
         _termLookups = termLookups.ToArray();
         _logger = logger;
+        _payflow = payflow.Value;
     }
 
     public TenantTheme Theme { get; private set; } = new(
@@ -50,6 +54,8 @@ public class BillingModel : CampusFlowPageModel
     public IReadOnlyList<BillingTermGroup> CurrentAndUpcomingTerms { get; private set; } = [];
     public IReadOnlyList<BillingTermGroup> HistoricalTerms { get; private set; } = [];
     public string? CurrentTermCode { get; private set; }
+    public bool CanMakePayment => _payflow.IsConfigured && !_currentStudentView.IsImpersonating && OverallBalance > 0;
+    public bool IsPaymentTestMode => _payflow.TestMode;
 
     public string FormatCurrency(decimal amount) =>
         FormatCurrencyValue(amount);
