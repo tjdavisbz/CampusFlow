@@ -63,11 +63,16 @@
                     <small>Includes posted and pending account activity</small>
                 </div>
                 <div class="balance-payment">
-                    <button type="button" disabled>
-                        <i class="fa-solid fa-lock" aria-hidden="true"></i>
-                        Make a payment
-                    </button>
-                    <small>Secure online payments are coming next.</small>
+                    @if (Model.CanMakePayment)
+                    {
+                        <a class="payment-link" asp-page="/Payments/Checkout"><i class="fa-solid fa-lock" aria-hidden="true"></i> Make a payment</a>
+                        <small>@(Model.IsPaymentTestMode ? "Payflow test mode — no real charges." : "Secure checkout powered by PayPal.")</small>
+                    }
+                    else
+                    {
+                        <button type="button" disabled><i class="fa-solid fa-lock" aria-hidden="true"></i> Make a payment</button>
+                        <small>@(Model.OverallBalance <= 0 ? "No payment is currently due." : "Online payments are not available.")</small>
+                    }
                 </div>
             </article>
         </section>

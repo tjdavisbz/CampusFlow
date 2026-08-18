@@ -13,6 +13,7 @@ using CampusFlow.Permissions;
 using CampusFlow.Web.Menus;
 using CampusFlow.Web.HealthChecks;
 using CampusFlow.Web.BillApprovals;
+using CampusFlow.Web.Payments;
 using Microsoft.OpenApi;
 using Volo.Abp;
 using Volo.Abp.Studio;
@@ -131,6 +132,9 @@ public class CampusFlowWebModule : AbpModule
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
         context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
         context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
+        context.Services.Configure<PayflowOptions>(configuration.GetSection(PayflowOptions.SectionName));
+        context.Services.AddHttpClient<IPayflowGateway, PayflowGateway>(client =>
+            client.Timeout = TimeSpan.FromSeconds(30));
         context.Services.AddHttpContextAccessor();
         context.Services.Configure<PerformanceLoggingOptions>(
             configuration.GetSection(PerformanceLoggingOptions.SectionName));
