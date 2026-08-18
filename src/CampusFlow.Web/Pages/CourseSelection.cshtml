@@ -71,6 +71,20 @@
                     </form>
                 }
             </div>
+            @if (Model.AuditProgress is { CreditsRequired: > 0 } progress)
+            {
+                <div class="selection-degree-progress">
+                    <div class="selection-progress-ring" style="--completed:@progress.CompletionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;--projected:@progress.ProjectedCompletionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%" aria-label="@progress.CompletionPercent.ToString("0") percent complete, projected to reach @progress.ProjectedCompletionPercent.ToString("0") percent after selected courses">
+                        <div><strong>@progress.CompletionPercent.ToString("0")%</strong><span>degree complete</span></div>
+                    </div>
+                    <div class="selection-progress-copy">
+                        <span>Degree progress</span>
+                        <strong>@progress.ProjectedCompletionPercent.ToString("0")% projected</strong>
+                        <small><i class="completed"></i> Completed</small>
+                        <small><i class="projected"></i> Selected courses</small>
+                    </div>
+                </div>
+            }
             <div class="credit-total"><span>Scheduled credits</span><strong>@Model.Selection.SelectedCredits.ToString("0.##")</strong><small>of @Model.Selection.MaximumAllowedCredits.ToString("0.##") allowed</small></div>
         </section>
 
