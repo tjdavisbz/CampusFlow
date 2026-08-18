@@ -48,6 +48,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     public string StudentDisplayName { get; private set; } = "Student";
     public string StudentIdentifier { get; private set; } = "Unavailable";
     public CourseSelectionDto? Selection { get; private set; }
+    public DegreeAuditProgress? AuditProgress { get; private set; }
     public IReadOnlyList<CourseSelectionTermDto> EligibleTerms { get; private set; } = [];
     public bool IsUnavailable { get; private set; }
     public string? ErrorMessage { get; private set; }
@@ -199,11 +200,43 @@ public class CourseSelectionModel : CampusFlowPageModel
 
             ExternalTermId = selectedTermId;
             Selection = await _courseSelection.GetAsync(selectedTermId);
+            await LoadDegreeAuditProgressAsync(profile);
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
             IsUnavailable = true;
             _logger.LogWarning(exception, "Unable to load Course Selection for the current student.");
+        }
+    }
+
+    private async Task LoadDegreeAuditProgressAsync(StudentProfile profile)
+    {
+        if (Selection?.DegreeAuditAvailable != true)
+            return;
+
+        var lookup = _degreeAuditLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+        if (lookup is null)
+            return;
+
+        try
+        {
+            var summary = (await lookup.GetAuditsAsync(
+                profile.ExternalStudentId, HttpContext.RequestAborted)).FirstOrDefault();
+            if (summary is null)
+                return;
+
+            var audit = await lookup.GetAuditAsync(
+                profile.ExternalStudentId, summary.RevisionTermId, summary.AuditDegreeId,
+                summary.AuditProgramId, HttpContext.RequestAborted);
+            var selectedCredits = Selection.Registrations
+                .GroupBy(registration => registration.ExternalOfferingId)
+                .Sum(registration => registration.Max(item => item.Credits));
+            AuditProgress = DegreeAuditProgress.From(audit, selectedCredits);
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception,
+                "Unable to load degree progress on Course Selection for the current student.");
         }
     }
 }
