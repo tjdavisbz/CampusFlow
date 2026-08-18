@@ -18,6 +18,7 @@ public class CourseSelectionModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly IRepository<StudentProfile, Guid> _profiles;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemDegreeAuditLookup> _degreeAuditLookups;
     private readonly ICourseSelectionAppService _courseSelection;
@@ -26,6 +27,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     public CourseSelectionModel(
         ITenantThemeProvider tenantThemeProvider,
         IRepository<StudentProfile, Guid> profiles,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         IEnumerable<IStudentInformationSystemDegreeAuditLookup> degreeAuditLookups,
         ICourseSelectionAppService courseSelection,
@@ -33,6 +35,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     {
         _tenantThemeProvider = tenantThemeProvider;
         _profiles = profiles;
+        _currentStudentView = currentStudentView;
         _termLookups = termLookups.ToArray();
         _degreeAuditLookups = degreeAuditLookups.ToArray();
         _courseSelection = courseSelection;
@@ -49,6 +52,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     public bool IsUnavailable { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string ErrorTitle { get; private set; } = "Course not added";
+    public bool IsReadOnlyStudentView => _currentStudentView.IsImpersonating;
     public string FilterPreferenceKey => CurrentUser.Id?.ToString("N") ?? "anonymous";
 
     [BindProperty(SupportsGet = true)]
@@ -76,7 +80,7 @@ public class CourseSelectionModel : CampusFlowPageModel
         if (CurrentUser.Id is null)
             return Unauthorized();
 
-        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         var lookup = profile is null
             ? null
             : _degreeAuditLookups.SingleOrDefault(x => x.Provider == profile.Provider);
@@ -160,7 +164,7 @@ public class CourseSelectionModel : CampusFlowPageModel
             return;
         }
 
-        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null)
         {
             IsUnavailable = true;

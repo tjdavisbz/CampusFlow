@@ -16,18 +16,21 @@ namespace CampusFlow.Housing;
 public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
 {
     private readonly IRepository<StudentProfile, Guid> _profiles;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IRepository<MealPlanConfiguration, Guid> _configurations;
     private readonly IRepository<StudentHousingSelection, Guid> _selections;
     private readonly IReadOnlyCollection<IStudentInformationSystemMealPlanService> _services;
     private readonly ILogger<MealPlanAppService> _logger;
 
     public MealPlanAppService(IRepository<StudentProfile, Guid> profiles,
+        ICurrentStudentView currentStudentView,
         IRepository<MealPlanConfiguration, Guid> configurations,
         IRepository<StudentHousingSelection, Guid> selections,
         IEnumerable<IStudentInformationSystemMealPlanService> services,
         ILogger<MealPlanAppService> logger)
     {
         _profiles = profiles;
+        _currentStudentView = currentStudentView;
         _configurations = configurations;
         _selections = selections;
         _services = services.ToArray();
@@ -97,6 +100,8 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
 
     public async Task<MealPlanSelectionDto> SaveAsync(SaveMealPlanSelectionInput input)
     {
+        if (_currentStudentView.IsImpersonating)
+            throw new Volo.Abp.Authorization.AbpAuthorizationException("Student impersonation is read-only.");
         if (!Enum.IsDefined(input.HousingChoice)) throw new UserFriendlyException("Choose a housing option.");
         var profile = await GetProfileAsync();
         var view = await GetAsync();
@@ -142,8 +147,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
 
     private async Task<StudentProfile> GetProfileAsync()
     {
-        if (!CurrentUser.Id.HasValue) throw new UserFriendlyException("Sign in to continue.");
-        return await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value)
+        return await _currentStudentView.GetProfileAsync()
             ?? throw new UserFriendlyException("A student record could not be found.");
     }
 

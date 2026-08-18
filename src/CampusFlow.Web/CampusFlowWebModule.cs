@@ -61,6 +61,7 @@ using CampusFlow.Web.Portals;
 using CampusFlow.Branding;
 using CampusFlow.Web.Branding;
 using CampusFlow.Web.Observability;
+using CampusFlow.Students;
 
 namespace CampusFlow.Web;
 
@@ -129,6 +130,7 @@ public class CampusFlowWebModule : AbpModule
 
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
         context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
+        context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
         context.Services.AddHttpContextAccessor();
         context.Services.Configure<PerformanceLoggingOptions>(
             configuration.GetSection(PerformanceLoggingOptions.SectionName));
@@ -400,6 +402,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseUnitOfWork();
         app.UseDynamicClaims();
         app.UseAuthorization();
+        app.UseMiddleware<StudentViewContextMiddleware>();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {

@@ -16,6 +16,7 @@ public class FinancialAidModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidLookup> _awardLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidDecisionService> _decisionServices;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
@@ -24,6 +25,7 @@ public class FinancialAidModel : CampusFlowPageModel
     public FinancialAidModel(
         ITenantThemeProvider tenantThemeProvider,
         IRepository<StudentProfile, Guid> studentProfileRepository,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemFinancialAidLookup> awardLookups,
         IEnumerable<IStudentInformationSystemFinancialAidDecisionService> decisionServices,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
@@ -31,6 +33,7 @@ public class FinancialAidModel : CampusFlowPageModel
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
+        _currentStudentView = currentStudentView;
         _awardLookups = awardLookups.ToArray();
         _decisionServices = decisionServices.ToArray();
         _termLookups = termLookups.ToArray();
@@ -63,7 +66,7 @@ public class FinancialAidModel : CampusFlowPageModel
             return;
         }
 
-        var profile = await _studentProfileRepository.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null)
         {
             IsUnavailable = true;
@@ -142,7 +145,7 @@ public class FinancialAidModel : CampusFlowPageModel
             return Forbid();
         }
 
-        var profile = await _studentProfileRepository.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         var service = profile is null
             ? null
             : _decisionServices.SingleOrDefault(x => x.Provider == profile.Provider);

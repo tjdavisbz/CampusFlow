@@ -17,6 +17,7 @@ public class ScheduleModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly ILogger<ScheduleModel> _logger;
@@ -24,12 +25,14 @@ public class ScheduleModel : CampusFlowPageModel
     public ScheduleModel(
         ITenantThemeProvider tenantThemeProvider,
         IRepository<StudentProfile, Guid> studentProfileRepository,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         ILogger<ScheduleModel> logger)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
+        _currentStudentView = currentStudentView;
         _scheduleLookups = scheduleLookups.ToArray();
         _termLookups = termLookups.ToArray();
         _logger = logger;
@@ -53,7 +56,7 @@ public class ScheduleModel : CampusFlowPageModel
             return;
         }
 
-        var profile = await _studentProfileRepository.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null)
         {
             IsScheduleUnavailable = true;

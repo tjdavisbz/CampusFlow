@@ -86,7 +86,7 @@
     }
 </main>
 
-@if (Model.SelectedAudit is not null && !Model.RefreshComplete)
+@if (Model.SelectedAudit is not null && !Model.RefreshComplete && !Model.IsReadOnlyStudentView)
 {
     <form id="audit-refresh-token" class="audit-refresh-token">
         @Html.AntiForgeryToken()
@@ -103,7 +103,7 @@
 }
 
 @section scripts {
-    @if (Model.SelectedAudit is not null && !Model.RefreshComplete)
+    @if (Model.SelectedAudit is not null && !Model.RefreshComplete && !Model.IsReadOnlyStudentView)
     {
         <script>
             (() => {

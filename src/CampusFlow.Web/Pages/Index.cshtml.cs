@@ -25,6 +25,7 @@ public class IndexModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _studentLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly IGuidGenerator _guidGenerator;
@@ -37,6 +38,7 @@ public class IndexModel : CampusFlowPageModel
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
         IRepository<StudentProfile, Guid> studentProfileRepository,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemStudentLookup> studentLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         IGuidGenerator guidGenerator,
@@ -48,6 +50,7 @@ public class IndexModel : CampusFlowPageModel
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
+        _currentStudentView = currentStudentView;
         _studentLookups = studentLookups.ToArray();
         _termLookups = termLookups.ToArray();
         _guidGenerator = guidGenerator;
@@ -83,11 +86,11 @@ public class IndexModel : CampusFlowPageModel
             return;
         }
 
-        HasAdvisorAccess = await _permissionChecker.IsGrantedAsync(
+        HasAdvisorAccess = !_currentStudentView.IsImpersonating && await _permissionChecker.IsGrantedAsync(
             CampusFlowPermissions.AdvisorPortal.Default);
 
-        var profile = await _studentProfileRepository.FindAsync(x => x.UserId == CurrentUser.Id.Value);
-        if (!string.IsNullOrWhiteSpace(CurrentUser.Email))
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
+        if (!_currentStudentView.IsImpersonating && !string.IsNullOrWhiteSpace(CurrentUser.Email))
         {
             var lookup = _studentLookups.SingleOrDefault(x =>
                 x.Provider == (profile?.Provider ?? StudentInformationSystemProvider.ThesisElements));

@@ -16,6 +16,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:AdvisorPortal.ViewAll"), MultiTenancySides.Tenant);
         advisorPortal.AddChild(CampusFlowPermissions.AdvisorPortal.ManageRouting,
             L("Permission:AdvisorPortal.ManageRouting"), MultiTenancySides.Tenant);
+        group.AddPermission(CampusFlowPermissions.StudentImpersonation.Default,
+            L("Permission:StudentImpersonation"), MultiTenancySides.Tenant);
     }
 
     private static LocalizableString L(string name)

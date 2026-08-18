@@ -10,4 +10,9 @@ public static class CampusFlowPermissions
         public const string ViewAll = Default + ".ViewAll";
         public const string ManageRouting = Default + ".ManageRouting";
     }
+
+    public static class StudentImpersonation
+    {
+        public const string Default = GroupName + ".StudentImpersonation";
+    }
 }
