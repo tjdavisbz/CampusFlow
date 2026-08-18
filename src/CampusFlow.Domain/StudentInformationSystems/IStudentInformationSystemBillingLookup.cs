@@ -11,4 +11,9 @@ public interface IStudentInformationSystemBillingLookup
     Task<IReadOnlyList<StudentBillingTransaction>> GetTransactionsAsync(
         string externalStudentId,
         CancellationToken cancellationToken = default);
+
+    Task<decimal> GetPreviousBalanceAsync(
+        string externalStudentId,
+        string externalTermId,
+        CancellationToken cancellationToken = default);
 }
