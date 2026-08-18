@@ -23,8 +23,28 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     accepted?.addEventListener('change', updateSubmission);
     const planPreview = document.querySelector('#planPreview');
+    const paymentForm = document.querySelector('#billPaymentForm');
+    const deferredContinue = document.querySelector('#deferredContinue');
+    const paymentPurposeInput = document.querySelector('#paymentPurposeInput');
+    const paymentAmountLabel = document.querySelector('#paymentAmountLabel');
+    const paymentAmountValue = document.querySelector('#paymentAmountValue');
+    const paymentSubmitText = document.querySelector('#paymentSubmitButton span');
+    const updatePaymentAction = () => {
+        const selectedChoice = document.querySelector('[name="paymentChoice"]:checked');
+        const isDeferred = selectedChoice?.value === 'Deferred';
+        const deferredPaymentDue = paymentForm?.dataset.deferredDueToday === 'true';
+        const requiresPayment = !isDeferred || deferredPaymentDue;
+        if (paymentForm) paymentForm.hidden = !requiresPayment;
+        if (deferredContinue) deferredContinue.hidden = !isDeferred || deferredPaymentDue;
+        if (paymentPurposeInput) paymentPurposeInput.value = isDeferred ? 'Deferred' : 'PayNow';
+        const amount = isDeferred ? paymentForm?.dataset.deferredAmount : paymentForm?.dataset.payNowAmount;
+        if (paymentAmountLabel) paymentAmountLabel.textContent = isDeferred ? 'Payment-plan amount due today' : 'Payment amount';
+        if (paymentAmountValue && amount) paymentAmountValue.textContent = amount;
+        if (paymentSubmitText && amount) paymentSubmitText.textContent = `Pay ${amount} securely`;
+        if (planPreview) planPreview.hidden = !isDeferred;
+    };
     document.querySelectorAll('[name="paymentChoice"]').forEach(choice => choice.addEventListener('change', () => {
-        if (planPreview) planPreview.hidden = choice.value !== 'Deferred' || !choice.checked;
+        updatePaymentAction();
         updateSubmission();
     }));
     document.querySelector('[data-processing-form]')?.addEventListener('submit', event => {
@@ -34,5 +54,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('is-processing-agreement');
         if (finalButton) finalButton.disabled = true;
     });
+    paymentForm?.addEventListener('submit', event => {
+        if (!event.currentTarget.checkValidity()) return;
+        const modal = document.querySelector('#paymentProcessing');
+        if (modal) modal.hidden = false;
+        document.body.classList.add('is-processing-payment');
+        const submit = paymentForm.querySelector('[type="submit"]');
+        if (submit) submit.disabled = true;
+    });
+    updatePaymentAction();
     updateSubmission();
+    const initialStep = document.querySelector('.approval-page')?.dataset.initialStep;
+    if (initialStep && steps.some(step => step.dataset.step === initialStep)) show(initialStep);
 });

@@ -17,6 +17,9 @@ using CampusFlow.AdvisorPortal;
 using CampusFlow.Permissions;
 using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Identity;
+using CampusFlow.BillApprovals;
+using CampusFlow.CourseSelections;
+using CampusFlow.Housing;
 
 namespace CampusFlow.Web.Pages;
 
@@ -34,6 +37,10 @@ public class IndexModel : CampusFlowPageModel
     private readonly IPermissionChecker _permissionChecker;
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
     private readonly IdentityUserManager _userManager;
+    private readonly ICourseSelectionAppService _courseSelection;
+    private readonly IMealPlanAppService _mealPlans;
+    private readonly IRepository<BillApproval, Guid> _billApprovals;
+    private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -46,7 +53,11 @@ public class IndexModel : CampusFlowPageModel
         IAdvisorPortalAppService advisorPortal,
         IPermissionChecker permissionChecker,
         IStudentInformationSystemAdvisorLookup advisorLookup,
-        IdentityUserManager userManager)
+        IdentityUserManager userManager,
+        ICourseSelectionAppService courseSelection,
+        IMealPlanAppService mealPlans,
+        IRepository<BillApproval, Guid> billApprovals,
+        IEnumerable<IStudentInformationSystemBillingLookup> billingLookups)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -59,6 +70,10 @@ public class IndexModel : CampusFlowPageModel
         _permissionChecker = permissionChecker;
         _advisorLookup = advisorLookup;
         _userManager = userManager;
+        _courseSelection = courseSelection;
+        _mealPlans = mealPlans;
+        _billApprovals = billApprovals;
+        _billingLookups = billingLookups.ToArray();
     }
 
     public string? TenantName { get; private set; }
@@ -74,6 +89,7 @@ public class IndexModel : CampusFlowPageModel
     public bool HasAdvisorAccess { get; private set; }
     public int AdvisorStudentCount { get; private set; }
     public int AdvisorCourseCount { get; private set; }
+    public RegistrationJourneyViewModel? RegistrationJourney { get; private set; }
 
     public async Task OnGetAsync()
     {
@@ -135,6 +151,11 @@ public class IndexModel : CampusFlowPageModel
                     _logger.LogWarning(exception, "Unable to resolve the current academic term.");
                 }
             }
+
+            if (CurrentTerm is not null)
+            {
+                RegistrationJourney = await BuildRegistrationJourneyAsync(profile, CurrentTerm);
+            }
         }
         else
         {
@@ -177,4 +198,107 @@ public class IndexModel : CampusFlowPageModel
             AdvisorCourseCount = queue.Sum(x => x.PendingCourseCount);
         }
     }
+
+    private async Task<RegistrationJourneyViewModel> BuildRegistrationJourneyAsync(
+        StudentProfile profile,
+        StudentInformationSystemTerm term)
+    {
+        var journey = new RegistrationJourneyViewModel();
+
+        try
+        {
+            var billingLookup = _billingLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+            if (billingLookup is not null)
+            {
+                journey.PreviousBalance = await billingLookup.GetPreviousBalanceAsync(
+                    profile.ExternalStudentId, term.ExternalTermId, HttpContext.RequestAborted);
+            }
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            journey.HasUnavailableData = true;
+            _logger.LogWarning(exception, "Unable to calculate registration-journey prior balance.");
+        }
+
+        try
+        {
+            var selection = await _courseSelection.GetAsync(term.ExternalTermId);
+            journey.HasSelectedCourses = selection.Registrations.Count > 0;
+            journey.IsAwaitingAdvisor = selection.Registrations.Any(x => x.NeedsReview);
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            journey.HasUnavailableData = true;
+            _logger.LogWarning(exception, "Unable to load registration-journey course status.");
+        }
+
+        try
+        {
+            var mealPlan = await _mealPlans.GetAsync();
+            journey.MealPlanRequired = mealPlan.Options.Values.Any(x => x.Count > 0);
+            journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            journey.HasUnavailableData = true;
+            _logger.LogWarning(exception, "Unable to load registration-journey meal-plan status.");
+        }
+
+        try
+        {
+            var approval = await _billApprovals.FirstOrDefaultAsync(x =>
+                x.StudentProfileId == profile.Id && x.ExternalTermId == term.ExternalTermId);
+            journey.BillApproved = approval?.Status is BillApprovalStatus.Approved
+                or BillApprovalStatus.DocumentPending
+                or BillApprovalStatus.Completed;
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            journey.HasUnavailableData = true;
+            _logger.LogWarning(exception, "Unable to load registration-journey bill-approval status.");
+        }
+
+        journey.BuildSteps();
+        return journey;
+    }
+
+    public sealed class RegistrationJourneyViewModel
+    {
+        public decimal PreviousBalance { get; set; }
+        public bool HasSelectedCourses { get; set; }
+        public bool IsAwaitingAdvisor { get; set; }
+        public bool MealPlanRequired { get; set; }
+        public bool MealPlanSelected { get; set; }
+        public bool BillApproved { get; set; }
+        public bool HasUnavailableData { get; set; }
+        public List<RegistrationJourneyStep> Steps { get; } = [];
+        public int CompletedCount => Steps.Count(x => x.State is "complete" or "not-required");
+
+        public void BuildSteps()
+        {
+            Steps.Clear();
+            Steps.Add(PreviousBalance > 50
+                ? new("Previous balance", $"${PreviousBalance:N2} needs attention before registration.", "action", "/Billing", "Review balance")
+                : new("Previous balance", "No prior balance is blocking registration.", "complete", "/Billing", "View account"));
+
+            Steps.Add(IsAwaitingAdvisor
+                ? new("Course selection", "Your selected courses are awaiting advisor review.", "waiting", "/CourseSelection", "View courses")
+                : HasSelectedCourses
+                    ? new("Course selection", "Courses have been selected for this term.", "complete", "/CourseSelection", "View courses")
+                    : new("Course selection", "Choose the courses you plan to take.", "action", "/CourseSelection", "Select courses"));
+
+            Steps.Add(!MealPlanRequired
+                ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", "/Housing", "View options")
+                : MealPlanSelected
+                    ? new("Meal plan", "Your housing and meal-plan choice has been recorded.", "complete", "/Housing", "View selection")
+                    : new("Meal plan", "Choose the housing and meal-plan option that applies to you.", "action", "/Housing", "Choose plan"));
+
+            Steps.Add(BillApproved
+                ? new("Bill approval", "Your bill has been reviewed and approved.", "complete", "/BillApproval", "View agreement")
+                : new("Bill approval", "Review your charges, payment choice, and agreement.", "action", "/BillApproval", "Review bill"));
+        }
+    }
+
+    public sealed record RegistrationJourneyStep(
+        string Title, string Description, string State, string Url, string ActionLabel);
 }

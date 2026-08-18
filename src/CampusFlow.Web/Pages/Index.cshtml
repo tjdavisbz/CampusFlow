@@ -87,6 +87,53 @@
             }
         </section>
 
+        @if (Model.RegistrationJourney is not null)
+        {
+            <section class="registration-journey" aria-labelledby="registration-journey-heading">
+                <div class="journey-heading">
+                    <div>
+                        <span class="summary-label">Registration checklist</span>
+                        <h2 id="registration-journey-heading">Your path to registration</h2>
+                        <p>Complete each step to be ready for the semester.</p>
+                    </div>
+                    <div class="journey-progress" aria-label="@Model.RegistrationJourney.CompletedCount of @Model.RegistrationJourney.Steps.Count steps complete">
+                        <strong>@Model.RegistrationJourney.CompletedCount/@Model.RegistrationJourney.Steps.Count</strong>
+                        <span>steps complete</span>
+                    </div>
+                </div>
+                <ol class="journey-steps">
+                    @foreach (var step in Model.RegistrationJourney.Steps)
+                    {
+                        <li class="journey-step journey-step-@step.State">
+                            <span class="journey-marker" aria-hidden="true">
+                                @if (step.State is "complete" or "not-required")
+                                {
+                                    <i class="fa-solid fa-check"></i>
+                                }
+                                else if (step.State == "waiting")
+                                {
+                                    <i class="fa-regular fa-clock"></i>
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                }
+                            </span>
+                            <div class="journey-copy">
+                                <h3>@step.Title</h3>
+                                <p>@step.Description</p>
+                            </div>
+                            <a href="@step.Url">@step.ActionLabel <i class="fa-solid fa-chevron-right"></i></a>
+                        </li>
+                    }
+                </ol>
+                @if (Model.RegistrationJourney.HasUnavailableData)
+                {
+                    <p class="journey-note"><i class="fa-solid fa-circle-info"></i> Some status information is still being refreshed. You can continue using the links above.</p>
+                }
+            </section>
+        }
+
         <section class="portal-actions" aria-label="Student services">
             <article class="portal-card registration-card">
                 <div class="portal-card-icon" aria-hidden="true">
@@ -97,7 +144,7 @@
                     <h2>Online Registration</h2>
                     <p>Select courses and choose the meal plan available for your attendance type.</p>
                 </div>
-                <span class="availability-label">Coming soon</span>
+                <a class="availability-label" href="/CourseSelection">Start registration</a>
             </article>
 
             <a class="portal-card billing-card" href="/Billing">

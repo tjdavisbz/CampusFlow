@@ -19,7 +19,7 @@
 }
 @section scripts { <abp-script src="/Pages/BillApproval.js" /> }
 
-<main class="approval-page">
+<main class="approval-page" data-initial-step="@Model.InitialStep">
     <header class="approval-hero">
         <div>
             <span class="eyebrow">Registration checkout</span>
@@ -56,7 +56,7 @@
         {
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
         {
-            <section class="notice success" role="status"><i class="fa-regular fa-circle-check"></i><div><h2>Agreement status</h2><p>@Model.StatusMessage</p></div></section>
+            <section class="notice success" role="status"><i class="fa-regular fa-circle-check"></i><div><h2>Bill approval status</h2><p>@Model.StatusMessage</p></div></section>
         }
         <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
         <nav class="stepper @(Model.RemainingBalance <= 0 ? "no-payment" : null)" aria-label="Bill approval progress">
@@ -92,12 +92,12 @@
                 <section class="approval-step" data-step="payment" hidden>
                     <div class="section-title"><div><span>Step 2</span><h2>Choose how to cover your balance</h2></div><p>Your selection will be recorded with this approval.</p></div>
                     <div class="choice-grid">
-                        <label><input type="radio" name="paymentChoice" value="PayNow" checked><span class="choice-icon"><i class="fa-solid fa-credit-card"></i></span><strong>Pay remaining balance</strong><small>Continue to the secure payment service for @BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0)).</small></label>
-                        <label><input type="radio" name="paymentChoice" value="Deferred"><span class="choice-icon"><i class="fa-solid fa-calendar-check"></i></span><strong>Deferred payment plan</strong><small>Split the balance into installments. A $100 enrollment fee applies.</small></label>
+                        <label><input type="radio" name="paymentChoice" value="PayNow" checked="@(Model.InitialPaymentChoice == "PayNow")"><span class="choice-icon"><i class="fa-solid fa-credit-card"></i></span><strong>Pay remaining balance</strong><small>Pay @BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0)) today.</small></label>
+                        <label><input type="radio" name="paymentChoice" value="Deferred" checked="@(Model.InitialPaymentChoice == "Deferred")"><span class="choice-icon"><i class="fa-solid fa-calendar-check"></i></span><strong>Deferred payment plan</strong><small>Split the balance into installments. A $100 enrollment fee applies@(Model.DeferredDueToday > 0 ? $"; {BillApprovalModel.Currency(Model.DeferredDueToday)} is due today" : "; no payment is due today").</small></label>
                     </div>
                     @if (Model.PaymentPlan is not null)
                     {
-                        <section class="plan-preview" id="planPreview" hidden>
+                        <section class="plan-preview" id="planPreview" hidden="@(Model.InitialPaymentChoice != "Deferred")">
                             <div><span>Your estimated plan</span><strong>@Model.PaymentPlan.Installments.Count payments · $100 fee included</strong></div>
                             <div class="installments">
                                 @foreach (var installment in Model.PaymentPlan.Installments)
@@ -107,8 +107,54 @@
                             </div>
                         </section>
                     }
-                    <div class="integration-note"><i class="fa-solid fa-shield-halved"></i><span>Payment and plan activation stay disabled until CampusFlow can use a supported Elements write endpoint.</span></div>
-                    <div class="step-actions"><button class="secondary" type="button" data-next="review">Back</button><button class="primary" type="button" data-next="agreement">Review agreement <i class="fa-solid fa-arrow-right"></i></button></div>
+                    <form method="post" asp-page-handler="Payment" asp-route-term="@Model.TermCode" id="billPaymentForm" class="bill-payment-form" autocomplete="on"
+                          data-pay-now-amount="@BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0))"
+                          data-deferred-amount="@BillApprovalModel.Currency(Model.DeferredDueToday)"
+                          data-deferred-due-today="@(Model.DeferredDueToday > 0 ? "true" : "false")">
+                        <input type="hidden" asp-for="PaymentPurposeInput" id="paymentPurposeInput" />
+                        <div class="payment-amount"><span id="paymentAmountLabel">Payment amount</span><strong id="paymentAmountValue">@BillApprovalModel.Currency(Model.InitialPaymentChoice == "Deferred" ? Model.DeferredDueToday : Math.Max(Model.RemainingBalance, 0))</strong></div>
+                        <div class="card-fields">
+                            <label class="full-field">Card number
+                                <input asp-for="PaymentCardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="Card number" />
+                                <span asp-validation-for="PaymentCardNumber"></span>
+                            </label>
+                            <label>Expiration month
+                                <select asp-for="PaymentExpirationMonth" autocomplete="cc-exp-month">
+                                    @for (var month = 1; month <= 12; month++) { <option value="@month">@month.ToString("00")</option> }
+                                </select>
+                                <span asp-validation-for="PaymentExpirationMonth"></span>
+                            </label>
+                            <label>Expiration year
+                                <select asp-for="PaymentExpirationYear" autocomplete="cc-exp-year">
+                                    @for (var year = DateTime.UtcNow.Year; year <= DateTime.UtcNow.Year + 15; year++) { <option value="@year">@year</option> }
+                                </select>
+                                <span asp-validation-for="PaymentExpirationYear"></span>
+                            </label>
+                            <label>Security code
+                                <input asp-for="PaymentSecurityCode" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="CVV" />
+                                <span asp-validation-for="PaymentSecurityCode"></span>
+                            </label>
+                            <label>Billing ZIP/postal code
+                                <input asp-for="PaymentPostalCode" autocomplete="postal-code" />
+                                <span asp-validation-for="PaymentPostalCode"></span>
+                            </label>
+                        </div>
+                        @if (Model.IsPayflowTestMode)
+                        {
+                            <aside class="payment-test-note"><strong>Payflow test mode</strong><span>No real charges will be made. Use card 4111 1111 1111 1111 with a future expiration date.</span></aside>
+                        }
+                        <div class="integration-note"><i class="fa-solid fa-shield-halved"></i><span>Your card information is sent securely to PayPal and is never stored by CampusFlow.</span></div>
+                        <div class="step-actions">
+                            <button class="secondary" type="button" data-next="review">Back</button>
+                            <button class="primary" type="submit" id="paymentSubmitButton"><span>Pay @BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0)) securely</span> <i class="fa-solid fa-lock"></i></button>
+                        </div>
+                    </form>
+                    <div id="deferredContinue" hidden>
+                        <div class="step-actions">
+                            <button class="secondary" type="button" data-next="review">Back</button>
+                            <button class="primary" type="button" data-next="agreement">Review agreement <i class="fa-solid fa-arrow-right"></i></button>
+                        </div>
+                    </div>
                 </section>
                 }
 
@@ -152,6 +198,13 @@
                 <span class="processing-spinner" aria-hidden="true"></span>
                 <h2 id="processingTitle">Recording your agreement</h2>
                 <p>Please wait while we securely save your approval and prepare your copy.</p>
+            </div>
+        </div>
+        <div class="processing-modal" id="paymentProcessing" role="dialog" aria-modal="true" aria-labelledby="paymentProcessingTitle" hidden>
+            <div class="processing-card">
+                <span class="processing-spinner" aria-hidden="true"></span>
+                <h2 id="paymentProcessingTitle">Processing your payment</h2>
+                <p>Please do not close or refresh this page. Your agreement will be ready for review when payment is complete.</p>
             </div>
         </div>
         }

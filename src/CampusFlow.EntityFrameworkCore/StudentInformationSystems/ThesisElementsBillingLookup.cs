@@ -116,4 +116,61 @@ public sealed class ThesisElementsBillingLookup : IStudentInformationSystemBilli
 
         return transactions;
     }
+
+    public async Task<decimal> GetPreviousBalanceAsync(
+        string externalStudentId,
+        string externalTermId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalStudentId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalTermId);
+        if (!int.TryParse(externalStudentId, out var studentUid) ||
+            !int.TryParse(externalTermId, out var termCalendarId))
+        {
+            throw new ArgumentException("The Thesis Elements student or term identifier is invalid.");
+        }
+
+        var connectionString = _configuration.GetConnectionString(ConnectionStringName);
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is not configured.");
+        }
+
+        // Reproduces the durable portion of dbo.StudentPreviousBalance without depending on
+        // Nelson's custom function. Term.Term is the Elements chronological sort value.
+        const string sql = """
+            DECLARE @SelectedTerm varchar(30) =
+                (SELECT Term FROM TermCalendar WHERE TermCalendarID = @TermCalendarID);
+
+            SELECT
+                COALESCE((
+                    SELECT SUM(B.ShowAmount)
+                    FROM Billing B
+                    INNER JOIN TransDoc TD ON B.TransDocID = TD.TransDocID
+                    INNER JOIN TermCalendar TC ON B.TermCalendarID = TC.TermCalendarID
+                    WHERE B.OwnerUID = @StudentUID
+                      AND B.Voided = 'No'
+                      AND B.Reversing = 'No'
+                      AND TD.ReportFlag = 'Yes'
+                      AND TC.Term < @SelectedTerm
+                ), 0)
+                + COALESCE((
+                    SELECT SUM(BB.ShowAmount)
+                    FROM BillingBatch BB
+                    INNER JOIN TransDoc TD ON BB.TransDocID = TD.TransDocID
+                    INNER JOIN TermCalendar TC ON BB.TermCalendarID = TC.TermCalendarID
+                    WHERE BB.OwnerUID = @StudentUID
+                      AND TD.ReportFlag = 'Yes'
+                      AND TC.Term < @SelectedTerm
+                ), 0);
+            """;
+
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@StudentUID", SqlDbType.Int).Value = studentUid;
+        command.Parameters.Add("@TermCalendarID", SqlDbType.Int).Value = termCalendarId;
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is null or DBNull ? 0m : Convert.ToDecimal(result);
+    }
 }

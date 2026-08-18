@@ -1,19 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CampusFlow.BillApprovals;
 using CampusFlow.Branding;
+using CampusFlow.Payments;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
 using CampusFlow.Web.BillApprovals;
+using CampusFlow.Web.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.BlobStoring;
 using Volo.Abp.Guids;
@@ -34,6 +39,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidLookup> _aidLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemPaymentPlanLookup> _paymentPlanLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemDocumentTrackingService> _documentTrackingServices;
+    private readonly IReadOnlyCollection<IStudentInformationSystemPaymentPostingService> _paymentPostingServices;
     private readonly IConfiguration _configuration;
     private readonly IRepository<AgreementTemplate, Guid> _agreementTemplates;
     private readonly IRepository<PaymentPlanPolicy, Guid> _paymentPlanPolicies;
@@ -43,6 +49,9 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly IBillApprovalPdfGenerator _pdfGenerator;
     private readonly IGuidGenerator _guidGenerator;
     private readonly IClock _clock;
+    private readonly IRepository<PayflowPayment, Guid> _payflowPayments;
+    private readonly IPayflowGateway _payflowGateway;
+    private readonly PayflowOptions _payflowOptions;
     private readonly ILogger<BillApprovalModel> _logger;
 
     public BillApprovalModel(
@@ -56,6 +65,7 @@ public class BillApprovalModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemFinancialAidLookup> aidLookups,
         IEnumerable<IStudentInformationSystemPaymentPlanLookup> paymentPlanLookups,
         IEnumerable<IStudentInformationSystemDocumentTrackingService> documentTrackingServices,
+        IEnumerable<IStudentInformationSystemPaymentPostingService> paymentPostingServices,
         IConfiguration configuration,
         IRepository<AgreementTemplate, Guid> agreementTemplates,
         IRepository<PaymentPlanPolicy, Guid> paymentPlanPolicies,
@@ -65,6 +75,9 @@ public class BillApprovalModel : CampusFlowPageModel
         IBillApprovalPdfGenerator pdfGenerator,
         IGuidGenerator guidGenerator,
         IClock clock,
+        IRepository<PayflowPayment, Guid> payflowPayments,
+        IPayflowGateway payflowGateway,
+        IOptions<PayflowOptions> payflowOptions,
         ILogger<BillApprovalModel> logger)
     {
         _themeProvider = themeProvider;
@@ -77,6 +90,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _aidLookups = aidLookups.ToArray();
         _paymentPlanLookups = paymentPlanLookups.ToArray();
         _documentTrackingServices = documentTrackingServices.ToArray();
+        _paymentPostingServices = paymentPostingServices.ToArray();
         _configuration = configuration;
         _agreementTemplates = agreementTemplates;
         _paymentPlanPolicies = paymentPlanPolicies;
@@ -86,6 +100,9 @@ public class BillApprovalModel : CampusFlowPageModel
         _pdfGenerator = pdfGenerator;
         _guidGenerator = guidGenerator;
         _clock = clock;
+        _payflowPayments = payflowPayments;
+        _payflowGateway = payflowGateway;
+        _payflowOptions = payflowOptions.Value;
         _logger = logger;
     }
 
@@ -108,8 +125,23 @@ public class BillApprovalModel : CampusFlowPageModel
     public bool DocumentTrackingCompleted { get; private set; }
     public string? PdfFileName { get; private set; }
     [BindProperty] public string? PaymentChoiceInput { get; set; }
+    [BindProperty] public string PaymentPurposeInput { get; set; } = "PayNow";
     [BindProperty] public bool AgreementAcceptedInput { get; set; }
+    [BindProperty, Required, CreditCard, Display(Name = "Card number")]
+    public string PaymentCardNumber { get; set; } = string.Empty;
+    [BindProperty, Range(1, 12), Display(Name = "Expiration month")]
+    public int PaymentExpirationMonth { get; set; }
+    [BindProperty, Range(2026, 2100), Display(Name = "Expiration year")]
+    public int PaymentExpirationYear { get; set; }
+    [BindProperty, Required, RegularExpression(@"^\d{3,4}$"), Display(Name = "Security code")]
+    public string PaymentSecurityCode { get; set; } = string.Empty;
+    [BindProperty, StringLength(20), Display(Name = "Billing ZIP/postal code")]
+    public string? PaymentPostalCode { get; set; }
     [TempData] public string? StatusMessage { get; set; }
+    public string InitialStep { get; private set; } = "review";
+    public string InitialPaymentChoice { get; private set; } = "PayNow";
+    public bool IsPayflowTestMode => _payflowOptions.TestMode;
+    public decimal DeferredDueToday => PaymentPlan?.Installments.FirstOrDefault()?.Amount ?? 0m;
     public decimal TotalCredits => Courses.Sum(x => x.Credits);
     public decimal ChargesTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Debit);
     public decimal CreditsTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Credit);
@@ -120,8 +152,13 @@ public class BillApprovalModel : CampusFlowPageModel
     public static string Currency(decimal value) => value.ToString("$#,##0.00;($#,##0.00);$0.00");
     public static string Credits(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
-    public async Task OnGetAsync([FromQuery] string? term = null)
+    public async Task OnGetAsync([FromQuery] string? term = null, [FromQuery] string? step = null,
+        [FromQuery] string? choice = null)
     {
+        InitialStep = step is "payment" or "agreement" or "finish" ? step : "review";
+        InitialPaymentChoice = choice == "Deferred" || PaymentPurposeInput == "Deferred" ? "Deferred" : "PayNow";
+        if (PaymentExpirationMonth == 0) PaymentExpirationMonth = DateTime.UtcNow.Month;
+        if (PaymentExpirationYear == 0) PaymentExpirationYear = DateTime.UtcNow.Year;
         Theme = _themeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null) return;
 
@@ -213,6 +250,103 @@ public class BillApprovalModel : CampusFlowPageModel
         {
             IsUnavailable = true;
             _logger.LogWarning(exception, "Unable to prepare bill approval review for the current student.");
+        }
+    }
+
+    public async Task<IActionResult> OnPostPaymentAsync([FromQuery] string? term = null)
+    {
+        InitialStep = "payment";
+        await OnGetAsync(term, InitialStep, PaymentPurposeInput);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
+        if (_currentStudentView.IsImpersonating || CurrentUser.Id is null || profile is null)
+            return Unauthorized();
+
+        if (IsUnavailable || string.IsNullOrWhiteSpace(ExternalTermId))
+            ModelState.AddModelError(string.Empty, "Your account information could not be loaded. No payment was made.");
+        if (!_payflowOptions.IsConfigured)
+            ModelState.AddModelError(string.Empty, "Online payments are not configured yet.");
+        if (RemainingBalance <= 0)
+            ModelState.AddModelError(string.Empty, "There is no remaining balance to pay.");
+        if (PaymentPurposeInput == "Deferred" && PaymentPlan is null)
+            ModelState.AddModelError(string.Empty, "The deferred payment plan could not be calculated. No payment was made.");
+        if (!int.TryParse(ExternalTermId, out var termCalendarId))
+            ModelState.AddModelError(string.Empty, "The selected academic term could not be verified. No payment was made.");
+        var now = DateTime.UtcNow;
+        if (PaymentExpirationYear < now.Year || PaymentExpirationYear == now.Year && PaymentExpirationMonth < now.Month)
+            ModelState.AddModelError(nameof(PaymentExpirationMonth), "Enter a future expiration date.");
+        if (!ModelState.IsValid)
+        {
+            ClearPaymentFields();
+            return Page();
+        }
+
+        var isDeferredPayment = PaymentPurposeInput == "Deferred";
+        var amount = decimal.Round(isDeferredPayment ? DeferredDueToday : Math.Max(RemainingBalance, 0), 2);
+        if (amount <= 0)
+        {
+            ModelState.AddModelError(string.Empty, "No payment is due today for this selection.");
+            ClearPaymentFields();
+            return Page();
+        }
+        var id = _guidGenerator.Create();
+        var payment = new PayflowPayment(id, CurrentTenant.Id, CurrentUser.Id.Value, profile.Id,
+            profile.ExternalStudentId, amount, _payflowOptions.Currency, Guid.NewGuid().ToString("N"),
+            _payflowOptions.TestMode);
+        await _payflowPayments.InsertAsync(payment, autoSave: true);
+        try
+        {
+            var number = Regex.Replace(PaymentCardNumber, @"[\s-]", string.Empty);
+            var response = await _payflowGateway.SaleAsync(amount, $"CF{id:N}"[..20],
+                new PayflowCard(number, PaymentExpirationMonth, PaymentExpirationYear,
+                    PaymentSecurityCode, PaymentPostalCode), HttpContext.RequestAborted);
+            payment.Complete(response.IsDirectSaleApproved, response.Result, response.Message, response.Reference);
+            await _payflowPayments.UpdateAsync(payment, autoSave: true);
+            _logger.LogInformation(
+                "Bill approval Payflow sale completed for payment {PaymentId}. Result={GatewayResult}, Reference={GatewayReference}",
+                id, response.Result, response.Reference);
+            if (!response.IsDirectSaleApproved)
+            {
+                ModelState.AddModelError(string.Empty,
+                    "The payment was not approved. Please review the card details or try another payment method.");
+                ClearPaymentFields();
+                return Page();
+            }
+
+            var accountUpdatePending = false;
+            try
+            {
+                var postingService = _paymentPostingServices.Single(x => x.Provider == profile.Provider);
+                var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId, amount,
+                    response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
+                    HttpContext.RequestAborted);
+                payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId);
+                await _payflowPayments.UpdateAsync(payment, autoSave: true);
+            }
+            catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                accountUpdatePending = true;
+                payment.MarkElementsPostingFailed(exception.Message);
+                await _payflowPayments.UpdateAsync(payment, autoSave: true);
+                _logger.LogError(exception,
+                    "Bill approval payment {PaymentId} was approved but could not be posted to Elements", id);
+            }
+
+            StatusMessage = accountUpdatePending
+                ? $"Your payment of {Currency(amount)} was received. Your student account is still updating, but you can continue reviewing the agreement."
+                : isDeferredPayment
+                    ? $"Your payment-plan amount of {Currency(amount)} due today was received. You can now review and record your agreement."
+                    : $"Your payment of {Currency(amount)} was received. You can now review and record your agreement.";
+            ClearPaymentFields();
+            return RedirectToPage(new { term, step = "agreement", choice = isDeferredPayment ? "Deferred" : "PayNow" });
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            payment.Fail(null, "Gateway unavailable");
+            await _payflowPayments.UpdateAsync(payment, autoSave: true);
+            _logger.LogWarning(exception, "Unable to process bill approval Payflow payment {PaymentId}", id);
+            ModelState.AddModelError(string.Empty, "PayPal is temporarily unavailable. No payment was made.");
+            ClearPaymentFields();
+            return Page();
         }
     }
 
@@ -433,6 +567,22 @@ public class BillApprovalModel : CampusFlowPageModel
             section.GetSection("FallDueDates").Get<string[]>() ?? [],
             section.GetSection("SpringDueDates").Get<string[]>() ?? [],
             section.GetSection("SummerDueDates").Get<string[]>() ?? []);
+    }
+
+    private void ClearPaymentFields()
+    {
+        var cardErrors = ModelState.TryGetValue(nameof(PaymentCardNumber), out var cardState)
+            ? cardState.Errors.Select(x => x.ErrorMessage).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+            : [];
+        var securityCodeErrors = ModelState.TryGetValue(nameof(PaymentSecurityCode), out var securityCodeState)
+            ? securityCodeState.Errors.Select(x => x.ErrorMessage).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
+            : [];
+        PaymentCardNumber = string.Empty;
+        PaymentSecurityCode = string.Empty;
+        ModelState.Remove(nameof(PaymentCardNumber));
+        ModelState.Remove(nameof(PaymentSecurityCode));
+        foreach (var error in cardErrors) ModelState.AddModelError(nameof(PaymentCardNumber), error);
+        foreach (var error in securityCodeErrors) ModelState.AddModelError(nameof(PaymentSecurityCode), error);
     }
 
     private static bool IsEligibleAid(StudentFinancialAidAward award) =>

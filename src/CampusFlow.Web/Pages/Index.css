@@ -91,6 +91,34 @@
 .availability-label { border-radius: 999px; font-size: .78rem; font-weight: 700; }
 .status-neutral { padding: .45rem .75rem; color: #475467; background: #f2f4f7; }
 
+.registration-journey {
+    padding: 1.5rem;
+    border: 1px solid var(--dashboard-border);
+    border-radius: 1.15rem;
+    background: var(--lpx-card-bg, #fff);
+    box-shadow: 0 8px 24px rgba(16, 24, 40, .06);
+}
+
+.journey-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.journey-heading h2 { margin: .25rem 0; color: var(--dashboard-ink); font-size: 1.45rem; }
+.journey-heading p,.journey-step p { margin: 0; color: var(--dashboard-muted); }
+.journey-progress { min-width: 112px; padding: .75rem 1rem; border-radius: .9rem; background: color-mix(in srgb, var(--tenant-primary), white 92%); text-align: center; }
+.journey-progress strong,.journey-progress span { display: block; }
+.journey-progress strong { color: var(--tenant-primary); font-size: 1.45rem; }
+.journey-progress span { color: var(--dashboard-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+.journey-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin: 0; padding: 0; list-style: none; }
+.journey-step { display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto; gap: .75rem; min-height: 170px; padding: 1rem; border: 1px solid var(--dashboard-border); border-radius: .9rem; background: color-mix(in srgb, var(--tenant-surface), white 72%); }
+.journey-marker { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; color: #fff; background: var(--tenant-primary); }
+.journey-copy h3 { margin: .1rem 0 .3rem; color: var(--dashboard-ink); font-size: 1rem; }
+.journey-step > a { grid-column: 1 / -1; align-self: end; color: var(--tenant-primary); font-size: .83rem; font-weight: 750; text-decoration: none; }
+.journey-step > a i { margin-left: .25rem; font-size: .68rem; }
+.journey-step-complete .journey-marker,.journey-step-not-required .journey-marker { background: #18864b; }
+.journey-step-complete { border-color: #bfe5ce; background: #f2fbf5; }
+.journey-step-not-required { opacity: .78; }
+.journey-step-waiting .journey-marker { background: #9a6700; }
+.journey-note { margin: 1rem 0 0; color: var(--dashboard-muted); font-size: .83rem; }
+.journey-note i { margin-right: .35rem; color: var(--tenant-primary); }
+
 .portal-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -167,4 +195,7 @@
     .advisor-dashboard-summary { grid-template-columns: repeat(2, 1fr); }
     .advisor-summary-copy,.advisor-dashboard-summary > a { grid-column: 1 / -1; }
     .advisor-dashboard-summary > a { text-align: center; }
+    .journey-heading { align-items: flex-start; }
+    .journey-steps { grid-template-columns: 1fr; }
+    .journey-step { min-height: 0; }
 }
