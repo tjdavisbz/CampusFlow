@@ -60,6 +60,7 @@ using Volo.Abp.Studio.Client.AspNetCore;
 using CampusFlow.Web.Portals;
 using CampusFlow.Branding;
 using CampusFlow.Web.Branding;
+using CampusFlow.Web.Observability;
 
 namespace CampusFlow.Web;
 
@@ -128,6 +129,12 @@ public class CampusFlowWebModule : AbpModule
 
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
         context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
+        context.Services.AddHttpContextAccessor();
+        context.Services.Configure<PerformanceLoggingOptions>(
+            configuration.GetSection(PerformanceLoggingOptions.SectionName));
+        context.Services.AddSingleton<DependencyPerformanceListener>();
+        context.Services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(provider =>
+            provider.GetRequiredService<DependencyPerformanceListener>());
 
         if (!configuration.GetValue<bool>("App:DisablePII"))
         {
@@ -376,6 +383,7 @@ public class CampusFlowWebModule : AbpModule
 
         app.UseCorrelationId();
         app.UseRouting();
+        app.UseMiddleware<RequestPerformanceMiddleware>();
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
         app.UseAbpSecurityHeaders();
