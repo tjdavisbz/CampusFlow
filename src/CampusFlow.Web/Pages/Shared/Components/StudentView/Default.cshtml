@@ -1,0 +1,65 @@
+@model CampusFlow.Web.Components.Toolbar.StudentView.StudentViewToolbarModel
+<div class="student-view-banner" role="status">
+    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+    <span><strong>Viewing as @Model.StudentName</strong><small>ID @Model.StudentId · Read-only</small></span>
+    <form method="post" action="/Admin/ImpersonateStudent/End">
+        @Html.AntiForgeryToken()
+        <button type="submit">Exit student view</button>
+    </form>
+</div>
+<div class="student-view-readonly-modal" id="studentViewReadOnlyModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="studentViewReadOnlyTitle">
+    <div class="student-view-readonly-card">
+        <div class="student-view-readonly-icon"><i class="fa-solid fa-lock"></i></div>
+        <span>Read-only student view</span>
+        <h2 id="studentViewReadOnlyTitle">Changes are disabled</h2>
+        <p>Exit student view before performing actions that change this student’s record.</p>
+        <button type="button" id="studentViewReadOnlyAcknowledge">Got it</button>
+    </div>
+</div>
+<style>
+    .student-view-banner{position:fixed;z-index:1090;top:58px;right:18px;display:flex;align-items:center;gap:.75rem;padding:.7rem .8rem;border:1px solid #d49b13;border-radius:.8rem;background:#fff4cc;color:#4b3500;box-shadow:0 10px 30px rgba(60,42,0,.2)}
+    .student-view-banner>span{display:flex;flex-direction:column;line-height:1.15}.student-view-banner small{margin-top:.2rem;color:#715b25}.student-view-banner button{border:0;border-radius:.55rem;padding:.55rem .75rem;background:#6a4700;color:#fff;font-weight:750}.student-view-banner form{margin:0}
+    .student-view-readonly-modal{position:fixed;z-index:2200;inset:0;display:grid;place-items:center;padding:1rem;background:rgba(18,13,30,.58);backdrop-filter:blur(5px)}.student-view-readonly-modal[hidden]{display:none}.student-view-readonly-card{box-sizing:border-box;width:min(430px,100%);padding:1.7rem;border-radius:1.1rem;background:#fff;color:#172033;box-shadow:0 24px 80px rgba(18,13,30,.3);text-align:center}.student-view-readonly-icon{display:grid;place-items:center;width:52px;height:52px;margin:0 auto .8rem;border-radius:50%;background:#fff4cc;color:#6a4700}.student-view-readonly-card>span{color:#6a4700;font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.student-view-readonly-card h2{margin:.35rem 0;font-size:1.35rem}.student-view-readonly-card p{margin:0;color:#64748b;line-height:1.5}.student-view-readonly-card button{margin-top:1.2rem;border:0;border-radius:.6rem;padding:.65rem 1.2rem;background:#58318c;color:#fff;font-weight:750}
+    @@media(max-width:720px){.student-view-banner{left:10px;right:10px;top:52px}.student-view-banner>span{flex:1}.student-view-banner button{font-size:.8rem}}
+</style>
+<script>
+    (() => {
+        const isEndForm = form => form?.action && new URL(form.action, window.location.href).pathname === '/Admin/ImpersonateStudent/End';
+        const modal = document.getElementById('studentViewReadOnlyModal');
+        const acknowledge = document.getElementById('studentViewReadOnlyAcknowledge');
+        const closeOtherDialogs = () => {
+            document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+            document.querySelectorAll('.remove-course-modal:not([hidden]), .processing-modal:not([hidden]), .processing-overlay:not([hidden])').forEach(item => item.hidden = true);
+            document.body.classList.remove('modal-open', 'is-processing-agreement');
+        };
+        const showReadOnlyMessage = () => {
+            closeOtherDialogs();
+            modal.hidden = false;
+            document.body.classList.add('modal-open');
+            acknowledge?.focus();
+        };
+        document.addEventListener('submit', event => {
+            const form = event.target;
+            if ((form.method || 'get').toLowerCase() !== 'post' || isEndForm(form)) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showReadOnlyMessage();
+        }, true);
+        document.addEventListener('click', event => {
+            const action = event.target.closest('button, input[type="submit"], [data-aid-decision]');
+            if (!action) return;
+            const form = action.form || action.closest('form');
+            const isWriteControl = action.matches('[data-aid-decision]') ||
+                (form && (form.method || 'get').toLowerCase() === 'post' && !isEndForm(form));
+            if (!isWriteControl) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showReadOnlyMessage();
+        }, true);
+        acknowledge?.addEventListener('click', () => {
+            modal.hidden = true;
+            document.body.classList.remove('modal-open');
+        });
+        modal?.addEventListener('click', event => { if (event.target === modal) acknowledge?.click(); });
+    })();
+</script>

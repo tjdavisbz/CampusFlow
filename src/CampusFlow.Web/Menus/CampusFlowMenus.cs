@@ -15,4 +15,6 @@ public class CampusFlowMenus
     public const string FinancialAid = Prefix + ".FinancialAid";
     public const string BillApproval = Prefix + ".BillApproval";
     public const string AdvisorQueue = Prefix + ".AdvisorQueue";
+    public const string Admin = Prefix + ".Admin";
+    public const string ImpersonateStudent = Prefix + ".ImpersonateStudent";
 }

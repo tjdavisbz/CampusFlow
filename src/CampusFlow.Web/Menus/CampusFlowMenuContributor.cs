@@ -12,6 +12,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using CampusFlow.Web.Portals;
 namespace CampusFlow.Web.Menus;
 public class CampusFlowMenuContributor : IMenuContributor
 {
@@ -26,9 +27,8 @@ public class CampusFlowMenuContributor : IMenuContributor
     {
         var l = context.GetLocalizer<CampusFlowResource>();
         var currentUser = context.ServiceProvider.GetRequiredService<ICurrentUser>();
-        var profiles = context.ServiceProvider.GetRequiredService<IRepository<StudentProfile, Guid>>();
-        var hasStudentProfile = currentUser.Id.HasValue &&
-                                await profiles.AnyAsync(x => x.UserId == currentUser.Id.Value);
+        var currentStudentView = context.ServiceProvider.GetRequiredService<ICurrentStudentView>();
+        var hasStudentProfile = await currentStudentView.GetProfileAsync() is not null;
 
         if (hasStudentProfile)
         {
@@ -129,9 +129,20 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 1));
             context.Menu.AddItem(advisor);
         }
+
+        var impersonationAccess = context.ServiceProvider.GetRequiredService<StudentImpersonationAccessService>();
+        if (await impersonationAccess.EnsureAccessAsync())
+        {
+            var admin = new ApplicationMenuItem(
+                CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
+            admin.AddItem(new ApplicationMenuItem(
+                CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
+                "~/Admin/ImpersonateStudent", icon: "fa fa-user-magnifying-glass", order: 1));
+            context.Menu.AddItem(admin);
+        }
         //Administration
         var administration = context.Menu.GetAdministration();
-        administration.Order = 3;
+        administration.Order = 4;
         //Administration->Identity
         administration.SetSubItemOrder(IdentityMenuNames.GroupName, 1);
 

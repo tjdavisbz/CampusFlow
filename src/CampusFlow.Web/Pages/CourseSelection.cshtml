@@ -160,7 +160,7 @@
     }
 </main>
 
-@if (Model.Selection?.DegreeAuditAvailable == true && !Model.RefreshComplete && string.IsNullOrWhiteSpace(Model.ErrorMessage))
+@if (Model.Selection?.DegreeAuditAvailable == true && !Model.RefreshComplete && !Model.IsReadOnlyStudentView && string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
     <form id="course-audit-refresh-token" hidden>
         @Html.AntiForgeryToken()

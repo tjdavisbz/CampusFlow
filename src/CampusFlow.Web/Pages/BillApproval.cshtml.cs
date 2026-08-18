@@ -26,6 +26,7 @@ public class BillApprovalModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _themeProvider;
     private readonly IRepository<StudentProfile, Guid> _profiles;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _studentLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
@@ -47,6 +48,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public BillApprovalModel(
         ITenantThemeProvider themeProvider,
         IRepository<StudentProfile, Guid> profiles,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemStudentLookup> studentLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
@@ -67,6 +69,7 @@ public class BillApprovalModel : CampusFlowPageModel
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
+        _currentStudentView = currentStudentView;
         _studentLookups = studentLookups.ToArray();
         _termLookups = termLookups.ToArray();
         _scheduleLookups = scheduleLookups.ToArray();
@@ -122,13 +125,13 @@ public class BillApprovalModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null) return;
 
-        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null) { IsUnavailable = true; return; }
 
         try
         {
             var liveStudentLookup = _studentLookups.SingleOrDefault(x => x.Provider == profile.Provider);
-            if (liveStudentLookup is not null && !string.IsNullOrWhiteSpace(CurrentUser.Email))
+            if (!_currentStudentView.IsImpersonating && liveStudentLookup is not null && !string.IsNullOrWhiteSpace(CurrentUser.Email))
             {
                 var refreshed = await liveStudentLookup.FindByEmailAsync(CurrentUser.Email, HttpContext.RequestAborted);
                 if (refreshed.Student is not null)
@@ -190,11 +193,11 @@ public class BillApprovalModel : CampusFlowPageModel
             if (!string.IsNullOrWhiteSpace(ExternalTermId))
             {
                 IsAlreadyAccepted = await _billApprovals.AnyAsync(x =>
-                    x.UserId == CurrentUser.Id.Value && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
+                    x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
                 if (IsAlreadyAccepted)
                 {
                     var accepted = await _billApprovals.FindAsync(x =>
-                        x.UserId == CurrentUser.Id.Value && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
+                        x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
                     if (accepted is not null)
                     {
                         var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == accepted.Id);
@@ -239,7 +242,7 @@ public class BillApprovalModel : CampusFlowPageModel
             return Page();
         }
 
-        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null) return Unauthorized();
         var approval = await _billApprovals.FindAsync(x =>
             x.UserId == CurrentUser.Id.Value && x.ExternalTermId == ExternalTermId);
@@ -351,8 +354,10 @@ public class BillApprovalModel : CampusFlowPageModel
     public async Task<IActionResult> OnGetPdfAsync([FromQuery] string term)
     {
         if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term)) return NotFound();
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
+        if (profile is null) return NotFound();
         var approval = await _billApprovals.FindAsync(x =>
-            x.UserId == CurrentUser.Id.Value && x.TermCode == term && x.AcceptedAt != null);
+            x.UserId == profile.UserId && x.TermCode == term && x.AcceptedAt != null);
         if (approval is null) return NotFound();
         var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
         if (artifact?.PdfStatus != BillArtifactOperationStatus.Completed ||

@@ -16,6 +16,7 @@ public class BillingModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly ILogger<BillingModel> _logger;
@@ -23,12 +24,14 @@ public class BillingModel : CampusFlowPageModel
     public BillingModel(
         ITenantThemeProvider tenantThemeProvider,
         IRepository<StudentProfile, Guid> studentProfileRepository,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         ILogger<BillingModel> logger)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
+        _currentStudentView = currentStudentView;
         _billingLookups = billingLookups.ToArray();
         _termLookups = termLookups.ToArray();
         _logger = logger;
@@ -62,7 +65,7 @@ public class BillingModel : CampusFlowPageModel
             return;
         }
 
-        var profile = await _studentProfileRepository.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null)
         {
             IsBillingUnavailable = true;

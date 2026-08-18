@@ -18,17 +18,20 @@ public class DegreeAuditModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _themeProvider;
     private readonly IRepository<StudentProfile, Guid> _profiles;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemDegreeAuditLookup> _lookups;
     private readonly ILogger<DegreeAuditModel> _logger;
 
     public DegreeAuditModel(
         ITenantThemeProvider themeProvider,
         IRepository<StudentProfile, Guid> profiles,
+        ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemDegreeAuditLookup> lookups,
         ILogger<DegreeAuditModel> logger)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
+        _currentStudentView = currentStudentView;
         _lookups = lookups.ToArray();
         _logger = logger;
     }
@@ -47,6 +50,7 @@ public class DegreeAuditModel : CampusFlowPageModel
     public IReadOnlyList<StudentDegreeAuditSummary> Audits { get; private set; } = [];
     public StudentDegreeAuditDetail? SelectedAudit { get; private set; }
     public IReadOnlyList<RequirementGroup> Requirements { get; private set; } = [];
+    public bool IsReadOnlyStudentView => _currentStudentView.IsImpersonating;
 
     public async Task<IActionResult> OnPostRefreshAsync(
         int revisionTermId,
@@ -58,7 +62,7 @@ public class DegreeAuditModel : CampusFlowPageModel
             return Unauthorized();
         }
 
-        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         var lookup = profile is null
             ? null
             : _lookups.SingleOrDefault(x => x.Provider == profile.Provider);
@@ -95,7 +99,7 @@ public class DegreeAuditModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null) return;
 
-        var profile = await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value);
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null)
         {
             IsUnavailable = true;

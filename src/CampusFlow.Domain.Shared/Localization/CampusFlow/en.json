@@ -7,6 +7,7 @@
     "Welcome": "Welcome",
     "Permission:AdvisorPortal": "Access the Advisor Portal",
     "Permission:AdvisorPortal.ViewAll": "View every advisor review queue",
-    "Permission:AdvisorPortal.ManageRouting": "Manage advisor routing"
+    "Permission:AdvisorPortal.ManageRouting": "Manage advisor routing",
+    "Permission:StudentImpersonation": "View the student portal as a student"
   }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,5 +10,10 @@ public interface IStudentInformationSystemStudentLookup
 
     Task<StudentLookupResult> FindByEmailAsync(
         string email,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<StudentInformationSystemStudent>> SearchAsync(
+        string query,
+        int maximumResults = 20,
         CancellationToken cancellationToken = default);
 }

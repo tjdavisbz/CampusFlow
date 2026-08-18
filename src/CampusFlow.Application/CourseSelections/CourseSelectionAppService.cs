@@ -17,6 +17,7 @@ namespace CampusFlow.CourseSelections;
 public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionAppService
 {
     private readonly IRepository<StudentProfile, Guid> _profiles;
+    private readonly ICurrentStudentView _currentStudentView;
     private readonly IRepository<CourseSelectionPolicy, Guid> _policies;
     private readonly IRepository<AdvisorAssignment, Guid> _advisorAssignments;
     private readonly IRepository<CourseReview, Guid> _reviews;
@@ -30,6 +31,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
 
     public CourseSelectionAppService(
         IRepository<StudentProfile, Guid> profiles,
+        ICurrentStudentView currentStudentView,
         IRepository<CourseSelectionPolicy, Guid> policies,
         IRepository<AdvisorAssignment, Guid> advisorAssignments,
         IRepository<CourseReview, Guid> reviews,
@@ -42,6 +44,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         ILogger<CourseSelectionAppService> logger)
     {
         _profiles = profiles;
+        _currentStudentView = currentStudentView;
         _policies = policies;
         _advisorAssignments = advisorAssignments;
         _reviews = reviews;
@@ -255,6 +258,8 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     [UnitOfWork(IsDisabled = true)]
     public async Task<AddCourseSelectionResultDto> AddAsync(AddCourseSelectionInput input)
     {
+        if (_currentStudentView.IsImpersonating)
+            throw new Volo.Abp.Authorization.AbpAuthorizationException("Student impersonation is read-only.");
         if (string.IsNullOrWhiteSpace(input.ExternalTermId) ||
             string.IsNullOrWhiteSpace(input.ExternalOfferingId) ||
             !Guid.TryParse(input.IdempotencyKey, out _))
@@ -331,6 +336,8 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     [UnitOfWork(IsDisabled = true)]
     public async Task RemoveAsync(RemoveCourseSelectionInput input)
     {
+        if (_currentStudentView.IsImpersonating)
+            throw new Volo.Abp.Authorization.AbpAuthorizationException("Student impersonation is read-only.");
         if (string.IsNullOrWhiteSpace(input.ExternalTermId) ||
             string.IsNullOrWhiteSpace(input.ExternalOfferingId) ||
             string.IsNullOrWhiteSpace(input.ExternalRegistrationId) ||
@@ -397,9 +404,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
 
     private async Task<StudentProfile> GetCurrentProfileAsync()
     {
-        if (CurrentUser.Id is null)
-            throw new UserFriendlyException("You must be signed in to select courses.");
-        return await _profiles.FindAsync(x => x.UserId == CurrentUser.Id.Value)
+        return await _currentStudentView.GetProfileAsync()
             ?? throw new UserFriendlyException("Your student profile could not be found.");
     }
 
