@@ -217,7 +217,15 @@ public class IndexModel : CampusFlowPageModel
                 }
             }
 
-            var queue = await _advisorPortal.GetQueueAsync();
+            var advisorTermId = (await _registrationTermConfigurations.GetListAsync())
+                .Where(x => x.IsStudentSelectable)
+                .OrderByDescending(x => x.IsDashboardDefault)
+                .ThenByDescending(x => x.TermCode)
+                .Select(x => x.ExternalTermId)
+                .FirstOrDefault();
+            var queue = string.IsNullOrWhiteSpace(advisorTermId)
+                ? []
+                : await _advisorPortal.GetQueueAsync(advisorTermId);
             AdvisorStudentCount = queue.Count;
             AdvisorCourseCount = queue.Sum(x => x.PendingCourseCount);
         }

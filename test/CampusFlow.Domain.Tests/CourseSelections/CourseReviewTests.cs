@@ -85,6 +85,25 @@ public class CourseReviewTests
         review.RemovalStatus.ShouldBe(ExternalCourseRemovalStatus.Completed);
     }
 
+    [Fact]
+    public void Pending_review_can_be_rerouted_to_another_advisor()
+    {
+        var review = CreateReview(needsReview: true);
+        review.ReassignAdvisor("77", "newadvisor@nelson.edu");
+        review.ExternalAdvisorId.ShouldBe("77");
+        review.AdvisorEmail.ShouldBe("newadvisor@nelson.edu");
+    }
+
+    [Fact]
+    public void Completed_review_keeps_its_historical_advisor()
+    {
+        var review = CreateReview(needsReview: true);
+        review.Approve(Guid.NewGuid(), DateTime.UtcNow, null);
+        review.ReassignAdvisor("77", "newadvisor@nelson.edu");
+        review.ExternalAdvisorId.ShouldBe("55");
+        review.AdvisorEmail.ShouldBe("advisor@nelson.edu");
+    }
+
     private static CourseReview CreateReview(bool needsReview) => new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "13465", "2026FA",
         "4321", "9876", "Residential Undergraduate", "{}", "55",

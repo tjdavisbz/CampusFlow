@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading;
@@ -79,5 +80,43 @@ public sealed class ThesisElementsAdvisorLookup : IStudentInformationSystemAdvis
             string.IsNullOrWhiteSpace(elementsEmail) ? normalizedEmail : elementsEmail,
             firstName, lastName, displayName,
             globalReviewers.Contains(userName, StringComparer.OrdinalIgnoreCase));
+    }
+
+    public async Task<IReadOnlyList<AdvisorLookupResult>> SearchAsync(
+        string search, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(search) || search.Trim().Length < 2) return [];
+        const string sql = """
+            SELECT TOP (12)
+                CAMSUserID, LTRIM(RTRIM(CAMSUser)), LTRIM(RTRIM(EmailAddress)),
+                LTRIM(RTRIM(FirstName)), LTRIM(RTRIM(LastName)),
+                LTRIM(RTRIM(CONCAT(FirstName, ' ', LastName)))
+            FROM dbo.CAMSUser
+            WHERE DisableLogin = 0
+              AND (LOWER(LTRIM(RTRIM(CAMSUser))) LIKE @Search
+                OR LOWER(LTRIM(RTRIM(EmailAddress))) LIKE @Search
+                OR LOWER(LTRIM(RTRIM(CONCAT(FirstName, ' ', LastName)))) LIKE @Search)
+            ORDER BY LastName, FirstName, CAMSUserID
+            """;
+        var connectionString = _configuration.GetConnectionString(ConnectionStringName);
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is not configured.");
+        var results = new List<AdvisorLookupResult>();
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@Search", SqlDbType.VarChar, 260).Value = $"%{search.Trim().ToLowerInvariant()}%";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var userName = reader.GetString(1);
+            var email = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+            if (string.IsNullOrWhiteSpace(email)) continue;
+            results.Add(new AdvisorLookupResult(reader.GetInt32(0).ToString(), userName, email,
+                reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                reader.IsDBNull(5) ? userName : reader.GetString(5), false));
+        }
+        return results;
     }
 }

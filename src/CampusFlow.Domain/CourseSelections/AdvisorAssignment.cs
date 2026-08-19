@@ -29,4 +29,10 @@ public class AdvisorAssignment : FullAuditedAggregateRoot<Guid>, IMultiTenant
         EffectiveFrom = effectiveFrom;
         IsActive = isActive;
     }
+
+    public void Retire(DateTime effectiveTo)
+    {
+        EffectiveTo = effectiveTo;
+        IsActive = false;
+    }
 }
