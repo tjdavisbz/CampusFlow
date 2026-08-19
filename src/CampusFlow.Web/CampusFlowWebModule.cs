@@ -1,11 +1,13 @@
 ﻿using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Primitives;
 using CampusFlow.EntityFrameworkCore;
 using CampusFlow.Localization;
 using CampusFlow.MultiTenancy;
@@ -175,6 +177,10 @@ public class CampusFlowWebModule : AbpModule
         ConfigureHealthChecks(context);
         ConfigureAuthentication(context);
         ConfigureMicrosoftIdentity(context, configuration);
+        context.Services.ConfigureApplicationCookie(options =>
+        {
+            options.LoginPath = "/Account/MicrosoftLogin";
+        });
         ConfigureVirtualFileSystem(hostingEnvironment);
         ConfigureNavigationServices();
         ConfigureAutoApiControllers();
@@ -389,6 +395,36 @@ public class CampusFlowWebModule : AbpModule
 
         app.UseCorrelationId();
         app.UseRouting();
+        app.Use(async (httpContext, next) =>
+        {
+            var isLegacyLoginPage = httpContext.Request.Path.Equals(
+                "/Account/Login",
+                StringComparison.OrdinalIgnoreCase);
+            var isMicrosoftCallback = string.Equals(
+                httpContext.Request.Query["handler"],
+                "ExternalLoginCallback",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isLegacyLoginPage && !isMicrosoftCallback)
+            {
+                var destination = new QueryString();
+                if (httpContext.Request.Query.TryGetValue("returnUrl", out var returnUrl) &&
+                    !StringValues.IsNullOrEmpty(returnUrl))
+                {
+                    destination = destination.Add("returnUrl", returnUrl.ToString());
+                }
+                if (httpContext.Request.Query.TryGetValue("returnUrlHash", out var returnUrlHash) &&
+                    !StringValues.IsNullOrEmpty(returnUrlHash))
+                {
+                    destination = destination.Add("returnUrlHash", returnUrlHash.ToString());
+                }
+
+                httpContext.Response.Redirect("/Account/MicrosoftLogin" + destination);
+                return;
+            }
+
+            await next();
+        });
         app.UseMiddleware<RequestPerformanceMiddleware>();
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
