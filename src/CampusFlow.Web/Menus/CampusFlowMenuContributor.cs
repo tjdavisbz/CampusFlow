@@ -131,13 +131,26 @@ public class CampusFlowMenuContributor : IMenuContributor
         }
 
         var impersonationAccess = context.ServiceProvider.GetRequiredService<StudentImpersonationAccessService>();
-        if (await impersonationAccess.EnsureAccessAsync())
+        var canImpersonate = await impersonationAccess.EnsureAccessAsync();
+        var canManagePlans = await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
+        var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
+        var canManageAccess = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AccessManagement);
+        if (canImpersonate || canManagePlans || canManageRegistration || canManageAccess)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
-            admin.AddItem(new ApplicationMenuItem(
-                CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
-                "~/Admin/ImpersonateStudent", icon: "fa fa-user-magnifying-glass", order: 1));
+            if (canManagePlans)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
+                    "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 1));
+            if (canManageRegistration)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
+                    "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 2));
+            if (canImpersonate)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
+                    "~/Admin/ImpersonateStudent", icon: "fa fa-user-magnifying-glass", order: 3));
+            if (canManageAccess)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AccessManagement, "Users & Roles",
+                    "~/Identity/Users", icon: "fa fa-users-gear", order: 4));
             context.Menu.AddItem(admin);
         }
         //Administration

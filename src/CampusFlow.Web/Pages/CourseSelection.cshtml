@@ -60,15 +60,10 @@
                 <span>Selected term</span><h2>@Model.Selection.TermName</h2><p>@Model.Selection.AttendanceType</p>
                 @if (Model.EligibleTerms.Count > 1)
                 {
-                    <form method="get" class="term-selector">
-                        <label for="term">Choose another term</label>
-                        <select id="term" name="term" onchange="this.form.submit()">
-                            @foreach (var term in Model.EligibleTerms)
-                            {
-                                <option value="@term.ExternalTermId" selected="@(term.ExternalTermId == Model.Selection.ExternalTermId)">@term.TermName</option>
-                            }
-                        </select>
-                    </form>
+                    <nav class="term-switcher" aria-label="Open registration terms">
+                        <span>Switch registration term</span>
+                        <div>@foreach (var term in Model.EligibleTerms){<a asp-page="/CourseSelection" asp-route-term="@term.ExternalTermId" class="@(term.ExternalTermId == Model.Selection.ExternalTermId ? "active" : "")">@term.TermName</a>}</div>
+                    </nav>
                 }
             </div>
             @if (Model.AuditProgress is { CreditsRequired: > 0 } progress)

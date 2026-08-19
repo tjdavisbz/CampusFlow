@@ -42,4 +42,10 @@ public class PaymentPlanPolicy : FullAuditedAggregateRoot<Guid>, IMultiTenant
         SummerDueDatesJson = summerDueDatesJson;
         IsPublished = isPublished;
     }
+
+    public void Retire(DateTime effectiveTo)
+    {
+        EffectiveTo = effectiveTo;
+        IsPublished = false;
+    }
 }

@@ -10,7 +10,10 @@
     PageLayout.Content.MenuItemName = CampusFlowMenus.ImpersonateStudent;
 }
 
-@section styles { <abp-style src="/Pages/Admin/ImpersonateStudent.css" /> }
+@section styles {
+    <abp-style src="/Pages/Admin/ImpersonateStudent.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor}</style>
+}
 
 <main class="impersonation-shell">
     <header class="impersonation-hero">

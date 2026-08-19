@@ -18,6 +18,14 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:AdvisorPortal.ManageRouting"), MultiTenancySides.Tenant);
         group.AddPermission(CampusFlowPermissions.StudentImpersonation.Default,
             L("Permission:StudentImpersonation"), MultiTenancySides.Tenant);
+        var admin = group.AddPermission(CampusFlowPermissions.Admin.Default,
+            L("Permission:Admin"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.PaymentPlans,
+            L("Permission:Admin.PaymentPlans"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.RegistrationRules,
+            L("Permission:Admin.RegistrationRules"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.AccessManagement,
+            L("Permission:Admin.AccessManagement"), MultiTenancySides.Tenant);
     }
 
     private static LocalizableString L(string name)
