@@ -282,7 +282,7 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         paragraph.Format.Font.Bold = bold;
     }
 
-    private static string Money(decimal amount) => amount.ToString("$#,##0.00;($#,##0.00);$0.00");
+    private static string Money(decimal amount) => Formatting.UsdCurrency.Format(amount);
     private static void AddUnavailable(Section section) => section.AddParagraph("Detailed snapshot unavailable for this approval.").Format.Font.Italic = true;
 
     private static BillApprovalReviewSnapshot DeserializeSnapshot(string json)

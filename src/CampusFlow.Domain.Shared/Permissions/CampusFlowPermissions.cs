@@ -19,6 +19,7 @@ public static class CampusFlowPermissions
     public static class Admin
     {
         public const string Default = GroupName + ".Admin";
+        public const string GlobalConfiguration = Default + ".GlobalConfiguration";
         public const string PaymentPlans = Default + ".PaymentPlans";
         public const string BillApproval = Default + ".BillApproval";
         public const string RegistrationRules = Default + ".RegistrationRules";

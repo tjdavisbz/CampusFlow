@@ -29,13 +29,16 @@ public class CampusFlowRoleDataSeedContributor : IDataSeedContributor, ITransien
     public async Task SeedAsync(DataSeedContext context)
     {
         if (!context.TenantId.HasValue) return;
+        await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Global Configuration Manager",
+            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.GlobalConfiguration);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Payment Plan Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.PaymentPlans);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Bill Approval Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.BillApproval,
             CampusFlowPermissions.Admin.PaymentPlans);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Registration Manager",
-            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.RegistrationRules,
+            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.GlobalConfiguration,
+            CampusFlowPermissions.Admin.RegistrationRules,
             CampusFlowPermissions.AdvisorPortal.Default, CampusFlowPermissions.AdvisorPortal.ManageRouting);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Advisor", CampusFlowPermissions.AdvisorPortal.Default);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Student Support",

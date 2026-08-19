@@ -26,7 +26,7 @@
                 <label asp-for="Amount">Payment amount</label>
                 <div class="amount-input"><span>$</span><input asp-for="Amount" inputmode="decimal" /></div>
                 <span asp-validation-for="Amount" class="validation"></span>
-                <small>Current balance: @Model.OutstandingBalance.ToString("C")</small>
+                <small>Current balance: @UsdCurrency.Format(Model.OutstandingBalance)</small>
                 <div class="card-fields">
                     <div class="full-field">
                         <label asp-for="CardNumber"></label>

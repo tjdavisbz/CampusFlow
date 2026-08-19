@@ -38,9 +38,12 @@ public class IndexModel : CampusFlowPageModel
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
     private readonly IdentityUserManager _userManager;
     private readonly ICourseSelectionAppService _courseSelection;
+    private readonly IRepository<RegistrationTermConfiguration, Guid> _registrationTermConfigurations;
     private readonly IMealPlanAppService _mealPlans;
     private readonly IRepository<BillApproval, Guid> _billApprovals;
+    private readonly IRepository<BillApprovalTermConfiguration, Guid> _billApprovalTermConfigurations;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
+    private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -55,9 +58,12 @@ public class IndexModel : CampusFlowPageModel
         IStudentInformationSystemAdvisorLookup advisorLookup,
         IdentityUserManager userManager,
         ICourseSelectionAppService courseSelection,
+        IRepository<RegistrationTermConfiguration, Guid> registrationTermConfigurations,
         IMealPlanAppService mealPlans,
         IRepository<BillApproval, Guid> billApprovals,
-        IEnumerable<IStudentInformationSystemBillingLookup> billingLookups)
+        IRepository<BillApprovalTermConfiguration, Guid> billApprovalTermConfigurations,
+        IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
+        IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -71,9 +77,12 @@ public class IndexModel : CampusFlowPageModel
         _advisorLookup = advisorLookup;
         _userManager = userManager;
         _courseSelection = courseSelection;
+        _registrationTermConfigurations = registrationTermConfigurations;
         _mealPlans = mealPlans;
         _billApprovals = billApprovals;
+        _billApprovalTermConfigurations = billApprovalTermConfigurations;
         _billingLookups = billingLookups.ToArray();
+        _scheduleLookups = scheduleLookups.ToArray();
     }
 
     public string? TenantName { get; private set; }
@@ -85,13 +94,14 @@ public class IndexModel : CampusFlowPageModel
     public string StudentIdentifier { get; private set; } = "Unavailable";
     public string StudentDisplayName { get; private set; } = "Student";
     public StudentInformationSystemTerm? CurrentTerm { get; private set; }
+    public IReadOnlyList<DashboardTermOption> DashboardTerms { get; private set; } = [];
     public bool HasStudentAccess { get; private set; }
     public bool HasAdvisorAccess { get; private set; }
     public int AdvisorStudentCount { get; private set; }
     public int AdvisorCourseCount { get; private set; }
     public RegistrationJourneyViewModel? RegistrationJourney { get; private set; }
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync([FromQuery] string? term = null)
     {
         TenantName = CurrentTenant.Name;
         Theme = _tenantThemeProvider.Get(TenantName);
@@ -144,7 +154,21 @@ public class IndexModel : CampusFlowPageModel
             {
                 try
                 {
-                    CurrentTerm = await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+                    var sisTerms = await termLookup.GetTermsAsync(HttpContext.RequestAborted);
+                    var configuredTerms = (await _registrationTermConfigurations.GetListAsync())
+                        .Where(x => x.IsStudentSelectable).OrderByDescending(x => x.TermCode).ToArray();
+                    DashboardTerms = configuredTerms.Select(configuration =>
+                    {
+                        var sisTerm = sisTerms.FirstOrDefault(x => x.ExternalTermId == configuration.ExternalTermId);
+                        return new DashboardTermOption(configuration.ExternalTermId, configuration.TermName,
+                            sisTerm?.StartDate, sisTerm?.EndDate);
+                    }).ToArray();
+                    var selectedId = !string.IsNullOrWhiteSpace(term) && DashboardTerms.Any(x => x.ExternalTermId == term)
+                        ? term
+                        : configuredTerms.FirstOrDefault(x => x.IsDashboardDefault)?.ExternalTermId;
+                    selectedId ??= (await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted))?.ExternalTermId;
+                    selectedId ??= DashboardTerms.FirstOrDefault()?.ExternalTermId;
+                    CurrentTerm = sisTerms.FirstOrDefault(x => x.ExternalTermId == selectedId);
                 }
                 catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
                 {
@@ -212,6 +236,11 @@ public class IndexModel : CampusFlowPageModel
             {
                 journey.PreviousBalance = await billingLookup.GetPreviousBalanceAsync(
                     profile.ExternalStudentId, term.ExternalTermId, HttpContext.RequestAborted);
+                var transactions = await billingLookup.GetTransactionsAsync(
+                    profile.ExternalStudentId, HttpContext.RequestAborted);
+                journey.AccountBalance = transactions
+                    .Where(x => !x.IsVoided && string.CompareOrdinal(x.TermCode, term.TermCode) <= 0)
+                    .Sum(x => x.BalanceChange);
             }
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -222,9 +251,24 @@ public class IndexModel : CampusFlowPageModel
 
         try
         {
-            var selection = await _courseSelection.GetAsync(term.ExternalTermId);
-            journey.HasSelectedCourses = selection.Registrations.Count > 0;
-            journey.IsAwaitingAdvisor = selection.Registrations.Any(x => x.NeedsReview);
+            var scheduleLookup = _scheduleLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+            if (scheduleLookup is not null)
+            {
+                var scheduledCourses = (await scheduleLookup.GetScheduleAsync(
+                    profile.ExternalStudentId, HttpContext.RequestAborted))
+                    .Where(x => x.ExternalTermId == term.ExternalTermId).ToArray();
+                journey.SelectedCourseCount = scheduledCourses.Length;
+                journey.SelectedCredits = scheduledCourses.Sum(x => x.Credits);
+                journey.HasSelectedCourses = scheduledCourses.Length > 0;
+            }
+            var eligibleTerms = await _courseSelection.GetEligibleTermsAsync();
+            journey.CourseSelectionEnabled = eligibleTerms.Any(x => x.ExternalTermId == term.ExternalTermId);
+            if (journey.CourseSelectionEnabled)
+            {
+                var selection = await _courseSelection.GetAsync(term.ExternalTermId);
+                journey.HasSelectedCourses = selection.Registrations.Count > 0;
+                journey.IsAwaitingAdvisor = selection.Registrations.Any(x => x.NeedsReview);
+            }
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
@@ -235,7 +279,8 @@ public class IndexModel : CampusFlowPageModel
         try
         {
             var mealPlan = await _mealPlans.GetAsync();
-            journey.MealPlanRequired = mealPlan.Options.Values.Any(x => x.Count > 0);
+            journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
+            journey.MealPlanRequired = journey.MealPlanEnabled;
             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -246,8 +291,13 @@ public class IndexModel : CampusFlowPageModel
 
         try
         {
-            var approval = await _billApprovals.FirstOrDefaultAsync(x =>
-                x.StudentProfileId == profile.Id && x.ExternalTermId == term.ExternalTermId);
+            var billTerm = (await _billApprovalTermConfigurations.GetListAsync())
+                .FirstOrDefault(x => x.ExternalTermId == term.ExternalTermId && x.IsOpen(Clock.Now));
+            journey.BillApprovalEnabled = billTerm is not null;
+            var approval = billTerm is null
+                ? null
+                : await _billApprovals.FirstOrDefaultAsync(x =>
+                    x.StudentProfileId == profile.Id && x.ExternalTermId == term.ExternalTermId);
             journey.BillApproved = approval?.Status is BillApprovalStatus.Approved
                 or BillApprovalStatus.DocumentPending
                 or BillApprovalStatus.Completed;
@@ -258,6 +308,8 @@ public class IndexModel : CampusFlowPageModel
             _logger.LogWarning(exception, "Unable to load registration-journey bill-approval status.");
         }
 
+        journey.MealPlanEnabled = journey.MealPlanEnabled && journey.BillApprovalEnabled;
+        journey.Term = term;
         journey.BuildSteps();
         return journey;
     }
@@ -265,40 +317,62 @@ public class IndexModel : CampusFlowPageModel
     public sealed class RegistrationJourneyViewModel
     {
         public decimal PreviousBalance { get; set; }
+        public decimal AccountBalance { get; set; }
+        public int SelectedCourseCount { get; set; }
+        public decimal SelectedCredits { get; set; }
         public bool HasSelectedCourses { get; set; }
         public bool IsAwaitingAdvisor { get; set; }
+        public bool CourseSelectionEnabled { get; set; }
+        public bool MealPlanEnabled { get; set; }
         public bool MealPlanRequired { get; set; }
         public bool MealPlanSelected { get; set; }
         public bool BillApproved { get; set; }
+        public bool BillApprovalEnabled { get; set; }
         public bool HasUnavailableData { get; set; }
         public List<RegistrationJourneyStep> Steps { get; } = [];
         public int CompletedCount => Steps.Count(x => x.State is "complete" or "not-required");
+        public StudentInformationSystemTerm Term { get; set; } = null!;
 
         public void BuildSteps()
         {
             Steps.Clear();
+            var courseUrl = $"/CourseSelection?term={Uri.EscapeDataString(Term.ExternalTermId)}";
+            var billUrl = $"/BillApproval?term={Uri.EscapeDataString(Term.TermCode)}";
             Steps.Add(PreviousBalance > 50
                 ? new("Previous balance", $"${PreviousBalance:N2} needs attention before registration.", "action", "/Billing", "Review balance")
                 : new("Previous balance", "No prior balance is blocking registration.", "complete", "/Billing", "View account"));
 
-            Steps.Add(IsAwaitingAdvisor
-                ? new("Course selection", "Your selected courses are awaiting advisor review.", "waiting", "/CourseSelection", "View courses")
+            Steps.Add(!CourseSelectionEnabled
+                ? RegistrationJourneyStep.ComingSoon("Course selection")
+                : IsAwaitingAdvisor
+                ? new("Course selection", "Your selected courses are awaiting advisor review.", "waiting", courseUrl, "View courses")
                 : HasSelectedCourses
-                    ? new("Course selection", "Courses have been selected for this term.", "complete", "/CourseSelection", "View courses")
-                    : new("Course selection", "Choose the courses you plan to take.", "action", "/CourseSelection", "Select courses"));
+                    ? new("Course selection", "Courses have been selected for this term.", "complete", courseUrl, "View courses")
+                    : new("Course selection", "Choose the courses you plan to take.", "action", courseUrl, "Select courses"));
 
-            Steps.Add(!MealPlanRequired
+            Steps.Add(!BillApprovalEnabled || !MealPlanEnabled
+                ? RegistrationJourneyStep.ComingSoon("Meal plan")
+                : !MealPlanRequired
                 ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", "/Housing", "View options")
                 : MealPlanSelected
                     ? new("Meal plan", "Your housing and meal-plan choice has been recorded.", "complete", "/Housing", "View selection")
                     : new("Meal plan", "Choose the housing and meal-plan option that applies to you.", "action", "/Housing", "Choose plan"));
 
-            Steps.Add(BillApproved
-                ? new("Bill approval", "Your bill has been reviewed and approved.", "complete", "/BillApproval", "View agreement")
-                : new("Bill approval", "Review your charges, payment choice, and agreement.", "action", "/BillApproval", "Review bill"));
+            Steps.Add(!BillApprovalEnabled
+                ? RegistrationJourneyStep.ComingSoon("Bill approval")
+                : BillApproved
+                ? new("Bill approval", "Your bill has been reviewed and approved.", "complete", billUrl, "View agreement")
+                : new("Bill approval", "Review your charges, payment choice, and agreement.", "action", billUrl, "Review bill"));
         }
     }
 
     public sealed record RegistrationJourneyStep(
-        string Title, string Description, string State, string Url, string ActionLabel);
+        string Title, string Description, string State, string? Url, string ActionLabel)
+    {
+        public static RegistrationJourneyStep ComingSoon(string title) =>
+            new(title, "This step is not currently available.", "disabled", null, "Coming soon");
+    }
+
+    public sealed record DashboardTermOption(string ExternalTermId, string DisplayName,
+        DateTime? StartDate, DateTime? EndDate);
 }

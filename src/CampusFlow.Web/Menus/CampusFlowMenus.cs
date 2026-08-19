@@ -16,6 +16,7 @@ public class CampusFlowMenus
     public const string BillApproval = Prefix + ".BillApproval";
     public const string AdvisorQueue = Prefix + ".AdvisorQueue";
     public const string Admin = Prefix + ".Admin";
+    public const string GlobalConfiguration = Prefix + ".GlobalConfiguration";
     public const string ImpersonateStudent = Prefix + ".ImpersonateStudent";
     public const string PaymentPlans = Prefix + ".PaymentPlans";
     public const string BillApprovalConfiguration = Prefix + ".BillApprovalConfiguration";

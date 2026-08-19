@@ -58,13 +58,6 @@
         <section class="term-summary">
             <div>
                 <span>Selected term</span><h2>@Model.Selection.TermName</h2><p>@Model.Selection.AttendanceType</p>
-                @if (Model.EligibleTerms.Count > 1)
-                {
-                    <nav class="term-switcher" aria-label="Open registration terms">
-                        <span>Switch registration term</span>
-                        <div>@foreach (var term in Model.EligibleTerms){<a asp-page="/CourseSelection" asp-route-term="@term.ExternalTermId" class="@(term.ExternalTermId == Model.Selection.ExternalTermId ? "active" : "")">@term.TermName</a>}</div>
-                    </nav>
-                }
             </div>
             @if (Model.AuditProgress is { CreditsRequired: > 0 } progress)
             {

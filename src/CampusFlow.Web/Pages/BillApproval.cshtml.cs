@@ -153,7 +153,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public decimal AccountBalance { get; private set; }
     public decimal RemainingBalance => AccountBalance - PendingAidTotal;
 
-    public static string Currency(decimal value) => value.ToString("$#,##0.00;($#,##0.00);$0.00");
+    public static string Currency(decimal value) => CampusFlow.Web.Formatting.UsdCurrency.Format(value);
     public static string Credits(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
     public async Task OnGetAsync([FromQuery] string? term = null, [FromQuery] string? step = null,
@@ -203,18 +203,14 @@ public class BillApprovalModel : CampusFlowPageModel
             var currentTerm = await currentTermTask;
             var configuredTerms = await _termConfigurations.GetListAsync();
             AvailableTerms = configuredTerms.Where(x => x.IsOpen(_clock.Now)).OrderByDescending(x => x.TermCode).ToArray();
-            if (configuredTerms.Count > 0)
+            TermCode = string.IsNullOrWhiteSpace(term)
+                ? AvailableTerms.FirstOrDefault(x => x.TermCode == currentTerm?.TermCode)?.TermCode ?? AvailableTerms.FirstOrDefault()?.TermCode
+                : term;
+            if (TermCode is null || AvailableTerms.All(x => x.TermCode != TermCode))
             {
-                TermCode = string.IsNullOrWhiteSpace(term)
-                    ? AvailableTerms.FirstOrDefault(x => x.TermCode == currentTerm?.TermCode)?.TermCode ?? AvailableTerms.FirstOrDefault()?.TermCode
-                    : term;
-                if (TermCode is null || AvailableTerms.All(x => x.TermCode != TermCode))
-                {
-                    IsUnavailable = true;
-                    return;
-                }
+                IsUnavailable = true;
+                return;
             }
-            else TermCode = string.IsNullOrWhiteSpace(term) ? currentTerm?.TermCode : term;
             var termConfiguration = configuredTerms.FirstOrDefault(x => x.TermCode == TermCode);
             var allCourses = await scheduleTask;
             Courses = allCourses.Where(x => x.TermCode == TermCode)

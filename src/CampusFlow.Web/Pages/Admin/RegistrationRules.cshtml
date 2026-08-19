@@ -12,7 +12,7 @@
  <header class="admin-config-hero"><div><span>Admin portal</span><h1>Course selection</h1><p>Choose which terms are open for course selection and tailor the rules students use for each.</p></div><i class="fa-solid fa-calendar-check"></i></header>
  <section class="config-card term-list-card">
   <div class="section-heading"><span>Course selection calendar</span><h2>Configured terms</h2><p>Students can switch between every enabled term whose course-selection window is currently open.</p></div>
-  @if(Model.Configurations.Count==0){<div class="empty-result"><strong>No terms configured yet</strong><span>Configure course selection for the first term below. Until then, the legacy global policy remains active.</span></div>}
+  @if(Model.Configurations.Count==0){<div class="empty-result"><strong>No terms configured yet</strong><span>Configure a term below before students can begin Course Selection.</span></div>}
   else {<div class="config-table"><div class="config-table-head"><span>Term</span><span>Course-selection window</span><span>Status</span><span>Actions</span></div>
    @foreach(var item in Model.Configurations){var open=item.IsOpen(DateTime.Now);<div class="config-table-row"><div><strong>@item.TermName</strong></div><div><span>@item.RegistrationOpensAt.ToString("MMM d, yyyy h:mm tt")</span><small>through @item.RegistrationClosesAt.ToString("MMM d, yyyy h:mm tt")</small></div><div><span class="status-pill @(open?"active":"")">@(open?"Open":item.IsEnabled?"Scheduled / closed":"Disabled")</span></div><div class="row-actions"><a asp-route-edit="@item.Id" asp-fragment="term-editor">Edit</a><a asp-route-copyFrom="@item.Id" asp-fragment="term-editor"><i class="fa-regular fa-copy"></i> Copy forward</a></div></div>}
   </div>}
@@ -65,13 +65,12 @@ document.addEventListener('DOMContentLoaded',()=>{
  function wire(){rows.querySelectorAll('.remove-mapping').forEach(b=>b.onclick=()=>{b.closest('.mapping-row').remove();reindex()})}
  add.onclick=()=>{const opts='<option value="">Choose…</option>'+types.map(x=>`<option value="${x}">${x}</option>`).join('');rows.insertAdjacentHTML('beforeend',`<div class="mapping-row"><select>${opts}</select><i class="fa-solid fa-arrow-right"></i><select>${opts}</select><button type="button" class="remove-mapping"><i class="fa-solid fa-xmark"></i></button></div>`);reindex();wire()};
  form.addEventListener('submit',reindex);wire();reindex();
- const picker=document.querySelector('[data-term-picker]');
- if(picker){const trigger=picker.querySelector('.term-picker-trigger'),menu=picker.querySelector('.term-picker-menu'),value=picker.querySelector('[data-term-value]'),label=picker.querySelector('[data-term-label]');
+ document.querySelectorAll('[data-term-picker]').forEach(picker=>{const trigger=picker.querySelector('.term-picker-trigger'),menu=picker.querySelector('.term-picker-menu'),value=picker.querySelector('[data-term-value]'),label=picker.querySelector('[data-term-label]');
   const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
   trigger.addEventListener('click',()=>{const opening=menu.hidden;menu.hidden=!opening;trigger.setAttribute('aria-expanded',opening?'true':'false')});
   menu.querySelectorAll('[data-value]').forEach(option=>option.addEventListener('click',()=>{value.value=option.dataset.value;label.textContent=option.querySelector('span').textContent;menu.querySelectorAll('[role=option]').forEach(x=>x.setAttribute('aria-selected',x===option?'true':'false'));value.dispatchEvent(new Event('change',{bubbles:true}));close()}));
   document.addEventListener('click',event=>{if(!picker.contains(event.target))close()});
   picker.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
- }
+ });
 })
 </script>}

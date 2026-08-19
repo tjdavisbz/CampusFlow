@@ -61,7 +61,7 @@ public class BillingModel : CampusFlowPageModel
         FormatCurrencyValue(amount);
 
     public static string FormatCurrencyValue(decimal amount) =>
-        amount.ToString("$#,##0.00;($#,##0.00);$0.00");
+        CampusFlow.Web.Formatting.UsdCurrency.Format(amount);
 
     public async Task OnGetAsync()
     {
