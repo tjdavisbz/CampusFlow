@@ -137,8 +137,8 @@ public class CheckoutModel : CampusFlowPageModel
             ResultTitle = WasApproved ? "Payment received" : "Payment was not approved";
             ResultMessage = WasApproved
                 ? accountUpdatePending
-                    ? $"Your payment of {payment.Amount:C} was approved. Reference: {response.Reference}. Your student account will update shortly."
-                    : $"Your payment of {payment.Amount:C} was approved and added to your student account. Reference: {response.Reference}"
+                    ? $"Your payment of {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.Amount)} was approved. Reference: {response.Reference}. Your student account will update shortly."
+                    : $"Your payment of {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.Amount)} was approved and added to your student account. Reference: {response.Reference}"
                 : "No payment was made. Please review your card details or try another payment method.";
             ClearSensitiveFields();
             return Page();

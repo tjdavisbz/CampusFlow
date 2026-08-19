@@ -20,6 +20,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:StudentImpersonation"), MultiTenancySides.Tenant);
         var admin = group.AddPermission(CampusFlowPermissions.Admin.Default,
             L("Permission:Admin"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.GlobalConfiguration,
+            L("Permission:Admin.GlobalConfiguration"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.PaymentPlans,
             L("Permission:Admin.PaymentPlans"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.BillApproval,

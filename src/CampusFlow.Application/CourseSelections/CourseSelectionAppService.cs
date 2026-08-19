@@ -18,7 +18,6 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
 {
     private readonly IRepository<StudentProfile, Guid> _profiles;
     private readonly ICurrentStudentView _currentStudentView;
-    private readonly IRepository<CourseSelectionPolicy, Guid> _policies;
     private readonly IRepository<RegistrationTermConfiguration, Guid> _termConfigurations;
     private readonly IRepository<AdvisorAssignment, Guid> _advisorAssignments;
     private readonly IRepository<CourseReview, Guid> _reviews;
@@ -33,7 +32,6 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     public CourseSelectionAppService(
         IRepository<StudentProfile, Guid> profiles,
         ICurrentStudentView currentStudentView,
-        IRepository<CourseSelectionPolicy, Guid> policies,
         IRepository<RegistrationTermConfiguration, Guid> termConfigurations,
         IRepository<AdvisorAssignment, Guid> advisorAssignments,
         IRepository<CourseReview, Guid> reviews,
@@ -47,7 +45,6 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
-        _policies = policies;
         _termConfigurations = termConfigurations;
         _advisorAssignments = advisorAssignments;
         _reviews = reviews;
@@ -250,11 +247,12 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     public async Task<List<CourseSelectionTermDto>> GetEligibleTermsAsync()
     {
         var profile = await GetCurrentProfileAsync();
-        var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
         var configurations = await _termConfigurations.GetListAsync();
-        if (configurations.Count > 0)
-            contexts = contexts.Where(x => configurations.Any(c =>
-                c.ExternalTermId == x.ExternalTermId && c.IsOpen(Clock.Now))).ToArray();
+        var openConfigurations = configurations.Where(x => x.IsOpen(Clock.Now)).ToArray();
+        if (openConfigurations.Length == 0) return [];
+        var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
+        contexts = contexts.Where(x => openConfigurations.Any(c =>
+            c.ExternalTermId == x.ExternalTermId && c.IsOpen(Clock.Now))).ToArray();
         return contexts
             .Select(x => new CourseSelectionTermDto
             {
@@ -426,14 +424,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 throw new UserFriendlyException("Registration is not currently open for that term.");
             return termConfiguration.CreatePolicy();
         }
-        if (await _termConfigurations.AnyAsync())
-            throw new UserFriendlyException("Registration is not configured for that term.");
-        var query = await _policies.GetQueryableAsync();
-        return await AsyncExecuter.FirstOrDefaultAsync(query
-                   .Where(x => x.IsPublished && x.EffectiveFrom <= now &&
-                               (x.EffectiveTo == null || x.EffectiveTo > now))
-                   .OrderByDescending(x => x.Version))
-               ?? throw new UserFriendlyException("Course Selection is not currently configured.");
+        throw new UserFriendlyException("Registration is not configured for that term.");
     }
 
     private async Task<AdvisorAssignment?> GetAdvisorAssignmentAsync(string attendanceType)

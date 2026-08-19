@@ -1,0 +1,18 @@
+@page "/Admin/GlobalConfiguration"
+@model CampusFlow.Web.Pages.Admin.GlobalConfigurationModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{ PageLayout.Content.Title="Global Configuration"; PageLayout.Content.MenuItemName=CampusFlowMenus.GlobalConfiguration; }
+@section styles{<abp-style src="/Pages/Admin/AdminConfiguration.css" /><style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>}
+<main class="admin-config-shell">
+ <header class="admin-config-hero"><div><span>Admin portal</span><h1>Global configuration</h1><p>Control portal-wide behavior shared across student workflows.</p></div><i class="fa-solid fa-globe"></i></header>
+ <form method="post" asp-page-handler="SaveTerms" class="config-card dashboard-term-admin">
+  <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+  <div class="section-heading"><span>Academic context</span><h2>Student dashboard terms</h2><p>Choose the term students see first and the other terms they may select from the registration dashboard.</p></div>
+  <label class="block-field"><span>Current dashboard term</span><div class="term-picker" data-picker><input asp-for="CurrentDashboardTermId" type="hidden" data-picker-value /><button type="button" class="term-picker-trigger" aria-expanded="false"><span><i class="fa-regular fa-calendar"></i><strong data-picker-label>@(Model.Terms.FirstOrDefault(x=>x.Id==Model.CurrentDashboardTermId)?.TermName??"Choose the current term…")</strong></span><i class="fa-solid fa-chevron-down picker-chevron"></i></button><div class="term-picker-menu" hidden>@foreach(var term in Model.Terms){<button type="button" data-value="@term.Id" aria-selected="@(term.Id==Model.CurrentDashboardTermId?"true":"false")"><i class="fa-regular fa-calendar-check"></i><span>@term.TermName</span><i class="fa-solid fa-check selected-check"></i></button>}</div></div><span asp-validation-for="CurrentDashboardTermId"></span><small>This becomes the initial term shown in “Your path to registration.”</small></label>
+  <div class="dashboard-term-options"><div class="mapping-heading"><div><strong>Terms students can choose</strong><small>The current term is always included automatically.</small></div></div>@foreach(var term in Model.Terms){<label><input type="checkbox" name="StudentSelectableTermIds" value="@term.Id" checked="@Model.StudentSelectableTermIds.Contains(term.Id)" /><span><strong>@term.TermName</strong><small>@(term.IsEnabled?"Course Selection configured":"Course Selection disabled")</small></span></label>}</div>
+  <button class="primary-action" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save dashboard terms</button>
+ </form>
+</main>
+@section scripts{<script>document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('[data-picker]').forEach(picker=>{const trigger=picker.querySelector('.term-picker-trigger'),menu=picker.querySelector('.term-picker-menu'),value=picker.querySelector('[data-picker-value]'),label=picker.querySelector('[data-picker-label]');const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};trigger.onclick=()=>{const open=menu.hidden;menu.hidden=!open;trigger.setAttribute('aria-expanded',open?'true':'false')};menu.querySelectorAll('[data-value]').forEach(option=>option.onclick=()=>{value.value=option.dataset.value;label.textContent=option.querySelector('span').textContent;menu.querySelectorAll('[data-value]').forEach(x=>x.setAttribute('aria-selected',x===option?'true':'false'));close()});document.addEventListener('click',event=>{if(!picker.contains(event.target))close()})})})</script>}

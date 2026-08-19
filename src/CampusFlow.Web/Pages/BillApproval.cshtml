@@ -69,7 +69,7 @@
             <button type="button" data-step-target="finish"><b>@(Model.RemainingBalance > 0 ? 4 : 3)</b><span>Finish</span></button>
         </nav>
 
-        <section class="term-banner"><div><span>Selected term</span><h2>@Model.TermName</h2>@if(Model.AvailableTerms.Count>1){<nav class="bill-term-switcher" aria-label="Open Bill Approval terms">@foreach(var openTerm in Model.AvailableTerms){<a asp-page="/BillApproval" asp-route-term="@openTerm.TermCode" class="@(openTerm.TermCode==Model.TermCode?"active":"")">@openTerm.TermName</a>}</nav>}</div><div><span>Registration</span><strong>@BillApprovalModel.Credits(Model.TotalCredits) credits · @Model.Courses.Count classes</strong></div></section>
+        <section class="term-banner"><div><span>Selected term</span><h2>@Model.TermName</h2></div><div><span>Registration</span><strong>@BillApprovalModel.Credits(Model.TotalCredits) credits · @Model.Courses.Count classes</strong></div></section>
 
         <div class="approval-layout">
             <div class="approval-main">

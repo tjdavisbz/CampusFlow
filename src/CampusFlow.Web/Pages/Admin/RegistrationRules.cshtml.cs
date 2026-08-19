@@ -87,10 +87,11 @@ public class RegistrationRulesModel : CampusFlowPageModel
         }
         else
         {
-            await _configurations.InsertAsync(new RegistrationTermConfiguration(_guidGenerator.Create(),
+            var configuration = new RegistrationTermConfiguration(_guidGenerator.Create(),
                 CurrentTenant.Id, selected.ExternalTermId, selected.TermCode, selected.DisplayName,
                 Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
-                Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson), autoSave: true);
+                Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
+            await _configurations.InsertAsync(configuration, autoSave: true);
             Alerts.Success($"{selected.DisplayName} registration was configured.");
         }
         return RedirectToPage();

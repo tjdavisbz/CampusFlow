@@ -29,6 +29,17 @@ public class RegistrationTermConfigurationTests
         Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), false)
             .IsOpen(new DateTime(2026, 4, 1)).ShouldBeFalse();
 
+    [Fact]
+    public void Dashboard_default_must_also_be_student_selectable()
+    {
+        var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);
+        term.ConfigureDashboard(false, true);
+        term.IsStudentSelectable.ShouldBeFalse();
+        term.IsDashboardDefault.ShouldBeFalse();
+        term.ConfigureDashboard(true, true);
+        term.IsDashboardDefault.ShouldBeTrue();
+    }
+
     private static RegistrationTermConfiguration Create(DateTime opens, DateTime closes, bool enabled) =>
         new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid().ToString(), "B26S", "Summer 2026",
             opens, closes, enabled, true, true, "[]");

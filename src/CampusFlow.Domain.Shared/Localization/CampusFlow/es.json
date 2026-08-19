@@ -43,6 +43,7 @@
     "ChoosePhoto": "Escoge una foto",
     "Permission:StudentImpersonation": "Ver el portal estudiantil como un estudiante",
     "Permission:Admin": "Acceder al portal administrativo de CampusFlow",
+    "Permission:Admin.GlobalConfiguration": "Administrar la configuración global del portal",
     "Permission:Admin.PaymentPlans": "Administrar la configuración de planes de pago",
     "Permission:Admin.BillApproval": "Administrar períodos y reglas de aprobación de factura",
     "Permission:Admin.RegistrationRules": "Administrar períodos y reglas de selección de cursos",

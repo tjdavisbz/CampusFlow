@@ -16,6 +16,8 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
     public bool IsEnabled { get; private set; }
     public bool RequireAdvisorReview { get; private set; }
     public bool EnforceSectionCapacity { get; private set; }
+    public bool IsStudentSelectable { get; private set; }
+    public bool IsDashboardDefault { get; private set; }
     public string AttendanceTypeMappingsJson { get; private set; } = "[]";
 
     protected RegistrationTermConfiguration() { }
@@ -29,6 +31,7 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
         TermCode = termCode;
         TermName = termName;
         Update(opensAt, closesAt, isEnabled, requireAdvisorReview, enforceSectionCapacity, mappingsJson);
+        IsStudentSelectable = true;
     }
 
     public void Update(DateTime opensAt, DateTime closesAt, bool isEnabled,
@@ -44,6 +47,12 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
     }
 
     public bool IsOpen(DateTime at) => IsEnabled && RegistrationOpensAt <= at && RegistrationClosesAt >= at;
+
+    public void ConfigureDashboard(bool isStudentSelectable, bool isDashboardDefault)
+    {
+        IsStudentSelectable = isStudentSelectable;
+        IsDashboardDefault = isStudentSelectable && isDashboardDefault;
+    }
 
     public CourseSelectionPolicy CreatePolicy() => new(Id, TenantId, TermName, 1,
         RegistrationOpensAt, IsEnabled, RequireAdvisorReview, EnforceSectionCapacity,

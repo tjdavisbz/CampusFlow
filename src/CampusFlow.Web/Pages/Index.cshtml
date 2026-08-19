@@ -79,7 +79,11 @@
                 <span class="summary-label">Current term</span>
                 <h2 id="semester-heading">@(Model.CurrentTerm?.DisplayName ?? "Term information unavailable")</h2>
             </div>
-            @if (Model.CurrentTerm is not null)
+            @if (Model.DashboardTerms.Count > 0 && Model.CurrentTerm is not null)
+            {
+                <div class="dashboard-term-form"><span>View another term</span><details class="dashboard-term-picker"><summary><i class="fa-regular fa-calendar"></i><strong>@Model.CurrentTerm.DisplayName</strong><i class="fa-solid fa-chevron-down"></i></summary><div>@foreach (var option in Model.DashboardTerms){<a asp-page="/Index" asp-route-term="@option.ExternalTermId" class="@(option.ExternalTermId == Model.CurrentTerm.ExternalTermId ? "selected" : "")"><span>@option.DisplayName</span>@if(option.ExternalTermId == Model.CurrentTerm.ExternalTermId){<i class="fa-solid fa-check"></i>}</a>}</div></details></div>
+            }
+            else if (Model.CurrentTerm is not null)
             {
                 <span class="status-pill status-neutral">
                     @Model.CurrentTerm.StartDate.ToString("MMM d")–@Model.CurrentTerm.EndDate.ToString("MMM d, yyyy")
@@ -123,7 +127,14 @@
                                 <h3>@step.Title</h3>
                                 <p>@step.Description</p>
                             </div>
-                            <a href="@step.Url">@step.ActionLabel <i class="fa-solid fa-chevron-right"></i></a>
+                            @if (step.Url is not null)
+                            {
+                                <a href="@step.Url">@step.ActionLabel <i class="fa-solid fa-chevron-right"></i></a>
+                            }
+                            else
+                            {
+                                <span class="journey-unavailable">@step.ActionLabel</span>
+                            }
                         </li>
                     }
                 </ol>
@@ -134,31 +145,13 @@
             </section>
         }
 
-        <section class="portal-actions" aria-label="Student services">
-            <article class="portal-card registration-card">
-                <div class="portal-card-icon" aria-hidden="true">
-                    <i class="fa-solid fa-calendar-check"></i>
-                </div>
-                <div class="portal-card-content">
-                    <span class="portal-card-kicker">Plan your semester</span>
-                    <h2>Online Registration</h2>
-                    <p>Select courses and choose the meal plan available for your attendance type.</p>
-                </div>
-                <a class="availability-label" href="/CourseSelection">Start registration</a>
-            </article>
-
-            <a class="portal-card billing-card" href="/Billing">
-                <div class="portal-card-icon" aria-hidden="true">
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                </div>
-                <div class="portal-card-content">
-                    <span class="portal-card-kicker">Complete your clearance</span>
-                    <h2>Billing &amp; Payments</h2>
-                    <p>Review your schedule, charges, financial aid, balance, and available payment options.</p>
-                </div>
-                <span class="availability-label">View account</span>
-            </a>
-        </section>
+        @if (Model.RegistrationJourney is not null)
+        {
+            <section class="term-snapshot" aria-label="Current term summary">
+                <article class="snapshot-card"><span class="snapshot-icon"><i class="fa-solid fa-book-open"></i></span><div><span class="summary-label">Courses selected</span><strong>@Model.RegistrationJourney.SelectedCourseCount</strong><p>@Model.RegistrationJourney.SelectedCredits.ToString("0.##") total credits</p></div></article>
+                <article class="snapshot-card"><span class="snapshot-icon"><i class="fa-solid fa-wallet"></i></span><div><span class="summary-label">Account balance</span><strong>@UsdCurrency.Format(Model.RegistrationJourney.AccountBalance)</strong><p>@(Model.RegistrationJourney.PreviousBalance > 50 ? $"{UsdCurrency.Format(Model.RegistrationJourney.PreviousBalance)} prior balance needs attention" : "No blocking prior balance")</p></div></article>
+            </section>
+        }
     }
 
     <section class="support-card">

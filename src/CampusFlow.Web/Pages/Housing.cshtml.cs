@@ -1,10 +1,14 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using CampusFlow.Branding;
+using CampusFlow.BillApprovals;
 using CampusFlow.Housing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Timing;
 
 namespace CampusFlow.Web.Pages;
 
@@ -13,13 +17,18 @@ public class HousingModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _themeProvider;
     private readonly IMealPlanAppService _mealPlans;
+    private readonly IRepository<BillApprovalTermConfiguration, Guid> _billApprovalTermConfigurations;
+    private readonly IClock _clock;
     private readonly ILogger<HousingModel> _logger;
 
     public HousingModel(ITenantThemeProvider themeProvider, IMealPlanAppService mealPlans,
-        ILogger<HousingModel> logger)
+        IRepository<BillApprovalTermConfiguration, Guid> billApprovalTermConfigurations,
+        IClock clock, ILogger<HousingModel> logger)
     {
         _themeProvider = themeProvider;
         _mealPlans = mealPlans;
+        _billApprovalTermConfigurations = billApprovalTermConfigurations;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -35,7 +44,17 @@ public class HousingModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         try
         {
+            if (!await IsEnabledAsync())
+            {
+                IsUnavailable = true;
+                return;
+            }
             Selection = await _mealPlans.GetAsync();
+            if (!Selection.Options.Values.Any(x => x.Count > 0))
+            {
+                IsUnavailable = true;
+                return;
+            }
             Input.HousingChoice = Selection.SelectedHousingChoice ?? HousingChoice.OnCampus;
             Input.ExternalMealPlanId = Selection.SelectedMealPlanId;
         }
@@ -48,6 +67,9 @@ public class HousingModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
+        if (!await IsEnabledAsync())
+            return RedirectToPage("/Index");
+
         try
         {
             var result = await _mealPlans.SaveAsync(Input);
@@ -77,4 +99,7 @@ public class HousingModel : CampusFlowPageModel
         HousingChoice.Commuter => "I have approval to live off campus.",
         _ => string.Empty
     };
+
+    private async Task<bool> IsEnabledAsync() =>
+        (await _billApprovalTermConfigurations.GetListAsync()).Any(x => x.IsOpen(_clock.Now));
 }

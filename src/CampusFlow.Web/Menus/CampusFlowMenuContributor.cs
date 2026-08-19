@@ -58,29 +58,11 @@ public class CampusFlowMenuContributor : IMenuContributor
             );
             student.AddItem(
             new ApplicationMenuItem(
-                CampusFlowMenus.CourseSelection,
-                "Course Selection",
-                "~/CourseSelection",
-                icon: "fa fa-list-check",
-                order: 3
-            )
-            );
-            student.AddItem(
-            new ApplicationMenuItem(
                 CampusFlowMenus.DegreeAudit,
                 "Degree Audit",
                 "~/DegreeAudit",
                 icon: "fa fa-chart-pie",
                 order: 4
-            )
-            );
-            student.AddItem(
-            new ApplicationMenuItem(
-                CampusFlowMenus.Housing,
-                "Housing & Meal Plan",
-                "~/Housing",
-                icon: "fa fa-utensils",
-                order: 5
             )
             );
             student.AddItem(
@@ -99,15 +81,6 @@ public class CampusFlowMenuContributor : IMenuContributor
                 "~/FinancialAid",
                 icon: "fa fa-graduation-cap",
                 order: 7
-            )
-            );
-            student.AddItem(
-            new ApplicationMenuItem(
-                CampusFlowMenus.BillApproval,
-                "Bill Approval",
-                "~/BillApproval",
-                icon: "fa fa-file-signature",
-                order: 8
             )
             );
             context.Menu.AddItem(student);
@@ -133,13 +106,17 @@ public class CampusFlowMenuContributor : IMenuContributor
         var impersonationAccess = context.ServiceProvider.GetRequiredService<StudentImpersonationAccessService>();
         var canImpersonate = await impersonationAccess.EnsureAccessAsync();
         var canManagePlans = await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
+        var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
         var canManageAccess = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AccessManagement);
-        if (canImpersonate || canManagePlans || canManageBillApproval || canManageRegistration || canManageAccess)
+        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAccess)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
+            if (canManageGlobalConfiguration)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.GlobalConfiguration, "Global Configuration",
+                    "~/Admin/GlobalConfiguration", icon: "fa fa-globe", order: 1));
             if (canManagePlans)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
                     "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 1));
