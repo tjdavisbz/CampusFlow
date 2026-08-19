@@ -1,6 +1,11 @@
 :root {
     --lpx-logo: url('/images/logo/leptonxlite/logo-light-thumbnail.png');
     --lpx-logo-icon: url('/images/logo/leptonxlite/logo-light-thumbnail.png');
+    --lpx-primary: var(--tenant-primary, #502d7f);
+    --lpx-primary-hover: var(--tenant-primary-dark, #28163f);
+    --bs-primary: var(--tenant-primary, #502d7f);
+    --bs-link-color: var(--tenant-primary, #502d7f);
+    --bs-link-hover-color: var(--tenant-primary-dark, #28163f);
 }
 :root .abp-account-layout .lpx-brand-logo{
     --lpx-logo: url('/images/logo/leptonxlite/logo-dark-thumbnail.png');
@@ -94,4 +99,39 @@ body .lpx-sidebar-container .lpx-sidebar-header {
 #desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link.selected .lpx-menu-item-text {
     color: #fff !important;
     font-weight: 700;
+}
+
+/* Keep LeptonX's transient, hover, and keyboard states inside the tenant palette. */
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected),
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected) {
+    color: color-mix(in srgb, var(--tenant-accent, #c5c0e0) 82%, white) !important;
+    background: transparent !important;
+}
+
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected) .lpx-menu-item-icon,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected) .lpx-menu-item-icon {
+    color: var(--tenant-accent, #c5c0e0) !important;
+}
+
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected):hover,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected):focus-visible,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected):active,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected).active,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected):hover,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected):focus-visible,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected):active,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected).active {
+    color: #fff !important;
+    background: color-mix(in srgb, white, transparent 90%) !important;
+}
+
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected):hover .lpx-menu-item-icon,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected):focus-visible .lpx-menu-item-icon,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected):active .lpx-menu-item-icon,
+#desktop-sidebar .lpx-menu-item:not(.outer-menu-item) > .lpx-menu-item-link:not(.selected).active .lpx-menu-item-icon,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected):hover .lpx-menu-item-icon,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected):focus-visible .lpx-menu-item-icon,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected):active .lpx-menu-item-icon,
+#desktop-sidebar .lpx-inner-menu .lpx-menu-item-link:not(.selected).active .lpx-menu-item-icon {
+    color: #fff !important;
 }
