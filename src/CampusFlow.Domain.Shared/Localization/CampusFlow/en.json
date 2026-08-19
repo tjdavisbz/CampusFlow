@@ -11,6 +11,7 @@
     "Permission:StudentImpersonation": "View the student portal as a student",
     "Permission:Admin": "Access the CampusFlow Admin portal",
     "Permission:Admin.PaymentPlans": "Manage payment-plan configuration",
+    "Permission:Admin.BillApproval": "Manage Bill Approval terms and rules",
     "Permission:Admin.RegistrationRules": "Manage course-selection terms and rules",
     "Permission:Admin.AccessManagement": "Manage CampusFlow user access"
   }

@@ -43,6 +43,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly IConfiguration _configuration;
     private readonly IRepository<AgreementTemplate, Guid> _agreementTemplates;
     private readonly IRepository<PaymentPlanPolicy, Guid> _paymentPlanPolicies;
+    private readonly IRepository<BillApprovalTermConfiguration, Guid> _termConfigurations;
     private readonly IRepository<BillApproval, Guid> _billApprovals;
     private readonly IRepository<BillApprovalArtifact, Guid> _artifacts;
     private readonly IBlobContainer<BillApprovalPdfContainer> _pdfs;
@@ -69,6 +70,7 @@ public class BillApprovalModel : CampusFlowPageModel
         IConfiguration configuration,
         IRepository<AgreementTemplate, Guid> agreementTemplates,
         IRepository<PaymentPlanPolicy, Guid> paymentPlanPolicies,
+        IRepository<BillApprovalTermConfiguration, Guid> termConfigurations,
         IRepository<BillApproval, Guid> billApprovals,
         IRepository<BillApprovalArtifact, Guid> artifacts,
         IBlobContainer<BillApprovalPdfContainer> pdfs,
@@ -94,6 +96,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _configuration = configuration;
         _agreementTemplates = agreementTemplates;
         _paymentPlanPolicies = paymentPlanPolicies;
+        _termConfigurations = termConfigurations;
         _billApprovals = billApprovals;
         _artifacts = artifacts;
         _pdfs = pdfs;
@@ -115,6 +118,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public string? TermCode { get; private set; }
     public string? ExternalTermId { get; private set; }
     public bool IsUnavailable { get; private set; }
+    public IReadOnlyList<BillApprovalTermConfiguration> AvailableTerms { get; private set; } = [];
     public IReadOnlyList<StudentCourseScheduleItem> Courses { get; private set; } = [];
     public IReadOnlyList<StudentBillingTransaction> Charges { get; private set; } = [];
     public IReadOnlyList<StudentFinancialAidAward> Aid { get; private set; } = [];
@@ -197,7 +201,21 @@ public class BillApprovalModel : CampusFlowPageModel
             await Task.WhenAll(currentTermTask, scheduleTask, billingTask, aidTask);
 
             var currentTerm = await currentTermTask;
-            TermCode = string.IsNullOrWhiteSpace(term) ? currentTerm?.TermCode : term;
+            var configuredTerms = await _termConfigurations.GetListAsync();
+            AvailableTerms = configuredTerms.Where(x => x.IsOpen(_clock.Now)).OrderByDescending(x => x.TermCode).ToArray();
+            if (configuredTerms.Count > 0)
+            {
+                TermCode = string.IsNullOrWhiteSpace(term)
+                    ? AvailableTerms.FirstOrDefault(x => x.TermCode == currentTerm?.TermCode)?.TermCode ?? AvailableTerms.FirstOrDefault()?.TermCode
+                    : term;
+                if (TermCode is null || AvailableTerms.All(x => x.TermCode != TermCode))
+                {
+                    IsUnavailable = true;
+                    return;
+                }
+            }
+            else TermCode = string.IsNullOrWhiteSpace(term) ? currentTerm?.TermCode : term;
+            var termConfiguration = configuredTerms.FirstOrDefault(x => x.TermCode == TermCode);
             var allCourses = await scheduleTask;
             Courses = allCourses.Where(x => x.TermCode == TermCode)
                 .OrderBy(x => x.Department).ThenBy(x => x.CourseNumber).ToArray();
@@ -220,13 +238,13 @@ public class BillApprovalModel : CampusFlowPageModel
                     profile.ExternalStudentId, ExternalTermId, HttpContext.RequestAborted);
                 if (context is not null)
                 {
-                    var policy = await GetCurrentPaymentPlanPolicyAsync();
+                    var policy = await GetCurrentPaymentPlanPolicyAsync(termConfiguration?.PaymentPlanPolicyId);
                     PaymentPlan = StudentPaymentPlanCalculator.Calculate(
                         AccountBalance, PendingAidTotal, TermName, context, policy);
                 }
             }
 
-            Agreement = await FindCurrentAgreementAsync();
+            Agreement = await FindCurrentAgreementAsync(termConfiguration?.AgreementTemplateId);
             if (!string.IsNullOrWhiteSpace(ExternalTermId))
             {
                 IsAlreadyAccepted = await _billApprovals.AnyAsync(x =>
@@ -534,20 +552,24 @@ public class BillApprovalModel : CampusFlowPageModel
         await _artifacts.UpdateAsync(artifact, autoSave: true);
     }
 
-    private async Task<AgreementTemplate?> FindCurrentAgreementAsync()
+    private async Task<AgreementTemplate?> FindCurrentAgreementAsync(Guid? configuredAgreementId = null)
     {
+        if (configuredAgreementId.HasValue)
+            return await _agreementTemplates.GetAsync(configuredAgreementId.Value);
         var now = _clock.Now;
         var query = await _agreementTemplates.GetQueryableAsync();
         return query.Where(x => x.IsPublished && x.EffectiveFrom <= now && (x.EffectiveTo == null || x.EffectiveTo >= now))
             .OrderByDescending(x => x.Version).FirstOrDefault();
     }
 
-    private async Task<StudentPaymentPlanPolicy> GetCurrentPaymentPlanPolicyAsync()
+    private async Task<StudentPaymentPlanPolicy> GetCurrentPaymentPlanPolicyAsync(Guid? configuredPolicyId = null)
     {
         var now = _clock.Now;
         var query = await _paymentPlanPolicies.GetQueryableAsync();
-        var stored = query.Where(x => x.IsPublished && x.EffectiveFrom <= now && (x.EffectiveTo == null || x.EffectiveTo >= now))
-            .OrderByDescending(x => x.Version).FirstOrDefault();
+        var stored = configuredPolicyId.HasValue
+            ? query.FirstOrDefault(x => x.Id == configuredPolicyId.Value)
+            : query.Where(x => x.IsPublished && x.EffectiveFrom <= now && (x.EffectiveTo == null || x.EffectiveTo >= now))
+                .OrderByDescending(x => x.Version).FirstOrDefault();
         if (stored is not null)
         {
             return new StudentPaymentPlanPolicy(
