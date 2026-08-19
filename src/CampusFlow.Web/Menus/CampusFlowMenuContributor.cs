@@ -136,7 +136,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                     "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 5));
             if (canImpersonate)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
-                    "~/Admin/ImpersonateStudent", icon: "fa fa-user-magnifying-glass", order: 3));
+                    "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 3));
             if (canManageAccess)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AccessManagement, "Users & Roles",
                     "~/Identity/Users", icon: "fa fa-users-gear", order: 4));
