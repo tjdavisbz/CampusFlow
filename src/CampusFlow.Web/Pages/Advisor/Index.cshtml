@@ -22,7 +22,7 @@
     </header>
 
     <section class="advisor-card">
-        <div class="card-heading"><div><span>Pending reviews</span><h2>Students</h2></div></div>
+        <div class="card-heading"><div><span>Pending reviews</span><h2>Students@(Model.SelectedTerm is null?"":$" · {Model.SelectedTerm.DisplayName}")</h2></div>@if(Model.Terms.Count>0){<div class="advisor-term-control"><span>Review term</span><details><summary><i class="fa-regular fa-calendar"></i><strong>@Model.SelectedTerm?.DisplayName</strong><i class="fa-solid fa-chevron-down"></i></summary><div>@foreach(var term in Model.Terms){<a asp-page="/Advisor/Index" asp-route-term="@term.ExternalTermId" class="@(term.ExternalTermId==Model.SelectedTerm?.ExternalTermId?"selected":"")"><span>@term.DisplayName</span>@if(term.ExternalTermId==Model.SelectedTerm?.ExternalTermId){<i class="fa-solid fa-check"></i>}</a>}</div></details></div>}</div>
         @if (Model.Students.Count == 0)
         {
             <div class="advisor-empty"><i class="fa-regular fa-circle-check"></i><h2>You're all caught up</h2><p>No students currently have courses waiting for your review.</p></div>

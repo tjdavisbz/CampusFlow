@@ -109,8 +109,9 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
+        var canManageAdvisorRouting = await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ManageRouting);
         var canManageAccess = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AccessManagement);
-        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAccess)
+        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canManageAccess)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -130,6 +131,9 @@ public class CampusFlowMenuContributor : IMenuContributor
             if (canManageRegistration)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
                     "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 4));
+            if (canManageAdvisorRouting)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AdvisorVisibility, "Advisor Visibility",
+                    "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 5));
             if (canImpersonate)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
                     "~/Admin/ImpersonateStudent", icon: "fa fa-user-magnifying-glass", order: 3));

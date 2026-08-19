@@ -50,6 +50,13 @@ public class CourseReview : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public void RecordComment(string? comment) => AdvisorComment = comment;
 
+    public void ReassignAdvisor(string? externalAdvisorId, string? advisorEmail)
+    {
+        if (!NeedsReview) return;
+        ExternalAdvisorId = externalAdvisorId;
+        AdvisorEmail = advisorEmail;
+    }
+
     public void Approve(Guid userId, DateTime decidedAt, string? comment)
     {
         AdvisorComment = comment;
