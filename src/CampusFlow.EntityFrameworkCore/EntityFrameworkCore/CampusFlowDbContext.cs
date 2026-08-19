@@ -36,6 +36,7 @@ public class CampusFlowDbContext :
     public DbSet<BillApproval> BillApprovals { get; set; }
     public DbSet<BillApprovalArtifact> BillApprovalArtifacts { get; set; }
     public DbSet<CourseSelectionPolicy> CourseSelectionPolicies { get; set; }
+    public DbSet<RegistrationTermConfiguration> RegistrationTermConfigurations { get; set; }
     public DbSet<AdvisorAssignment> AdvisorAssignments { get; set; }
     public DbSet<CourseReview> CourseReviews { get; set; }
     public DbSet<CourseReviewSubmission> CourseReviewSubmissions { get; set; }
@@ -201,6 +202,18 @@ public class CampusFlowDbContext :
             b.Property(x => x.EligibleTermRulesJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<RegistrationTermConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "RegistrationTermConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TermCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.AttendanceTypeMappingsJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.ExternalTermId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsEnabled, x.RegistrationOpensAt, x.RegistrationClosesAt });
         });
 
         builder.Entity<AdvisorAssignment>(b =>

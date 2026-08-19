@@ -39,12 +39,23 @@ public class CourseSelectionPolicy : FullAuditedAggregateRoot<Guid>, IMultiTenan
         EligibleTermRulesJson = eligibleTermRulesJson;
     }
 
+    public void Retire(DateTime effectiveTo)
+    {
+        EffectiveTo = effectiveTo;
+        IsPublished = false;
+    }
+
     public bool CanSelect(CourseSelectionContext context, CourseSelectionOffering offering)
         => CanSelect(context, offering, [offering.CourseAttendanceType]);
 
     public bool CanSelect(CourseSelectionContext context, CourseSelectionOffering offering,
         IReadOnlyCollection<string> courseAttendanceTypes)
+        => CanSelect(context, offering, courseAttendanceTypes, DateTime.UtcNow);
+
+    public bool CanSelect(CourseSelectionContext context, CourseSelectionOffering offering,
+        IReadOnlyCollection<string> courseAttendanceTypes, DateTime at)
     {
+        if (!GetEligibilityRules().IsOpen(at)) return false;
         if (!string.Equals(context.ExternalTermId, offering.ExternalTermId, StringComparison.Ordinal))
             return false;
         if (EnforceSectionCapacity && offering.SeatsRemaining <= 0)
@@ -53,6 +64,19 @@ public class CourseSelectionPolicy : FullAuditedAggregateRoot<Guid>, IMultiTenan
         var courseAttendanceType = ResolveCourseAttendanceType(context.TermName, context.AttendanceType);
         return courseAttendanceTypes.Any(x => string.Equals(courseAttendanceType, x,
             StringComparison.OrdinalIgnoreCase));
+    }
+
+    public CourseSelectionEligibilityRules GetEligibilityRules()
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<CourseSelectionEligibilityRules>(EligibleTermRulesJson)
+                   ?? new CourseSelectionEligibilityRules();
+        }
+        catch (JsonException)
+        {
+            return new CourseSelectionEligibilityRules();
+        }
     }
 
     public string ResolveCourseAttendanceType(string termName, string studentAttendanceType)

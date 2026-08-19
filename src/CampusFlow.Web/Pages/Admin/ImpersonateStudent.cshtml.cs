@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CampusFlow.Permissions;
+using CampusFlow.Branding;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Web.Portals;
 using Microsoft.AspNetCore.Authorization;
@@ -20,19 +21,22 @@ public class ImpersonateStudentModel : CampusFlowPageModel
     private readonly IPermissionChecker _permissionChecker;
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _lookups;
     private readonly ILogger<ImpersonateStudentModel> _logger;
+    private readonly ITenantThemeProvider _tenantThemeProvider;
 
     public ImpersonateStudentModel(
         StudentImpersonationAccessService access,
         StudentViewSession session,
         IPermissionChecker permissionChecker,
         IEnumerable<IStudentInformationSystemStudentLookup> lookups,
-        ILogger<ImpersonateStudentModel> logger)
+        ILogger<ImpersonateStudentModel> logger,
+        ITenantThemeProvider tenantThemeProvider)
     {
         _access = access;
         _session = session;
         _permissionChecker = permissionChecker;
         _lookups = lookups.ToArray();
         _logger = logger;
+        _tenantThemeProvider = tenantThemeProvider;
     }
 
     [BindProperty(SupportsGet = true)]
@@ -43,10 +47,12 @@ public class ImpersonateStudentModel : CampusFlowPageModel
 
     public IReadOnlyList<StudentInformationSystemStudent> Results { get; private set; } = [];
     public bool SearchPerformed { get; private set; }
+    public TenantTheme Theme { get; private set; } = null!;
 
     public async Task<IActionResult> OnGetAsync()
     {
         if (!await CanUseAsync()) return Forbid();
+        Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         if (string.IsNullOrWhiteSpace(Query) || Query.Trim().Length < 2) return Page();
 
         SearchPerformed = true;

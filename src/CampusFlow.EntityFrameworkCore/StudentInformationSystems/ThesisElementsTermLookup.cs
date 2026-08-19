@@ -2,6 +2,7 @@ using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Volo.Abp.DependencyInjection;
@@ -85,5 +86,29 @@ public sealed class ThesisElementsTermLookup :
             reader.GetString(2).Trim(),
             reader.GetDateTime(3),
             reader.GetDateTime(4));
+    }
+
+    public async Task<IReadOnlyList<StudentInformationSystemTerm>> GetTermsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var connectionString = _configuration.GetConnectionString(ConnectionStringName);
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is not configured.");
+        const string sql = """
+            SELECT TermCalendarID, Term, TextTerm, TermStartDate, TermEndDate
+            FROM dbo.TermCalendar
+            WHERE TermStartDate >= DATEADD(year, -2, CAST(GETDATE() AS date))
+              AND TermStartDate < DATEADD(year, 4, CAST(GETDATE() AS date))
+            ORDER BY TermStartDate DESC
+            """;
+        var terms = new List<StudentInformationSystemTerm>();
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            terms.Add(new StudentInformationSystemTerm(Provider, Convert.ToString(reader.GetValue(0))!,
+                reader.GetString(1).Trim(), reader.GetString(2).Trim(), reader.GetDateTime(3), reader.GetDateTime(4)));
+        return terms;
     }
 }

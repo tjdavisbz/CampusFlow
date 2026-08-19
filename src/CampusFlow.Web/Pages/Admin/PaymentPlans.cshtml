@@ -1,0 +1,36 @@
+@page "/Admin/PaymentPlans"
+@model CampusFlow.Web.Pages.Admin.PaymentPlansModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Payment Plans";
+    PageLayout.Content.MenuItemName = CampusFlowMenus.PaymentPlans;
+}
+@section styles {
+    <abp-style src="/Pages/Admin/AdminConfiguration.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+
+<main class="admin-config-shell">
+    <header class="admin-config-hero"><div><span>Admin portal</span><h1>Payment plans</h1><p>Control the amounts, eligibility, and installment schedule students see during bill approval.</p></div><i class="fa-solid fa-credit-card"></i></header>
+    <div class="admin-config-grid">
+        <form method="post" asp-page-handler="Publish" class="config-card">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="section-heading"><span>Active configuration</span><h2>Publish a new version</h2><p>Publishing preserves the prior version for audit history and makes these settings effective immediately.</p></div>
+            <div class="field-grid">
+                <label class="wide">Plan name<input asp-for="Input.Name" /></label>
+                <label>Enrollment fee<input asp-for="Input.EnrollmentFee" /><span asp-validation-for="Input.EnrollmentFee"></span></label>
+                <label>Part-time balance divisor<input asp-for="Input.PartTimeBalanceDivisor" /><span asp-validation-for="Input.PartTimeBalanceDivisor"></span></label>
+                <label>Residential minimum payment<input asp-for="Input.ResidentialMinimumPayment" /><span asp-validation-for="Input.ResidentialMinimumPayment"></span></label>
+                <label>Standard minimum payment<input asp-for="Input.StandardMinimumPayment" /><span asp-validation-for="Input.StandardMinimumPayment"></span></label>
+                <label class="wide">Residential attendance types <small>One per line</small><textarea asp-for="Input.ResidentialAttendanceTypes" rows="6"></textarea></label>
+                <label>Fall due dates <small>One label per line</small><textarea asp-for="Input.FallDueDates" rows="5"></textarea></label>
+                <label>Spring due dates <small>One label per line</small><textarea asp-for="Input.SpringDueDates" rows="5"></textarea></label>
+                <label>Summer due dates <small>One label per line</small><textarea asp-for="Input.SummerDueDates" rows="5"></textarea></label>
+            </div>
+            <button class="primary-action" type="submit"><i class="fa-solid fa-cloud-arrow-up"></i> Publish payment plan</button>
+        </form>
+        <aside class="history-card"><div class="section-heading"><span>Audit history</span><h2>Versions</h2></div>@foreach (var item in Model.History){<div class="history-row"><div><strong>Version @item.Version</strong><span>@item.Name</span></div><span class="status-pill @(item.IsPublished ? "active" : "")">@(item.IsPublished ? "Active" : "Retired")</span></div>}</aside>
+    </div>
+</main>

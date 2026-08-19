@@ -37,6 +37,22 @@ public class CourseSelectionPolicyTests
         policy.CanSelect(context, offering).ShouldBeTrue();
     }
 
+    [Fact]
+    public void Selection_is_allowed_only_inside_the_configured_registration_window()
+    {
+        var rules = new CourseSelectionEligibilityRules(
+            RegistrationOpensAt: new DateTime(2026, 8, 1),
+            RegistrationClosesAt: new DateTime(2026, 8, 31));
+        var policy = new CourseSelectionPolicy(Guid.NewGuid(), Guid.NewGuid(), "Windowed", 1,
+            new DateTime(2026, 1, 1), true, true, false, "[]", JsonSerializer.Serialize(rules));
+        var context = CreateContext();
+        var offering = CreateOffering(20, 1);
+
+        policy.CanSelect(context, offering, ["Residential Undergraduate"], new DateTime(2026, 7, 31)).ShouldBeFalse();
+        policy.CanSelect(context, offering, ["Residential Undergraduate"], new DateTime(2026, 8, 15)).ShouldBeTrue();
+        policy.CanSelect(context, offering, ["Residential Undergraduate"], new DateTime(2026, 9, 1)).ShouldBeFalse();
+    }
+
     private static CourseSelectionPolicy CreatePolicy(bool enforceCapacity)
     {
         CourseSelectionAttendanceTypeMapping[] mappings =

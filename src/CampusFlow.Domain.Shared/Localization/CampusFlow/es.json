@@ -41,6 +41,10 @@
     "SeeAllUsers": "Ver todos los usuarios",
     "TakePhoto": "Tomar foto",
     "ChoosePhoto": "Escoge una foto",
-    "Permission:StudentImpersonation": "Ver el portal estudiantil como un estudiante"
+    "Permission:StudentImpersonation": "Ver el portal estudiantil como un estudiante",
+    "Permission:Admin": "Acceder al portal administrativo de CampusFlow",
+    "Permission:Admin.PaymentPlans": "Administrar la configuración de planes de pago",
+    "Permission:Admin.RegistrationRules": "Administrar períodos y reglas de selección de cursos",
+    "Permission:Admin.AccessManagement": "Administrar el acceso de usuarios de CampusFlow"
   }
 }
