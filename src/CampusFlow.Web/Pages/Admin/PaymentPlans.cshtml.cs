@@ -18,13 +18,16 @@ namespace CampusFlow.Web.Pages.Admin;
 public class PaymentPlansModel : CampusFlowPageModel
 {
     private readonly IRepository<PaymentPlanPolicy, Guid> _policies;
+    private readonly IRepository<BillApprovalTermConfiguration, Guid> _termConfigurations;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ITenantThemeProvider _tenantThemeProvider;
 
-    public PaymentPlansModel(IRepository<PaymentPlanPolicy, Guid> policies, IGuidGenerator guidGenerator,
+    public PaymentPlansModel(IRepository<PaymentPlanPolicy, Guid> policies,
+        IRepository<BillApprovalTermConfiguration, Guid> termConfigurations, IGuidGenerator guidGenerator,
         ITenantThemeProvider tenantThemeProvider)
     {
         _policies = policies;
+        _termConfigurations = termConfigurations;
         _guidGenerator = guidGenerator;
         _tenantThemeProvider = tenantThemeProvider;
     }
@@ -32,8 +35,32 @@ public class PaymentPlansModel : CampusFlowPageModel
     [BindProperty] public InputModel Input { get; set; } = new();
     public IReadOnlyList<PaymentPlanPolicy> History { get; private set; } = [];
     public TenantTheme Theme { get; private set; } = null!;
+    public PaymentPlanPolicy? ViewedPolicy { get; private set; }
+    public int ViewedPolicyTermCount { get; private set; }
+    public IReadOnlyList<string> ViewedResidentialAttendanceTypes { get; private set; } = [];
+    public IReadOnlyList<string> ViewedFallDueDates { get; private set; } = [];
+    public IReadOnlyList<string> ViewedSpringDueDates { get; private set; } = [];
+    public IReadOnlyList<string> ViewedSummerDueDates { get; private set; } = [];
 
-    public async Task OnGetAsync() => await LoadAsync();
+    public async Task OnGetAsync(Guid? copyFrom = null, Guid? view = null)
+    {
+        await LoadHistoryAsync();
+        if (view.HasValue)
+        {
+            ViewedPolicy = History.FirstOrDefault(x => x.Id == view.Value);
+            if (ViewedPolicy is not null)
+            {
+                ViewedPolicyTermCount = await _termConfigurations.CountAsync(x => x.PaymentPlanPolicyId == ViewedPolicy.Id);
+                ViewedResidentialAttendanceTypes = DeserializeValues(ViewedPolicy.ResidentialAttendanceTypesJson);
+                ViewedFallDueDates = DeserializeValues(ViewedPolicy.FallDueDatesJson);
+                ViewedSpringDueDates = DeserializeValues(ViewedPolicy.SpringDueDatesJson);
+                ViewedSummerDueDates = DeserializeValues(ViewedPolicy.SummerDueDatesJson);
+            }
+        }
+
+        var source = copyFrom.HasValue ? History.FirstOrDefault(x => x.Id == copyFrom.Value) : History.FirstOrDefault(x => x.IsPublished);
+        if (source is not null) PopulateInput(source);
+    }
 
     public async Task<IActionResult> OnPostPublishAsync()
     {
@@ -63,11 +90,8 @@ public class PaymentPlansModel : CampusFlowPageModel
         return RedirectToPage();
     }
 
-    private async Task LoadAsync()
+    private void PopulateInput(PaymentPlanPolicy current)
     {
-        await LoadHistoryAsync();
-        var current = History.FirstOrDefault(x => x.IsPublished);
-        if (current is null) return;
         Input = new InputModel
         {
             Name = current.Name,
@@ -94,6 +118,9 @@ public class PaymentPlansModel : CampusFlowPageModel
 
     private static string DeserializeLines(string json) =>
         string.Join(Environment.NewLine, JsonSerializer.Deserialize<string[]>(json) ?? []);
+
+    private static IReadOnlyList<string> DeserializeValues(string json) =>
+        JsonSerializer.Deserialize<string[]>(json) ?? [];
 
     public class InputModel
     {

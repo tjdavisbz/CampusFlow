@@ -14,6 +14,17 @@
 
 <main class="admin-config-shell">
     <header class="admin-config-hero"><div><span>Admin portal</span><h1>Payment plans</h1><p>Control the amounts, eligibility, and installment schedule students see during bill approval.</p></div><i class="fa-solid fa-credit-card"></i></header>
+    @if (Model.ViewedPolicy is not null)
+    {
+        <section class="config-card agreement-preview-card" id="paymentPlanPreview">
+            <div class="agreement-preview-heading"><div class="section-heading"><span>Read-only payment plan</span><h2>@Model.ViewedPolicy.Name <small>Version @Model.ViewedPolicy.Version</small></h2><p>These are the exact saved settings for this version.</p></div><a asp-page="/Admin/PaymentPlans" class="secondary-action"><i class="fa-solid fa-xmark"></i> Close</a></div>
+            <div class="agreement-preview-meta"><span class="status-pill @(Model.ViewedPolicy.IsPublished ? "active" : "")">@(Model.ViewedPolicy.IsPublished ? "Active" : "Retired")</span><span><i class="fa-regular fa-calendar"></i> Published @Model.ViewedPolicy.EffectiveFrom.ToString("MMM d, yyyy")</span><span><i class="fa-solid fa-link"></i> Used by @Model.ViewedPolicyTermCount Bill Approval term configuration@(Model.ViewedPolicyTermCount == 1 ? "" : "s")</span></div>
+            <div class="policy-preview-grid">
+                <div><span>Enrollment fee</span><strong>@Model.ViewedPolicy.EnrollmentFee.ToString("C")</strong></div><div><span>Part-time balance divisor</span><strong>@Model.ViewedPolicy.PartTimeBalanceDivisor</strong></div><div><span>Residential minimum</span><strong>@Model.ViewedPolicy.ResidentialMinimumPayment.ToString("C")</strong></div><div><span>Standard minimum</span><strong>@Model.ViewedPolicy.StandardMinimumPayment.ToString("C")</strong></div>
+            </div>
+            <div class="policy-list-grid"><div><h3>Residential attendance types</h3>@foreach(var value in Model.ViewedResidentialAttendanceTypes){<span>@value</span>}</div><div><h3>Fall due dates</h3>@foreach(var value in Model.ViewedFallDueDates){<span>@value</span>}</div><div><h3>Spring due dates</h3>@foreach(var value in Model.ViewedSpringDueDates){<span>@value</span>}</div><div><h3>Summer due dates</h3>@foreach(var value in Model.ViewedSummerDueDates){<span>@value</span>}</div></div>
+        </section>
+    }
     <div class="admin-config-grid">
         <form method="post" asp-page-handler="Publish" class="config-card">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -31,6 +42,6 @@
             </div>
             <button class="primary-action" type="submit"><i class="fa-solid fa-cloud-arrow-up"></i> Publish payment plan</button>
         </form>
-        <aside class="history-card"><div class="section-heading"><span>Audit history</span><h2>Versions</h2></div>@foreach (var item in Model.History){<div class="history-row"><div><strong>Version @item.Version</strong><span>@item.Name</span></div><span class="status-pill @(item.IsPublished ? "active" : "")">@(item.IsPublished ? "Active" : "Retired")</span></div>}</aside>
+        <aside class="history-card"><div class="section-heading"><span>Audit history</span><h2>Versions</h2></div>@foreach (var item in Model.History){<div class="history-row"><div><strong>Version @item.Version</strong><span>@item.Name</span></div><span class="status-pill @(item.IsPublished ? "active" : "")">@(item.IsPublished ? "Active" : "Retired")</span><div class="history-actions"><a asp-route-view="@item.Id" asp-fragment="paymentPlanPreview"><i class="fa-regular fa-eye"></i> View</a><a asp-route-copyFrom="@item.Id"><i class="fa-regular fa-copy"></i> Use as starting point</a></div></div>}</aside>
     </div>
 </main>

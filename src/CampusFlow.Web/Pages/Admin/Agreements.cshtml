@@ -1,0 +1,31 @@
+@page "/Admin/Agreements"
+@model CampusFlow.Web.Pages.Admin.AgreementsModel
+@using CampusFlow.Web.Menus
+@using Microsoft.AspNetCore.Html
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{ PageLayout.Content.Title="Agreements"; PageLayout.Content.MenuItemName=CampusFlowMenus.Agreements; }
+@section styles{<abp-style src="/Pages/Admin/AdminConfiguration.css" /><style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>}
+<main class="admin-config-shell">
+ <header class="admin-config-hero"><div><span>Admin portal</span><h1>Bill agreements</h1><p>Create the terms students review and accept during Bill Approval.</p></div><i class="fa-solid fa-file-contract"></i></header>
+ @if(Model.ViewedAgreement is not null){
+ <section class="config-card agreement-preview-card" id="agreementPreview">
+  <div class="agreement-preview-heading"><div class="section-heading"><span>Read-only agreement</span><h2>@Model.ViewedAgreement.Name <small>Version @Model.ViewedAgreement.Version</small></h2><p>This is the exact saved language for this version.</p></div><a asp-page="/Admin/Agreements" class="secondary-action"><i class="fa-solid fa-xmark"></i> Close</a></div>
+  <div class="agreement-preview-meta"><span class="status-pill @(Model.ViewedAgreement.IsPublished?"active":"")">@(Model.ViewedAgreement.IsPublished?"Active":"Retired")</span><span><i class="fa-regular fa-calendar"></i> Published @Model.ViewedAgreement.EffectiveFrom.ToString("MMM d, yyyy")</span><span><i class="fa-solid fa-signature"></i> @Model.ViewedAgreementAcceptanceCount student@(Model.ViewedAgreementAcceptanceCount==1?" has":"s have") accepted this version</span></div>
+  <article class="agreement-preview">@Html.Raw(Model.ViewedAgreement.ContentHtml)</article>
+ </section>}
+ <div class="admin-config-grid">
+  <form method="post" asp-page-handler="Publish" class="config-card agreement-form" id="agreementForm">
+   <div asp-validation-summary="ModelOnly" class="text-danger"></div><div class="section-heading"><span>New version</span><h2>Publish an agreement</h2><p>Publishing creates a new immutable version. Existing approvals keep the exact language students accepted.</p></div>
+   <div class="field-grid"><label class="wide">Agreement name<input asp-for="Input.Name" /><span asp-validation-for="Input.Name"></span></label></div>
+   <label class="agreement-field"><span>Agreement content</span><small>Use headings and short sections to keep the agreement readable.</small></label>
+   <div class="editor-toolbar" role="toolbar" aria-label="Agreement formatting"><button type="button" data-command="formatBlock" data-value="h3">Heading</button><button type="button" data-command="bold"><i class="fa-solid fa-bold"></i></button><button type="button" data-command="italic"><i class="fa-solid fa-italic"></i></button><button type="button" data-command="insertUnorderedList"><i class="fa-solid fa-list-ul"></i></button><button type="button" data-command="formatBlock" data-value="p">Paragraph</button></div>
+   <div class="agreement-editor" id="agreementEditor" contenteditable="true" role="textbox" aria-multiline="true">@Html.Raw(Model.Input.ContentHtml)</div>
+   <textarea asp-for="Input.ContentHtml" hidden></textarea><span asp-validation-for="Input.ContentHtml"></span>
+   <div class="merge-fields"><strong>Available student details</strong><span>Student name</span><span>Student ID</span><span>Term name</span><span>Acceptance date</span></div>
+   <button class="primary-action" type="submit"><i class="fa-solid fa-cloud-arrow-up"></i> Publish new agreement version</button>
+  </form>
+  <aside class="history-card"><div class="section-heading"><span>Audit history</span><h2>Versions</h2></div>@foreach(var item in Model.History){<div class="history-row"><div><strong>Version @item.Version</strong><span>@item.Name</span><small>@item.EffectiveFrom.ToString("MMM d, yyyy")</small></div><span class="status-pill @(item.IsPublished?"active":"")">@(item.IsPublished?"Active":"Retired")</span><div class="history-actions"><a asp-route-view="@item.Id" asp-fragment="agreementPreview"><i class="fa-regular fa-eye"></i> View</a><a asp-route-copyFrom="@item.Id"><i class="fa-regular fa-copy"></i> Use as starting point</a></div></div>}</aside>
+ </div>
+</main>
+@section scripts{<script>document.addEventListener('DOMContentLoaded',()=>{const form=document.getElementById('agreementForm'),editor=document.getElementById('agreementEditor'),field=document.getElementById('Input_ContentHtml');document.querySelectorAll('[data-command]').forEach(button=>button.onclick=()=>{editor.focus();document.execCommand(button.dataset.command,false,button.dataset.value||null)});form.addEventListener('submit',()=>field.value=editor.innerHTML)})</script>}

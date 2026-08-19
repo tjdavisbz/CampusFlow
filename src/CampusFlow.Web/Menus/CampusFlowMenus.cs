@@ -18,6 +18,8 @@ public class CampusFlowMenus
     public const string Admin = Prefix + ".Admin";
     public const string ImpersonateStudent = Prefix + ".ImpersonateStudent";
     public const string PaymentPlans = Prefix + ".PaymentPlans";
+    public const string BillApprovalConfiguration = Prefix + ".BillApprovalConfiguration";
+    public const string Agreements = Prefix + ".Agreements";
     public const string RegistrationRules = Prefix + ".RegistrationRules";
     public const string AccessManagement = Prefix + ".AccessManagement";
 }

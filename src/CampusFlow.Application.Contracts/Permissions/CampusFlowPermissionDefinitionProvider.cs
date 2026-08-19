@@ -22,6 +22,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:Admin"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.PaymentPlans,
             L("Permission:Admin.PaymentPlans"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.BillApproval,
+            L("Permission:Admin.BillApproval"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.RegistrationRules,
             L("Permission:Admin.RegistrationRules"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.AccessManagement,

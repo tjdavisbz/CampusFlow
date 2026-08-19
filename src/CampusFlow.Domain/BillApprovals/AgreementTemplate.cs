@@ -28,4 +28,10 @@ public class AgreementTemplate : FullAuditedAggregateRoot<Guid>, IMultiTenant
         AllowedMergeFieldsJson = allowedMergeFieldsJson;
         IsPublished = isPublished;
     }
+
+    public void Retire(DateTime effectiveTo)
+    {
+        EffectiveTo = effectiveTo;
+        IsPublished = false;
+    }
 }

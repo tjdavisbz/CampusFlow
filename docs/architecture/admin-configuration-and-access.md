@@ -26,6 +26,19 @@ residential attendance types, and seasonal installment labels. Publishing retire
 previous active policy without deleting it, preserving the policy used by historical bill
 approvals.
 
+## Bill Approval configuration
+
+The Bill Approval Admin page owns one `BillApprovalTermConfiguration` per Elements term.
+Each term selects an immutable agreement version and payment-plan version, plus its own open
+and close timestamps and enabled state. Copy forward carries those choices into a future
+term while leaving the new configuration disabled for review. Initial Nelson drafts begin
+30 days before the term start and close at the term end.
+
+When Bill Approval term configurations exist, the student page offers only enabled terms
+whose windows are currently open. More than one term may be open, and students can switch
+between them without mixing approval records. The selected term configuration supplies the
+exact agreement and payment-plan versions used for that approval.
+
 ## Course Selection configuration
 
 The Course Selection Admin page owns one `RegistrationTermConfiguration` per Elements

@@ -33,6 +33,7 @@ public class CampusFlowDbContext :
     public DbSet<StudentProfile> StudentProfiles { get; set; }
     public DbSet<AgreementTemplate> AgreementTemplates { get; set; }
     public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
+    public DbSet<BillApprovalTermConfiguration> BillApprovalTermConfigurations { get; set; }
     public DbSet<BillApproval> BillApprovals { get; set; }
     public DbSet<BillApprovalArtifact> BillApprovalArtifacts { get; set; }
     public DbSet<CourseSelectionPolicy> CourseSelectionPolicies { get; set; }
@@ -156,6 +157,19 @@ public class CampusFlowDbContext :
             b.Property(x => x.StandardMinimumPayment).HasPrecision(18, 2);
             b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<BillApprovalTermConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "BillApprovalTermConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TermCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
+            b.HasIndex(x => new { x.TenantId, x.ExternalTermId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsEnabled, x.OpensAt, x.ClosesAt });
+            b.HasOne<AgreementTemplate>().WithMany().HasForeignKey(x => x.AgreementTemplateId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<PaymentPlanPolicy>().WithMany().HasForeignKey(x => x.PaymentPlanPolicyId).OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<BillApproval>(b =>

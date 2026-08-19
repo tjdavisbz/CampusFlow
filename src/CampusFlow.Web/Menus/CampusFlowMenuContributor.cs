@@ -133,18 +133,26 @@ public class CampusFlowMenuContributor : IMenuContributor
         var impersonationAccess = context.ServiceProvider.GetRequiredService<StudentImpersonationAccessService>();
         var canImpersonate = await impersonationAccess.EnsureAccessAsync();
         var canManagePlans = await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
+        var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
         var canManageAccess = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AccessManagement);
-        if (canImpersonate || canManagePlans || canManageRegistration || canManageAccess)
+        if (canImpersonate || canManagePlans || canManageBillApproval || canManageRegistration || canManageAccess)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
             if (canManagePlans)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
                     "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 1));
+            if (canManageBillApproval)
+            {
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.BillApprovalConfiguration, "Bill Approval",
+                    "~/Admin/BillApproval", icon: "fa fa-file-signature", order: 2));
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.Agreements, "Agreements",
+                    "~/Admin/Agreements", icon: "fa fa-file-contract", order: 3));
+            }
             if (canManageRegistration)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
-                    "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 2));
+                    "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 4));
             if (canImpersonate)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
                     "~/Admin/ImpersonateStudent", icon: "fa fa-user-magnifying-glass", order: 3));
