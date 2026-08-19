@@ -3,10 +3,10 @@
 @using CampusFlow.Web.Menus
 @using Volo.Abp.AspNetCore.Mvc.UI.Layout
 @inject IPageLayout PageLayout
-@{ PageLayout.Content.Title="Advisor Visibility"; PageLayout.Content.MenuItemName=CampusFlowMenus.AdvisorVisibility; }
+@{ PageLayout.Content.Title="Advisor Assignments"; PageLayout.Content.MenuItemName=CampusFlowMenus.AdvisorVisibility; }
 @section styles { <abp-style src="/Pages/Admin/AdminConfiguration.css" /><style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style> }
 <main class="admin-config-shell">
- <header class="admin-config-hero"><div><span>Admin portal</span><h1>Advisor visibility</h1><p>Choose which advisors can work with each student group.</p></div><i class="fa-solid fa-people-arrows"></i></header>
+ <header class="admin-config-hero"><div><span>Admin portal</span><h1>Advisor assignments</h1><p>Choose which advisors can work with each student group.</p></div><i class="fa-solid fa-people-arrows"></i></header>
  <form method="post" asp-page-handler="Save" class="config-card advisor-routing-card">
   <div asp-validation-summary="ModelOnly" class="text-danger"></div>
   <div class="section-heading"><span>Student routing</span><h2>Attendance-type assignments</h2><p>Search for an active Elements advisor by name, username, or university email. Each group can have as many advisors as it needs.</p></div>

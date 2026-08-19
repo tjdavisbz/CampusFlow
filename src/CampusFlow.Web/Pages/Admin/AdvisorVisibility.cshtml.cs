@@ -101,7 +101,7 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
                     row.AttendanceType, advisor.ExternalAdvisorId, advisor.Email, advisor.DisplayName, now),
                     autoSave: true);
         }
-        Alerts.Success("Advisor visibility assignments were saved.");
+        Alerts.Success("Advisor assignments were saved.");
         return RedirectToPage();
     }
 

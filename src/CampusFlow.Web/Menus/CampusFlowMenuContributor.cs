@@ -120,26 +120,26 @@ public class CampusFlowMenuContributor : IMenuContributor
                     "~/Admin/GlobalConfiguration", icon: "fa fa-globe", order: 1));
             if (canManagePlans)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
-                    "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 1));
+                    "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 5));
             if (canManageBillApproval)
             {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.BillApprovalConfiguration, "Bill Approval",
-                    "~/Admin/BillApproval", icon: "fa fa-file-signature", order: 2));
+                    "~/Admin/BillApproval", icon: "fa fa-file-signature", order: 6));
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.Agreements, "Agreements",
-                    "~/Admin/Agreements", icon: "fa fa-file-contract", order: 3));
+                    "~/Admin/Agreements", icon: "fa fa-file-contract", order: 4));
             }
             if (canManageRegistration)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
-                    "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 4));
+                    "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 2));
             if (canManageAdvisorRouting)
-                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AdvisorVisibility, "Advisor Visibility",
-                    "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 5));
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AdvisorVisibility, "Advisor Assignments",
+                    "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 3));
             if (canImpersonate)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
-                    "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 3));
+                    "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 7));
             if (canManageAccess)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AccessManagement, "Users & Roles",
-                    "~/Identity/Users", icon: "fa fa-users-gear", order: 4));
+                    "~/Identity/Users", icon: "fa fa-users-gear", order: 8));
             context.Menu.AddItem(admin);
         }
         //Administration
