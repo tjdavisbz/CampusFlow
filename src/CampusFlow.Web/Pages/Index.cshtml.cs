@@ -2,6 +2,7 @@ using CampusFlow.Branding;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using CampusFlow.Portals;
 using CampusFlow.Web.Portals;
 using Volo.Abp.MultiTenancy;
@@ -44,6 +45,7 @@ public class IndexModel : CampusFlowPageModel
     private readonly IRepository<BillApprovalTermConfiguration, Guid> _billApprovalTermConfigurations;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
+    private readonly IConfiguration _configuration;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -63,7 +65,8 @@ public class IndexModel : CampusFlowPageModel
         IRepository<BillApproval, Guid> billApprovals,
         IRepository<BillApprovalTermConfiguration, Guid> billApprovalTermConfigurations,
         IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
-        IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups)
+        IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
+        IConfiguration configuration)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -83,6 +86,7 @@ public class IndexModel : CampusFlowPageModel
         _billApprovalTermConfigurations = billApprovalTermConfigurations;
         _billingLookups = billingLookups.ToArray();
         _scheduleLookups = scheduleLookups.ToArray();
+        _configuration = configuration;
     }
 
     public string? TenantName { get; private set; }
@@ -268,6 +272,7 @@ public class IndexModel : CampusFlowPageModel
                 journey.SelectedCourseCount = scheduledCourses.Length;
                 journey.SelectedCredits = scheduledCourses.Sum(x => x.Credits);
                 journey.HasSelectedCourses = scheduledCourses.Length > 0;
+                journey.BookstoreUrl = BuildBookstoreUrl(term, scheduledCourses);
             }
             var eligibleTerms = await _courseSelection.GetEligibleTermsAsync();
             journey.CourseSelectionEnabled = eligibleTerms.Any(x => x.ExternalTermId == term.ExternalTermId);
@@ -322,6 +327,30 @@ public class IndexModel : CampusFlowPageModel
         return journey;
     }
 
+    private string? BuildBookstoreUrl(StudentInformationSystemTerm term,
+        IReadOnlyCollection<StudentCourseScheduleItem> courses)
+    {
+        var tenantKey = CurrentTenant.Name ?? "Default";
+        var section = _configuration.GetSection($"CampusStores:{tenantKey}");
+        var baseUrl = section["CourseSelectionUrl"];
+        var storeId = section["StoreId"];
+        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(storeId)) return null;
+
+        var offeringIds = courses.Select(x => x.ExternalCourseOfferingId)
+            .Where(x => long.TryParse(x, out _))
+            .Select(x => x.PadLeft(15, '0'))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (offeringIds.Length == 0) return null;
+
+        var displayParts = term.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var bookstoreTerm = displayParts.Length > 1 && displayParts[^1].Length >= 2
+            ? $"{string.Join(' ', displayParts[..^1])} {displayParts[^1][^2..]}"
+            : term.DisplayName;
+        return $"{baseUrl}?src=2&type=2&stoid={Uri.EscapeDataString(storeId)}" +
+               $"&trm={Uri.EscapeDataString(bookstoreTerm)}&cid={string.Join(',', offeringIds)}";
+    }
+
     public sealed class RegistrationJourneyViewModel
     {
         public decimal PreviousBalance { get; set; }
@@ -337,6 +366,7 @@ public class IndexModel : CampusFlowPageModel
         public bool BillApproved { get; set; }
         public bool BillApprovalEnabled { get; set; }
         public bool HasUnavailableData { get; set; }
+        public string? BookstoreUrl { get; set; }
         public List<RegistrationJourneyStep> Steps { get; } = [];
         public int CompletedCount => Steps.Count(x => x.State is "complete" or "not-required");
         public StudentInformationSystemTerm Term { get; set; } = null!;

@@ -40,6 +40,7 @@ public sealed class ThesisElementsScheduleLookup : IStudentInformationSystemSche
         const string sql = """
             SELECT
                 schedule.SRAcademicID,
+                schedule.SROfferID,
                 schedule.TermCalendarID,
                 schedule.Term,
                 schedule.TextTerm,
@@ -81,7 +82,7 @@ public sealed class ThesisElementsScheduleLookup : IStudentInformationSystemSche
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            var meetingDays = reader.IsDBNull(14) ? null : reader.GetString(14).Trim();
+            var meetingDays = reader.IsDBNull(15) ? null : reader.GetString(15).Trim();
             var hasScheduledMeeting = !string.IsNullOrWhiteSpace(meetingDays) &&
                                       !string.Equals(meetingDays, "N\\A", StringComparison.OrdinalIgnoreCase) &&
                                       !string.Equals(meetingDays, "N/A", StringComparison.OrdinalIgnoreCase);
@@ -90,25 +91,26 @@ public sealed class ThesisElementsScheduleLookup : IStudentInformationSystemSche
                 StudentInformationSystemProvider.ThesisElements,
                 Convert.ToString(reader.GetValue(0))!,
                 Convert.ToString(reader.GetValue(1))!,
-                reader.GetString(2).Trim(),
+                Convert.ToString(reader.GetValue(2))!,
                 reader.GetString(3).Trim(),
                 reader.GetString(4).Trim(),
                 reader.GetString(5).Trim(),
                 reader.GetString(6).Trim(),
                 reader.GetString(7).Trim(),
                 reader.GetString(8).Trim(),
-                Convert.ToDecimal(reader.GetValue(9)),
-                reader.GetString(10).Trim(),
-                reader.IsDBNull(11) ? null : reader.GetDateTime(11),
+                reader.GetString(9).Trim(),
+                Convert.ToDecimal(reader.GetValue(10)),
+                reader.GetString(11).Trim(),
                 reader.IsDBNull(12) ? null : reader.GetDateTime(12),
-                reader.IsDBNull(13) ? "Instructor to be announced" : reader.GetString(13).Trim(),
+                reader.IsDBNull(13) ? null : reader.GetDateTime(13),
+                reader.IsDBNull(14) ? "Instructor to be announced" : reader.GetString(14).Trim(),
                 hasScheduledMeeting ? meetingDays : null,
-                !hasScheduledMeeting || reader.IsDBNull(15) ? null : reader.GetDateTime(15).TimeOfDay,
                 !hasScheduledMeeting || reader.IsDBNull(16) ? null : reader.GetDateTime(16).TimeOfDay,
-                reader.IsDBNull(17) ? null : reader.GetString(17).Trim(),
-                reader.IsDBNull(18) ? null : reader.GetDecimal(18),
+                !hasScheduledMeeting || reader.IsDBNull(17) ? null : reader.GetDateTime(17).TimeOfDay,
+                reader.IsDBNull(18) ? null : reader.GetString(18).Trim(),
                 reader.IsDBNull(19) ? null : reader.GetDecimal(19),
-                reader.IsDBNull(20) ? null : reader.GetString(20).Trim()));
+                reader.IsDBNull(20) ? null : reader.GetDecimal(20),
+                reader.IsDBNull(21) ? null : reader.GetString(21).Trim()));
         }
 
         return courses;

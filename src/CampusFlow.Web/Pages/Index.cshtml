@@ -150,6 +150,13 @@
             <section class="term-snapshot" aria-label="Current term summary">
                 <article class="snapshot-card"><span class="snapshot-icon"><i class="fa-solid fa-book-open"></i></span><div><span class="summary-label">Courses selected</span><strong>@Model.RegistrationJourney.SelectedCourseCount</strong><p>@Model.RegistrationJourney.SelectedCredits.ToString("0.##") total credits</p></div></article>
                 <article class="snapshot-card"><span class="snapshot-icon"><i class="fa-solid fa-wallet"></i></span><div><span class="summary-label">Account balance</span><strong>@UsdCurrency.Format(Model.RegistrationJourney.AccountBalance)</strong><p>@(Model.RegistrationJourney.PreviousBalance > 50 ? $"{UsdCurrency.Format(Model.RegistrationJourney.PreviousBalance)} prior balance needs attention" : "No blocking prior balance")</p></div></article>
+                @if (Model.RegistrationJourney.BookstoreUrl is not null)
+                {
+                    <a class="snapshot-card bookstore-card" href="@Model.RegistrationJourney.BookstoreUrl" target="_blank" rel="noopener">
+                        <span class="snapshot-icon"><i class="fa-solid fa-book"></i></span>
+                        <div><span class="summary-label">Next action</span><strong>Purchase books</strong><p>Open the campus store for your selected courses <i class="fa-solid fa-arrow-up-right-from-square"></i></p></div>
+                    </a>
+                }
             </section>
         }
     }

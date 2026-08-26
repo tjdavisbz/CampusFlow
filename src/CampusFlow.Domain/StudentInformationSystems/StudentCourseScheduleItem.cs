@@ -5,6 +5,7 @@ namespace CampusFlow.StudentInformationSystems;
 public sealed record StudentCourseScheduleItem(
     StudentInformationSystemProvider Provider,
     string ExternalAcademicId,
+    string ExternalCourseOfferingId,
     string ExternalTermId,
     string TermCode,
     string TermName,
