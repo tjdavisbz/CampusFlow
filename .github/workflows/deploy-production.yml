@@ -1,0 +1,81 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: campusflow-production
+  cancel-in-progress: false
+
+env:
+  AZURE_WEBAPP_NAME: app-campusflow-prod-001
+  DOTNET_VERSION: 10.0.x
+  WEB_PROJECT: src/CampusFlow.Web/CampusFlow.Web.csproj
+  PUBLISH_DIRECTORY: ${{ github.workspace }}/publish
+
+jobs:
+  build-test-deploy:
+    name: Build, test, and deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore CampusFlow.slnx
+
+      - name: Run tests
+        run: dotnet test CampusFlow.slnx --configuration Release --no-restore
+
+      - name: Restore production OpenIddict certificate
+        shell: bash
+        env:
+          OPENIDDICT_PFX_BASE64: ${{ secrets.OPENIDDICT_PFX_BASE64 }}
+        run: |
+          if [ -z "$OPENIDDICT_PFX_BASE64" ]; then
+            echo "OPENIDDICT_PFX_BASE64 is not configured in the production environment." >&2
+            exit 1
+          fi
+          printf '%s' "$OPENIDDICT_PFX_BASE64" | base64 --decode > src/CampusFlow.Web/openiddict.pfx
+
+      - name: Publish web application
+        run: >-
+          dotnet publish "${{ env.WEB_PROJECT }}"
+          --configuration Release
+          --no-restore
+          --output "${{ env.PUBLISH_DIRECTORY }}"
+
+      - name: Sign in to Azure
+        uses: azure/login@v2.4.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to production App Service
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          slot-name: production
+          package: ${{ env.PUBLISH_DIRECTORY }}
+
+      - name: Sign out of Azure
+        if: always()
+        run: az logout
