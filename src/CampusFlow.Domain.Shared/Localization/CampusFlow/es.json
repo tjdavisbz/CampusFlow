@@ -10,6 +10,9 @@
     "LongWelcomeMessage": "Bienvenido a la aplicacion. Este es un proyecto de inicio basado en el marco ABP. Para obtener mas informacion, visite",
     "Date": "Fecha",
     "Permission:Dashboard": "Panel de control",
+    "Permission:AdvisorPortal": "Acceder al portal de asesores",
+    "Permission:AdvisorPortal.ViewAll": "Ver todas las colas de revisión",
+    "Permission:AdvisorPortal.ManageRouting": "Administrar el enrutamiento de asesores",
     "Menu:Dashboard": "Panel de control",
     "Menu:HomePage": "Página de inicio",
     "Dashboard": "Panel de control",
@@ -37,6 +40,13 @@
     "Unspecified": "Sistema",
     "SeeAllUsers": "Ver todos los usuarios",
     "TakePhoto": "Tomar foto",
-    "ChoosePhoto": "Escoge una foto"
+    "ChoosePhoto": "Escoge una foto",
+    "Permission:StudentImpersonation": "Ver el portal estudiantil como un estudiante",
+    "Permission:Admin": "Acceder al portal administrativo de CampusFlow",
+    "Permission:Admin.GlobalConfiguration": "Administrar la configuración global del portal",
+    "Permission:Admin.PaymentPlans": "Administrar la configuración de planes de pago",
+    "Permission:Admin.BillApproval": "Administrar períodos y reglas de aprobación de factura",
+    "Permission:Admin.RegistrationRules": "Administrar períodos y reglas de selección de cursos",
+    "Permission:Admin.AccessManagement": "Administrar el acceso de usuarios de CampusFlow"
   }
 }

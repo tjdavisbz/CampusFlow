@@ -1,0 +1,365 @@
+@page
+@model CampusFlow.Web.Pages.CourseSelectionModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Course Selection";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.CourseSelection;
+}
+
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl))
+    {
+        <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" />
+    }
+    <abp-style src="/Pages/CourseSelection.css" />
+    <style>
+        :root {
+            --tenant-primary: @Model.Theme.PrimaryColor;
+            --tenant-primary-dark: @Model.Theme.PrimaryDarkColor;
+            --tenant-accent: @Model.Theme.AccentColor;
+            --tenant-surface: @Model.Theme.SurfaceColor;
+            --tenant-text: @Model.Theme.TextColor;
+            --tenant-heading-font: @Model.Theme.HeadingFontFamily;
+            --tenant-body-font: @Model.Theme.BodyFontFamily;
+        }
+    </style>
+}
+
+<main class="course-selection-page">
+    <header class="course-selection-header">
+        <div>
+            <div class="course-selection-eyebrow">Registration</div>
+            <h1>Choose your courses</h1>
+            <p>Build your schedule for the upcoming academic term.</p>
+        </div>
+        <div class="course-selection-student">
+            <span>@Model.StudentDisplayName</span>
+            <strong>ID @Model.StudentIdentifier</strong>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+    {
+        <div class="course-selection-alert success" role="status"><i class="fa-solid fa-circle-check"></i><span>@Model.SuccessMessage</span></div>
+    }
+    @if (Model.IsUnavailable || Model.Selection is null)
+    {
+        <section class="course-selection-message" role="status">
+            <i class="fa-regular fa-hourglass-half" aria-hidden="true"></i>
+            <div><h2>Course Selection is temporarily unavailable</h2><p>Please try again shortly.</p></div>
+        </section>
+    }
+    else
+    {
+        <section class="term-summary">
+            <div>
+                <span>Selected term</span><h2>@Model.Selection.TermName</h2><p>@Model.Selection.AttendanceType</p>
+            </div>
+            @if (Model.AuditProgress is { CreditsRequired: > 0 } progress)
+            {
+                <div class="selection-degree-progress">
+                    <div class="selection-progress-ring" style="--completed:@progress.CompletionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;--projected:@progress.ProjectedCompletionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%" aria-label="@progress.CompletionPercent.ToString("0") percent complete, projected to reach @progress.ProjectedCompletionPercent.ToString("0") percent after selected courses">
+                        <div><strong>@progress.CompletionPercent.ToString("0")%</strong><span>degree complete</span></div>
+                    </div>
+                    <div class="selection-progress-copy">
+                        <span>Degree progress</span>
+                        <strong>@progress.ProjectedCompletionPercent.ToString("0")% projected</strong>
+                        <small><i class="completed"></i> Completed</small>
+                        <small><i class="projected"></i> Selected courses</small>
+                    </div>
+                </div>
+            }
+            <div class="credit-total"><span>Scheduled credits</span><strong>@Model.Selection.SelectedCredits.ToString("0.##")</strong><small>of @Model.Selection.MaximumAllowedCredits.ToString("0.##") allowed</small></div>
+        </section>
+
+        <section class="selected-courses" aria-labelledby="selected-heading">
+            <div class="section-heading"><div><span>Your schedule</span><h2 id="selected-heading">Selected courses</h2></div></div>
+            @if (Model.Selection.Registrations.Count == 0)
+            {
+                <p class="empty-state">You have not selected any courses for this term yet.</p>
+            }
+            else
+            {
+                <div class="selected-list">
+                    @foreach (var course in Model.Selection.Registrations)
+                    {
+                        <article class="selected-course">
+                            <div><strong>@course.CourseCode-@course.Section</strong><h3>@course.CourseName</h3></div>
+                            <div class="course-meta"><span>@course.Credits.ToString("0.##") credits</span><span>@course.Status</span>@if (course.NeedsReview) { <span class="review-badge">Advisor review</span> }
+                                @if (course.CanRemove)
+                                {
+                                    <form method="post" asp-page-handler="Remove" class="remove-course-form" data-course-name="@course.CourseName" data-course-code="@($"{course.CourseCode}-{course.Section}")">
+                                        <input type="hidden" name="ExternalTermId" value="@Model.Selection.ExternalTermId" />
+                                        <input type="hidden" name="ExternalOfferingId" value="@course.ExternalOfferingId" />
+                                        <input type="hidden" name="ExternalRegistrationId" value="@course.ExternalRegistrationId" />
+                                        <input type="hidden" name="IdempotencyKey" value="@Guid.NewGuid().ToString("D")" />
+                                        <button type="submit">Remove</button>
+                                    </form>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="available-courses" aria-labelledby="available-heading">
+            <div class="section-heading">
+                <div><span>Course catalog</span><h2 id="available-heading">Available courses</h2></div>
+                <div class="catalog-tools">
+                    @if (Model.Selection.DegreeAuditAvailable)
+                    {
+                        <label class="degree-filter"><input id="degreeRequirementFilter" type="checkbox" checked /><span>Degree requirements only</span></label>
+                    }
+                    <label class="degree-filter"><input id="excludeCompletedFilter" type="checkbox" checked /><span>Exclude already taken</span></label>
+                    <label class="course-search"><i class="fa-solid fa-magnifying-glass"></i><input id="courseSearch" type="search" placeholder="Search courses" aria-label="Search courses" /></label>
+                </div>
+            </div>
+            <div class="offering-grid" id="offeringGrid">
+                @foreach (var course in Model.Selection.Offerings.Where(x => x.CanSelect))
+                {
+                    <article class="offering-card" data-search="@($"{course.CourseCode} {course.Section} {course.CourseName} {course.InstructorName}".ToLowerInvariant())" data-degree-required="@course.FulfillsDegreeRequirement.ToString().ToLowerInvariant()" data-attempt-outcome="@course.PreviousAttemptOutcome">
+                        <div class="offering-top"><span>@course.CourseCode-@course.Section</span><span>@course.Credits.ToString("0.##") credits</span></div>
+                        <h3>@course.CourseName</h3>
+                        @if (course.FulfillsDegreeRequirement)
+                        {
+                            <div class="degree-requirement-badge" title="@course.DegreeRequirementName"><i class="fa-solid fa-circle-check"></i> Fulfills degree requirement</div>
+                        }
+                        @if (course.WasPreviouslyTaken)
+                        {
+                            var attemptLabel = string.IsNullOrWhiteSpace(course.PreviousGrade)
+                                ? "Already taken"
+                                : $"Already taken · Grade {course.PreviousGrade}";
+                            <div class="course-attempt-badge @course.PreviousAttemptOutcome">
+                                <i class="fa-solid @(course.PreviousAttemptOutcome == "successful" ? "fa-circle-check" : course.PreviousAttemptOutcome == "unsuccessful" ? "fa-circle-exclamation" : "fa-clock")"></i>
+                                <span>@attemptLabel</span>
+                            </div>
+                        }
+                        <div class="offering-details">
+                            <span><i class="fa-regular fa-user"></i> @(course.InstructorName ?? "Instructor to be announced")</span>
+                            @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }
+                            <span><i class="fa-solid fa-chair"></i> @course.SeatsRemaining seats available</span>
+                        </div>
+                        <form method="post" asp-page-handler="Add" class="add-course-form">
+                            <input type="hidden" name="ExternalTermId" value="@Model.Selection.ExternalTermId" />
+                            <input type="hidden" name="ExternalOfferingId" value="@course.ExternalOfferingId" />
+                            <input type="hidden" name="IdempotencyKey" value="@Guid.NewGuid().ToString("D")" />
+                            <button type="submit">Add course <i class="fa-solid fa-arrow-right"></i></button>
+                        </form>
+                    </article>
+                }
+            </div>
+            @if (!Model.Selection.Offerings.Any(x => x.CanSelect))
+            {
+                <p class="empty-state">There are no additional courses available for your attendance type.</p>
+            }
+            <p id="noSearchResults" class="empty-state" hidden>No courses match your search.</p>
+        </section>
+    }
+</main>
+
+@if (Model.Selection?.DegreeAuditAvailable == true && !Model.RefreshComplete && !Model.IsReadOnlyStudentView && string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <form id="course-audit-refresh-token" hidden>
+        @Html.AntiForgeryToken()
+    </form>
+    <div class="processing-overlay" id="degreeAuditRefreshOverlay" role="status" aria-live="polite">
+        <div>
+            <span class="processing-spinner"></span>
+            <h2 id="degreeAuditRefreshTitle">Refreshing your degree audit</h2>
+            <p id="degreeAuditRefreshMessage">Checking which available courses apply to your remaining degree requirements.</p>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="course-error-modal" id="courseErrorDialog" role="alertdialog" aria-modal="true" aria-labelledby="courseErrorTitle" aria-describedby="courseErrorDescription">
+        <div class="course-error-modal-card">
+            <div class="course-error-icon"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></div>
+            <div class="course-error-content">
+                <span>Course selection</span>
+                <h2 id="courseErrorTitle">@Model.ErrorTitle</h2>
+                <p id="courseErrorDescription">@Model.ErrorMessage</p>
+            </div>
+            <div class="course-error-actions">
+                <button type="button" id="acknowledgeCourseError">Okay, I understand</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="remove-course-modal" id="removeCourseDialog" hidden role="dialog" aria-modal="true" aria-labelledby="removeDialogTitle" aria-describedby="removeDialogDescription">
+    <div class="remove-course-modal-card">
+        <div class="remove-dialog-icon"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></div>
+        <div class="remove-dialog-content">
+            <span>Course selection</span>
+            <h2 id="removeDialogTitle">Remove this course?</h2>
+            <p id="removeDialogDescription">This course will be removed from your schedule.</p>
+            <div class="remove-dialog-course"><strong id="removeDialogCourseCode"></strong><span id="removeDialogCourseName"></span></div>
+        </div>
+        <div class="remove-dialog-actions">
+            <button type="button" class="remove-dialog-cancel" id="cancelCourseRemoval">Keep course</button>
+            <button type="button" class="remove-dialog-confirm" id="confirmCourseRemoval"><i class="fa-regular fa-trash-can"></i> Remove course</button>
+        </div>
+    </div>
+</div>
+
+<div class="processing-overlay" id="processingOverlay" hidden role="status" aria-live="polite">
+    <div><span class="processing-spinner"></span><h2 id="processingTitle">Updating your schedule</h2><p>Please wait while we complete your request.</p></div>
+</div>
+
+@section scripts {
+    <script>
+        (() => {
+            const search = document.getElementById('courseSearch');
+            const degreeFilter = document.getElementById('degreeRequirementFilter');
+            const excludeCompletedFilter = document.getElementById('excludeCompletedFilter');
+            const filterCookieName = 'campusflow_course_filters_@Model.FilterPreferenceKey';
+            const readFilterCookie = () => {
+                const prefix = `${filterCookieName}=`;
+                const cookie = document.cookie.split('; ').find(value => value.startsWith(prefix));
+                if (!cookie) return null;
+                try { return JSON.parse(decodeURIComponent(cookie.substring(prefix.length))); }
+                catch { return null; }
+            };
+            const saveFilterCookie = () => {
+                const settings = {
+                    degreeOnly: degreeFilter?.checked ?? true,
+                    excludeCompleted: excludeCompletedFilter?.checked ?? true
+                };
+                document.cookie = `${filterCookieName}=${encodeURIComponent(JSON.stringify(settings))}; path=/; max-age=31536000; SameSite=Lax; Secure`;
+            };
+            const savedFilters = readFilterCookie();
+            if (savedFilters) {
+                if (degreeFilter && typeof savedFilters.degreeOnly === 'boolean')
+                    degreeFilter.checked = savedFilters.degreeOnly;
+                if (excludeCompletedFilter && typeof savedFilters.excludeCompleted === 'boolean')
+                    excludeCompletedFilter.checked = savedFilters.excludeCompleted;
+            }
+            const errorDialog = document.getElementById('courseErrorDialog');
+            const acknowledgeError = document.getElementById('acknowledgeCourseError');
+            const degreeAuditRefreshOverlay = document.getElementById('degreeAuditRefreshOverlay');
+            if (degreeAuditRefreshOverlay) {
+                document.body.classList.add('modal-open');
+                const token = document.querySelector('#course-audit-refresh-token input[name="__RequestVerificationToken"]');
+                const body = new FormData();
+                body.append('__RequestVerificationToken', token.value);
+                fetch('@Url.Page("/CourseSelection", "RefreshDegreeAudit")', {
+                    method: 'POST',
+                    body,
+                    credentials: 'same-origin'
+                }).then(response => {
+                    if (!response.ok) throw new Error('Degree audit refresh failed.');
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('refreshComplete', 'true');
+                    window.location.replace(url);
+                }).catch(() => {
+                    document.getElementById('degreeAuditRefreshTitle').textContent = 'Using your latest degree audit';
+                    document.getElementById('degreeAuditRefreshMessage').textContent =
+                        'We could not check for newer information right now. The available course list is still ready to use.';
+                    window.setTimeout(() => {
+                        degreeAuditRefreshOverlay.remove();
+                        document.body.classList.remove('modal-open');
+                    }, 1800);
+                });
+            }
+            if (errorDialog) {
+                document.body.classList.add('modal-open');
+                acknowledgeError?.focus();
+                acknowledgeError?.addEventListener('click', () => {
+                    errorDialog.hidden = true;
+                    document.body.classList.remove('modal-open');
+                });
+            }
+            const cards = [...document.querySelectorAll('.offering-card')];
+            const none = document.getElementById('noSearchResults');
+            const applyCatalogFilters = () => {
+                const value = search.value.trim().toLowerCase();
+                const degreeOnly = degreeFilter?.checked === true;
+                const excludeCompleted = excludeCompletedFilter?.checked === true;
+                let visible = 0;
+                cards.forEach(card => {
+                    const show = card.dataset.search.includes(value) &&
+                        (!degreeOnly || card.dataset.degreeRequired === 'true') &&
+                        (!excludeCompleted || card.dataset.attemptOutcome !== 'successful');
+                    card.hidden = !show;
+                    if (show) visible++;
+                });
+                if (none) {
+                    none.textContent = degreeOnly
+                        ? 'No available courses match your outstanding degree requirements and current filters.'
+                        : 'No courses match your current filters.';
+                    none.hidden = visible !== 0;
+                }
+            };
+            search?.addEventListener('input', applyCatalogFilters);
+            degreeFilter?.addEventListener('change', () => {
+                saveFilterCookie();
+                applyCatalogFilters();
+            });
+            excludeCompletedFilter?.addEventListener('change', () => {
+                saveFilterCookie();
+                applyCatalogFilters();
+            });
+            applyCatalogFilters();
+            document.querySelectorAll('.add-course-form').forEach(form => form.addEventListener('submit', () => {
+                const overlay = document.getElementById('processingOverlay');
+                const title = document.getElementById('processingTitle');
+                if (title) title.textContent = 'Adding your course';
+                if (overlay) overlay.hidden = false;
+                form.querySelector('button').disabled = true;
+            }));
+            const removeDialog = document.getElementById('removeCourseDialog');
+            const cancelRemoval = document.getElementById('cancelCourseRemoval');
+            const confirmRemoval = document.getElementById('confirmCourseRemoval');
+            let pendingRemovalForm = null;
+            const closeRemoveDialog = () => {
+                removeDialog.hidden = true;
+                document.body.classList.remove('modal-open');
+            };
+            document.querySelectorAll('.remove-course-form').forEach(form => form.addEventListener('submit', event => {
+                if (form.dataset.confirmed === 'true') return;
+                event.preventDefault();
+                pendingRemovalForm = form;
+                document.getElementById('removeDialogCourseCode').textContent = form.dataset.courseCode;
+                document.getElementById('removeDialogCourseName').textContent = form.dataset.courseName;
+                removeDialog.hidden = false;
+                document.body.classList.add('modal-open');
+                cancelRemoval?.focus();
+            }));
+            cancelRemoval?.addEventListener('click', () => {
+                pendingRemovalForm = null;
+                closeRemoveDialog();
+            });
+            removeDialog?.addEventListener('click', event => {
+                if (event.target === removeDialog) {
+                    pendingRemovalForm = null;
+                    closeRemoveDialog();
+                }
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && !removeDialog.hidden) {
+                    pendingRemovalForm = null;
+                    closeRemoveDialog();
+                }
+            });
+            confirmRemoval?.addEventListener('click', () => {
+                const form = pendingRemovalForm;
+                if (!form) return;
+                form.dataset.confirmed = 'true';
+                closeRemoveDialog();
+                const overlay = document.getElementById('processingOverlay');
+                const title = document.getElementById('processingTitle');
+                if (title) title.textContent = 'Removing your course';
+                if (overlay) overlay.hidden = false;
+                form.querySelector('button').disabled = true;
+                form.requestSubmit();
+            });
+        })();
+    </script>
+}

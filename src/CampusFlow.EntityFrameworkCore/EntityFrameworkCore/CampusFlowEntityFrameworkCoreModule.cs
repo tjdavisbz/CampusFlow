@@ -14,6 +14,7 @@ using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.BlobStoring.Database.EntityFrameworkCore;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using Volo.Abp.Studio;
+using CampusFlow.StudentInformationSystems;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -42,6 +43,50 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
 
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
+        context.Services.AddTransient<
+            IStudentInformationSystemStudentLookup,
+            ThesisElementsStudentLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemAdvisorLookup,
+            ThesisElementsAdvisorLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemTermLookup,
+            ThesisElementsTermLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemDegreeAuditLookup,
+            ThesisElementsDegreeAuditLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemBillingLookup,
+            ThesisElementsBillingLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemScheduleLookup,
+            ThesisElementsScheduleLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemCourseSelectionLookup,
+            ThesisElementsCourseSelectionLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemCourseRegistrationService,
+            ThesisElementsCourseRegistrationService>();
+        context.Services.AddTransient<
+            IStudentInformationSystemFinancialAidLookup,
+            ThesisElementsFinancialAidLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemFinancialAidDecisionService,
+            ThesisElementsFinancialAidDecisionService>();
+        context.Services.AddTransient<
+            IStudentInformationSystemPaymentPlanLookup,
+            ThesisElementsPaymentPlanLookup>();
+        context.Services.AddTransient<
+            IStudentInformationSystemDocumentTrackingService,
+            ThesisElementsDocumentTrackingService>();
+        context.Services.AddTransient<
+            IStudentInformationSystemMealPlanService,
+            ThesisElementsMealPlanService>();
+        context.Services.AddTransient<
+            IStudentInformationSystemPaymentPostingService,
+            ThesisElementsPaymentPostingService>();
+        context.Services.AddMemoryCache();
+
         context.Services.AddAbpDbContext<CampusFlowDbContext>(options =>
         {
                 /* Remove "includeAllEntities: true" to create

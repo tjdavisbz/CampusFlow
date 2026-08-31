@@ -1,4 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -31,6 +34,13 @@ class Program
     public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .AddAppSettingsSecretsJson()
+            .ConfigureAppConfiguration((_, configuration) =>
+            {
+                var workspacePath = Path.Combine(Directory.GetCurrentDirectory(), "src", "CampusFlow.Web", "appsettings.secrets.json");
+                var outputPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "CampusFlow.Web", "appsettings.secrets.json"));
+                var secretsPath = File.Exists(workspacePath) ? workspacePath : outputPath;
+                configuration.AddJsonFile(secretsPath, optional: true, reloadOnChange: false);
+            })
             .ConfigureLogging((context, logging) => logging.ClearProviders())
             .ConfigureServices((hostContext, services) =>
             {

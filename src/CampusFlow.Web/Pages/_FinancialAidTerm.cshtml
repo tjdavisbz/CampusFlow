@@ -1,0 +1,45 @@
+@model CampusFlow.Web.Pages.FinancialAidModel.AwardTermGroup
+@using CampusFlow.Web.Pages
+@{
+    var open = ViewData["Open"] as bool? ?? false;
+}
+<details class="aid-term" open="@(open ? "open" : null)">
+    <summary>
+        <div><strong>@Model.TermName</strong><span>@Model.Awards.Count award@(Model.Awards.Count == 1 ? "" : "s")</span></div>
+        <div class="aid-term-total"><strong>@FinancialAidModel.FormatCurrency(Model.TotalAmount)</strong><i class="fa-solid fa-chevron-down"></i></div>
+    </summary>
+    <div class="award-grid">
+        @foreach (var award in Model.Awards)
+        {
+            <article class="award-card">
+                <div class="award-topline"><span>@award.AwardType</span><strong>@FinancialAidModel.FormatCurrency(award.Amount)</strong></div>
+                <h3>@award.Description</h3>
+                <div class="award-meta">
+                    <span><i class="fa-regular fa-calendar"></i>@(award.AwardDate?.ToString("MMM d, yyyy") ?? "Date unavailable")</span>
+                    <span><i class="fa-regular fa-circle-check"></i>@award.AwardStatus</span>
+                </div>
+                <div class="award-footer">
+                    <span class="billing-status @(award.IsSentToBilling ? "sent" : "anticipated")">
+                        <i class="fa-solid @(award.IsSentToBilling ? "fa-building-columns" : "fa-clock")"></i>
+                        @(award.IsSentToBilling ? "Sent to student accounts" : "Anticipated aid")
+                    </span>
+                    <div class="award-actions" aria-label="Award decision">
+                        @if (award.Amount <= 0 || award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <span class="decision-recorded unavailable"><i class="fa-solid fa-ban"></i> Not available</span>
+                        }
+                        else if (award.StudentAccepted is 0 or 1)
+                        {
+                            <span class="decision-recorded"><i class="fa-solid fa-lock"></i> @(award.StudentAccepted == 1 ? "Accepted" : "Declined")</span>
+                        }
+                        else
+                        {
+                            <button type="button" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Accept</button>
+                            <button type="button" class="decline" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Decline</button>
+                        }
+                    </div>
+                </div>
+            </article>
+        }
+    </div>
+</details>

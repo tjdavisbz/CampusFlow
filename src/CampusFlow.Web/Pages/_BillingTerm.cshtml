@@ -1,0 +1,77 @@
+@model CampusFlow.Web.Pages.BillingModel.BillingTermGroup
+@{
+    var open = ViewData["Open"] as bool? == true;
+    var showHeaderBalance = ViewData["ShowHeaderBalance"] as bool? == true;
+    var balanceCarriedOut = ViewData["BalanceCarriedOut"] as bool? == true;
+}
+<details class="term-ledger" open="@(open ? "open" : null)">
+    <summary>
+        <div>
+            <strong>@Model.TermName</strong>
+            @{ var transactionCount = Model.Transactions.Count(x => !x.IsCarryForward); }
+            <span>@transactionCount transaction@(transactionCount == 1 ? "" : "s")</span>
+        </div>
+        <div class="term-summary-status">
+            @if (Model.PendingCount > 0)
+            {
+                <span class="pending-count">@Model.PendingCount pending</span>
+            }
+            @if (showHeaderBalance)
+            {
+                <strong class="term-header-balance">@CampusFlow.Web.Pages.BillingModel.FormatCurrencyValue(Model.Balance)</strong>
+            }
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </div>
+    </summary>
+    <div class="transaction-table-wrap">
+        <table class="transaction-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th class="money">Debit</th>
+                    <th class="money">Credit</th>
+                    <th class="money">Balance</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Transactions)
+                {
+                    <tr class="@(row.IsCarryForward ? "carry-forward-row" : row.Transaction!.IsVoided ? "voided-row" : null)">
+                        <td>@(row.IsCarryForward ? "—" : row.Transaction!.TransactionDate.ToString("MMM d, yyyy"))</td>
+                        <td>@(row.IsCarryForward ? "Balance Carried Forward" : row.Transaction!.Description)</td>
+                        <td class="money">@(row.IsCarryForward || row.Transaction!.Debit == 0 ? "—" : CampusFlow.Web.Pages.BillingModel.FormatCurrencyValue(row.Transaction.Debit))</td>
+                        <td class="money">@(row.IsCarryForward || row.Transaction!.Credit == 0 ? "—" : CampusFlow.Web.Pages.BillingModel.FormatCurrencyValue(row.Transaction.Credit))</td>
+                        <td class="money">@CampusFlow.Web.Pages.BillingModel.FormatCurrencyValue(row.RunningBalance)</td>
+                        <td>
+                            @if (row.IsCarryForward)
+                            {
+                                <span class="transaction-status status-carried">Carried forward</span>
+                            }
+                            else if (row.Transaction!.IsVoided)
+                            {
+                                <span class="transaction-status status-voided">Voided</span>
+                            }
+                            else if (row.Transaction.IsPending)
+                            {
+                                <span class="transaction-status status-pending">Pending</span>
+                            }
+                            else
+                            {
+                                <span class="transaction-status status-posted">Posted</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4">Balance</td>
+                    <td class="money">@CampusFlow.Web.Pages.BillingModel.FormatCurrencyValue(balanceCarriedOut ? 0m : Model.Balance)</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</details>

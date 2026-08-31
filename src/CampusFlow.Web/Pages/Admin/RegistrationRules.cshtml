@@ -1,0 +1,76 @@
+@page "/Admin/CourseSelection"
+@model CampusFlow.Web.Pages.Admin.RegistrationRulesModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{ PageLayout.Content.Title="Course Selection"; PageLayout.Content.MenuItemName=CampusFlowMenus.RegistrationRules; }
+@section styles {
+ <abp-style src="/Pages/Admin/AdminConfiguration.css" />
+ <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+<main class="admin-config-shell">
+ <header class="admin-config-hero"><div><span>Admin portal</span><h1>Course selection</h1><p>Choose which terms are open for course selection and tailor the rules students use for each.</p></div><i class="fa-solid fa-calendar-check"></i></header>
+ <section class="config-card term-list-card">
+  <div class="section-heading"><span>Course selection calendar</span><h2>Configured terms</h2><p>Students can switch between every enabled term whose course-selection window is currently open.</p></div>
+  @if(Model.Configurations.Count==0){<div class="empty-result"><strong>No terms configured yet</strong><span>Configure a term below before students can begin Course Selection.</span></div>}
+  else {<div class="config-table"><div class="config-table-head"><span>Term</span><span>Course-selection window</span><span>Status</span><span>Actions</span></div>
+   @foreach(var item in Model.Configurations){var open=item.IsOpen(DateTime.Now);<div class="config-table-row"><div><strong>@item.TermName</strong></div><div><span>@item.RegistrationOpensAt.ToString("MMM d, yyyy h:mm tt")</span><small>through @item.RegistrationClosesAt.ToString("MMM d, yyyy h:mm tt")</small></div><div><span class="status-pill @(open?"active":"")">@(open?"Open":item.IsEnabled?"Scheduled / closed":"Disabled")</span></div><div class="row-actions"><a asp-route-edit="@item.Id" asp-fragment="term-editor">Edit</a><a asp-route-copyFrom="@item.Id" asp-fragment="term-editor"><i class="fa-regular fa-copy"></i> Copy forward</a></div></div>}
+  </div>}
+ </section>
+ <form method="post" asp-page-handler="Save" class="config-card term-editor" id="term-editor">
+  <input asp-for="Input.Id" type="hidden" /><div asp-validation-summary="ModelOnly" class="text-danger"></div>
+  <div class="section-heading"><span>@(Model.Input.Id.HasValue?"Edit term":"New term")</span><h2>@(Model.Input.Id.HasValue?"Update course-selection settings":"Configure course selection for a term")</h2><p>Use Copy forward above to start a future term with the same attendance mappings and rules.</p></div>
+  <div class="field-grid">
+   <label class="wide">
+    <span>Academic term</span>
+    @if (Model.Input.Id.HasValue)
+    {
+        <input asp-for="Input.ExternalTermId" type="hidden" />
+        <div class="term-display"><i class="fa-regular fa-calendar"></i><strong>@Model.Terms.FirstOrDefault(x => x.Value == Model.Input.ExternalTermId)?.Text</strong><span>Current configuration</span></div>
+        <small>To use these rules for another term, choose Copy forward above.</small>
+    }
+    else
+    {
+        <div class="term-picker" data-term-picker>
+            <input asp-for="Input.ExternalTermId" type="hidden" data-term-value />
+            <button type="button" class="term-picker-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span><i class="fa-regular fa-calendar"></i><strong data-term-label>@(Model.Terms.FirstOrDefault(x => x.Value == Model.Input.ExternalTermId)?.Text ?? "Choose a term…")</strong></span>
+                <i class="fa-solid fa-chevron-down picker-chevron"></i>
+            </button>
+            <div class="term-picker-menu" role="listbox" hidden>
+                @foreach (var term in Model.Terms)
+                {
+                    <button type="button" role="option" data-value="@term.Value" aria-selected="@(term.Value == Model.Input.ExternalTermId ? "true" : "false")"><i class="fa-regular fa-calendar-check"></i><span>@term.Text</span><i class="fa-solid fa-check selected-check"></i></button>
+                }
+            </div>
+        </div>
+    }
+    <span asp-validation-for="Input.ExternalTermId"></span>
+   </label>
+   <label>Course selection opens<input asp-for="Input.RegistrationOpensAt" type="datetime-local" /></label>
+   <label>Course selection closes<input asp-for="Input.RegistrationClosesAt" type="datetime-local" /><span asp-validation-for="Input.RegistrationClosesAt"></span></label>
+  </div>
+  <div class="toggle-grid"><label><input asp-for="Input.IsEnabled" /><span><strong>Enabled</strong>Allow this term to open during its window.</span></label><label><input asp-for="Input.RequireAdvisorReview" /><span><strong>Advisor review</strong>Send new selections to the advisor queue.</span></label><label><input asp-for="Input.EnforceSectionCapacity" /><span><strong>Section capacity</strong>Prevent selection of full sections.</span></label></div>
+  <div class="mapping-editor"><div class="mapping-heading"><div><strong>Attendance mappings</strong><small>Choose which offered-course attendance type each student group can use.</small></div><button type="button" id="addMapping"><i class="fa-solid fa-plus"></i> Add row</button></div><div id="mappingRows">
+   @for(var i=0;i<Model.Input.Mappings.Count;i++){<div class="mapping-row"><select asp-for="Input.Mappings[i].StudentAttendanceType"><option value="">Student attendance type…</option>@foreach(var type in Model.AttendanceTypes){<option value="@type">@type</option>}</select><i class="fa-solid fa-arrow-right"></i><select asp-for="Input.Mappings[i].CourseAttendanceType"><option value="">Course attendance type…</option>@foreach(var type in Model.AttendanceTypes){<option value="@type">@type</option>}</select><button type="button" class="remove-mapping" aria-label="Remove mapping"><i class="fa-solid fa-xmark"></i></button></div>}
+  </div><span asp-validation-for="Input.Mappings"></span></div>
+  <button class="primary-action" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save course-selection settings</button>
+ </form>
+</main>
+@section scripts {<script>
+document.addEventListener('DOMContentLoaded',()=>{
+ const rows=document.getElementById('mappingRows'),add=document.getElementById('addMapping'),form=rows.closest('form');
+ const types=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AttendanceTypes));
+ function reindex(){[...rows.children].forEach((row,i)=>{row.querySelectorAll('select')[0].name=`Input.Mappings[${i}].StudentAttendanceType`;row.querySelectorAll('select')[1].name=`Input.Mappings[${i}].CourseAttendanceType`})}
+ function wire(){rows.querySelectorAll('.remove-mapping').forEach(b=>b.onclick=()=>{b.closest('.mapping-row').remove();reindex()})}
+ add.onclick=()=>{const opts='<option value="">Choose…</option>'+types.map(x=>`<option value="${x}">${x}</option>`).join('');rows.insertAdjacentHTML('beforeend',`<div class="mapping-row"><select>${opts}</select><i class="fa-solid fa-arrow-right"></i><select>${opts}</select><button type="button" class="remove-mapping"><i class="fa-solid fa-xmark"></i></button></div>`);reindex();wire()};
+ form.addEventListener('submit',reindex);wire();reindex();
+ document.querySelectorAll('[data-term-picker]').forEach(picker=>{const trigger=picker.querySelector('.term-picker-trigger'),menu=picker.querySelector('.term-picker-menu'),value=picker.querySelector('[data-term-value]'),label=picker.querySelector('[data-term-label]');
+  const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
+  trigger.addEventListener('click',()=>{const opening=menu.hidden;menu.hidden=!opening;trigger.setAttribute('aria-expanded',opening?'true':'false')});
+  menu.querySelectorAll('[data-value]').forEach(option=>option.addEventListener('click',()=>{value.value=option.dataset.value;label.textContent=option.querySelector('span').textContent;menu.querySelectorAll('[role=option]').forEach(x=>x.setAttribute('aria-selected',x===option?'true':'false'));value.dispatchEvent(new Event('change',{bubbles:true}));close()}));
+  document.addEventListener('click',event=>{if(!picker.contains(event.target))close()});
+  picker.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
+ });
+})
+</script>}

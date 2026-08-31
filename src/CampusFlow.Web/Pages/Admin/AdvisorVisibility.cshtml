@@ -1,0 +1,49 @@
+@page "/Admin/AdvisorVisibility"
+@model CampusFlow.Web.Pages.Admin.AdvisorVisibilityModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{ PageLayout.Content.Title="Advisor Assignments"; PageLayout.Content.MenuItemName=CampusFlowMenus.AdvisorVisibility; }
+@section styles { <abp-style src="/Pages/Admin/AdminConfiguration.css" /><style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style> }
+<main class="admin-config-shell">
+ <header class="admin-config-hero"><div><span>Admin portal</span><h1>Advisor assignments</h1><p>Choose which advisors can work with each student group.</p></div><i class="fa-solid fa-people-arrows"></i></header>
+ <form method="post" asp-page-handler="Save" class="config-card advisor-routing-card">
+  <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+  <div class="section-heading"><span>Student routing</span><h2>Attendance-type assignments</h2><p>Search for an active Elements advisor by name, username, or university email. Each group can have as many advisors as it needs.</p></div>
+  @if(Model.Rows.Count==0){<div class="empty-result"><strong>No attendance types are available</strong><span>Attendance types appear here after Course Selection section mappings are loaded.</span></div>}
+  else
+  {
+   <div class="advisor-groups">
+   @for(var i=0;i<Model.Rows.Count;i++)
+   {
+    <section class="advisor-group" data-advisor-group>
+     <input asp-for="Rows[i].AttendanceType" type="hidden" />
+     <input asp-for="Rows[i].AdvisorEmailsJson" type="hidden" data-advisor-values />
+     <div class="advisor-group-title"><strong>@Model.Rows[i].AttendanceType</strong><span data-advisor-count>@Model.Rows[i].Advisors.Count advisor@(Model.Rows[i].Advisors.Count==1 ? "" : "s") assigned</span></div>
+     <div class="advisor-chips" data-advisor-chips>
+      @foreach(var advisor in Model.Rows[i].Advisors){<span class="advisor-chip" data-email="@advisor.Email"><span><strong>@advisor.Name</strong><small>@advisor.Email</small></span><button type="button" aria-label="Remove @advisor.Name"><i class="fa-solid fa-xmark"></i></button></span>}
+     </div>
+     <div class="advisor-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Search advisors by name or email…" autocomplete="off" data-advisor-search /><span class="advisor-search-status" data-search-status></span></div>
+     <div class="advisor-results" data-advisor-results hidden></div>
+    </section>
+   }
+   </div>
+  }
+  <div class="routing-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Advisors who can see every student</strong><p>Global visibility is intentionally separate from attendance routing. Assign the “View all advisor students” permission through <a href="/Identity/Users">Users &amp; Roles</a>.</p></div></div>
+  @if(Model.Rows.Count>0){<button class="primary-action" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save advisor assignments</button>}
+ </form>
+</main>
+@section scripts {
+<script>
+document.querySelectorAll('[data-advisor-group]').forEach(group => {
+ const input=group.querySelector('[data-advisor-search]'), values=group.querySelector('[data-advisor-values]'), chips=group.querySelector('[data-advisor-chips]'), results=group.querySelector('[data-advisor-results]'), status=group.querySelector('[data-search-status]'), count=group.querySelector('[data-advisor-count]');
+ let timer;
+ const selected=()=>Array.from(chips.querySelectorAll('[data-email]')).map(x=>x.dataset.email);
+ const sync=()=>{const total=selected().length;values.value=JSON.stringify(selected());count.textContent=`${total} advisor${total===1?'':'s'} assigned`;};
+ const remove=e=>{const button=e.target.closest('button');if(button){button.closest('[data-email]').remove();sync();}};
+ chips.addEventListener('click',remove);
+ input.addEventListener('input',()=>{clearTimeout(timer);results.hidden=true;status.textContent='';const q=input.value.trim();if(q.length<2)return;status.textContent='Searching…';timer=setTimeout(async()=>{try{const response=await fetch(`?handler=Search&q=${encodeURIComponent(q)}`);const advisors=await response.json();status.textContent='';results.innerHTML='';const current=new Set(selected().map(x=>x.toLowerCase()));advisors.filter(x=>!current.has(x.email.toLowerCase())).forEach(advisor=>{const button=document.createElement('button');button.type='button';button.className='advisor-result';button.innerHTML=`<span><strong></strong><small></small></span><i class="fa-solid fa-plus"></i>`;button.querySelector('strong').textContent=advisor.name;button.querySelector('small').textContent=advisor.email;button.addEventListener('click',()=>{const chip=document.createElement('span');chip.className='advisor-chip';chip.dataset.email=advisor.email;chip.innerHTML=`<span><strong></strong><small></small></span><button type="button" aria-label="Remove advisor"><i class="fa-solid fa-xmark"></i></button>`;chip.querySelector('strong').textContent=advisor.name;chip.querySelector('small').textContent=advisor.email;chips.appendChild(chip);sync();results.hidden=true;input.value='';});results.appendChild(button);});if(!results.children.length)results.innerHTML='<div class="advisor-no-results">No matching advisors found.</div>';results.hidden=false;}catch{status.textContent='Search unavailable';}},300);});
+ document.addEventListener('click',e=>{if(!group.contains(e.target))results.hidden=true;});sync();
+});
+</script>
+}

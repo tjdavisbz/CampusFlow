@@ -1,0 +1,46 @@
+@page "/Advisor"
+@model CampusFlow.Web.Pages.Advisor.IndexModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Advisor Portal";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.AdvisorQueue;
+}
+
+@section styles {
+    <abp-style src="/Pages/Advisor/Advisor.css" />
+    <style>:root { --advisor-primary: @Model.Theme.PrimaryColor; --advisor-dark: @Model.Theme.PrimaryDarkColor; --advisor-accent: @Model.Theme.AccentColor; }</style>
+}
+
+<main class="advisor-shell">
+    <header class="advisor-hero">
+        <div><span>Advisor portal</span><h1>Course review queue</h1><p>Review the course selections currently waiting for your attention.</p></div>
+        <div class="queue-count"><strong>@Model.Students.Count</strong><span>@(Model.Students.Count == 1 ? "student" : "students") waiting</span></div>
+    </header>
+
+    <section class="advisor-card">
+        <div class="card-heading"><div><span>Pending reviews</span><h2>Students@(Model.SelectedTerm is null?"":$" · {Model.SelectedTerm.DisplayName}")</h2></div>@if(Model.Terms.Count>0){<div class="advisor-term-control"><span>Review term</span><details><summary><i class="fa-regular fa-calendar"></i><strong>@Model.SelectedTerm?.DisplayName</strong><i class="fa-solid fa-chevron-down"></i></summary><div>@foreach(var term in Model.Terms){<a asp-page="/Advisor/Index" asp-route-term="@term.ExternalTermId" class="@(term.ExternalTermId==Model.SelectedTerm?.ExternalTermId?"selected":"")"><span>@term.DisplayName</span>@if(term.ExternalTermId==Model.SelectedTerm?.ExternalTermId){<i class="fa-solid fa-check"></i>}</a>}</div></details></div>}</div>
+        @if (Model.Students.Count == 0)
+        {
+            <div class="advisor-empty"><i class="fa-regular fa-circle-check"></i><h2>You're all caught up</h2><p>No students currently have courses waiting for your review.</p></div>
+        }
+        else
+        {
+            <div class="queue-list">
+                @foreach (var student in Model.Students)
+                {
+                    <a class="queue-row" asp-page="/Advisor/Review" asp-route-studentProfileId="@student.StudentProfileId" asp-route-term="@student.ExternalTermId">
+                        <div class="student-avatar">@student.StudentName.Substring(0, 1).ToUpperInvariant()</div>
+                        <div class="student-summary"><strong>@student.StudentName</strong><span>ID @student.StudentId · @student.AttendanceType</span></div>
+                        <div class="course-total"><strong>@student.PendingCourseCount</strong><span>@(student.PendingCourseCount == 1 ? "course" : "courses")</span></div>
+                        <div class="waiting-since"><span>Waiting since</span><strong>@student.WaitingSince.ToString("MMM d, yyyy")</strong></div>
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+</main>

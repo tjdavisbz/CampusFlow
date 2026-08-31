@@ -1,0 +1,41 @@
+using CampusFlow.Branding;
+using Microsoft.Extensions.Configuration;
+using Volo.Abp.DependencyInjection;
+
+namespace CampusFlow.Web.Branding;
+
+public sealed class ConfigurationTenantThemeProvider : ITenantThemeProvider, ITransientDependency
+{
+    private readonly IConfiguration _configuration;
+
+    public ConfigurationTenantThemeProvider(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public TenantTheme Get(string? tenantName)
+    {
+        var resolvedTenantName = string.IsNullOrWhiteSpace(tenantName)
+            ? _configuration["DevelopmentPortal:DefaultTenant"]
+            : tenantName;
+        var section = _configuration.GetSection($"TenantThemes:{resolvedTenantName ?? "Default"}");
+        var fallback = _configuration.GetSection("TenantThemes:Default");
+
+        string Value(string key, string defaultValue) =>
+            section[key] ?? fallback[key] ?? defaultValue;
+
+        return new TenantTheme(
+            Value("OrganizationName", resolvedTenantName ?? "CampusFlow"),
+            Value("PrimaryColor", "#274690"),
+            Value("PrimaryDarkColor", "#172554"),
+            Value("AccentColor", "#667eea"),
+            Value("NeutralColor", "#a1a8ae"),
+            Value("SurfaceColor", "#f7f8fa"),
+            Value("TextColor", "#172033"),
+            section["LogoUrl"] ?? fallback["LogoUrl"],
+            section["LogoReverseUrl"] ?? fallback["LogoReverseUrl"],
+            Value("HeadingFontFamily", "system-ui, sans-serif"),
+            Value("BodyFontFamily", "system-ui, sans-serif"),
+            section["FontStylesheetUrl"] ?? fallback["FontStylesheetUrl"]);
+    }
+}
