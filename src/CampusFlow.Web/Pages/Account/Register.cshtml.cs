@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Volo.Abp.Account;
@@ -29,6 +30,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
     private readonly IdentityRoleManager _roleManager;
     private readonly IPermissionManager _permissionManager;
+    private readonly IConfiguration _configuration;
 
     public RegisterModel(
         IAccountAppService accountAppService,
@@ -40,7 +42,8 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         IGuidGenerator guidGenerator,
         IStudentInformationSystemAdvisorLookup advisorLookup,
         IdentityRoleManager roleManager,
-        IPermissionManager permissionManager)
+        IPermissionManager permissionManager,
+        IConfiguration configuration)
         : base(
             accountAppService,
             schemeProvider,
@@ -53,6 +56,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         _advisorLookup = advisorLookup;
         _roleManager = roleManager;
         _permissionManager = permissionManager;
+        _configuration = configuration;
     }
 
     public override async Task<IActionResult> OnGetAsync()
@@ -101,6 +105,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
             var studentUser = await UserManager.FindByEmailAsync(result.Student.Email);
             if (studentUser is not null)
             {
+                await EnsureConfiguredFullAdministratorAsync(studentUser, result.Student.Email);
                 await _studentProfileRepository.InsertAsync(new StudentProfile(
                     _guidGenerator.Create(), CurrentTenant.Id, studentUser.Id, result.Student));
             }
@@ -133,6 +138,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         user.Name = advisor.FirstName;
         user.Surname = advisor.LastName;
         EnsureIdentitySucceeded(await UserManager.UpdateAsync(user));
+        await EnsureConfiguredFullAdministratorAsync(user, email);
 
         const string advisorRoleName = "advisor";
         await EnsureRoleAsync(user, advisorRoleName);
@@ -149,6 +155,26 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         }
 
         return await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash);
+    }
+
+    private async Task EnsureConfiguredFullAdministratorAsync(IdentityUser user, string email)
+    {
+        var administratorEmails = _configuration
+            .GetSection("Administration:FullAdministratorEmails")
+            .Get<string[]>() ?? [];
+        if (!administratorEmails.Contains(email, StringComparer.OrdinalIgnoreCase)) return;
+
+        const string administratorRoleName = "admin";
+        var administratorRole = await _roleManager.FindByNameAsync(administratorRoleName);
+        if (administratorRole is null)
+        {
+            throw new UserFriendlyException("The tenant administrator role has not been initialized.");
+        }
+
+        if (!await UserManager.IsInRoleAsync(user, administratorRoleName))
+        {
+            EnsureIdentitySucceeded(await UserManager.AddToRoleAsync(user, administratorRoleName));
+        }
     }
 
     private async Task EnsureRoleAsync(IdentityUser user, string roleName)
