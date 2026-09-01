@@ -1,17 +1,21 @@
 ﻿using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Primitives;
 using CampusFlow.EntityFrameworkCore;
 using CampusFlow.Localization;
 using CampusFlow.MultiTenancy;
 using CampusFlow.Permissions;
 using CampusFlow.Web.Menus;
 using CampusFlow.Web.HealthChecks;
+using CampusFlow.Web.BillApprovals;
+using CampusFlow.Web.Payments;
 using Microsoft.OpenApi;
 using Volo.Abp;
 using Volo.Abp.Studio;
@@ -37,9 +41,15 @@ using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using Volo.Abp.TenantManagement.Web;
 using System;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Validators;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Volo.Abp.Account.Web;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.Toolbars;
@@ -50,6 +60,11 @@ using Volo.Abp.OpenIddict;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.SettingManagement.Web;
 using Volo.Abp.Studio.Client.AspNetCore;
+using CampusFlow.Web.Portals;
+using CampusFlow.Branding;
+using CampusFlow.Web.Branding;
+using CampusFlow.Web.Observability;
+using CampusFlow.Students;
 
 namespace CampusFlow.Web;
 
@@ -116,6 +131,19 @@ public class CampusFlowWebModule : AbpModule
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
+        context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
+        context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
+        context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
+        context.Services.Configure<PayflowOptions>(configuration.GetSection(PayflowOptions.SectionName));
+        context.Services.AddHttpClient<IPayflowGateway, PayflowGateway>(client =>
+            client.Timeout = TimeSpan.FromSeconds(30));
+        context.Services.AddHttpContextAccessor();
+        context.Services.Configure<PerformanceLoggingOptions>(
+            configuration.GetSection(PerformanceLoggingOptions.SectionName));
+        context.Services.AddSingleton<DependencyPerformanceListener>();
+        context.Services.AddSingleton<Microsoft.Extensions.Hosting.IHostedService>(provider =>
+            provider.GetRequiredService<DependencyPerformanceListener>());
+
         if (!configuration.GetValue<bool>("App:DisablePII"))
         {
             Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true;
@@ -148,6 +176,11 @@ public class CampusFlowWebModule : AbpModule
         ConfigureUrls(configuration);
         ConfigureHealthChecks(context);
         ConfigureAuthentication(context);
+        ConfigureMicrosoftIdentity(context, configuration);
+        context.Services.ConfigureApplicationCookie(options =>
+        {
+            options.LoginPath = "/Account/MicrosoftLogin";
+        });
         ConfigureVirtualFileSystem(hostingEnvironment);
         ConfigureNavigationServices();
         ConfigureAutoApiControllers();
@@ -217,6 +250,76 @@ public class CampusFlowWebModule : AbpModule
         {
             options.IsDynamicClaimsEnabled = true;
         });
+    }
+
+    private static void ConfigureMicrosoftIdentity(
+        ServiceConfigurationContext context,
+        IConfiguration configuration)
+    {
+        var authorityTenant = configuration["MicrosoftIdentity:AuthorityTenant"];
+        var clientId = configuration["MicrosoftIdentity:ClientId"];
+        var clientSecret = configuration["MicrosoftIdentity:ClientSecret"];
+
+        if (string.IsNullOrWhiteSpace(authorityTenant) ||
+            string.IsNullOrWhiteSpace(clientId) ||
+            string.IsNullOrWhiteSpace(clientSecret))
+        {
+            return;
+        }
+
+        context.Services
+            .AddAuthentication()
+            .AddOpenIdConnect("MicrosoftEntra", "Sign in with Microsoft", options =>
+            {
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+                options.Authority = $"https://login.microsoftonline.com/{authorityTenant}/v2.0";
+                options.ClientId = clientId;
+                options.ClientSecret = clientSecret;
+                options.CallbackPath = configuration["MicrosoftIdentity:CallbackPath"] ?? "/signin-oidc";
+                options.SignedOutCallbackPath = configuration["MicrosoftIdentity:SignedOutCallbackPath"] ?? "/signout-callback-oidc";
+                options.ResponseType = OpenIdConnectResponseType.Code;
+                options.UsePkce = true;
+                options.SaveTokens = true;
+                options.GetClaimsFromUserInfoEndpoint = false;
+                options.Scope.Add("email");
+                options.TokenValidationParameters.ValidateIssuer = true;
+                options.TokenValidationParameters.IssuerValidator =
+                    AadIssuerValidator.GetAadIssuerValidator(options.Authority).Validate;
+                options.Events = new OpenIdConnectEvents
+                {
+                    OnTokenValidated = context =>
+                    {
+                        if (context.Principal?.Identity is not ClaimsIdentity identity)
+                        {
+                            return Task.CompletedTask;
+                        }
+
+                        var tenantId = context.Principal.FindFirstValue("tid") ??
+                                       context.Principal.FindFirstValue(
+                                           "http://schemas.microsoft.com/identity/claims/tenantid");
+                        var objectId = context.Principal.FindFirstValue("oid") ??
+                                      context.Principal.FindFirstValue(
+                                          "http://schemas.microsoft.com/identity/claims/objectidentifier");
+                        if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(objectId))
+                        {
+                            context.Fail("The Microsoft identity is missing its tenant or object identifier.");
+                            return Task.CompletedTask;
+                        }
+
+                        var existingIdentifier = identity.FindFirst(ClaimTypes.NameIdentifier);
+                        if (existingIdentifier is not null)
+                        {
+                            identity.RemoveClaim(existingIdentifier);
+                        }
+
+                        identity.AddClaim(new Claim(
+                            ClaimTypes.NameIdentifier,
+                            $"{tenantId}:{objectId}"));
+
+                        return Task.CompletedTask;
+                    }
+                };
+            });
     }
 
     private void ConfigureVirtualFileSystem(IWebHostEnvironment hostingEnvironment)
@@ -292,11 +395,44 @@ public class CampusFlowWebModule : AbpModule
 
         app.UseCorrelationId();
         app.UseRouting();
+        app.Use(async (httpContext, next) =>
+        {
+            var isLegacyLoginPage = httpContext.Request.Path.Equals(
+                "/Account/Login",
+                StringComparison.OrdinalIgnoreCase);
+            var isMicrosoftCallback = string.Equals(
+                httpContext.Request.Query["handler"],
+                "ExternalLoginCallback",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (isLegacyLoginPage && !isMicrosoftCallback)
+            {
+                var destination = new QueryString();
+                if (httpContext.Request.Query.TryGetValue("returnUrl", out var returnUrl) &&
+                    !StringValues.IsNullOrEmpty(returnUrl))
+                {
+                    destination = destination.Add("returnUrl", returnUrl.ToString());
+                }
+                if (httpContext.Request.Query.TryGetValue("returnUrlHash", out var returnUrlHash) &&
+                    !StringValues.IsNullOrEmpty(returnUrlHash))
+                {
+                    destination = destination.Add("returnUrlHash", returnUrlHash.ToString());
+                }
+
+                httpContext.Response.Redirect("/Account/MicrosoftLogin" + destination);
+                return;
+            }
+
+            await next();
+        });
+        app.UseMiddleware<RequestPerformanceMiddleware>();
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
         app.UseAbpSecurityHeaders();
         app.UseAuthentication();
         app.UseAbpOpenIddictValidation();
+
+        app.UseMiddleware<DevelopmentPortalContextMiddleware>();
 
         if (MultiTenancyConsts.IsEnabled)
         {
@@ -306,6 +442,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseUnitOfWork();
         app.UseDynamicClaims();
         app.UseAuthorization();
+        app.UseMiddleware<StudentViewContextMiddleware>();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {

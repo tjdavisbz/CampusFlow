@@ -1,0 +1,140 @@
+@page
+@model CampusFlow.Web.Pages.BillingModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Billing & Payments";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.Billing;
+}
+
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl))
+    {
+        <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" />
+    }
+    <abp-style src="/Pages/Billing.css" />
+    <style>
+        :root {
+            --tenant-primary: @Model.Theme.PrimaryColor;
+            --tenant-primary-dark: @Model.Theme.PrimaryDarkColor;
+            --tenant-accent: @Model.Theme.AccentColor;
+            --tenant-neutral: @Model.Theme.NeutralColor;
+            --tenant-surface: @Model.Theme.SurfaceColor;
+            --tenant-text: @Model.Theme.TextColor;
+            --tenant-heading-font: @Model.Theme.HeadingFontFamily;
+            --tenant-body-font: @Model.Theme.BodyFontFamily;
+        }
+    </style>
+}
+
+<main class="billing-page">
+    <header class="billing-header">
+        <div>
+            <div class="billing-eyebrow">Student account</div>
+            <h1>Billing &amp; Payments</h1>
+            <p>Review posted and pending activity across all academic terms.</p>
+        </div>
+        <div class="billing-student">
+            <span>@Model.StudentDisplayName</span>
+            <strong>ID @Model.StudentIdentifier</strong>
+        </div>
+    </header>
+
+    @if (Model.IsBillingUnavailable)
+    {
+        <section class="billing-message" role="status">
+            <i class="fa-regular fa-circle-exclamation" aria-hidden="true"></i>
+            <div>
+                <h2>Billing information is temporarily unavailable</h2>
+                <p>Please try again shortly. Your account information has not been changed.</p>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="balance-grid" aria-label="Account balances">
+            <article class="balance-card balance-primary">
+                <div class="balance-details">
+                    <span>Overall balance</span>
+                    <strong>@Model.FormatCurrency(Model.OverallBalance)</strong>
+                    <small>Includes posted and pending account activity</small>
+                </div>
+                <div class="balance-payment">
+                    @if (Model.CanMakePayment)
+                    {
+                        <a class="payment-link" asp-page="/Payments/Checkout"><i class="fa-solid fa-lock" aria-hidden="true"></i> Make a payment</a>
+                        <small>@(Model.IsPaymentTestMode ? "Payflow test mode — no real charges." : "Secure checkout powered by PayPal.")</small>
+                    }
+                    else
+                    {
+                        <button type="button" disabled><i class="fa-solid fa-lock" aria-hidden="true"></i> Make a payment</button>
+                        <small>@(Model.OverallBalance <= 0 ? "No payment is currently due." : "Online payments are not available.")</small>
+                    }
+                </div>
+            </article>
+        </section>
+
+        @if (Model.Terms.Count == 0)
+        {
+            <section class="billing-message">
+                <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                <div>
+                    <h2>No billing activity to display</h2>
+                    <p>Transactions will appear here when they are added to your student account.</p>
+                </div>
+            </section>
+        }
+        else
+        {
+            @if (Model.CurrentAndUpcomingTerms.Count > 0)
+            {
+                <section class="term-ledgers active-term-ledgers" aria-labelledby="active-activity-heading">
+                    <div class="section-heading">
+                        <div>
+                            <span>Now and next</span>
+                            <h2 id="active-activity-heading">Current &amp; upcoming activity</h2>
+                        </div>
+                        <p>Recent charges, credits, and pending items for active and future terms.</p>
+                    </div>
+
+                    @foreach (var term in Model.CurrentAndUpcomingTerms)
+                    {
+                        @await Html.PartialAsync("_BillingTerm", term, new ViewDataDictionary(ViewData)
+                        {
+                        ["Open"] = term.TermCode == Model.CurrentTermCode,
+                        ["ShowHeaderBalance"] = true,
+                        ["BalanceCarriedOut"] = false
+                        })
+                    }
+                </section>
+            }
+
+            @if (Model.HistoricalTerms.Count > 0)
+            {
+            <section class="term-ledgers" aria-labelledby="activity-heading">
+                <div class="section-heading">
+                    <div>
+                        <span>Account history</span>
+                        <h2 id="activity-heading">Activity by term</h2>
+                    </div>
+                    <p>Pending items are included in balances and may change before posting.</p>
+                </div>
+
+                @for (var termIndex = 0; termIndex < Model.HistoricalTerms.Count; termIndex++)
+                {
+                    @await Html.PartialAsync("_BillingTerm", Model.HistoricalTerms[termIndex], new ViewDataDictionary(ViewData)
+                    {
+                        ["Open"] = false,
+                        ["ShowHeaderBalance"] = false,
+                        ["BalanceCarriedOut"] = true
+                    })
+                }
+            </section>
+            }
+        }
+
+    }
+</main>

@@ -1,0 +1,83 @@
+@model CampusFlow.Web.Pages.ScheduleModel.ScheduleTermGroup
+@{
+    var open = ViewData["Open"] as bool? == true;
+    var showStatus = ViewData["ShowStatus"] as bool? == true;
+    var showGrades = ViewData["ShowGrades"] as bool? == true;
+}
+<details class="schedule-term" open="@(open ? "open" : null)">
+    <summary>
+        <div>
+            <strong>@Model.TermName</strong>
+            <span>@Model.Courses.Count course@(Model.Courses.Count == 1 ? "" : "s") · @CampusFlow.Web.Pages.ScheduleModel.FormatCredits(Model.TotalCredits) credits</span>
+        </div>
+        <div class="schedule-term-status">
+            @if (showStatus)
+            {
+                <span>@(open ? "Current term" : "Upcoming")</span>
+            }
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </div>
+    </summary>
+    <div class="course-grid">
+        @foreach (var course in Model.Courses)
+        {
+            var hasMeeting = !string.IsNullOrWhiteSpace(course.MeetingDays) || course.StartTime is not null;
+            <article class="course-card">
+                <div class="course-card-topline">
+                    <span class="course-code">@course.Department @course.CourseNumber</span>
+                    <span class="registration-status">@course.RegistrationStatus</span>
+                </div>
+                <h3>@course.CourseName</h3>
+                <div class="course-meta">
+                    <span><i class="fa-regular fa-user" aria-hidden="true"></i>@course.Instructor</span>
+                    <span><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Section @course.Section · @CampusFlow.Web.Pages.ScheduleModel.FormatCredits(course.Credits) credits</span>
+                    @if (hasMeeting)
+                    {
+                        <span>
+                            <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                            @(string.IsNullOrWhiteSpace(course.MeetingDays) ? "Meeting time" : course.MeetingDays)
+                            @if (course.StartTime is not null)
+                            {
+                                <text> · @CampusFlow.Web.Pages.ScheduleModel.FormatTime(course.StartTime)–@CampusFlow.Web.Pages.ScheduleModel.FormatTime(course.EndTime)</text>
+                            }
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="online-course"><i class="fa-solid fa-laptop" aria-hidden="true"></i>Online</span>
+                    }
+                    @if (hasMeeting)
+                    {
+                        <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>@(course.Room ?? "Room to be announced")</span>
+                    }
+                    @if (course.StartDate is not null || course.EndDate is not null)
+                    {
+                        <span>
+                            <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                            @(course.StartDate?.ToString("MMM d") ?? "TBD")–@(course.EndDate?.ToString("MMM d, yyyy") ?? "TBD")
+                        </span>
+                    }
+                </div>
+                @if (showGrades && (course.MidtermGrade is not null || course.FinalNumericGrade is not null || !string.IsNullOrWhiteSpace(course.FinalLetterGrade)))
+                {
+                    <div class="course-grades" aria-label="Course grades">
+                        <div>
+                            <span>Midterm</span>
+                            <strong>@(course.MidtermGrade?.ToString("0.##") ?? "—")</strong>
+                        </div>
+                        <div>
+                            <span>Final</span>
+                            <strong>
+                                @(course.FinalLetterGrade ?? course.FinalNumericGrade?.ToString("0.##") ?? "—")
+                                @if (course.FinalLetterGrade is not null && course.FinalNumericGrade is not null)
+                                {
+                                    <small>@course.FinalNumericGrade.Value.ToString("0.##")</small>
+                                }
+                            </strong>
+                        </div>
+                    </div>
+                }
+            </article>
+        }
+    </div>
+</details>

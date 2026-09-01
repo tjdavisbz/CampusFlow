@@ -1,0 +1,75 @@
+@page
+@model CampusFlow.Web.Pages.Payments.CheckoutModel
+@{
+    ViewData["Title"] = "Make a payment";
+}
+<main class="payflow-page">
+    <section class="payflow-card">
+        @if (Model.IsTestMode)
+        {
+            <div class="test-banner"><strong>Payflow test mode</strong><span>No real charges will be made.</span></div>
+        }
+        @if (Model.ResultTitle is not null)
+        {
+            <div class="payment-result @(Model.WasApproved ? "approved" : "")">
+                <i class="fa-solid @(Model.WasApproved ? "fa-circle-check" : "fa-circle-info")"></i>
+                <div><h1>@Model.ResultTitle</h1><p>@Model.ResultMessage</p></div>
+            </div>
+            <a class="button secondary" asp-page="/Billing">Return to billing</a>
+        }
+        else
+        {
+            <div class="payflow-heading"><div><span>Secure checkout</span><h1>Make a payment</h1></div><i class="fa-solid fa-shield-halved"></i></div>
+            <p>Enter your card details below. CampusFlow sends them securely to PayPal and does not store the card number or security code.</p>
+            <form method="post" id="direct-payment-form" autocomplete="on">
+                <div asp-validation-summary="ModelOnly" class="validation"></div>
+                <label asp-for="Amount">Payment amount</label>
+                <div class="amount-input"><span>$</span><input asp-for="Amount" inputmode="decimal" /></div>
+                <span asp-validation-for="Amount" class="validation"></span>
+                <small>Current balance: @UsdCurrency.Format(Model.OutstandingBalance)</small>
+                <div class="card-fields">
+                    <div class="full-field">
+                        <label asp-for="CardNumber"></label>
+                        <input asp-for="CardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="Card number" />
+                        <span asp-validation-for="CardNumber" class="validation"></span>
+                    </div>
+                    <div>
+                        <label asp-for="ExpirationMonth"></label>
+                        <select asp-for="ExpirationMonth" autocomplete="cc-exp-month">
+                            @for (var month = 1; month <= 12; month++) { <option value="@month">@month.ToString("00")</option> }
+                        </select>
+                    </div>
+                    <div>
+                        <label asp-for="ExpirationYear"></label>
+                        <select asp-for="ExpirationYear" autocomplete="cc-exp-year">
+                            @for (var year = DateTime.UtcNow.Year; year <= DateTime.UtcNow.Year + 15; year++) { <option value="@year">@year</option> }
+                        </select>
+                    </div>
+                    <div>
+                        <label asp-for="SecurityCode"></label>
+                        <input asp-for="SecurityCode" inputmode="numeric" autocomplete="cc-csc" placeholder="CVV" maxlength="4" />
+                        <span asp-validation-for="SecurityCode" class="validation"></span>
+                    </div>
+                    <div>
+                        <label asp-for="PostalCode"></label>
+                        <input asp-for="PostalCode" autocomplete="postal-code" />
+                        <span asp-validation-for="PostalCode" class="validation"></span>
+                    </div>
+                </div>
+                @if (Model.IsTestMode)
+                {
+                    <aside><strong>Sandbox card</strong><code>4111 1111 1111 1111</code><span>Use a future expiration date. Test credentials must be configured in Payflow Manager.</span></aside>
+                }
+                <div class="actions"><a class="button secondary" asp-page="/Billing">Cancel</a><button class="button" type="submit">Submit payment</button></div>
+            </form>
+            <div class="processing-modal" id="payment-processing" aria-hidden="true"><div><i class="fa-solid fa-spinner fa-spin"></i><strong>Processing your payment</strong><span>Please do not close or refresh this page.</span></div></div>
+            <script>document.getElementById('direct-payment-form').addEventListener('submit',function(){if(this.checkValidity()){document.getElementById('payment-processing').setAttribute('aria-hidden','false');}});</script>
+        }
+    </section>
+</main>
+<style>
+    .payflow-page{max-width:680px;margin:3rem auto}.payflow-card{padding:2rem;border:1px solid #e5e7eb;border-radius:1.25rem;background:#fff;box-shadow:0 18px 50px rgba(16,24,40,.08)}
+    .test-banner{display:flex;justify-content:space-between;gap:1rem;margin:-2rem -2rem 1.5rem;padding:.8rem 1.25rem;border-radius:1.25rem 1.25rem 0 0;color:#78350f;background:#fef3c7}.payflow-heading,.payment-result{display:flex;align-items:center;justify-content:space-between;gap:1rem}.payflow-heading span{color:var(--tenant-primary,#502d7f);font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.payflow-heading h1,.payment-result h1{margin:.2rem 0}.payflow-heading i{font-size:2rem;color:var(--tenant-primary,#502d7f)}
+    .payflow-card label{display:block;margin-top:1.5rem;font-weight:700}.amount-input{display:flex;align-items:center;margin:.35rem 0;border:1px solid #d0d5dd;border-radius:.65rem;overflow:hidden}.amount-input span{padding:.75rem;background:#f2f4f7}.amount-input input{width:100%;padding:.75rem;border:0;font-size:1.1rem}.payflow-card aside{display:grid;gap:.35rem;margin-top:1.5rem;padding:1rem;border-radius:.75rem;background:#fefce8}.payflow-card code{font-size:1.05rem}.payflow-card aside span,.payflow-card small{color:#667085}.actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem}.button{display:inline-flex;padding:.7rem 1rem;border:0;border-radius:.6rem;color:#fff!important;background:var(--tenant-primary,#502d7f);font-weight:700;text-decoration:none}.button.secondary{color:#344054!important;background:#f2f4f7}.validation{color:#b42318}.payment-result{justify-content:flex-start;margin-bottom:1.5rem}.payment-result>i{font-size:2rem;color:#475467}.payment-result.approved>i{color:#15803d}.payment-result p{margin:0;color:#667085}
+    .card-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1rem}.card-fields .full-field{grid-column:1/-1}.card-fields input,.card-fields select{box-sizing:border-box;width:100%;margin-top:.35rem;padding:.75rem;border:1px solid #d0d5dd;border-radius:.65rem;background:#fff;font-size:1rem}.processing-modal{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:1rem;background:rgba(16,24,40,.55);backdrop-filter:blur(3px)}.processing-modal[aria-hidden="true"]{display:none}.processing-modal>div{display:grid;justify-items:center;gap:.65rem;min-width:280px;padding:2rem;border-radius:1rem;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.2)}.processing-modal i{font-size:2rem;color:var(--tenant-primary,#502d7f)}.processing-modal span{color:#667085}@@media(max-width:560px){.card-fields{grid-template-columns:1fr}.card-fields .full-field{grid-column:auto}.test-banner{flex-direction:column}.actions{flex-direction:column-reverse}.button{justify-content:center}}
+</style>

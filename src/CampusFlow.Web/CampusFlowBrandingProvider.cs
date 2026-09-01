@@ -1,19 +1,27 @@
-﻿using Volo.Abp.Ui.Branding;
+﻿using CampusFlow.Branding;
+using Volo.Abp.Ui.Branding;
 using Volo.Abp.DependencyInjection;
-using Microsoft.Extensions.Localization;
-using CampusFlow.Localization;
+using Volo.Abp.MultiTenancy;
 
 namespace CampusFlow.Web;
 
 [Dependency(ReplaceServices = true)]
 public class CampusFlowBrandingProvider : DefaultBrandingProvider
 {
-    private IStringLocalizer<CampusFlowResource> _localizer;
+    private readonly ICurrentTenant _currentTenant;
+    private readonly ITenantThemeProvider _tenantThemeProvider;
 
-    public CampusFlowBrandingProvider(IStringLocalizer<CampusFlowResource> localizer)
+    public CampusFlowBrandingProvider(
+        ICurrentTenant currentTenant,
+        ITenantThemeProvider tenantThemeProvider)
     {
-        _localizer = localizer;
+        _currentTenant = currentTenant;
+        _tenantThemeProvider = tenantThemeProvider;
     }
 
-    public override string AppName => _localizer["AppName"];
+    private TenantTheme Theme => _tenantThemeProvider.Get(_currentTenant.Name);
+
+    public override string AppName => Theme.OrganizationName;
+    public override string? LogoUrl => Theme.LogoUrl;
+    public override string? LogoReverseUrl => Theme.LogoReverseUrl;
 }

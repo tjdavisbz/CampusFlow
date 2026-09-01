@@ -1,0 +1,53 @@
+@page "/Admin/ImpersonateStudent"
+@model CampusFlow.Web.Pages.Admin.ImpersonateStudentModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Impersonate Student";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ImpersonateStudent;
+}
+
+@section styles {
+    <abp-style src="/Pages/Admin/ImpersonateStudent.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor}</style>
+}
+
+<main class="impersonation-shell">
+    <header class="impersonation-hero">
+        <div><span>Admin portal</span><h1>Impersonate a student</h1><p>Open a secure, read-only view of the student portal exactly as that student sees it.</p></div>
+        <div class="read-only-callout"><i class="fa-solid fa-shield-halved"></i><strong>Read-only</strong><span>No student information can be changed.</span></div>
+    </header>
+
+    <section class="impersonation-card">
+        <div class="card-heading"><span>Student search</span><h2>Find a student</h2><p>Search by name, student ID, Elements ID, or email address.</p></div>
+        <form method="get" class="student-search">
+            <label asp-for="Query" class="visually-hidden">Student search</label>
+            <div class="search-control"><i class="fa-solid fa-magnifying-glass"></i><input asp-for="Query" placeholder="Name, ID, or email" autocomplete="off" /><button type="submit">Search</button></div>
+        </form>
+
+        @if (Model.SearchPerformed && Model.Results.Count == 0)
+        {
+            <div class="empty-result"><i class="fa-regular fa-circle-question"></i><strong>No students found</strong><span>Try a different name, ID, or email address.</span></div>
+        }
+        else if (Model.Results.Count > 0)
+        {
+            <div class="result-list">
+                @foreach (var student in Model.Results)
+                {
+                    var displayName = $"{(string.IsNullOrWhiteSpace(student.PreferredName) ? student.FirstName : student.PreferredName)} {student.LastName}";
+                    <article class="student-result">
+                        <div class="student-avatar">@displayName.Substring(0, 1).ToUpperInvariant()</div>
+                        <div class="student-details"><strong>@displayName</strong><span>ID @student.StudentId</span>@if (!string.IsNullOrWhiteSpace(student.Email)){<small>@student.Email</small>}</div>
+                        <form method="post" asp-page-handler="Start">
+                            <input type="hidden" name="ExternalStudentId" value="@student.ExternalStudentId" />
+                            <button type="submit">View as student <i class="fa-solid fa-arrow-right"></i></button>
+                        </form>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</main>
