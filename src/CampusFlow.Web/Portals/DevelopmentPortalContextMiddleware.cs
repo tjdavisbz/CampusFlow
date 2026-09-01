@@ -33,8 +33,21 @@ public class DevelopmentPortalContextMiddleware
         {
             ApplyDevelopmentContext(context);
         }
+        else
+        {
+            ApplyConfiguredTenant(context);
+        }
 
         await _next(context);
+    }
+
+    private void ApplyConfiguredTenant(HttpContext context)
+    {
+        var tenant = _configuration["TenantResolution:DefaultTenant"];
+        if (!string.IsNullOrWhiteSpace(tenant))
+        {
+            SetTenantQueryParameter(context, tenant);
+        }
     }
 
     private void ApplyDevelopmentContext(HttpContext context)
@@ -65,23 +78,7 @@ public class DevelopmentPortalContextMiddleware
         }
         var portal = context.Request.Query["portal"].ToString();
 
-        if (!string.IsNullOrWhiteSpace(tenant))
-        {
-            var query = new List<KeyValuePair<string, string?>>();
-            foreach (var item in context.Request.Query)
-            {
-                foreach (var value in item.Value)
-                {
-                    query.Add(new KeyValuePair<string, string?>(item.Key, value));
-                }
-            }
-
-            if (!context.Request.Query.ContainsKey("__tenant"))
-            {
-                query.Add(new KeyValuePair<string, string?>("__tenant", tenant));
-            }
-            context.Request.QueryString = QueryString.Create(query);
-        }
+        if (!string.IsNullOrWhiteSpace(tenant)) SetTenantQueryParameter(context, tenant);
 
         // Keep the legacy development URL working while the product-facing name moves
         // from Scheduler Portal to Advisor Portal.
@@ -94,5 +91,21 @@ public class DevelopmentPortalContextMiddleware
         {
             context.Items[PortalItemKey] = portalType;
         }
+    }
+
+    private static void SetTenantQueryParameter(HttpContext context, string tenant)
+    {
+        var query = new List<KeyValuePair<string, string?>>();
+        foreach (var item in context.Request.Query)
+        {
+            if (item.Key.Equals("__tenant", StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var value in item.Value)
+            {
+                query.Add(new KeyValuePair<string, string?>(item.Key, value));
+            }
+        }
+
+        query.Add(new KeyValuePair<string, string?>("__tenant", tenant));
+        context.Request.QueryString = QueryString.Create(query);
     }
 }
