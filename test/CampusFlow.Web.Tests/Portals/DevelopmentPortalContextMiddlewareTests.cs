@@ -34,7 +34,7 @@ public class DevelopmentPortalContextMiddlewareTests
     }
 
     [Fact]
-    public async Task Should_Ignore_Overrides_Outside_Development()
+    public async Task Should_Use_Configured_Tenant_And_Ignore_Portal_Overrides_Outside_Development()
     {
         var environment = Substitute.For<IWebHostEnvironment>();
         environment.EnvironmentName.Returns("Production");
@@ -44,7 +44,7 @@ public class DevelopmentPortalContextMiddlewareTests
 
         await middleware.InvokeAsync(context);
 
-        context.Request.Query.ContainsKey("__tenant").ShouldBeFalse();
+        context.Request.Query["__tenant"].ToString().ShouldBe("nelson");
         context.Items.ContainsKey(DevelopmentPortalContextMiddleware.PortalItemKey).ShouldBeFalse();
     }
 
@@ -80,7 +80,8 @@ public class DevelopmentPortalContextMiddlewareTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new System.Collections.Generic.Dictionary<string, string?>
             {
-                ["DevelopmentPortal:DefaultTenant"] = "nelson"
+                ["DevelopmentPortal:DefaultTenant"] = "nelson",
+                ["TenantResolution:DefaultTenant"] = "nelson"
             })
             .Build();
 
