@@ -12,6 +12,43 @@
     background-position: left;
 }
 
+/* Keep framework-owned identity and permission controls in the tenant palette. */
+body .btn-primary {
+    --bs-btn-bg: var(--tenant-primary, #502d7f);
+    --bs-btn-border-color: var(--tenant-primary, #502d7f);
+    --bs-btn-hover-bg: var(--tenant-primary-dark, #28163f);
+    --bs-btn-hover-border-color: var(--tenant-primary-dark, #28163f);
+    --bs-btn-active-bg: var(--tenant-primary-dark, #28163f);
+    --bs-btn-active-border-color: var(--tenant-primary-dark, #28163f);
+    --bs-btn-disabled-bg: var(--tenant-primary, #502d7f);
+    --bs-btn-disabled-border-color: var(--tenant-primary, #502d7f);
+    background-color: var(--tenant-primary, #502d7f) !important;
+    border-color: var(--tenant-primary, #502d7f) !important;
+}
+
+body .btn-primary:hover,
+body .btn-primary:focus-visible,
+body .btn-primary:active,
+body .btn-primary.active {
+    background-color: var(--tenant-primary-dark, #28163f) !important;
+    border-color: var(--tenant-primary-dark, #28163f) !important;
+}
+
+body .btn-primary:focus,
+body .form-check-input:focus {
+    box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--tenant-primary, #502d7f) 24%, transparent) !important;
+}
+
+body .form-check-input:checked,
+body .form-check-input:indeterminate {
+    background-color: var(--tenant-primary, #502d7f) !important;
+    border-color: var(--tenant-primary, #502d7f) !important;
+}
+
+body .form-check-input:not(:checked):focus {
+    border-color: var(--tenant-primary, #502d7f) !important;
+}
+
 body .lpx-sidebar,
 body .lpx-sidebar-container,
 body .lpx-sidebar .lpx-sidebar-container,
