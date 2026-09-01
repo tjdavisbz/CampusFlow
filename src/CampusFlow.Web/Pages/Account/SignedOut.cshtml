@@ -1,0 +1,31 @@
+@page
+@model CampusFlow.Web.Pages.Account.SignedOutModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Signed out | CampusFlow</title>
+    <link rel="stylesheet" href="~/global-styles.css" />
+    <style>
+        body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f5f4f7; color: #171326; font-family: Arial, sans-serif; }
+        .signed-out-card { width: min(34rem, calc(100% - 3rem)); padding: 3rem; border: 1px solid #ded9e7; border-radius: 1.5rem; background: white; box-shadow: 0 1rem 3rem rgba(44, 25, 70, .09); text-align: center; }
+        .signed-out-mark { display: inline-grid; width: 4rem; height: 4rem; margin-bottom: 1rem; place-items: center; border-radius: 50%; background: #eee9f4; color: #4b2772; font-size: 2rem; }
+        h1 { margin: 0 0 .75rem; font-size: 2rem; }
+        p { margin: 0 0 1.75rem; color: #687188; line-height: 1.55; }
+        a { display: inline-block; padding: .85rem 1.35rem; border-radius: .7rem; background: #5b2d86; color: white; font-weight: 700; text-decoration: none; }
+        a:hover { background: #482268; }
+    </style>
+</head>
+<body>
+<main class="signed-out-card">
+    <div class="signed-out-mark" aria-hidden="true">✓</div>
+    <h1>You’re signed out</h1>
+    <p>Your CampusFlow and Microsoft sign-in sessions have been closed.</p>
+    <a asp-page="/Account/MicrosoftLogin">Sign in again</a>
+</main>
+</body>
+</html>
