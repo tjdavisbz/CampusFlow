@@ -122,28 +122,35 @@ public class IndexModel : CampusFlowPageModel
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (!_currentStudentView.IsImpersonating && !string.IsNullOrWhiteSpace(CurrentUser.Email))
         {
-            var lookup = _studentLookups.SingleOrDefault(x =>
-                x.Provider == (profile?.Provider ?? StudentInformationSystemProvider.ThesisElements));
-            var result = lookup is null
-                ? null
-                : await lookup.FindByEmailAsync(CurrentUser.Email, HttpContext.RequestAborted);
-
-            if (result?.Status == StudentLookupStatus.Matched && result.Student is not null)
+            try
             {
-                if (profile is null)
+                var lookup = _studentLookups.SingleOrDefault(x =>
+                    x.Provider == (profile?.Provider ?? StudentInformationSystemProvider.ThesisElements));
+                var result = lookup is null
+                    ? null
+                    : await lookup.FindByEmailAsync(CurrentUser.Email, HttpContext.RequestAborted);
+
+                if (result?.Status == StudentLookupStatus.Matched && result.Student is not null)
                 {
-                    profile = await _studentProfileRepository.InsertAsync(new StudentProfile(
-                        _guidGenerator.Create(),
-                        CurrentTenant.Id,
-                        CurrentUser.Id.Value,
-                        result.Student));
+                    if (profile is null)
+                    {
+                        profile = await _studentProfileRepository.InsertAsync(new StudentProfile(
+                            _guidGenerator.Create(),
+                            CurrentTenant.Id,
+                            CurrentUser.Id.Value,
+                            result.Student));
+                    }
+                    else if (profile.Provider == result.Student.Provider &&
+                             profile.ExternalStudentId == result.Student.ExternalStudentId)
+                    {
+                        profile.Update(result.Student);
+                        profile = await _studentProfileRepository.UpdateAsync(profile);
+                    }
                 }
-                else if (profile.Provider == result.Student.Provider &&
-                         profile.ExternalStudentId == result.Student.ExternalStudentId)
-                {
-                    profile.Update(result.Student);
-                    profile = await _studentProfileRepository.UpdateAsync(profile);
-                }
+            }
+            catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                _logger.LogWarning(exception, "Unable to refresh the current student's Elements profile.");
             }
         }
 
