@@ -40,6 +40,11 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore CampusFlow.slnx
 
+      - name: Install client-side libraries
+        run: |
+          dotnet tool install --global Volo.Abp.Studio.Cli --version 3.0.7
+          abp install-libs
+
       - name: Run tests
         run: dotnet test CampusFlow.slnx --configuration Release --no-restore
 
