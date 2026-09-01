@@ -13,6 +13,7 @@ using CampusFlow.Localization;
 using CampusFlow.MultiTenancy;
 using CampusFlow.Permissions;
 using CampusFlow.Web.Menus;
+using CampusFlow.Web.Administration;
 using CampusFlow.Web.HealthChecks;
 using CampusFlow.Web.BillApprovals;
 using CampusFlow.Web.Payments;
@@ -440,6 +441,7 @@ public class CampusFlowWebModule : AbpModule
         }
 
         app.UseUnitOfWork();
+        app.UseMiddleware<ConfiguredAdministratorMiddleware>();
         app.UseDynamicClaims();
         app.UseAuthorization();
         app.UseMiddleware<StudentViewContextMiddleware>();
