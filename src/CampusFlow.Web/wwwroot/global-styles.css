@@ -49,6 +49,37 @@ body .form-check-input:not(:checked):focus {
     border-color: var(--tenant-primary, #502d7f) !important;
 }
 
+body .nav-tabs .nav-link.active,
+body .nav-tabs .nav-item.show .nav-link {
+    color: var(--tenant-primary, #502d7f) !important;
+    border-bottom-color: var(--tenant-primary, #502d7f) !important;
+}
+
+body .nav-tabs .nav-link.active::before,
+body .nav-tabs .nav-link.active::after,
+body .nav-tabs .nav-item.show .nav-link::before,
+body .nav-tabs .nav-item.show .nav-link::after {
+    background-color: var(--tenant-primary, #502d7f) !important;
+    border-color: var(--tenant-primary, #502d7f) !important;
+}
+
+body .nav-tabs .nav-link:hover,
+body .nav-tabs .nav-link:focus-visible,
+body .pagination .page-link {
+    color: var(--tenant-primary, #502d7f) !important;
+}
+
+body .pagination .page-item.active > .page-link,
+body .pagination .page-link.active {
+    color: #fff !important;
+    background-color: var(--tenant-primary, #502d7f) !important;
+    border-color: var(--tenant-primary, #502d7f) !important;
+}
+
+body .pagination .page-link:focus {
+    box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--tenant-primary, #502d7f) 24%, transparent) !important;
+}
+
 body .lpx-sidebar,
 body .lpx-sidebar-container,
 body .lpx-sidebar .lpx-sidebar-container,
