@@ -12,6 +12,10 @@ public interface IStudentInformationSystemStudentLookup
         string email,
         CancellationToken cancellationToken = default);
 
+    Task<StudentInformationSystemStudent?> FindByExternalStudentIdAsync(
+        string externalStudentId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<StudentInformationSystemStudent>> SearchAsync(
         string query,
         int maximumResults = 20,

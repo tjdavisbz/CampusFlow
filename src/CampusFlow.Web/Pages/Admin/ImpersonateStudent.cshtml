@@ -28,7 +28,11 @@
             <div class="search-control"><i class="fa-solid fa-magnifying-glass"></i><input asp-for="Query" placeholder="Name, ID, or email" autocomplete="off" /><button type="submit">Search</button></div>
         </form>
 
-        @if (Model.SearchPerformed && Model.Results.Count == 0)
+        @if (!string.IsNullOrWhiteSpace(Model.SearchError))
+        {
+            <div class="empty-result"><i class="fa-solid fa-triangle-exclamation"></i><strong>Search unavailable</strong><span>@Model.SearchError</span></div>
+        }
+        else if (Model.SearchPerformed && Model.Results.Count == 0)
         {
             <div class="empty-result"><i class="fa-regular fa-circle-question"></i><strong>No students found</strong><span>Try a different name, ID, or email address.</span></div>
         }
