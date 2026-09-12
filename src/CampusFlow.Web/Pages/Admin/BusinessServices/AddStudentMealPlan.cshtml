@@ -1,0 +1,56 @@
+@page "/Admin/BusinessServices/AddStudentMealPlan"
+@model CampusFlow.Web.Pages.Admin.BusinessServices.AddStudentMealPlanModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Add Student Meal Plan";
+    PageLayout.Content.MenuItemName = CampusFlowMenus.AddStudentMealPlan;
+}
+@section styles {
+    <abp-style src="/Pages/Admin/BusinessServices/AddStudentMealPlan.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+
+<main class="meal-admin-shell">
+    <header class="meal-admin-hero"><div><span>Business Services</span><h1>Add Student Meal Plan</h1><p>Set a student's term housing status and assign an available meal plan in Elements.</p></div><i class="fa-solid fa-utensils"></i></header>
+
+    <section class="meal-card">
+        <div class="section-heading"><span>Step 1</span><h2>Find a student</h2><p>Search by name, student ID, Elements ID, or email address.</p></div>
+        <form method="get" asp-fragment="student-results" class="student-search"><input asp-for="Query" placeholder="Name, ID, or email" autocomplete="off" /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Search</button></form>
+        @if (!string.IsNullOrWhiteSpace(Model.SearchError)){<div class="notice error" id="student-results">@Model.SearchError</div>}
+        else if (!string.IsNullOrWhiteSpace(Model.Query) && Model.Results.Count == 0){<div class="notice" id="student-results">No matching students were found.</div>}
+        else if (Model.Results.Count > 0)
+        {
+            <div class="student-results" id="student-results">@foreach(var student in Model.Results){<article><div><strong>@student.Name</strong><span>Student ID @student.StudentId</span><small>@student.Email</small></div><a asp-route-query="@Model.Query" asp-route-student="@student.ExternalStudentId" asp-fragment="plans">Select student</a></article>}</div>
+        }
+    </section>
+
+    @if (Model.Context is not null)
+    {
+        <section class="meal-card" id="plans">
+            <div class="section-heading"><span>Step 2</span><h2>Choose the term and housing status</h2><p>@Model.Context.Student.Name · Student ID @Model.Context.Student.StudentId · @Model.Context.AttendanceType</p></div>
+            <form method="get" asp-fragment="plans" class="student-search">
+                <input type="hidden" name="query" value="@Model.Query" /><input type="hidden" name="student" value="@Model.Context.Student.ExternalStudentId" />
+                <select name="term" aria-label="Academic term" onchange="this.form.submit()">@foreach(var term in Model.Context.Terms){<option value="@term.TermCalendarId" selected="@(term.TermCalendarId == Model.Term ? "selected" : null)">@term.Name</option>}</select>
+                <select name="housingStatus" aria-label="Housing status">@foreach(var status in Model.Context.HousingStatuses){<option value="@status.Id" selected="@(status.Id == Model.HousingStatus ? "selected" : null)">@status.Name</option>}</select>
+                <button type="submit">Apply</button>
+            </form>
+            <div class="section-heading plan-heading"><span>Step 3</span><h2>Choose a meal plan</h2></div>
+            @if (Model.Context.HousingStatuses.Count == 0){<div class="notice error">Elements did not return a housing-status option for this student and term.</div>}
+            @if (Model.Context.Options.Count == 0){<div class="notice">No active meal plans are currently available in Elements.</div>}
+            else
+            {
+                <div class="plan-list">@foreach(var plan in Model.Context.Options){<article><div><strong>@plan.Name</strong><p>@plan.Description</p><span>@plan.StartDate.ToString("MMM d, yyyy")–@plan.EndDate.ToString("MMM d, yyyy")</span></div><div class="plan-action"><strong>@(plan.Amount.HasValue ? $"${plan.Amount.Value:N2}" : "Price unavailable")</strong><a asp-route-query="@Model.Query" asp-route-student="@Model.Context.Student.ExternalStudentId" asp-route-term="@Model.Term" asp-route-housingStatus="@Model.HousingStatus" asp-route-mealPlan="@plan.MealPlanId" asp-fragment="confirm">Review assignment</a></div></article>}</div>
+            }
+        </section>
+    }
+
+    @if (Model.Context is not null && Model.Preview is not null)
+    {
+        var selectedHousing = Model.Context.HousingStatuses.SingleOrDefault(x => x.Id == Model.HousingStatus);
+        <section class="meal-card confirmation" id="confirm"><div class="warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div><span class="eyebrow">Step 4 · Confirmation required</span><h2>Apply this housing and meal-plan selection?</h2><p>This will set <strong>@selectedHousing?.Name</strong> and assign <strong>@Model.Preview.Name</strong> to <strong>@Model.Context.Student.Name</strong> (Student ID @Model.Context.Student.StudentId) in Elements.</p>
+            <form method="post" asp-page-handler="Assign"><input asp-for="Input.ExternalStudentId" type="hidden" value="@Model.Context.Student.ExternalStudentId" /><input asp-for="Input.TermCalendarId" type="hidden" value="@Model.Term" /><input asp-for="Input.HousingStatusId" type="hidden" value="@Model.HousingStatus" /><input asp-for="Input.MealPlanId" type="hidden" value="@Model.Preview.MealPlanId" /><label class="confirm-check"><input asp-for="Input.Confirmed" /><span>I have verified the student, term, housing status, meal plan, and applicable dates.</span></label><span asp-validation-for="Input.Confirmed" class="validation-message"></span><div class="confirm-actions"><a asp-route-query="@Model.Query" asp-route-student="@Model.Context.Student.ExternalStudentId" asp-route-term="@Model.Term" asp-route-housingStatus="@Model.HousingStatus">Cancel</a><button type="submit"><i class="fa-solid fa-utensils"></i> Apply selection</button></div></form>
+        </div></section>
+    }
+</main>

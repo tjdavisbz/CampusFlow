@@ -1,0 +1,70 @@
+@page "/Admin/StudentBilling/ResetIndividualBillApproval"
+@model CampusFlow.Web.Pages.Admin.StudentBilling.ResetIndividualBillApprovalModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Reset Individual Student Bill Approval";
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ResetIndividualBillApproval;
+}
+
+@section styles {
+    <abp-style src="/Pages/Admin/StudentBilling/ResetIndividualBillApproval.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+
+<main class="reset-shell">
+    <header class="reset-hero">
+        <div><span>Student Billing · Registration</span><h1>Reset Individual Student Bill Approval</h1><p>Remove a student's submitted Bill Approval so they can complete it again.</p></div>
+        <i class="fa-solid fa-arrow-rotate-left"></i>
+    </header>
+
+    <section class="reset-card">
+        <div class="section-heading"><span>Find an approval</span><h2>Student search</h2><p>Search existing Bill Approval records by student name, ID, or email.</p></div>
+        <form method="get" class="search-form">
+            <label><span>Academic term</span><select asp-for="TermCode"><option value="">All terms</option>@foreach (var term in Model.Terms){<option value="@term.TermCode">@term.TermName</option>}</select></label>
+            <label class="query"><span>Student</span><input asp-for="Query" placeholder="Name, ID, or email" autocomplete="off" /></label>
+            <button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+        </form>
+
+        @if (Model.Approvals.Count == 0)
+        {
+            <div class="empty-result"><i class="fa-regular fa-circle-check"></i><strong>No matching Bill Approval records</strong><span>Try another student or term.</span></div>
+        }
+        else
+        {
+            <div class="result-list">
+                @foreach (var item in Model.Approvals)
+                {
+                    <article class="approval-row">
+                        <div><strong>@item.StudentName</strong><span>Student ID @item.StudentId</span></div>
+                        <div><strong>@item.TermName</strong><span>@item.Status@if(item.AcceptedAt.HasValue){<text> · @item.AcceptedAt.Value.ToString("MMM d, yyyy h:mm tt")</text>}</span></div>
+                        <a asp-route-termCode="@Model.TermCode" asp-route-query="@Model.Query" asp-route-previewId="@item.Id">Review reset</a>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    @if (Model.Preview is not null)
+    {
+        <section class="reset-card confirmation-card" id="confirm-reset">
+            <div class="warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div class="confirmation-copy">
+                <span>Confirmation required</span><h2>Reset this Bill Approval?</h2>
+                <p><strong>@Model.Preview.StudentName</strong> (Student ID @Model.Preview.StudentId) will be able to restart Bill Approval for <strong>@Model.Preview.TermName</strong>. This does not change the student's charges, aid, or registration.</p>
+                <form method="post" asp-page-handler="Reset">
+                    <input asp-for="ResetInput.ApprovalId" type="hidden" value="@Model.Preview.Id" />
+                    <label class="confirm-check"><input asp-for="ResetInput.Confirmed" /><span>I have verified the student and term and intend to reset this Bill Approval.</span></label>
+                    <span asp-validation-for="ResetInput.Confirmed" class="validation-message"></span>
+                    <div class="confirmation-actions"><a asp-route-termCode="@Model.TermCode" asp-route-query="@Model.Query">Cancel</a><button type="submit"><i class="fa-solid fa-arrow-rotate-left"></i> Reset Bill Approval</button></div>
+                </form>
+            </div>
+        </section>
+    }
+</main>
+
+@if (Model.Preview is not null)
+{
+    @section scripts { <script>document.getElementById('confirm-reset')?.scrollIntoView({behavior:'smooth',block:'center'});</script> }
+}

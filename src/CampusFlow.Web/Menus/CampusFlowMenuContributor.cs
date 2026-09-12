@@ -11,6 +11,7 @@ using CampusFlow.Students;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using System;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using CampusFlow.Web.Portals;
 namespace CampusFlow.Web.Menus;
@@ -110,23 +111,41 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
         var canManageAdvisorRouting = await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ManageRouting);
-        var canManageAccess = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AccessManagement);
-        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canManageAccess)
+        var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
+        var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
+        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
             if (canManageGlobalConfiguration)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.GlobalConfiguration, "Global Configuration",
                     "~/Admin/GlobalConfiguration", icon: "fa fa-globe", order: 1));
+            var studentBilling = new ApplicationMenuItem(CampusFlowMenus.StudentBillingAdmin, "Student Billing",
+                icon: "fa fa-file-invoice-dollar", order: 4);
             if (canManagePlans)
-                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
-                    "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 5));
+                studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
+                    "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 2));
             if (canManageBillApproval)
             {
-                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.BillApprovalConfiguration, "Bill Approval",
-                    "~/Admin/BillApproval", icon: "fa fa-file-signature", order: 6));
-                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.Agreements, "Agreements",
-                    "~/Admin/Agreements", icon: "fa fa-file-contract", order: 4));
+                studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.BillApprovalConfiguration, "Bill Approval",
+                    "~/Admin/BillApproval", icon: "fa fa-file-signature", order: 1));
+                studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.Agreements, "Agreements",
+                    "~/Admin/Agreements", icon: "fa fa-file-contract", order: 3));
+            }
+            if (canResetBillApproval)
+                studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.ResetIndividualBillApproval,
+                    "Reset Bill Approval", "~/Admin/StudentBilling/ResetIndividualBillApproval",
+                    icon: "fa fa-arrow-rotate-left", order: 4));
+            if (studentBilling.Items.Count > 0)
+                admin.AddItem(studentBilling);
+            if (canAddStudentMealPlan)
+            {
+                var businessServices = new ApplicationMenuItem(CampusFlowMenus.BusinessServicesAdmin,
+                    "Business Services", icon: "fa fa-briefcase", order: 5);
+                businessServices.AddItem(new ApplicationMenuItem(CampusFlowMenus.AddStudentMealPlan,
+                    "Add Student Meal Plan", "~/Admin/BusinessServices/AddStudentMealPlan",
+                    icon: "fa fa-utensils", order: 1));
+                admin.AddItem(businessServices);
             }
             if (canManageRegistration)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
@@ -137,9 +156,6 @@ public class CampusFlowMenuContributor : IMenuContributor
             if (canImpersonate)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
                     "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 7));
-            if (canManageAccess)
-                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AccessManagement, "Users & Roles",
-                    "~/Identity/Users", icon: "fa fa-users-gear", order: 8));
             context.Menu.AddItem(admin);
         }
         //Administration
@@ -147,6 +163,9 @@ public class CampusFlowMenuContributor : IMenuContributor
         administration.Order = 4;
         //Administration->Identity
         administration.SetSubItemOrder(IdentityMenuNames.GroupName, 1);
+        var identityManagement = administration.Items.FirstOrDefault(x => x.Name == IdentityMenuNames.GroupName);
+        if (identityManagement is not null)
+            identityManagement.DisplayName = "Users & Access";
 
         if (MultiTenancyConsts.IsEnabled)
         {

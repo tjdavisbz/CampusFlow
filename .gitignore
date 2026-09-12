@@ -199,6 +199,12 @@ orleans.codegen.cs
 # Legacy Elements PortalAgent binaries and tenant configuration (reference only)
 /PortalAgent/
 
+# Local legacy/reference systems and migration workspaces (never deploy or commit)
+/SAGU SSRS Project/
+/ReportServer-Export/
+/outputs/
+/tools/
+
 # Logs created when applications are launched from the repository root
 /Logs/
 
