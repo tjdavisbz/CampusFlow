@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using CampusFlow.Permissions;
@@ -8,6 +9,7 @@ using CampusFlow.StudentInformationSystems;
 using CampusFlow.Web.Portals;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Authorization.Permissions;
 
@@ -47,6 +49,7 @@ public class ImpersonateStudentModel : CampusFlowPageModel
 
     public IReadOnlyList<StudentInformationSystemStudent> Results { get; private set; } = [];
     public bool SearchPerformed { get; private set; }
+    public string? SearchError { get; private set; }
     public TenantTheme Theme { get; private set; } = null!;
 
     public async Task<IActionResult> OnGetAsync()
@@ -57,9 +60,23 @@ public class ImpersonateStudentModel : CampusFlowPageModel
 
         SearchPerformed = true;
         var lookup = _lookups.SingleOrDefault(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
-        Results = lookup is null
-            ? []
-            : await lookup.SearchAsync(Query.Trim(), cancellationToken: HttpContext.RequestAborted);
+        if (lookup is null) return Page();
+
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            Results = await lookup.SearchAsync(Query.Trim(), cancellationToken: HttpContext.RequestAborted);
+            _logger.LogInformation(
+                "Student impersonation {SearchType} search completed in {ElapsedMilliseconds} ms with {ResultCount} results. TraceId={TraceId}",
+                GetSearchType(Query), stopwatch.ElapsedMilliseconds, Results.Count, HttpContext.TraceIdentifier);
+        }
+        catch (SqlException exception) when (exception.Number == -2)
+        {
+            SearchError = "The student search took too long. Please try again.";
+            _logger.LogWarning(exception,
+                "Student impersonation {SearchType} search timed out after {ElapsedMilliseconds} ms. TraceId={TraceId}",
+                GetSearchType(Query), stopwatch.ElapsedMilliseconds, HttpContext.TraceIdentifier);
+        }
         return Page();
     }
 
@@ -69,9 +86,8 @@ public class ImpersonateStudentModel : CampusFlowPageModel
         var lookup = _lookups.SingleOrDefault(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
         if (lookup is null || string.IsNullOrWhiteSpace(ExternalStudentId)) return BadRequest();
 
-        var matches = await lookup.SearchAsync(ExternalStudentId.Trim(), 10, HttpContext.RequestAborted);
-        var student = matches.SingleOrDefault(x =>
-            string.Equals(x.ExternalStudentId, ExternalStudentId.Trim(), StringComparison.OrdinalIgnoreCase));
+        var student = await lookup.FindByExternalStudentIdAsync(
+            ExternalStudentId.Trim(), HttpContext.RequestAborted);
         if (student is null) return NotFound();
 
         _session.Start(HttpContext, student);
@@ -84,4 +100,8 @@ public class ImpersonateStudentModel : CampusFlowPageModel
     private async Task<bool> CanUseAsync() =>
         await _access.EnsureAccessAsync() &&
         await _permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
+
+    private static string GetSearchType(string query) =>
+        query.Contains('@', StringComparison.Ordinal) ? "email" :
+        query.All(char.IsDigit) ? "numeric" : "name";
 }

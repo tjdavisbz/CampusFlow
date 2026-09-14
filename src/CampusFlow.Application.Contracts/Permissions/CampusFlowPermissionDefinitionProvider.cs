@@ -30,6 +30,16 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:Admin.RegistrationRules"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.AccessManagement,
             L("Permission:Admin.AccessManagement"), MultiTenancySides.Tenant);
+        var studentBilling = admin.AddChild(CampusFlowPermissions.Admin.StudentBilling,
+            L("Permission:Admin.StudentBilling"), MultiTenancySides.Tenant);
+        studentBilling.AddChild(CampusFlowPermissions.Admin.ResetIndividualBillApproval,
+            L("Permission:Admin.StudentBilling.ResetIndividualBillApproval"), MultiTenancySides.Tenant);
+        var businessServices = admin.AddChild(CampusFlowPermissions.Admin.BusinessServices,
+            L("Permission:Admin.BusinessServices"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.HousingAssignments,
+            new Volo.Abp.Localization.FixedLocalizableString("Manage housing assignment drafts"), MultiTenancySides.Tenant);
+        businessServices.AddChild(CampusFlowPermissions.Admin.AddStudentMealPlan,
+            L("Permission:Admin.BusinessServices.AddStudentMealPlan"), MultiTenancySides.Tenant);
     }
 
     private static LocalizableString L(string name)

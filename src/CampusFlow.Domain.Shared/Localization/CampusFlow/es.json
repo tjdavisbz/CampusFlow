@@ -47,6 +47,10 @@
     "Permission:Admin.PaymentPlans": "Administrar la configuración de planes de pago",
     "Permission:Admin.BillApproval": "Administrar períodos y reglas de aprobación de factura",
     "Permission:Admin.RegistrationRules": "Administrar períodos y reglas de selección de cursos",
-    "Permission:Admin.AccessManagement": "Administrar el acceso de usuarios de CampusFlow"
+    "Permission:Admin.AccessManagement": "Administrar el acceso de usuarios de CampusFlow",
+    "Permission:Admin.StudentBilling": "Acceder a la administración de facturación estudiantil",
+    "Permission:Admin.StudentBilling.ResetIndividualBillApproval": "Restablecer la aprobación de factura de un estudiante",
+    "Permission:Admin.BusinessServices": "Acceder a la administración de servicios empresariales",
+    "Permission:Admin.BusinessServices.AddStudentMealPlan": "Asignar un plan de comidas a un estudiante"
   }
 }
