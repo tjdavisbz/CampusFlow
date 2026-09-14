@@ -40,6 +40,8 @@ class Program
                 var outputPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "CampusFlow.Web", "appsettings.secrets.json"));
                 var secretsPath = File.Exists(workspacePath) ? workspacePath : outputPath;
                 configuration.AddJsonFile(secretsPath, optional: true, reloadOnChange: false);
+                // Keep explicitly supplied deployment settings authoritative over local secrets.
+                configuration.AddEnvironmentVariables();
             })
             .ConfigureLogging((context, logging) => logging.ClearProviders())
             .ConfigureServices((hostContext, services) =>
