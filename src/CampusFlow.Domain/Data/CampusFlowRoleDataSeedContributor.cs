@@ -44,6 +44,8 @@ public class CampusFlowRoleDataSeedContributor : IDataSeedContributor, ITransien
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Business Services Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.BusinessServices,
             CampusFlowPermissions.Admin.AddStudentMealPlan);
+        await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Housing Manager",
+            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.HousingAssignments);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Registration Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.GlobalConfiguration,
             CampusFlowPermissions.Admin.RegistrationRules,

@@ -302,6 +302,9 @@ tempkey.jwk
 /Student_MRP/
 /Scheduler/
 
+# Administrative SQL reference archive (not part of the application).
+/John Old SQL/
+
 # Local development utilities and generated previews.
 /tools/local/
 /output/

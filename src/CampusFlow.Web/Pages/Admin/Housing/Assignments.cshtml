@@ -1,0 +1,53 @@
+@page
+@model CampusFlow.Web.Pages.Admin.Housing.AssignmentsModel
+@{ ViewData["Title"] = "Housing Assignments"; }
+@section styles { <link rel="stylesheet" href="~/Pages/Admin/Housing/Assignments.css" asp-append-version="true" /> }
+@section scripts { <script src="~/Pages/Admin/Housing/Assignments.js" asp-append-version="true"></script> }
+<div id="housing-workspace">
+    @Html.AntiForgeryToken()
+    <header><p class="housing-eyebrow">HOUSING</p><h1>Housing assignments</h1>
+        <p>Plan room assignments together. Save changes here before reviewing what needs to change in Elements.</p></header>
+    <div class="alert alert-info">Draft workspace: saving does not change Elements. Live sync is not enabled yet; billing rules and assignment API behavior still need verification.</div>
+    <div id="housing-message" role="status" aria-live="polite"></div>
+    <div class="housing-toolbar">
+        <label>Housing period <select id="housing-period" class="form-select"><option value="">Choose a period</option></select></label>
+        <button id="housing-refresh" class="btn btn-outline-primary" type="button" disabled>Refresh from Elements</button>
+        <button id="housing-save" class="btn btn-primary" type="button" disabled>Save draft</button>
+        <button id="housing-preview" class="btn btn-outline-primary" type="button" disabled>Review changes</button>
+    </div>
+    <p id="housing-summary"></p>
+    <p>Rate choices and intentional-single flags are draft instructions, not imported billing amounts. Refreshed assignments start with an unreviewed rate.</p>
+    <div class="housing-toolbar">
+        <label>Filter assignments <input id="housing-filter" class="form-control" type="search" placeholder="Building, room, student, rate, or notes" /></label>
+        <button id="housing-clear" class="btn btn-outline-danger" type="button" disabled>Clear selected assignments</button>
+    </div>
+    <section id="housing-bulk" class="housing-bulk" aria-labelledby="housing-bulk-title">
+        <div><h2 id="housing-bulk-title">Bulk edit selected students</h2><p id="housing-selected-count">No students selected.</p></div>
+        <label class="housing-bulk-field"><span><input id="housing-bulk-rate-enabled" type="checkbox" /> Update rate choice</span>
+            <select id="housing-bulk-rate" class="form-select" disabled>
+                <option>Unreviewed</option><option>Standard</option><option>AIC Triple Room</option><option>Savell Triple Occupancy</option>
+            </select>
+        </label>
+        <label class="housing-bulk-field"><span><input id="housing-bulk-notes-enabled" type="checkbox" /> Update notes</span>
+            <input id="housing-bulk-notes" class="form-control" maxlength="2000" disabled />
+        </label>
+        <label class="housing-bulk-field"><span><input id="housing-bulk-single-enabled" type="checkbox" /> Update intentional single</span>
+            <select id="housing-bulk-single" class="form-select" disabled><option value="true">Yes</option><option value="false">No</option></select>
+        </label>
+        <button id="housing-bulk-apply" class="btn btn-primary" type="button" disabled>Apply to selected</button>
+    </section>
+    <div class="housing-grid" tabindex="0" aria-label="Housing assignments table">
+        <table class="table"><caption>Each empty slot represents an available bed. Choose “Assign student” to fill it.</caption>
+            <thead><tr><!th scope="col"><label class="housing-select-all"><input id="housing-select-all" type="checkbox" /> Select filtered</label></!th><!th scope="col">Building / room</!th><!th scope="col">Capacity</!th><!th scope="col">Student</!th><!th scope="col">Intentional single</!th><!th scope="col">Rate choice</!th><!th scope="col">Notes</!th></tr></thead>
+            <tbody id="housing-rows"></tbody>
+        </table>
+    </div>
+    <section id="housing-changes" hidden><h2>Change preview</h2><p>This compares the saved draft with its last refresh. A live conflict check and charge calculation are required before sync.</p><ul></ul></section>
+    <dialog id="housing-students" aria-labelledby="housing-students-title">
+        <h2 id="housing-students-title">Assign student</h2>
+        <form id="housing-search-form"><label>Student ID or name <input id="housing-search" class="form-control" minlength="2" required /></label>
+            <button class="btn btn-primary" type="submit">Search</button></form>
+        <div id="housing-search-results" aria-live="polite"></div>
+        <button id="housing-close-search" class="btn btn-outline-secondary" type="button">Close</button>
+    </dialog>
+</div>
