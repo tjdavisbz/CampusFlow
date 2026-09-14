@@ -35,7 +35,17 @@ public class CampusFlowRoleDataSeedContributor : IDataSeedContributor, ITransien
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.PaymentPlans);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Bill Approval Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.BillApproval,
-            CampusFlowPermissions.Admin.PaymentPlans);
+            CampusFlowPermissions.Admin.PaymentPlans, CampusFlowPermissions.Admin.StudentBilling,
+            CampusFlowPermissions.Admin.ResetIndividualBillApproval);
+        await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Student Billing Manager",
+            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.StudentBilling,
+            CampusFlowPermissions.Admin.PaymentPlans, CampusFlowPermissions.Admin.BillApproval,
+            CampusFlowPermissions.Admin.ResetIndividualBillApproval);
+        await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Business Services Manager",
+            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.BusinessServices,
+            CampusFlowPermissions.Admin.AddStudentMealPlan);
+        await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Housing Manager",
+            CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.HousingAssignments);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Registration Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.GlobalConfiguration,
             CampusFlowPermissions.Admin.RegistrationRules,

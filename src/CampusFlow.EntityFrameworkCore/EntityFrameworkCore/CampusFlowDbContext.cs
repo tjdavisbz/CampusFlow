@@ -45,6 +45,7 @@ public class CampusFlowDbContext :
     public DbSet<CourseSectionAttendanceTypeMapping> CourseSectionAttendanceTypeMappings { get; set; }
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
+    public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
 
     #region Entities from the modules
@@ -298,6 +299,15 @@ public class CampusFlowDbContext :
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Status, x.LastAttemptAt });
+        });
+
+        builder.Entity<HousingAssignmentDraft>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "HousingAssignmentDrafts", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.BaselineJson).IsRequired();
+            b.Property(x => x.RoomsJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.PeriodId }).IsUnique().HasFilter("\"IsDeleted\" = false");
         });
 
         builder.Entity<MealPlanConfiguration>(b =>

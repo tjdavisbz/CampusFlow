@@ -14,6 +14,10 @@
     "Permission:Admin.PaymentPlans": "Manage payment-plan configuration",
     "Permission:Admin.BillApproval": "Manage Bill Approval terms and rules",
     "Permission:Admin.RegistrationRules": "Manage course-selection terms and rules",
-    "Permission:Admin.AccessManagement": "Manage CampusFlow user access"
+    "Permission:Admin.AccessManagement": "Manage CampusFlow user access",
+    "Permission:Admin.StudentBilling": "Access Student Billing administration",
+    "Permission:Admin.StudentBilling.ResetIndividualBillApproval": "Reset an individual student's Bill Approval",
+    "Permission:Admin.BusinessServices": "Access Business Services administration",
+    "Permission:Admin.BusinessServices.AddStudentMealPlan": "Assign a student meal plan"
   }
 }

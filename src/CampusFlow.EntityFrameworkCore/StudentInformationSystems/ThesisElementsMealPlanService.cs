@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -32,7 +33,7 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
 
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
 
-    public async Task<StudentMealPlanContext> GetContextAsync(string externalStudentId,
+    public async Task<StudentMealPlanContext> GetContextAsync(string externalStudentId, int? termCalendarId = null,
         CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(externalStudentId, out var studentUid))
@@ -41,6 +42,11 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
         const string sql = """
             SELECT TOP (1) COALESCE(NULLIF(LTRIM(RTRIM(AttendanceType)), ''), 'Unknown')
             FROM dbo.CAMS_Student_View WHERE StudentUID = @StudentUID;
+
+            SELECT TermCalendarID, LTRIM(RTRIM(TextTerm)), TermStartDate, TermEndDate
+            FROM dbo.TermCalendar
+            WHERE TermEndDate >= DATEADD(month, -6, CAST(GETDATE() AS date))
+            ORDER BY Term DESC;
 
             SELECT MealPlanID, LTRIM(RTRIM(MealPlanName)),
                    COALESCE(NULLIF(LTRIM(RTRIM(PortalMealPlanDescription)), ''),
@@ -58,13 +64,47 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var attendanceType = await reader.ReadAsync(cancellationToken) ? reader.GetString(0) : "Unknown";
         await reader.NextResultAsync(cancellationToken);
+        var terms = new List<StudentMealPlanTerm>();
+        while (await reader.ReadAsync(cancellationToken))
+            terms.Add(new StudentMealPlanTerm(reader.GetInt32(0), reader.GetString(1), reader.GetDateTime(2), reader.GetDateTime(3)));
+        var selectedTermId = termCalendarId ?? terms.FirstOrDefault(x => x.StartDate <= DateTime.Today && x.EndDate >= DateTime.Today)?.TermCalendarId
+            ?? terms.FirstOrDefault()?.TermCalendarId;
+        await reader.NextResultAsync(cancellationToken);
         var plans = new List<StudentMealPlanCatalogItem>();
         while (await reader.ReadAsync(cancellationToken))
         {
             plans.Add(new StudentMealPlanCatalogItem(reader.GetInt32(0), reader.GetString(1), reader.GetString(2),
                 reader.IsDBNull(3) ? null : Convert.ToDecimal(reader.GetValue(3)), reader.GetDateTime(4), reader.GetDateTime(5)));
         }
-        return new StudentMealPlanContext(attendanceType, plans);
+        var housingStatuses = new List<StudentHousingStatusOption>();
+        int? currentHousingStatusId = null;
+        if (selectedTermId.HasValue)
+        {
+            var status = await GetStudentStatusContextAsync(studentUid, selectedTermId.Value, cancellationToken);
+            housingStatuses = status.Options;
+            currentHousingStatusId = status.CurrentId;
+        }
+        return new StudentMealPlanContext(attendanceType, plans, terms, selectedTermId, housingStatuses,
+            currentHousingStatusId);
+    }
+
+    public async Task UpdateHousingStatusAsync(string externalStudentId, int termCalendarId, int housingStatusId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!int.TryParse(externalStudentId, out var studentUid))
+            throw new ArgumentException("The Thesis Elements student identifier is invalid.", nameof(externalStudentId));
+        var context = await GetStudentStatusContextAsync(studentUid, termCalendarId, cancellationToken);
+        if (context.Options.All(x => x.Id != housingStatusId))
+            throw new InvalidOperationException("The selected housing status is not valid for this student and term.");
+        var status = context.RegisterStatus ?? throw new InvalidOperationException("Elements returned no student-status record.");
+        status["residentCommuterID"] = housingStatusId;
+        var token = await GetTokenAsync(cancellationToken);
+        using var request = CreateRequest(HttpMethod.Put, "/api/academic/register/student-status", token, "Registration");
+        request.Content = new StringContent(BuildUpdateStudentStatus(status).ToJsonString(), Encoding.UTF8, "application/json");
+        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode || JsonNode.Parse(body)?["isSuccess"]?.GetValue<bool>() != true)
+            throw new InvalidOperationException($"Elements housing-status update failed ({(int)response.StatusCode}).");
     }
 
     public async Task AssignAsync(string externalStudentId, int mealPlanId,
@@ -102,12 +142,43 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
         return token;
     }
 
-    private HttpRequestMessage CreateRequest(HttpMethod method, string route, string token)
+    private async Task<(List<StudentHousingStatusOption> Options, int? CurrentId, JsonObject? RegisterStatus)>
+        GetStudentStatusContextAsync(int studentUid, int termCalendarId, CancellationToken cancellationToken)
+    {
+        var token = await GetTokenAsync(cancellationToken);
+        using var request = CreateRequest(HttpMethod.Get,
+            $"/api/academic/register/student-status-select-items/{termCalendarId}/{studentUid}", token, "Registration");
+        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Elements could not load housing choices.");
+        var data = JsonNode.Parse(body)?["data"]?.AsObject()
+            ?? throw new InvalidOperationException("Elements returned no student-status choices.");
+        var options = data["commuters"]?.AsArray().Select(x => new StudentHousingStatusOption(
+            x?["uniqueId"]?.GetValue<int>() ?? 0, x?["displayText"]?.GetValue<string>() ?? string.Empty))
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Name)).ToList() ?? [];
+        var registerStatus = data["registerStatus"]?.AsObject();
+        return (options, registerStatus?["residentCommuterID"]?.GetValue<int>(), registerStatus);
+    }
+
+    private static JsonObject BuildUpdateStudentStatus(JsonObject source)
+    {
+        string[] names = ["studentStatusID", "termCalendarID", "statEffectiveDate", "enrollmentStatusID",
+            "academicStatusID", "registrationStatusID", "campusID", "alert", "collegeLevelID", "studentLevel",
+            "costTypeID", "refundTypeID", "ftptStatusID", "maxAllowedHours", "financialAid", "residentCommuterID",
+            "gpaGroupingID", "cohortGroupID", "classificationID", "vocationID", "chargeInsurance", "gradecatalogID",
+            "nonStateReporting", "degreeSeeking", "lastDateOfAttendance", "institutionalSAPID", "studentWorker",
+            "governmentalSAPID", "commentPosition", "transcriptComment", "leaveOfAbsence", "leaveOfAbsenceDue"];
+        var result = new JsonObject();
+        foreach (var name in names) result[name] = source[name]?.DeepClone();
+        return result;
+    }
+
+    private HttpRequestMessage CreateRequest(HttpMethod method, string route, string token, string module = "StudentLife")
     {
         var tenantHost = Setting("TenantHost").TrimEnd('/');
         var request = new HttpRequestMessage(method, $"{Setting("RegistrationBaseUrl").TrimEnd('/')}/{route.TrimStart('/')}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.Add("Module", "StudentLife");
+        request.Headers.Add("Module", module);
         request.Headers.Add("TenantHost", tenantHost);
         request.Headers.Add("Origin", $"https://{tenantHost}");
         request.Headers.Referrer = new Uri($"https://{tenantHost}");
