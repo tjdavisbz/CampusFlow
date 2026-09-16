@@ -190,7 +190,7 @@ ClientBin/
 *.dbproj.schemaview
 *.pfx
 *.publishsettings
-node_modules/
+node_modules
 orleans.codegen.cs
 
 # Local ABP configuration containing developer secrets
