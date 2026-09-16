@@ -19,6 +19,7 @@ using CampusFlow.BillApprovals;
 using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
 using CampusFlow.Payments;
+using CampusFlow.Reporting;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -47,6 +48,7 @@ public class CampusFlowDbContext :
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
+    public DbSet<TexasCountryCode> TexasCountryCodes { get; set; }
 
     #region Entities from the modules
 
@@ -335,6 +337,15 @@ public class CampusFlowDbContext :
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.TermName }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.SyncedToStudentInformationSystem, x.SubmittedAt });
+        });
+
+        builder.Entity<TexasCountryCode>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "TexasCountryCodes", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+            b.Property(x => x.Abbreviation).IsRequired().HasMaxLength(3);
+            b.HasIndex(x => x.Name).IsUnique();
         });
 
         //builder.Entity<YourEntity>(b =>
