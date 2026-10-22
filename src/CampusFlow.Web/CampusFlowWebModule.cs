@@ -65,6 +65,7 @@ using CampusFlow.Web.Portals;
 using CampusFlow.Branding;
 using CampusFlow.Web.Branding;
 using CampusFlow.Web.Observability;
+using CampusFlow.Web.Maintenance;
 using CampusFlow.Students;
 
 namespace CampusFlow.Web;
@@ -139,6 +140,8 @@ public class CampusFlowWebModule : AbpModule
         context.Services.AddHttpClient<IPayflowGateway, PayflowGateway>(client =>
             client.Timeout = TimeSpan.FromSeconds(30));
         context.Services.AddHttpContextAccessor();
+        context.Services.Configure<MaintenanceModeOptions>(
+            configuration.GetSection(MaintenanceModeOptions.SectionName));
         context.Services.Configure<PerformanceLoggingOptions>(
             configuration.GetSection(PerformanceLoggingOptions.SectionName));
         context.Services.AddSingleton<DependencyPerformanceListener>();
@@ -396,6 +399,7 @@ public class CampusFlowWebModule : AbpModule
 
         app.UseCorrelationId();
         app.UseRouting();
+        app.UseMiddleware<MaintenanceModeMiddleware>();
         app.Use(async (httpContext, next) =>
         {
             var isLegacyLoginPage = httpContext.Request.Path.Equals(
