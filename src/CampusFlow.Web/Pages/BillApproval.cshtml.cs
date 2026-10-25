@@ -145,7 +145,10 @@ public class BillApprovalModel : CampusFlowPageModel
     public string InitialStep { get; private set; } = "review";
     public string InitialPaymentChoice { get; private set; } = "PayNow";
     public bool IsPayflowTestMode => _payflowOptions.TestMode;
+    public decimal ConvenienceFeePercent => _payflowOptions.ConvenienceFeeRate * 100m;
     public decimal DeferredDueToday => PaymentPlan?.Installments.FirstOrDefault()?.Amount ?? 0m;
+    public decimal ConvenienceFee(decimal amount) => _payflowOptions.CalculateConvenienceFee(amount);
+    public decimal TotalCardCharge(decimal amount) => amount + ConvenienceFee(amount);
     public decimal TotalCredits => Courses.Sum(x => x.Credits);
     public decimal ChargesTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Debit);
     public decimal CreditsTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Credit);
@@ -303,14 +306,16 @@ public class BillApprovalModel : CampusFlowPageModel
             return Page();
         }
         var id = _guidGenerator.Create();
+        var convenienceFee = _payflowOptions.CalculateConvenienceFee(amount);
+        var totalCharge = amount + convenienceFee;
         var payment = new PayflowPayment(id, CurrentTenant.Id, CurrentUser.Id.Value, profile.Id,
-            profile.ExternalStudentId, amount, _payflowOptions.Currency, Guid.NewGuid().ToString("N"),
+            profile.ExternalStudentId, amount, convenienceFee, _payflowOptions.Currency, Guid.NewGuid().ToString("N"),
             _payflowOptions.TestMode);
         await _payflowPayments.InsertAsync(payment, autoSave: true);
         try
         {
             var number = Regex.Replace(PaymentCardNumber, @"[\s-]", string.Empty);
-            var response = await _payflowGateway.SaleAsync(amount, $"CF{id:N}"[..20],
+            var response = await _payflowGateway.SaleAsync(totalCharge, $"CF{id:N}"[..20],
                 new PayflowCard(number, PaymentExpirationMonth, PaymentExpirationYear,
                     PaymentSecurityCode, PaymentPostalCode), HttpContext.RequestAborted);
             payment.Complete(response.IsDirectSaleApproved, response.Result, response.Message, response.Reference);
@@ -331,9 +336,10 @@ public class BillApprovalModel : CampusFlowPageModel
             {
                 var postingService = _paymentPostingServices.Single(x => x.Provider == profile.Provider);
                 var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId, amount,
-                    response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
+                    convenienceFee, response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
                     HttpContext.RequestAborted);
-                payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId);
+                payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId,
+                    posting.ConvenienceFeeBillingBatchId);
                 await _payflowPayments.UpdateAsync(payment, autoSave: true);
             }
             catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -346,10 +352,10 @@ public class BillApprovalModel : CampusFlowPageModel
             }
 
             StatusMessage = accountUpdatePending
-                ? $"Your payment of {Currency(amount)} was received. Your student account is still updating, but you can continue reviewing the agreement."
+                ? $"Your card charge of {Currency(totalCharge)} ({Currency(amount)} payment plus {Currency(convenienceFee)} convenience fee) was received. Your student account is still updating, but you can continue reviewing the agreement."
                 : isDeferredPayment
-                    ? $"Your payment-plan amount of {Currency(amount)} due today was received. You can now review and record your agreement."
-                    : $"Your payment of {Currency(amount)} was received. You can now review and record your agreement.";
+                    ? $"Your payment-plan card charge of {Currency(totalCharge)} ({Currency(amount)} payment plus {Currency(convenienceFee)} convenience fee) was received. You can now review and record your agreement."
+                    : $"Your card charge of {Currency(totalCharge)} ({Currency(amount)} payment plus {Currency(convenienceFee)} convenience fee) was received. You can now review and record your agreement.";
             ClearPaymentFields();
             return RedirectToPage(new { term, step = "agreement", choice = isDeferredPayment ? "Deferred" : "PayNow" });
         }

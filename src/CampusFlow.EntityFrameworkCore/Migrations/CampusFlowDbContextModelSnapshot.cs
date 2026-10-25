@@ -1549,6 +1549,10 @@ namespace CampusFlow.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal>("ConvenienceFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -1581,6 +1585,9 @@ namespace CampusFlow.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int?>("ElementsBillingBatchId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ElementsFeeBillingBatchId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("ElementsPostedAt")

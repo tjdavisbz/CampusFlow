@@ -12,6 +12,16 @@ namespace CampusFlow.Payments;
 
 public class PayflowGatewayTests
 {
+    [Theory]
+    [InlineData(100, 2.85)]
+    [InlineData(692.12, 19.73)]
+    [InlineData(57.80, 1.65)]
+    public void Convenience_fee_matches_legacy_rounding(double payment, double expectedFee)
+    {
+        var options = new PayflowOptions { ConvenienceFeeRate = 0.0285m };
+        options.CalculateConvenienceFee((decimal)payment).ShouldBe((decimal)expectedFee);
+    }
+
     [Fact]
     public void Parses_length_tagged_and_encoded_nvp_response()
     {

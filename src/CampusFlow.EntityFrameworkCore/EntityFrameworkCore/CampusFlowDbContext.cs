@@ -125,6 +125,7 @@ public class CampusFlowDbContext :
             b.ConfigureByConvention();
             b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
             b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.ConvenienceFee).HasPrecision(18, 2);
             b.Property(x => x.Currency).IsRequired().HasMaxLength(3);
             b.Property(x => x.SecureTokenId).IsRequired().HasMaxLength(36);
             b.Property(x => x.SecureToken).HasMaxLength(256);
