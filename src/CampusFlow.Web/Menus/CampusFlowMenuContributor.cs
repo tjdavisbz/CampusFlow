@@ -104,8 +104,7 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(advisor);
         }
 
-        var impersonationAccess = context.ServiceProvider.GetRequiredService<StudentImpersonationAccessService>();
-        var canImpersonate = await impersonationAccess.EnsureAccessAsync();
+        var canImpersonate = await context.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
         var canManagePlans = await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
