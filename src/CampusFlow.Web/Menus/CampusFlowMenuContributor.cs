@@ -13,6 +13,7 @@ using Volo.Abp.Users;
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using CampusFlow.Web.Portals;
 namespace CampusFlow.Web.Menus;
 public class CampusFlowMenuContributor : IMenuContributor
@@ -29,6 +30,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var l = context.GetLocalizer<CampusFlowResource>();
         var currentUser = context.ServiceProvider.GetRequiredService<ICurrentUser>();
         var currentStudentView = context.ServiceProvider.GetRequiredService<ICurrentStudentView>();
+        var facultyReader = context.ServiceProvider.GetRequiredService<FacultyPortalReader>();
         var hasStudentProfile = await currentStudentView.GetProfileAsync() is not null;
 
         if (hasStudentProfile)
@@ -104,6 +106,36 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(advisor);
         }
 
+        var hasFacultyAccess = false;
+        var httpContext = context.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>().HttpContext;
+        var viewedFacultyId = httpContext is null ? null : FacultyViewSession.GetFacultyId(httpContext);
+        if (!currentStudentView.IsImpersonating && currentUser.IsAuthenticated)
+        {
+            try
+            {
+                hasFacultyAccess = viewedFacultyId.HasValue
+                    ? await facultyReader.FindByIdAsync(viewedFacultyId.Value, default) is not null
+                    : await facultyReader.FindFacultyAsync(currentUser.Email, default) is not null;
+            }
+            catch (Exception exception)
+            {
+                context.ServiceProvider.GetRequiredService<ILogger<CampusFlowMenuContributor>>()
+                    .LogWarning(exception, "Unable to check faculty portal access for the menu.");
+            }
+        }
+        if (hasFacultyAccess)
+        {
+            var faculty = new ApplicationMenuItem("CampusFlow.Faculty", "Faculty", icon: "fa fa-chalkboard-user", order: 2);
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.home", "Home", "~/Faculty", icon: "fa fa-home", order: 1));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.students", "My Students", "~/Faculty/students", icon: "fa fa-users", order: 2));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.schedule", "My Schedule", "~/Faculty/schedule", icon: "fa fa-calendar-days", order: 3));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.roster", "Class Roster", "~/Faculty/roster", icon: "fa fa-list", order: 4));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.courses", "My Courses", "~/Faculty/courses", icon: "fa fa-book", order: 5));
+            if (!viewedFacultyId.HasValue)
+                faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.email", "Email Students", "~/Faculty/email", icon: "fa fa-envelope", order: 6));
+            context.Menu.AddItem(faculty);
+        }
+
         var canImpersonate = await context.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
         var canManagePlans = await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
@@ -163,8 +195,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AdvisorVisibility, "Advisor Assignments",
                     "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 3));
             if (canImpersonate)
+            {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
                     "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 7));
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateFaculty, "Impersonate Faculty",
+                    "~/Admin/ImpersonateFaculty", icon: "fa fa-chalkboard-user", order: 8));
+            }
             context.Menu.AddItem(admin);
         }
         //Administration

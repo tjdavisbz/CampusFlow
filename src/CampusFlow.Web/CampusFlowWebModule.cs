@@ -449,6 +449,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseDynamicClaims();
         app.UseAuthorization();
         app.UseMiddleware<StudentViewContextMiddleware>();
+        app.UseMiddleware<FacultyViewContextMiddleware>();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {

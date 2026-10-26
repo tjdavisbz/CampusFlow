@@ -1,0 +1,108 @@
+@page "/Faculty/email"
+@model CampusFlow.Web.Pages.Faculty.EmailStudentsModel
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Email Students";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = "CampusFlow.Faculty.email";
+}
+
+@section styles { <abp-style src="/Pages/Faculty/Faculty.css" /> }
+@section scripts { <abp-script src="/Pages/Faculty/EmailStudents.js" /> }
+
+<main class="faculty-shell">
+    <header class="faculty-hero"><span>Faculty portal</span><h1>Email Students</h1><p>Send a course message from your Microsoft mailbox.</p></header>
+    <nav class="faculty-tabs" aria-label="Faculty pages">
+        <a href="/Faculty?term=@Model.SelectedTerm?.Id">Home</a>
+        <a href="/Faculty/students?term=@Model.SelectedTerm?.Id">My Students</a>
+        <a href="/Faculty/schedule?term=@Model.SelectedTerm?.Id">My Schedule</a>
+        <a href="/Faculty/roster?term=@Model.SelectedTerm?.Id">Class Roster</a>
+        <a href="/Faculty/courses?term=@Model.SelectedTerm?.Id">My Courses</a>
+        <a class="active" href="/Faculty/email?term=@Model.SelectedTerm?.Id">Email Students</a>
+    </nav>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Notice))
+    {
+        <div class="faculty-card" role="status">@Model.Notice</div>
+    }
+
+    <section class="faculty-card">
+        <h2>Choose a class</h2>
+        <form method="get" class="faculty-course-select">
+            <label for="email-term">Term</label>
+            <select id="email-term" name="term" onchange="this.form.submit()">
+                @foreach (var option in Model.Terms)
+                {
+                    <option value="@option.Id" selected="@(option.Id == Model.SelectedTerm?.Id)">@option.Name</option>
+                }
+            </select>
+            <label for="email-course">Course</label>
+            <select id="email-course" name="course" onchange="this.form.submit()">
+                @foreach (var option in Model.Courses)
+                {
+                    <option value="@option.OfferId" selected="@(option.OfferId == Model.SelectedCourse?.OfferId)">@option.Code · @option.Name</option>
+                }
+            </select>
+            <noscript><button type="submit">Show class</button></noscript>
+        </form>
+    </section>
+
+    @if (Model.SelectedCourse is null)
+    {
+        <section class="faculty-card"><p>No courses are assigned to you for this term.</p></section>
+    }
+    else
+    {
+        @if (!Model.MailConnected)
+        {
+            <section class="faculty-card">
+                <h2>Email is temporarily unavailable</h2>
+                <p>Microsoft sign-in did not complete. You can try again; if it keeps happening, contact Nelson IT.</p>
+                <form method="post" asp-page-handler="Connect">
+                    <input type="hidden" name="Term" value="@Model.SelectedTerm?.Id" />
+                    <input type="hidden" name="Course" value="@Model.SelectedCourse.OfferId" />
+                    <button type="submit" class="faculty-primary">Try Microsoft sign-in again</button>
+                </form>
+            </section>
+        }
+        <section class="faculty-card">
+            <h2>Compose message · @Model.SelectedCourse.Code</h2>
+            <p>Only registered students in this class are listed. Recipients are placed in Bcc so they cannot see one another's addresses. You receive a copy.</p>
+            <div asp-validation-summary="All" class="faculty-errors" role="alert"></div>
+            <form method="post">
+                <input type="hidden" name="Term" value="@Model.SelectedTerm?.Id" />
+                <input type="hidden" name="Course" value="@Model.SelectedCourse.OfferId" />
+                <fieldset class="faculty-recipient-list">
+                    <legend>Students (@Model.Roster.Count)</legend>
+                    @if (Model.Roster.Count > 0)
+                    {
+                        <label class="faculty-select-all"><input type="checkbox" id="faculty-select-all" /> <span>Select all available students (up to 100)</span></label>
+                    }
+                    @if (Model.Roster.Count == 0)
+                    {
+                        <p>No registered students are in this class.</p>
+                    }
+                    @foreach (var student in Model.Roster)
+                    {
+                        <label><input type="checkbox" name="StudentUids" value="@student.StudentUid" checked="@Model.StudentUids.Contains(student.StudentUid)" disabled="@(string.IsNullOrWhiteSpace(student.Email))" />
+                            <span>@student.Name</span><small>@(string.IsNullOrWhiteSpace(student.Email) ? "No active local email" : student.Email)</small>
+                        </label>
+                    }
+                </fieldset>
+                <div class="faculty-field"><label asp-for="Subject">Subject</label><input asp-for="Subject" maxlength="200" /></div>
+                <div class="faculty-field"><label asp-for="Body">Message</label><textarea asp-for="Body" rows="10" maxlength="10000"></textarea></div>
+                <button type="submit" asp-page-handler="Preview" class="faculty-primary" disabled="@(!Model.MailConnected)">Review recipients and message</button>
+                @if (Model.PreviewReady)
+                {
+                    <div class="faculty-send-preview" role="status">
+                        <h3>Ready to send</h3>
+                        <p>@Model.RecipientCount students in @Model.SelectedCourse.Code will receive this message. Check the subject and message above, then confirm.</p>
+                        <button type="submit" asp-page-handler="Send" class="faculty-primary">Send email now</button>
+                    </div>
+                }
+            </form>
+        </section>
+    }
+</main>

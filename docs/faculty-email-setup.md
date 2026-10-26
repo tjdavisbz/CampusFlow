@@ -1,0 +1,9 @@
+# Faculty Email Students
+
+The faculty `Email Students` page uses Microsoft Graph `POST /me/sendMail` with delegated `Mail.Send`. It sends a plain-text message to the faculty member and Bccs the selected registered students. Graph saves the message to Sent Items. A 202 response means accepted, not delivered.
+
+Before enabling in production, confirm that the Entra app configured under `MicrosoftIdentity` permits delegated Microsoft Graph `Mail.Send` and `offline_access`. If user consent is restricted, an Entra administrator must grant the mail permission to the app. No additional redirect URI is needed: the existing `/signin-oidc` callback is used. The selected faculty member must have a linked `MicrosoftEntra` login and an Exchange Online mailbox. On the first visit, CampusFlow redirects to Microsoft automatically; after consent, the faculty member returns to the email form. If authorization expires or is revoked, this automatic flow repeats.
+
+Recipients are resolved at send time from the selected faculty's Elements course roster and each student's active Local address email. The message is limited to 100 students, and the server checks the course assignment, selection, email addresses, and preview before calling Graph. Read-only faculty impersonation cannot authorize or send. Access and refresh tokens are data-protected before being stored in CampusFlow's existing per-user authentication-token table; they never enter browser cookies, page markup, or logs. CampusFlow silently renews short-lived access tokens and replaces rotated refresh tokens.
+
+After deployment, test with a faculty account and a small class: visit Email Students, preview one selected student, send a harmless test, verify the sender's Sent Items, and confirm receipt. Revisit after the access token expires to verify silent renewal. If the consent prompt is blocked, grant delegated `Mail.Send` in the Entra app registration and retry.
