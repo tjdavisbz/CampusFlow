@@ -12,7 +12,10 @@ public class LegacyPortalHomeRedirectMiddlewareTests
     [InlineData("GET", "/index.asp")]
     [InlineData("GET", "/INDEX.ASP")]
     [InlineData("HEAD", "/index.asp")]
-    public async Task Legacy_Home_Should_Redirect_Without_Old_Query_Parameters(string method, string path)
+    [InlineData("GET", "/login.asp")]
+    [InlineData("GET", "/LOGIN.ASP")]
+    [InlineData("HEAD", "/login.asp")]
+    public async Task Legacy_Home_And_Login_Should_Redirect_Without_Old_Query_Parameters(string method, string path)
     {
         var continued = false;
         var middleware = new LegacyPortalHomeRedirectMiddleware(_ =>
@@ -34,6 +37,7 @@ public class LegacyPortalHomeRedirectMiddlewareTests
 
     [Theory]
     [InlineData("POST", "/index.asp")]
+    [InlineData("POST", "/login.asp")]
     [InlineData("GET", "/other.asp")]
     public async Task Other_Requests_Should_Continue(string method, string path)
     {

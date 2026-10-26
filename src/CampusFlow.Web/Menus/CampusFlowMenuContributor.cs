@@ -31,7 +31,8 @@ public class CampusFlowMenuContributor : IMenuContributor
         var currentUser = context.ServiceProvider.GetRequiredService<ICurrentUser>();
         var currentStudentView = context.ServiceProvider.GetRequiredService<ICurrentStudentView>();
         var facultyReader = context.ServiceProvider.GetRequiredService<FacultyPortalReader>();
-        var hasStudentProfile = await currentStudentView.GetProfileAsync() is not null;
+        var studentProfile = await currentStudentView.GetProfileAsync();
+        var hasStudentProfile = studentProfile is not null;
 
         if (hasStudentProfile)
         {
@@ -86,6 +87,18 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 7
             )
             );
+            if (!currentStudentView.IsImpersonating &&
+                studentProfile?.Provider == CampusFlow.StudentInformationSystems.StudentInformationSystemProvider.ThesisElements &&
+                string.Equals(context.ServiceProvider.GetRequiredService<Volo.Abp.MultiTenancy.ICurrentTenant>().Name,
+                    "nelson", StringComparison.OrdinalIgnoreCase))
+            {
+                student.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.PrivacyPasswords,
+                    "FERPA / Privacy Passwords",
+                    "~/PrivacyPasswords",
+                    icon: "fa fa-lock",
+                    order: 8));
+            }
             context.Menu.AddItem(student);
         }
 
