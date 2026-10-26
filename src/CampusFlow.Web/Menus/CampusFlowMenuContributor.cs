@@ -118,8 +118,12 @@ public class CampusFlowMenuContributor : IMenuContributor
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
             if (canManageGlobalConfiguration)
+            {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.GlobalConfiguration, "Global Configuration",
                     "~/Admin/GlobalConfiguration", icon: "fa fa-globe", order: 1));
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.Announcements, "Announcements",
+                    "~/Admin/Announcements", icon: "fa fa-bullhorn", order: 2));
+            }
             var studentBilling = new ApplicationMenuItem(CampusFlowMenus.StudentBillingAdmin, "Student Billing",
                 icon: "fa fa-file-invoice-dollar", order: 4);
             if (canManagePlans)

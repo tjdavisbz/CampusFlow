@@ -19,6 +19,7 @@ using CampusFlow.BillApprovals;
 using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
 using CampusFlow.Payments;
+using CampusFlow.Announcements;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -47,6 +48,7 @@ public class CampusFlowDbContext :
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
+    public DbSet<PortalAnnouncement> PortalAnnouncements { get; set; }
 
     #region Entities from the modules
 
@@ -146,6 +148,16 @@ public class CampusFlowDbContext :
             b.Property(x => x.AllowedMergeFieldsJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<PortalAnnouncement>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "PortalAnnouncements", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Title).IsRequired().HasMaxLength(160);
+            b.Property(x => x.ContentHtml).IsRequired();
+            b.Property(x => x.TermsJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.IsPublished, x.StartsAtUtc, x.EndsAtUtc });
         });
 
         builder.Entity<PaymentPlanPolicy>(b =>
