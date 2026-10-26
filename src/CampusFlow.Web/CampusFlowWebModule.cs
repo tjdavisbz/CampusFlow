@@ -398,6 +398,7 @@ public class CampusFlowWebModule : AbpModule
         }
 
         app.UseCorrelationId();
+        app.UseMiddleware<LegacyPortalHomeRedirectMiddleware>();
         app.UseRouting();
         app.UseMiddleware<MaintenanceModeMiddleware>();
         app.Use(async (httpContext, next) =>
