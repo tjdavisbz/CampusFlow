@@ -103,6 +103,7 @@ public class CheckoutModel : CampusFlowPageModel
             var number = Regex.Replace(CardNumber, @"[\s-]", string.Empty);
             var response = await _gateway.SaleAsync(totalCharge, $"CF{id:N}"[..20],
                 new PayflowCard(number, ExpirationMonth, ExpirationYear, SecurityCode, PostalCode),
+                new PayflowCustomer(profile.StudentId, profile.FirstName, profile.LastName),
                 HttpContext.RequestAborted);
             _logger.LogInformation(
                 "Payflow sale completed for payment {PaymentId}. Result={GatewayResult}, Message={GatewayMessage}, Reference={GatewayReference}",

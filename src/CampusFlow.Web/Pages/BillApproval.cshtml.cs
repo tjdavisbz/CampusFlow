@@ -317,7 +317,9 @@ public class BillApprovalModel : CampusFlowPageModel
             var number = Regex.Replace(PaymentCardNumber, @"[\s-]", string.Empty);
             var response = await _payflowGateway.SaleAsync(totalCharge, $"CF{id:N}"[..20],
                 new PayflowCard(number, PaymentExpirationMonth, PaymentExpirationYear,
-                    PaymentSecurityCode, PaymentPostalCode), HttpContext.RequestAborted);
+                    PaymentSecurityCode, PaymentPostalCode),
+                new PayflowCustomer(profile.StudentId, profile.FirstName, profile.LastName),
+                HttpContext.RequestAborted);
             payment.Complete(response.IsDirectSaleApproved, response.Result, response.Message, response.Reference);
             await _payflowPayments.UpdateAsync(payment, autoSave: true);
             _logger.LogInformation(

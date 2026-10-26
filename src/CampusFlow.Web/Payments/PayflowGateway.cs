@@ -20,9 +20,11 @@ public sealed record PayflowResponse(int Result, int? OriginalResult, string? Me
 public sealed record PayflowCard(string Number, int ExpirationMonth, int ExpirationYear, string SecurityCode,
     string? PostalCode);
 
+public sealed record PayflowCustomer(string StudentId, string FirstName, string LastName);
+
 public interface IPayflowGateway
 {
-    Task<PayflowResponse> SaleAsync(decimal amount, string invoiceNumber, PayflowCard card,
+    Task<PayflowResponse> SaleAsync(decimal amount, string invoiceNumber, PayflowCard card, PayflowCustomer customer,
         CancellationToken cancellationToken);
 }
 
@@ -30,7 +32,7 @@ public sealed class PayflowGateway(HttpClient client, IOptions<PayflowOptions> o
 {
     private readonly PayflowOptions _options = options.Value;
 
-    public Task<PayflowResponse> SaleAsync(decimal amount, string invoiceNumber, PayflowCard card,
+    public Task<PayflowResponse> SaleAsync(decimal amount, string invoiceNumber, PayflowCard card, PayflowCustomer customer,
         CancellationToken cancellationToken)
     {
         var expirationYear = card.ExpirationYear % 100;
@@ -41,12 +43,22 @@ public sealed class PayflowGateway(HttpClient client, IOptions<PayflowOptions> o
             ["AMT"] = amount.ToString("0.00", CultureInfo.InvariantCulture),
             ["CURRENCY"] = _options.Currency,
             ["INVNUM"] = invoiceNumber,
+            ["COMMENT1"] = FormatStudentComment(customer),
+            ["CUSTREF"] = customer.StudentId.Trim(),
             ["ACCT"] = card.Number,
             ["EXPDATE"] = $"{card.ExpirationMonth:00}{expirationYear:00}",
             ["CVV2"] = card.SecurityCode
         };
         if (!string.IsNullOrWhiteSpace(card.PostalCode)) values["ZIP"] = card.PostalCode.Trim();
         return SendAsync(values, cancellationToken);
+    }
+
+    private static string FormatStudentComment(PayflowCustomer customer)
+    {
+        var studentId = customer.StudentId.Trim();
+        var name = $"{customer.LastName.Trim()}, {customer.FirstName.Trim()}";
+        var maximumNameLength = Math.Max(0, 128 - studentId.Length - 1);
+        return $"{name[..Math.Min(name.Length, maximumNameLength)]} {studentId}".Trim();
     }
 
     private async Task<PayflowResponse> SendAsync(Dictionary<string, string> values, CancellationToken cancellationToken)

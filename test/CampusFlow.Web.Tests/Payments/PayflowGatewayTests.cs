@@ -42,7 +42,8 @@ public class PayflowGatewayTests
         var gateway = new PayflowGateway(new HttpClient(handler), options);
 
         var response = await gateway.SaleAsync(20m, "CF123",
-            new PayflowCard("4111111111111111", 8, 2030, "123", "75165"), CancellationToken.None);
+            new PayflowCard("4111111111111111", 8, 2030, "123", "75165"),
+            new PayflowCustomer("20000041293", "Jane", "Doe"), CancellationToken.None);
 
         response.IsDirectSaleApproved.ShouldBeTrue();
         handler.Body.ShouldContain("TRXTYPE[1]=S");
@@ -50,6 +51,8 @@ public class PayflowGatewayTests
         handler.Body.ShouldContain("EXPDATE[4]=0830");
         handler.Body.ShouldContain("CVV2[3]=123");
         handler.Body.ShouldContain("PARTNER[6]=PayPal");
+        handler.Body.ShouldContain("COMMENT1[21]=Doe, Jane 20000041293");
+        handler.Body.ShouldContain("CUSTREF[11]=20000041293");
     }
 
     private sealed class RecordingHandler(string responseBody) : HttpMessageHandler
