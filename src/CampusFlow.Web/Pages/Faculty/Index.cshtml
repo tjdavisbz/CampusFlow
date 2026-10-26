@@ -1,5 +1,6 @@
 @page "/Faculty/{view?}"
 @model CampusFlow.Web.Pages.Faculty.IndexModel
+@using CampusFlow.Web.Pages.Faculty
 @using CampusFlow.Web.Menus
 @using CampusFlow.Web.Announcements
 @using Volo.Abp.AspNetCore.Mvc.UI.Layout
@@ -22,6 +23,10 @@
         <a class="@(Model.ViewName == "schedule" ? "active" : "")" href="/Faculty/schedule?term=@Model.SelectedTerm?.Id">My Schedule</a>
         <a class="@(Model.ViewName == "roster" ? "active" : "")" href="/Faculty/roster?term=@Model.SelectedTerm?.Id">Class Roster</a>
         <a class="@(Model.ViewName == "courses" ? "active" : "")" href="/Faculty/courses?term=@Model.SelectedTerm?.Id">My Courses</a>
+        @if (Model.HasAdvisingAccess)
+        {
+            <a href="/Faculty/advising?term=@Model.SelectedTerm?.Id">My Advisees</a>
+        }
         @if (!CampusFlow.Web.Portals.FacultyViewSession.GetFacultyId(ViewContext.HttpContext).HasValue)
         {
             <a href="/Faculty/email?term=@Model.SelectedTerm?.Id">Email Students</a>
@@ -58,7 +63,7 @@
         </section>
         <section class="faculty-card"><h2>Upcoming classes</h2>
             @if (Model.Meetings.Count == 0) { <p>No class meetings are listed for this term.</p> }
-            else { <ul class="faculty-meetings">@foreach (var meeting in Model.Meetings.Take(8)) { <li><strong>@meeting.CourseCode</strong><span>@meeting.Days · @meeting.StartsAt?.ToString(@"hh\:mm")–@meeting.EndsAt?.ToString(@"hh\:mm")</span></li> }</ul> }
+            else { <ul class="faculty-meetings">@foreach (var meeting in Model.Meetings.Take(8)) { <li><strong>@meeting.CourseCode @meeting.Section</strong><span>@meeting.Days · @IndexModel.FormatTime(meeting.StartsAt)–@IndexModel.FormatTime(meeting.EndsAt)</span></li> }</ul> }
         </section>
     }
     else if (Model.ViewName == "courses")
@@ -75,7 +80,7 @@
         <section class="faculty-card"><h2>Class meetings · @Model.SelectedTerm.Name</h2>
             @if (Model.Meetings.Count == 0) { <p>No class meetings are listed for this term.</p> }
             else { <div class="faculty-table-wrap"><table><thead><tr><th>Course</th><th>Days</th><th>Begins</th><th>Ends</th></tr></thead><tbody>
-            @foreach (var meeting in Model.Meetings) { <tr><td><strong>@meeting.CourseCode</strong></td><td>@(meeting.Days ?? "Not scheduled")</td><td>@meeting.StartsAt?.ToString(@"hh\:mm")</td><td>@meeting.EndsAt?.ToString(@"hh\:mm")</td></tr> }
+            @foreach (var meeting in Model.Meetings) { <tr><td><strong>@meeting.CourseCode @meeting.Section</strong></td><td>@(meeting.Days ?? "Not scheduled")</td><td>@IndexModel.FormatTime(meeting.StartsAt)</td><td>@IndexModel.FormatTime(meeting.EndsAt)</td></tr> }
             </tbody></table></div> }
         </section>
     }
@@ -85,7 +90,7 @@
             @{ var groupedStudents = Model.Students.GroupBy(x => x.StudentUid).OrderBy(x => x.First().Name).ToArray(); }
             @if (groupedStudents.Length == 0) { <p>No registered students are in your courses for this term.</p> }
             else { <div class="faculty-table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Courses with you</th></tr></thead><tbody>
-            @foreach (var student in groupedStudents) { <tr><td><strong>@student.First().Name</strong></td><td>@student.First().StudentId</td><td>@string.Join(", ", student.Select(x => x.CourseCode).Distinct())</td></tr> }
+            @foreach (var student in groupedStudents) { <tr><td><strong>@student.First().Name</strong></td><td>@student.First().StudentId</td><td>@string.Join(", ", student.Select(x => $"{x.CourseCode} {x.Section}".Trim()).Distinct())</td></tr> }
             </tbody></table></div> }
         </section>
     }
@@ -99,7 +104,7 @@
                 var selectedCourse = Model.Courses.FirstOrDefault(x => x.OfferId == requestedCourse) ?? Model.Courses[0];
                 var roster = Model.Students.Where(x => x.OfferId == selectedCourse.OfferId).ToArray();
                 <form method="get" class="faculty-course-select"><label for="roster-course">Course</label><select id="roster-course" name="course" onchange="this.form.submit()">
-                    @foreach (var option in Model.Courses) { <option value="@option.OfferId" selected="@(option.OfferId == selectedCourse.OfferId)">@option.Code · @option.Name</option> }
+                    @foreach (var option in Model.Courses) { <option value="@option.OfferId" selected="@(option.OfferId == selectedCourse.OfferId)">@option.Code @option.Section · @option.Name</option> }
                 </select><input type="hidden" name="term" value="@Model.SelectedTerm.Id" /><noscript><button type="submit">Show roster</button></noscript></form>
                 <p>@roster.Length registered students</p>
                 <div class="faculty-table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Status</th></tr></thead><tbody>

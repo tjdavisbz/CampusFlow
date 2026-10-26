@@ -15,10 +15,10 @@ public sealed record FacultySearchResult(int FacultyId, string DisplayName, stri
 public sealed record FacultyTerm(int Id, string Name, DateTime? StartsAt, DateTime? EndsAt);
 public sealed record FacultyCourse(int OfferId, string Code, string Name, string? CourseType,
     string? Section, int StudentCount, DateTime? StartsAt, DateTime? EndsAt);
-public sealed record FacultyMeeting(int OfferId, string CourseCode, string? Days,
+public sealed record FacultyMeeting(int OfferId, string CourseCode, string? Section, string? Days,
     TimeSpan? StartsAt, TimeSpan? EndsAt);
 public sealed record FacultyStudent(int StudentUid, string StudentId, string Name,
-    int OfferId, string CourseCode, string RegistrationStatus);
+    int OfferId, string CourseCode, string? Section, string RegistrationStatus);
 public sealed record FacultyEmailRecipient(int StudentUid, string Name, string? Email);
 
 /// <summary>Read-only faculty data. Every query is bound to a faculty ID proven by FacultyPortal membership.</summary>
@@ -207,7 +207,7 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
     {
         const string sql = FacultyCourses + """
             SELECT fc.SROfferID, LTRIM(RTRIM(CONCAT(fc.Department, ' ', fc.CourseID))),
-                s.OfferDays, s.OfferTimeFrom, s.OfferTimeTo
+                fc.Section, s.OfferDays, s.OfferTimeFrom, s.OfferTimeTo
             FROM FacultyCourses fc
             INNER JOIN dbo.SROfferSchedule s ON s.SROfferID = fc.SROfferID
             ORDER BY s.OfferDays, s.OfferTimeFrom, fc.Department, fc.CourseID
@@ -218,9 +218,10 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             result.Add(new FacultyMeeting(reader.GetInt32(0), reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetDateTime(3).TimeOfDay,
-                reader.IsDBNull(4) ? null : reader.GetDateTime(4).TimeOfDay));
+                reader.IsDBNull(2) ? null : reader.GetString(2).Trim(),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetDateTime(4).TimeOfDay,
+                reader.IsDBNull(5) ? null : reader.GetDateTime(5).TimeOfDay));
         return result;
     }
 
@@ -231,7 +232,7 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
             SELECT DISTINCT st.StudentUID, LTRIM(RTRIM(st.StudentID)),
                 LTRIM(RTRIM(CONCAT(st.LastName, ', ', st.FirstName))),
                 fc.SROfferID, LTRIM(RTRIM(CONCAT(fc.Department, ' ', fc.CourseID))),
-                LTRIM(RTRIM(a.RegistrationStatus))
+                fc.Section, LTRIM(RTRIM(a.RegistrationStatus))
             FROM FacultyCourses fc
             INNER JOIN dbo.SRAcademic a ON a.SROfferID = fc.SROfferID
                 AND a.TermCalendarID = @TermID
@@ -245,7 +246,8 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             result.Add(new FacultyStudent(reader.GetInt32(0), reader.GetString(1), reader.GetString(2),
-                reader.GetInt32(3), reader.GetString(4), reader.GetString(5)));
+                reader.GetInt32(3), reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5).Trim(), reader.GetString(6)));
         return result;
     }
 

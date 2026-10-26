@@ -20,6 +20,10 @@
         <a href="/Faculty/schedule?term=@Model.SelectedTerm?.Id">My Schedule</a>
         <a href="/Faculty/roster?term=@Model.SelectedTerm?.Id">Class Roster</a>
         <a href="/Faculty/courses?term=@Model.SelectedTerm?.Id">My Courses</a>
+        @if (Model.HasAdvisingAccess)
+        {
+            <a href="/Faculty/advising?term=@Model.SelectedTerm?.Id">My Advisees</a>
+        }
         <a class="active" href="/Faculty/email?term=@Model.SelectedTerm?.Id">Email Students</a>
     </nav>
 
@@ -42,7 +46,7 @@
             <select id="email-course" name="course" onchange="this.form.submit()">
                 @foreach (var option in Model.Courses)
                 {
-                    <option value="@option.OfferId" selected="@(option.OfferId == Model.SelectedCourse?.OfferId)">@option.Code · @option.Name</option>
+                    <option value="@option.OfferId" selected="@(option.OfferId == Model.SelectedCourse?.OfferId)">@option.Code @option.Section · @option.Name</option>
                 }
             </select>
             <noscript><button type="submit">Show class</button></noscript>
@@ -68,7 +72,7 @@
             </section>
         }
         <section class="faculty-card">
-            <h2>Compose message · @Model.SelectedCourse.Code</h2>
+            <h2>Compose message · @Model.SelectedCourse.Code @Model.SelectedCourse.Section</h2>
             <p>Only registered students in this class are listed. Recipients are placed in Bcc so they cannot see one another's addresses. You receive a copy.</p>
             <div asp-validation-summary="All" class="faculty-errors" role="alert"></div>
             <form method="post">

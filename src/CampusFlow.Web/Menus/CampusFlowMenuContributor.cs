@@ -31,6 +31,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var currentUser = context.ServiceProvider.GetRequiredService<ICurrentUser>();
         var currentStudentView = context.ServiceProvider.GetRequiredService<ICurrentStudentView>();
         var facultyReader = context.ServiceProvider.GetRequiredService<FacultyPortalReader>();
+        var advisingReader = context.ServiceProvider.GetRequiredService<FacultyAdvisingReader>();
         var studentProfile = await currentStudentView.GetProfileAsync();
         var hasStudentProfile = studentProfile is not null;
 
@@ -119,16 +120,16 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(advisor);
         }
 
-        var hasFacultyAccess = false;
+        FacultyIdentity? facultyIdentity = null;
         var httpContext = context.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>().HttpContext;
         var viewedFacultyId = httpContext is null ? null : FacultyViewSession.GetFacultyId(httpContext);
         if (!currentStudentView.IsImpersonating && currentUser.IsAuthenticated)
         {
             try
             {
-                hasFacultyAccess = viewedFacultyId.HasValue
-                    ? await facultyReader.FindByIdAsync(viewedFacultyId.Value, default) is not null
-                    : await facultyReader.FindFacultyAsync(currentUser.Email, default) is not null;
+                facultyIdentity = viewedFacultyId.HasValue
+                    ? await facultyReader.FindByIdAsync(viewedFacultyId.Value, default)
+                    : await facultyReader.FindFacultyAsync(currentUser.Email, default);
             }
             catch (Exception exception)
             {
@@ -136,7 +137,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                     .LogWarning(exception, "Unable to check faculty portal access for the menu.");
             }
         }
-        if (hasFacultyAccess)
+        if (facultyIdentity is not null)
         {
             var faculty = new ApplicationMenuItem("CampusFlow.Faculty", "Faculty", icon: "fa fa-chalkboard-user", order: 2);
             faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.home", "Home", "~/Faculty", icon: "fa fa-home", order: 1));
@@ -144,8 +145,18 @@ public class CampusFlowMenuContributor : IMenuContributor
             faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.schedule", "My Schedule", "~/Faculty/schedule", icon: "fa fa-calendar-days", order: 3));
             faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.roster", "Class Roster", "~/Faculty/roster", icon: "fa fa-list", order: 4));
             faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.courses", "My Courses", "~/Faculty/courses", icon: "fa fa-book", order: 5));
+            try
+            {
+                if (await advisingReader.HasAdvisorAccessAsync(facultyIdentity.FacultyId, default))
+                    faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.advising", "My Advisees", "~/Faculty/advising", icon: "fa fa-user-check", order: 6));
+            }
+            catch (Exception exception)
+            {
+                context.ServiceProvider.GetRequiredService<ILogger<CampusFlowMenuContributor>>()
+                    .LogWarning(exception, "Unable to check faculty advising access for the menu.");
+            }
             if (!viewedFacultyId.HasValue)
-                faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.email", "Email Students", "~/Faculty/email", icon: "fa fa-envelope", order: 6));
+                faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.email", "Email Students", "~/Faculty/email", icon: "fa fa-envelope", order: 7));
             context.Menu.AddItem(faculty);
         }
 

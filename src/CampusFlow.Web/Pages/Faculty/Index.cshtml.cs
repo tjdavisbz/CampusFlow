@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using System.Threading.Tasks;
 using CampusFlow.Announcements;
 using CampusFlow.Web.Portals;
@@ -14,6 +15,7 @@ namespace CampusFlow.Web.Pages.Faculty;
 [Authorize]
 public class IndexModel(
     FacultyPortalReader facultyReader,
+    FacultyAdvisingReader advisingReader,
     ICurrentStudentView currentStudentView,
     IRepository<PortalAnnouncement, Guid> announcements) : CampusFlowPageModel
 {
@@ -25,6 +27,11 @@ public class IndexModel(
     public IReadOnlyList<FacultyStudent> Students { get; private set; } = [];
     public IReadOnlyList<PortalAnnouncement> VisibleAnnouncements { get; private set; } = [];
     public string ViewName { get; private set; } = "home";
+    public bool HasAdvisingAccess { get; private set; }
+
+    public static string FormatTime(TimeSpan? time) => time.HasValue
+        ? DateTime.Today.Add(time.Value).ToString("h:mm tt", CultureInfo.GetCultureInfo("en-US"))
+        : "—";
 
     public async Task<IActionResult> OnGetAsync(string? view, int? term)
     {
@@ -35,6 +42,8 @@ public class IndexModel(
             : await facultyReader.FindFacultyAsync(CurrentUser.Email, HttpContext.RequestAborted);
         if (faculty is null) return Forbid();
         Faculty = faculty;
+        HasAdvisingAccess = await advisingReader.HasAdvisorAccessAsync(
+            faculty.FacultyId, HttpContext.RequestAborted);
 
         ViewName = view?.ToLowerInvariant() switch
         {

@@ -24,6 +24,7 @@ namespace CampusFlow.Web.Pages.Faculty;
 [Authorize]
 public class EmailStudentsModel(
     FacultyPortalReader facultyReader,
+    FacultyAdvisingReader advisingReader,
     FacultyMailConnection mailConnection,
     FacultyGraphMailSender mailSender,
     IdentityUserManager userManager,
@@ -51,6 +52,7 @@ public class EmailStudentsModel(
     public bool PreviewReady { get; private set; }
     public int RecipientCount { get; private set; }
     public string? Notice { get; private set; }
+    public bool HasAdvisingAccess { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -168,6 +170,8 @@ public class EmailStudentsModel(
         var faculty = await facultyReader.FindFacultyAsync(CurrentUser.Email, HttpContext.RequestAborted);
         if (faculty is null) return false;
         Faculty = faculty;
+        HasAdvisingAccess = await advisingReader.HasAdvisorAccessAsync(
+            faculty.FacultyId, HttpContext.RequestAborted);
         Terms = await facultyReader.GetTermsAsync(faculty.FacultyId, HttpContext.RequestAborted);
         var today = DateTime.Today;
         SelectedTerm = Terms.FirstOrDefault(x => x.Id == Term)
