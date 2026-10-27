@@ -2,7 +2,7 @@
 
 ## Scope and current state
 
-Prepared locally for the nelson production tenant (`3a236d25-0541-8fa3-25ec-fecc83432a1a`). No production schema, approval data, web deployment, or Power Automate flow has been changed by this import preparation. Commit/deployment and production migration/import approval are the remaining operational step.
+With explicit user approval, the history migration and all 83,167 source records were applied to the nelson production tenant (`3a236d25-0541-8fa3-25ec-fecc83432a1a`). Commit `45fcb2726bfc04e714a4030fea03f938f32954d1` was deployed successfully through [production run 40444333879](https://github.com/tjdavisbz/CampusFlow/actions/runs/40444333879) on October 26, 2026 (Central time). Production Power Automate flows and BibliU delivery remain unchanged.
 
 The supplied tab-separated export is from custom legacy `SAGU_ApprovedBills`, not the Elements reporting replica. Its header is `StudentUID`, `TermCalendarID`, `Approved`, `LoginTime`, `AcceptTime`. Source SHA-256: `1bd80658c5a09a3501b213356365e76eb476f5a8ebf9839a3860d6cc7b6d5f4f`. The source file and student mappings remain private; neither is committed.
 
@@ -29,7 +29,7 @@ Exceptions are retained, not rewritten:
 * Six approved records use term ID `0`, which exists in Elements with code `A` and no display name. History labels it “Unspecified legacy term”; these records do not qualify for academic approval completion or BibliU.
 * Original timestamps have no offset. They are stored as `timestamp without time zone` and displayed as recorded. Sentinel login dates such as 1900-01-01 are retained; no approval dates, offsets, signatures, agreements or financial snapshots are invented.
 
-Fall 2026 (268/B26Q) has 1,869 approved records with dates. A read-only export-reader preview produced 6,838 identity rows plus 3,736 voucher rows for 1,868 students (10,574 rows total). One approved student has no Fall 2026 row in `CAMS_StudentStatus_View`; this is an existing export filter. All 1,869 pass the Home-address and numeric-ID filters. This preview did not import approval records or deliver files. After deployment/import, rerun the manual user test flow and verify its actual voucher-bearing file before cutover.
+Fall 2026 (268/B26Q) has 1,869 approved records with dates. A read-only export-reader preview produced 6,838 identity rows plus 3,736 voucher rows for 1,868 students (10,574 rows total). One approved student has no Fall 2026 row in `CAMS_StudentStatus_View`; this is an existing export filter. All 1,869 pass the Home-address and numeric-ID filters. The deployed export API subsequently returned the same row counts. Manual test-flow/file verification is recorded in [the Power Automate setup record](bibliu-power-automate-test-setup.md).
 
 ## Storage and portal behavior
 
@@ -56,18 +56,18 @@ dotnet run --project src/CampusFlow.LegacyBillApprovalImport --configuration Rel
 
 Applying also requires `--apply`, `--expected-sha256` with the reviewed hash, and `--expected-rows 83167`. The utility checks the target tenant and schema, serializes concurrent imports with a transaction-scoped advisory lock, refuses differing or deleted existing legacy records, and inserts only new records in one transaction using a temporary staging table. Matching existing records are left untouched, including their original import provenance. It never updates native approvals, creates accounts, posts payments, generates/uploads documents, or uploads bookstore files. Running the same source afterward in preview mode should report zero inserts, 83,167 unchanged, and zero conflicts.
 
-The PostgreSQL write path has been built and reviewed but not executed against production. Docker was unavailable for a disposable local PostgreSQL run. Persistence, timestamp retention, tenant isolation, and duplicate-key enforcement were tested using the local SQLite integration fixture; the production preview exercised the complete source parser, live mappings, target tenant, native overlap and schema checks without writes.
+Docker was unavailable for a disposable local PostgreSQL run. Persistence, timestamp retention, tenant isolation, and duplicate-key enforcement were tested using the local SQLite integration fixture before the approved production operation. The production PostgreSQL import then inserted all 83,167 records atomically. Stored aggregate counts and source provenance matched the reviewed file. A subsequent complete preview compared source statuses, timestamps and mappings with stored records: zero inserts, 83,167 unchanged, zero conflicts and zero native overlap.
 
 ## Validation and authorized rollout
 
 142 tests passed: 61 domain, 5 persistence, 76 web. Coverage includes source parsing/nulls/precision, malformed and duplicate rows, eligibility exceptions, storage without accounts, tenant isolation, database uniqueness, native precedence in BibliU, and current-student history access. The importer builds in Release; the EF pending-model check reports no changes. A narrow migration SQL script was generated privately and contains only the new history table/indexes and its migration-history entry.
 
-After approval:
+Completed production rollout:
 
-1. Commit the reviewed changes and recheck the production migration baseline.
-2. Apply only the prepared history migration in a transaction; do not run broad data seeds.
-3. Run the approved source import with the exact hash/count and verify stored flags/timestamps/counts. Rerun the default preview to prove idempotency.
-4. Deploy the reviewed web changes. Verify health, own-student/authorized impersonation history, existing-native precedence, and export authorization.
-5. Run only manual test flow copies and verify the voucher-bearing user file. Keep the three production flows and BibliU delivery unchanged.
+1. Committed the reviewed changes and verified the migration baseline was `20261027020336_AddBibliuConfiguration`.
+2. Applied only `20261027031358_AddLegacyBillApprovalHistory` and its migration-history entry in a transaction, without data seeds.
+3. Imported the exact approved hash/count and verified all 83,167 records, including the original anomaly counts. The repeat preview confirmed idempotency.
+4. Deployed the reviewed web changes; the workflow build/tests passed and `/health-status` returned HTTP 200. The authenticated administrator's own history page correctly reported no student profile. An existing authorized read-only student view displayed three imported terms with their original approval dates and statuses; the session was exited after visual inspection. Native precedence and tenant guards are covered by the automated tests.
+5. The live export API returned all four feeds, with 10,574 user rows. The dedicated client remained unable to edit settings (HTTP 403); a token without the BibliU scope was denied and an unapproved scope was rejected. The three original production flows remain unchanged. See the linked setup record for final manual test-file checks.
 
 If deployment fails, the old application can continue with the added history table unused; the import does not alter native records. Do not remove imported production records or apply a down migration without a separate recovery decision.

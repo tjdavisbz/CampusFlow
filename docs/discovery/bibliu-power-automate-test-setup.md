@@ -28,7 +28,7 @@ ABP 10.5's built-in client provider checks host grants; its permission checker a
 
 Commit `e9b3779eacf1aa27b03630b1d3a6d16889b2d22d` was deployed successfully through [production run 40441261429](https://github.com/tjdavisbz/CampusFlow/actions/runs/40441261429). The workflow's build and tests passed; the local web suite passed 73 tests. Production health returned HTTP 200. No further database migration was required.
 
-## Completed verification
+## Initial verification before legacy approval import
 
 * Fresh client tokens contain the nelson tenant claim and the BibliU scope. The live export API returned HTTP 200 for all four feeds. The settings page returned HTTP 403 for this client.
 * A token without the BibliU scope could not read exports (HTTP 401). A request for unapproved scope `CampusFlow` was rejected by the token endpoint (HTTP 400, `invalid_request`). Local tests cover cross-tenant denial and host denial through the real permission checker, bypassing the shared test fixture's always-allow stub.
@@ -54,9 +54,32 @@ Successful test run IDs:
 
 Private test files are under ignored `tools/local/bibliu-flow-test/files/` (directory mode 700, files mode 600). Source response, run metadata, checksums, and aggregate validation results are retained privately in the same ignored setup directory. Student data is not committed.
 
+## Verification after legacy approval import
+
+With explicit approval, commit `45fcb2726bfc04e714a4030fea03f938f32954d1` added the legacy approval archive and eligibility lookup. All 83,167 supplied records were imported and reconciled in nelson production, then deployed successfully through [production run 40444333879](https://github.com/tjdavisbz/CampusFlow/actions/runs/40444333879). See [the import record](legacy-bill-approval-import.md) for preserved exceptions and native-record precedence. The configured terms/stores and all test flow definitions remained unchanged.
+
+The live API returned 10,574 user rows: 6,838 AM identities and 3,736 AE voucher rows for 1,868 eligible students. There are 1,869 dated approved legacy bills for Fall 2026; one student's missing row in the existing term-status source view excludes that student under the existing export filter. No eligibility or financial source data was altered to make the counts match.
+
+All three manual test copies succeeded again and were stopped afterward:
+
+* User: `08584085342712530969296554026CU24`
+* Schedule/enrollment: `08584085342457388935396398548CU16`
+* Course: `08584085342137702094591291996CU16`
+
+| Output | Data rows | Fields | Header | UTF-8 bytes |
+| --- | ---: | ---: | --- | ---: |
+| Bookstore_UserImportFile.txt | 10,574 | 9 | None | 1,004,530 |
+| CourseImport_123.csv | 770 | 17 | None | 130,129 |
+| CourseSchedule.csv | 1,720 | 16 | Yes | 278,419 |
+| CourseEnrollment.csv | 10,729 | 12 | Yes | 1,804,917 |
+
+All four source-based private file reconstructions matched the new Power Automate Compose-output hashes and byte counts. Every selected field also passed the CSV/tab round trip, width, padding, header and line-ending checks described above. Secure action logging remained enabled. The dedicated client still received HTTP 403 for settings, a token without the BibliU scope received HTTP 401 for exports, and an unapproved scope was rejected with HTTP 400. Production health returned HTTP 200. The history page was visually checked through the existing authorized read-only student view, which was exited afterward.
+
+Final management readback confirmed all three originals still matched their preserved definitions, connection references, names and states. All three test copies were `Stopped`, manual-only, protected and connected only to the dedicated Key Vault connection, with no delivery actions.
+
 ## Remaining before cutover
 
-Verify a voucher-bearing file when an eligible approved bill is available, or obtain an explicit decision to use a different billing term with eligible approvals. Review the four current files with the bookstore/BibliU owner and test delivery through an approved staging destination. Production flow changes and BibliU delivery remain outside this completed test setup and require the user's cutover instruction.
+The voucher-bearing file is now verified through the manual test copy. Review the four current files with the bookstore/BibliU owner and test delivery through an approved staging destination. Production flow changes and BibliU delivery remain outside this completed test setup and require the user's cutover instruction.
 
 
 Private original/test definitions and manifests are retained under ignored `tools/local/bibliu-flow-test/`; credentials and student rows are not included in this document.
