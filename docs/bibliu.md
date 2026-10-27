@@ -16,8 +16,8 @@ saving does not run a flow, upload a file, or change Power Automate.
 Settings are fully audited entities, with one live configuration per tenant and
 optimistic concurrency. A stale form must be reloaded before saving. There are
 no seeded production terms. Apply migration `AddBibliuConfiguration` to the
-intended CampusFlow database before using the screen. This migration has been
-created locally, not applied to production.
+intended CampusFlow database before using the screen. Production migration and
+test-configuration status are recorded in the [test setup record](discovery/bibliu-power-automate-test-setup.md).
 
 ## Export API
 
@@ -29,7 +29,18 @@ of permission to edit settings, plus a resolved tenant. Use the application's
 existing authentication and tenant-resolution mechanisms. A tenant header alone
 does not authenticate or grant access. Configure a dedicated approved integration
 identity before connecting Power Automate; never put tokens or passwords in URLs.
-Client/token issuance and production identity grants are not part of this change.
+
+For client credentials, use a confidential client allowed the token endpoint,
+`client_credentials`, and scope `CampusFlow.Bibliu` (resource/audience `CampusFlow`).
+Grant `CampusFlow.Admin.BibliuExport` with provider `C` and the client ID **within
+the intended tenant**, not at the host. ABP's built-in client permission provider
+checks host grants and does not honor this tenant grant. The BibliU claims handler
+binds a scoped client token to the issuing tenant only after checking that tenant's
+explicit export grant; the BibliU permission provider checks the same grant and
+requires its tenant claim to match the resolved tenant. Neither component grants
+settings access. Client grants and secrets must be provisioned separately with
+approval. Keep the secret in the approved vault, protect token/secret action
+inputs and outputs, and obtain new tokens after deploying the claims handler.
 
 Responses contain `configurationId`, `configurationVersion`, `generatedAtUtc`,
 `billingTerm`, `bibliuTerm`, `expandedTerms`, and `exports`. The latter maps each
@@ -101,10 +112,9 @@ logging controls. All four query shapes were validated against the reporting
 replica; readers were exercised without delivery, including a synthetic voucher
 eligibility preview whose identities and amounts were suppressed.
 
-Production flows are unchanged. Before cutover: apply the migration to the chosen
-environment through the controlled migration process, configure settings and the
-integration identity, verify identifier continuity and final formatted files with
-BibliU, and test through a staging destination. No production migration, deployment,
-flow edits, SFTP uploads or account permission grants were performed here.
+Production flows remain unchanged. Before cutover, verify identifier continuity
+and final formatted files with BibliU and test through an approved staging
+destination. See the test setup record for completed provisioning, validation,
+and remaining rollout work. Test copies contain no SFTP delivery actions.
 
 See [discovery findings](discovery/bibliu-elements-migration.md) for source mapping.

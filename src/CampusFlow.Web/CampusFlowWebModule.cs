@@ -67,6 +67,8 @@ using CampusFlow.Web.Branding;
 using CampusFlow.Web.Observability;
 using CampusFlow.Web.Maintenance;
 using CampusFlow.Students;
+using CampusFlow.Bibliu;
+using Volo.Abp.Authorization.Permissions;
 
 namespace CampusFlow.Web;
 
@@ -132,6 +134,11 @@ public class CampusFlowWebModule : AbpModule
     {
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
+
+        Configure<AbpPermissionOptions>(options =>
+            options.ValueProviders.Add<BibliuClientPermissionValueProvider>());
+        Configure<AbpOpenIddictClaimsPrincipalOptions>(options =>
+            options.ClaimsPrincipalHandlers.Add<BibliuClientClaimsPrincipalHandler>());
 
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
         context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
