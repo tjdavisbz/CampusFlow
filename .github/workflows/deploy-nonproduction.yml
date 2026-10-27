@@ -103,7 +103,7 @@ jobs:
         env:
           APP_URL: ${{ steps.deploy.outputs.webapp-url }}
         run: |
-          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+          curl --fail --silent --show-error --retry 30 --retry-all-errors \
             --retry-delay 10 --max-time 30 "${APP_URL%/}/health-status"
 
       - name: Sign out of Azure
