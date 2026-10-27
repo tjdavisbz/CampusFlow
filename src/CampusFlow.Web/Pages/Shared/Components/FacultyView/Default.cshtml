@@ -1,0 +1,38 @@
+@model CampusFlow.Web.Components.Toolbar.FacultyView.FacultyViewToolbarModel
+<div class="faculty-view-banner" role="status">
+    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+    <span><strong>Viewing as @Model.FacultyName</strong><small>Faculty ID @Model.FacultyId · Read-only</small></span>
+    <form method="post" action="/Admin/ImpersonateFaculty/End">
+        @Html.AntiForgeryToken()
+        <button type="submit">Exit faculty view</button>
+    </form>
+</div>
+<div class="faculty-view-readonly-modal" id="facultyViewReadOnlyModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="facultyViewReadOnlyTitle">
+    <div class="faculty-view-readonly-card">
+        <h2 id="facultyViewReadOnlyTitle">Changes are disabled</h2>
+        <p>Exit faculty view before performing actions that change information.</p>
+        <button type="button" id="facultyViewReadOnlyAcknowledge">Got it</button>
+    </div>
+</div>
+<style>
+    .faculty-view-banner{position:fixed;z-index:1090;top:58px;right:18px;display:flex;align-items:center;gap:.75rem;padding:.7rem .8rem;border:1px solid #d49b13;border-radius:.8rem;background:#fff4cc;color:#4b3500;box-shadow:0 10px 30px rgba(60,42,0,.2)}
+    .faculty-view-banner>span{display:flex;flex-direction:column;line-height:1.15}.faculty-view-banner small{margin-top:.2rem;color:#715b25}.faculty-view-banner button{border:0;border-radius:.55rem;padding:.55rem .75rem;background:#6a4700;color:#fff;font-weight:750}.faculty-view-banner form{margin:0}
+    .faculty-view-readonly-modal{position:fixed;z-index:2200;inset:0;display:grid;place-items:center;padding:1rem;background:rgba(18,13,30,.58)}.faculty-view-readonly-modal[hidden]{display:none}.faculty-view-readonly-card{box-sizing:border-box;width:min(430px,100%);padding:1.7rem;border-radius:1.1rem;background:#fff;color:#172033;text-align:center}.faculty-view-readonly-card h2{margin:0 0 .4rem;font-size:1.35rem}.faculty-view-readonly-card p{margin:0;color:#64748b}.faculty-view-readonly-card button{margin-top:1.2rem;border:0;border-radius:.6rem;padding:.65rem 1.2rem;background:#58318c;color:#fff;font-weight:750}
+    @@media(max-width:720px){.faculty-view-banner{left:10px;right:10px;top:52px}.faculty-view-banner>span{flex:1}.faculty-view-banner button{font-size:.8rem}}
+</style>
+<script>
+    (() => {
+        const isEndForm = form => form?.action && new URL(form.action, window.location.href).pathname === '/Admin/ImpersonateFaculty/End';
+        const modal = document.getElementById('facultyViewReadOnlyModal');
+        const acknowledge = document.getElementById('facultyViewReadOnlyAcknowledge');
+        const showReadOnlyMessage = () => { modal.hidden = false; acknowledge?.focus(); };
+        document.addEventListener('submit', event => {
+            const form = event.target;
+            if ((form.method || 'get').toLowerCase() !== 'post' || isEndForm(form)) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showReadOnlyMessage();
+        }, true);
+        acknowledge?.addEventListener('click', () => { modal.hidden = true; });
+    })();
+</script>

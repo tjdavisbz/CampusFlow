@@ -1,127 +1,126 @@
-# Azure non-production preparation
+# Azure non-production operations
 
-Prepared October 24, 2026, approximately 9:10–9:20 a.m. America/Chicago.
-Status: infrastructure prepared; application not deployed; paused at the owner's request
-until the non-production Elements API account is available.
+Updated October 27, 2026 (America/Chicago). Launch work is in progress.
+The owner authorized completing the non-production site at `https://my-np.nelson.edu`
+and copying the production PostgreSQL application database **into non-production only**.
 
-## Resources created
+## Environment and promotion path
 
-Subscription: `3cc0ce6b-9bac-4bc8-81c2-8b22bd8d5059`; resource group: `rg_campusflow`.
+| Stage | Deployment | Application database / Elements |
+| --- | --- | --- |
+| Local | Local app | Separate local PostgreSQL; non-production Elements replica is the proposed read source |
+| `develop` | No Azure deployment | Integration branch |
+| `staging` | `app-campusflow-nonprod-001`, `https://my-np.nelson.edu` | `campusflow_nonprod`; non-production Elements |
+| `main` | Existing production app, `https://my.nelson.edu` | Production PostgreSQL `postgres`; production Elements |
+
+Promote reviewed changes `develop` → `staging` → `main`. A merge/push to `staging`
+deploys non-production; a merge/push to `main` deploys production. Fixes made first on
+production must be brought back into development/staging. The launch branch reconciles
+production changes with the earlier development branch, preserving the Texas country
+reporting migration. Unrelated work in the primary checkout is left untouched.
+
+`.github/workflows/deploy-nonproduction.yml` is restricted to `staging`, including its
+manual-dispatch job condition. GitHub environment is `nonproduction`. Its default
+`slot-name: production` denotes the default slot of the **non-production app**.
+A readiness setting blocks deployment until environment setup is verified.
+
+## Azure resources
+
+Subscription `3cc0ce6b-9bac-4bc8-81c2-8b22bd8d5059`, resource group `rg_campusflow`.
 
 | Resource | Configuration |
 | --- | --- |
-| `asp-campusflow-nonprod-001` | Dedicated Linux B1 plan, Central US; additional Azure charges |
-| `app-campusflow-nonprod-001` | .NET 10, HTTPS only, minimum TLS 1.2, FTP disabled, Always On |
-| `campusflow_nonprod` | New empty PostgreSQL database on existing `psql-campusflow-prod-001`; shares database-server capacity |
-| `id-github-campusflow-nonprod-001` | Dedicated deployment identity; Website Contributor scoped to the new app only |
-| GitHub `nonproduction` environment | Three Azure identity secrets configured; GitHub environment OIDC federation |
+| `asp-campusflow-nonprod-001` | Dedicated Central US Linux B1 plan; additional Azure hosting charges |
+| `app-campusflow-nonprod-001` | .NET 10, Staging environment, HTTPS only, TLS 1.2 minimum, FTP disabled, Always On; `/health-status` |
+| `campusflow_nonprod` | Separate database on shared `psql-campusflow-prod-001`; dedicated login `campusflow_nonprod_app` |
+| `id-github-campusflow-nonprod-001` | GitHub environment OIDC identity; Website Contributor on non-production app only |
+| Entra `CampusFlow Non-Production` | Separate app registration `b61e876d-9316-4dfa-bed8-034528234d73`; separate secret |
 
-App system-assigned managed identity is enabled. Health-check path is `/health-status`.
-The platform resource is running; that does not establish application health because no
-CampusFlow package has been deployed.
+The non-production PostgreSQL role owns its database/schema, has no superuser,
+create-database, or create-role privileges, and must pass a check for zero production
+table write/ownership privileges before any refresh. The owner explicitly approved
+adding the non-production app's 12 previously unlisted exact outbound IPs to the shared
+PostgreSQL server firewall on October 27. Existing rules are preserved; no all-internet
+or all-Azure rule is used. This changes the shared server's network boundary, not its
+production database data or production application settings.
 
-## Application settings
+## DNS and TLS
 
-All new settings had no prior value on this newly created app.
+DNS provider: **DNS Made Easy / DigiCert DNS**. The owner added records on October 27
+in the public `nelson.edu` zone (not the separately delegated `my.nelson.edu` zone):
 
-- `ASPNETCORE_ENVIRONMENT=Staging`.
-- `App__SelfUrl` and `AuthServer__Authority` initially use
-  `https://app-campusflow-nonprod-001.azurewebsites.net`.
-- Intended final public URL: `https://test.my.nelson.edu`.
-- `ConnectionStrings__ThesisElementsReadOnly` uses server
-  `sql-elm-nonprod-usc-replica.database.windows.net`, database `EL-NP-NEL-DB`,
-  and the existing production replica credentials, reused privately as instructed.
-  No credential values are included here. SQL connectivity has not been tested.
-- Elements API `TenantHost=el-np-nel.thesiscloud.com`, as supplied by the owner.
-- Elements API `BaseUrl` and `RegistrationBaseUrl` are explicitly empty to override
-  the production defaults in tracked application configuration.
-- `Payments__Payflow__Enabled=false`; `Payments__Payflow__TestMode=true`.
-- `BillApproval__DocumentTracking__Enabled=false`.
-- `MaintenanceMode__Enabled=true`, with a setup-in-progress message.
-- `CampusFlow__NonProductionReady=false`; the deployment workflow refuses to deploy
-  until this is explicitly changed after the environment is verified.
+- `my-np` CNAME → `app-campusflow-nonprod-001.azurewebsites.net.`
+- `asuid.my-np` TXT → the new app's Azure custom-domain verification identifier.
 
-No production app settings, production maintenance settings, DNS records, TLS bindings,
-or existing database data were changed.
+Both records resolved and Azure accepted the hostname. A separate Azure managed
+certificate was issued and bound through SNI, thumbprint
+`D6948E318BE0F3CF7E7A60086B9C481D356EB824`, expiration April 27, 2027.
+Preserve the direct CNAME for managed renewal. No existing production or email records
+were changed. Verify Nelson split DNS if internal resolution differs.
 
-## Deployment workflow
+`App__SelfUrl` and `AuthServer__Authority` use `https://my-np.nelson.edu`.
+Entra callbacks include `/signin-oidc` and `/signout-callback-oidc` on that hostname,
+plus the Azure hostname for diagnostics. OpenIddict uses an independently generated
+signing/encryption certificate stored only in the GitHub nonproduction secret and its
+Azure passphrase setting. The Entra secret and OpenIddict certificate expire in roughly
+one year; plan their renewal. Signing credentials are separate from public TLS.
 
-`.github/workflows/deploy-nonproduction.yml` is maintained on `develop`.
-It deploys only from `staging`, uses the `nonproduction` GitHub environment, builds and tests,
-requires its own OpenIddict certificate secret, checks the readiness flag, deploys only
-to the new app, and retries the deployed `/health-status` check.
-The owner authorized committing and pushing this preparation to `develop` on October 24,
-2026. No staging promotion or deployment is authorized in this phase. YAML syntax was
-parsed successfully. Work is paused until the non-production Elements account and
-confirmed Integration API URL are available.
+## Elements and safety settings
 
-## Branch promotion and local development
+- SQL server: `sql-elm-nonprod-usc-replica.database.windows.net`; database `EL-NP-NEL-DB`.
+  Existing replica credentials reused privately as authorized. Connection and SELECT
+  access verified from the local network; 1,512 tables visible. Verify from Azure too.
+- Tenant: `el-np-nel.thesiscloud.com`.
+- Integration API: `https://app-elm-nonprod-usc-integrationapi.azurewebsites.net`.
+- Gateway: `https://np-usc-gateway.thesiscloud.com`.
 
-The intended promotion path is local development → `develop` → `staging` → `main`.
+Both API hostnames were found in the confirmed non-production Elements web app's public
+bundle. Integration API authentication returned HTTP 200 and a token using the existing
+account with the non-production tenant. Gateway API metadata is accessible. No Elements
+write operations were invoked during setup. Credentials are only in Azure settings.
 
-| Stage | Deployment | Data and integrations |
-| --- | --- | --- |
-| Local development | Local application only | Separate local CampusFlow PostgreSQL database; Elements non-production read-only replica is the tentative shared source |
-| `develop` | No Azure site deployment | Integration branch; can run build/test checks without deployment |
-| `staging` | Non-production Azure app at `test.my.nelson.edu` once DNS/TLS is configured | `campusflow_nonprod`, non-production Elements replica and APIs |
-| `main` | Existing production Azure app at `my.nelson.edu` | Production application database and Elements integrations |
+The stale `B25L` term override is explicitly cleared. Payments remain disabled and
+Payflow TestMode remains true; document-tracking writes remain disabled. PII logging is
+disabled. Keep these non-production overrides after every database refresh. Local work
+must use a separate writable CampusFlow database; shared non-production Elements writes
+can affect staging tests, so keep local writes disabled until testing is planned.
 
-Promote changes with reviewed pull requests from `develop` into `staging`, then from
-`staging` into `main` after validation. A Git pull only updates a local checkout;
-the merge/push to each remote deployment branch triggers its deployment. Fix failed
-staging validation in development and repeat promotion. Carry urgent production fixes
-back into `staging` and `develop` so branches do not diverge.
+## One-way PostgreSQL refresh
 
-Keep local credentials in ignored secrets or user secrets and Azure credentials in the
-corresponding environment settings. Local and staging must have separate writable
-CampusFlow databases. Shared non-production Elements data means API writes from local
-work can affect staging tests; keep local writes/payments disabled until an explicit
-test-data and account plan exists. A dedicated Elements sandbox or refreshed replica
-would provide better isolation if available later. No local connection settings have
-been changed by this preparation.
+Use `tools/database/refresh_nonproduction.py` with authenticated Azure CLI and PostgreSQL
+18+ client tools. Default is a read-only preview; `--apply` replaces non-production data.
+No source/target/direction arguments are accepted.
 
-The non-production workflow has both a push trigger and a job condition restricted to
-`staging`; manual invocation on another branch cannot deploy. Its `slot-name: production`
-means the default slot of the **non-production app**, not the production CampusFlow app.
-The existing production workflow remains unchanged. Branch protections and GitHub
-environment deployment-branch restrictions have not yet been configured or audited.
+**Allowed direction only:** production app `Default` connection, database `postgres`
+→ non-production app `ConnectionStrings__Default`, database `campusflow_nonprod`.
 
-## Remaining work before deployment
+Safeguards:
 
-1. Confirm the Integration API URL and registration gateway for non-production, then
-   provision/verify the non-production Elements API account. Same account details are
-   intended, but the owner cannot create the account yet.
-   `https://app-elm-nonprod-usc-integrationapi.azurewebsites.net` is an inferred candidate:
-   public DNS resolves and unauthenticated HTTPS returns 404. This does not verify the API,
-   its tenant routing, permissions, or that it is the correct environment. Do not configure
-   it on this evidence alone. The confirmed Elements web hostname resolves publicly.
-2. Verify replica SQL login, SELECT access, and the necessary firewall rules from the
-   new app's outbound network. Do not broaden access to all internet addresses.
-3. Create a dedicated PostgreSQL role restricted to `campusflow_nonprod`, configure the
-   app's `Default` connection, and run the CampusFlow migrator against that database only.
-   Do not copy production student data or point this app at the production application DB.
-4. Create a separate non-production OpenIddict signing/encryption PFX; store its base64
-   value as GitHub environment secret `OPENIDDICT_PFX_BASE64` and its passphrase in the
-   new app's `AuthServer__CertificatePassPhrase`. Never commit certificate material.
-5. Configure non-production Entra authentication and callbacks for the final hostname.
-   Prefer a separate app registration and credential; preserve production callbacks.
-6. Add `test` CNAME in the delegated public `my.nelson.edu` zone pointing to
-   `app-campusflow-nonprod-001.azurewebsites.net.` and `asuid.test` TXT using this
-   new app's `customDomainVerificationId`. Preserve all existing root, mail, and
-   subordinate records. Bind the custom hostname and issue/bind its managed TLS
-   certificate after verifying issuance prerequisites. The existing `*.nelson.edu`
-   certificate does not cover `test.my.nelson.edu`. Public DNS currently has no result
-   for the requested test hostname. Check Nelson split DNS as well.
-7. Once DNS/TLS is ready, change the two app URL settings to
-   `https://test.my.nelson.edu` and configure `/signin-oidc` and
-   `/signout-callback-oidc` in Entra. Validate login/logout and cookies.
-8. Review and commit/push the workflow on `develop` without deploying. Promote it to
-   `staging` through a reviewed pull request. Explicitly set readiness only after all
-   dependencies are isolated, then monitor the staging deployment and verify health,
-   maintenance, static assets, DNS, TLS, authentication, and non-production data access.
-9. Explicitly decide when to open the non-production portal. Production maintenance
-   must remain enabled until the owner separately authorizes production reopening.
+- Subscription, app names, database names, host, and destination role are fixed and
+  checked before operations. Source sessions enforce transaction read-only.
+- `pg_restore` receives only the non-production role, whose production table write and
+  ownership privileges are checked to be zero. No production credentials are supplied
+  to the restore command. No reverse-refresh operation is implemented.
+- Non-production maintenance must be enabled. Keep it closed during the refresh.
+- A private rollback dump of the previous non-production database is retained before
+  a consistent production snapshot is taken. Dumps and diagnostics stay outside Git
+  in a private temporary folder and contain sensitive production data.
+- Restore uses full TLS validation, no source ownership/ACLs, exit-on-error and a single
+  transaction. All source-dump table row counts are compared with the restored target.
+- Non-production tenant connection-string overrides are removed after restoration so
+  a copied tenant cannot redirect the site to a production database.
 
-Production observations requiring separate follow-up: its two canonical URL settings still
-reference its Azure hostname and its App Service health-check path is unset. These were
-observed read-only and left unchanged.
+A refresh copies a point-in-time application database, not the SQL Server Elements
+replica or uploaded App Service files. Independent Entra, signing credentials, API
+endpoints, payment settings, and environment settings remain configured in Azure.
+Apply any additional staging migrations only to non-production after the copy, then
+verify health and tenant access before reopening. Never restore non-production to production.
+
+## Verification and completion record
+
+- Initial non-production schema and host/Nelson tenant seed completed October 27.
+- Final launch build tests: 61 domain, 5 EF Core, 88 web tests passed (154 total).
+- DNS, hostname binding, managed-certificate issuance, local replica SELECT and
+  non-production Elements authentication verified.
+- Deployment, the requested production-to-nonproduction refresh, Azure-side replica
+  access, interactive sign-in/out and final reopening results will be recorded below.

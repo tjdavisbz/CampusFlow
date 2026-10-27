@@ -207,3 +207,5 @@
     .journey-step { min-height: 0; }
     .term-snapshot{grid-template-columns:1fr}.semester-summary{align-items:flex-start;gap:1rem;flex-direction:column}.dashboard-term-form{width:100%;align-items:flex-start;flex-direction:column}.dashboard-term-picker{width:100%}.dashboard-term-picker>div{left:0;right:0}
 }
+.dashboard-announcements{display:grid;gap:1rem;padding:1.5rem;border:1px solid #e5e9f2;border-radius:1.1rem;background:#fff}.dashboard-announcements-heading h2{margin:.25rem 0 0;font-size:1.35rem}.dashboard-announcement{padding:1.1rem 1.25rem;border:1px solid #e5e9f2;border-left:4px solid var(--tenant-primary);border-radius:.7rem;background:#fdfcff}.dashboard-announcement h3{margin:0 0 .5rem;font-size:1.08rem}.dashboard-announcement p:last-child{margin-bottom:0}.dashboard-announcement a{overflow-wrap:anywhere}
+.dashboard-announcement-terms{margin:0}.dashboard-announcement-terms a{display:inline-block;margin-left:.4rem;font-weight:700}

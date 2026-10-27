@@ -1,0 +1,32 @@
+@page
+@model CampusFlow.Web.Pages.BillApprovalHistoryModel
+@{
+    ViewData["Title"] = "Bill approval history";
+}
+<main class="container py-4">
+    <h1>Bill approval history</h1>
+    <p><a asp-page="/BillApproval">Return to bill approval</a></p>
+    @if (!Model.HasProfile)
+    {
+        <p>Your student profile is not available.</p>
+    }
+    else if (Model.Rows.Count == 0)
+    {
+        <p>No bill approval history was found.</p>
+    }
+    else
+    {
+        <p>Previous portal dates are shown as originally recorded. Historical agreement files and financial snapshots are not included in the imported records.</p>
+        <div class="table-responsive">
+            <table class="table">
+                <thead><tr><th scope="Column">Term</th><th scope="Column">Status</th><th scope="Column">Approval date</th><th scope="Column">Source</th><th scope="Column">Notes</th></tr></thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr><td>@row.Term</td><td>@row.Status</td><td>@(row.AcceptedAt?.ToString("MMM d, yyyy h:mm tt") ?? "Not recorded")</td><td>@row.Source</td><td>@row.Note</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</main>

@@ -20,9 +20,12 @@
 .approval-complete h2 { margin: .45rem 0; font-size: 1.8rem; }
 .approval-complete p { margin: 0 auto; color: #667085; }
 .bill-payment-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
-.payment-amount { display: flex; align-items: center; justify-content: space-between; margin-bottom: .9rem; padding: .9rem 1rem; border-radius: .75rem; background: var(--tenant-surface); }
-.payment-amount span { color: #667085; font-size: .8rem; font-weight: 700; }
-.payment-amount strong { color: var(--tenant-primary); font-size: 1.25rem; }
+.payment-amount { display: grid; gap: .5rem; margin-bottom: .9rem; padding: .9rem 1rem; border-radius: .75rem; background: var(--tenant-surface); }
+.payment-amount div { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.payment-amount dt { color: #667085; font-size: .8rem; font-weight: 700; }
+.payment-amount dd { margin: 0; font-weight: 750; }
+.payment-amount .total { padding-top: .55rem; border-top: 1px solid #ddd6e8; }
+.payment-amount .total dt, .payment-amount .total dd { color: var(--tenant-primary); font-size: 1.05rem; }
 .card-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem 1rem; }
 .card-fields .full-field { grid-column: 1 / -1; }
 .card-fields label { color: #344054; font-size: .82rem; font-weight: 750; }

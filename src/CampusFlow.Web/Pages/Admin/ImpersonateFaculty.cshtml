@@ -1,0 +1,56 @@
+@page "/Admin/ImpersonateFaculty"
+@model CampusFlow.Web.Pages.Admin.ImpersonateFacultyModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Impersonate Faculty";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ImpersonateFaculty;
+}
+
+@section styles {
+    <abp-style src="/Pages/Admin/ImpersonateStudent.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor}</style>
+}
+
+<main class="impersonation-shell">
+    <header class="impersonation-hero">
+        <div><span>Admin portal</span><h1>Impersonate faculty</h1><p>Open a secure, read-only view of the faculty portal.</p></div>
+        <div class="read-only-callout"><i class="fa-solid fa-shield-halved"></i><strong>Read-only</strong><span>No information can be changed in this view.</span></div>
+    </header>
+
+    <section class="impersonation-card">
+        <div class="card-heading"><span>Faculty search</span><h2>Find a faculty member</h2><p>Search by name, faculty ID, portal username, or email address.</p></div>
+        <form method="get" class="student-search">
+            <label asp-for="Query" class="visually-hidden">Faculty search</label>
+            <div class="search-control"><i class="fa-solid fa-magnifying-glass"></i><input asp-for="Query" placeholder="Name, ID, username, or email" autocomplete="off" /><button type="submit">Search</button></div>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(Model.SearchError))
+        {
+            <div class="empty-result"><i class="fa-solid fa-triangle-exclamation"></i><strong>Search unavailable</strong><span>@Model.SearchError</span></div>
+        }
+        else if (Model.SearchPerformed && Model.Results.Count == 0)
+        {
+            <div class="empty-result"><i class="fa-regular fa-circle-question"></i><strong>No faculty found</strong><span>Try a different name, ID, username, or email address.</span></div>
+        }
+        else if (Model.Results.Count > 0)
+        {
+            <div class="result-list">
+                @foreach (var faculty in Model.Results)
+                {
+                    <article class="student-result">
+                        <div class="student-avatar">@(string.IsNullOrWhiteSpace(faculty.DisplayName) ? "F" : faculty.DisplayName.Substring(0, 1).ToUpperInvariant())</div>
+                        <div class="student-details"><strong>@faculty.DisplayName</strong><span>Faculty ID @faculty.FacultyId</span>@if (!string.IsNullOrWhiteSpace(faculty.Email)){<small>@faculty.Email</small>}</div>
+                        <form method="post" asp-page-handler="Start">
+                            <input type="hidden" name="FacultyId" value="@faculty.FacultyId" />
+                            <button type="submit">View as faculty <i class="fa-solid fa-arrow-right"></i></button>
+                        </form>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</main>

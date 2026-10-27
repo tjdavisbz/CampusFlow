@@ -1,0 +1,56 @@
+@page "/Admin/Announcements"
+@model CampusFlow.Web.Pages.Admin.AnnouncementsModel
+@using CampusFlow.Web.Menus
+@using CampusFlow.Web.Announcements
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Announcements";
+    PageLayout.Content.MenuItemName = CampusFlowMenus.Announcements;
+}
+@section styles {
+    <abp-style src="/Pages/Admin/Announcements.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+
+<main class="announcements-admin">
+    <header class="announcement-hero"><div><span>Admin portal</span><h1>Announcements</h1><p>Publish news for a term, several terms, or every term.</p></div><i class="fa-solid fa-bullhorn" aria-hidden="true"></i></header>
+    <section class="announcement-editor-card">
+        <h2>@(Model.Input.Id.HasValue ? "Edit announcement" : "New announcement")</h2>
+        <form id="announcementForm" method="post" asp-page-handler="Save">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input asp-for="Input.Id" type="hidden" />
+            <label>Title<input asp-for="Input.Title" maxlength="160" required /><span asp-validation-for="Input.Title"></span></label>
+            <label>Content</label>
+            <div class="announcement-toolbar" role="toolbar" aria-label="Announcement formatting">
+                <button type="button" data-command="bold" title="Bold"><i class="fa-solid fa-bold"></i></button>
+                <button type="button" data-command="italic" title="Italic"><i class="fa-solid fa-italic"></i></button>
+                <button type="button" data-command="formatBlock" data-value="h3" title="Heading">Heading</button>
+                <button type="button" data-command="insertUnorderedList" title="List"><i class="fa-solid fa-list-ul"></i></button>
+                <button type="button" id="announcementLink" title="Add link"><i class="fa-solid fa-link"></i> Link</button>
+            </div>
+            <div id="announcementEditor" class="announcement-editor" contenteditable="true" role="textbox" aria-multiline="true">@Html.Raw(AnnouncementHtml.Sanitize(Model.Input.ContentHtml))</div>
+            <textarea asp-for="Input.ContentHtml" hidden></textarea><span asp-validation-for="Input.ContentHtml"></span>
+            <div class="announcement-fields">
+                <label>Starts (Central time)<input asp-for="Input.StartsAtLocal" type="datetime-local" required /></label>
+                <label>Ends (Central time)<input asp-for="Input.EndsAtLocal" type="datetime-local" required /><span asp-validation-for="Input.EndsAtLocal"></span></label>
+            </div>
+            <fieldset><legend>Show in</legend><label><input asp-for="Input.ForStudents" /> Student portal</label><label><input asp-for="Input.ForFaculty" /> Faculty portal (when available)</label><span asp-validation-for="Input.ForStudents"></span></fieldset>
+            <fieldset><legend>Terms</legend><label><input asp-for="Input.AllTerms" /> All terms</label><div class="announcement-term-options">@foreach (var term in Model.TermNames){<label><input type="checkbox" name="Input.Terms" value="@term" checked="@Model.Input.Terms.Contains(term)" /> @term</label>}</div><span asp-validation-for="Input.Terms"></span><small>Choose all terms or select one or more specific terms.</small></fieldset>
+            <label class="announcement-publish"><input asp-for="Input.IsPublished" /> Published</label>
+            <div class="announcement-actions"><button type="submit">@(Model.Input.Id.HasValue ? "Save changes" : "Create announcement")</button>@if(Model.Input.Id.HasValue){<a asp-page="/Admin/Announcements">Cancel edit</a>}</div>
+        </form>
+    </section>
+    <section class="announcement-list" aria-label="Saved announcements">
+        <h2>Saved announcements</h2>
+        @if (Model.Items.Count == 0) { <p>No announcements yet.</p> }
+        @foreach (var item in Model.Items)
+        {
+            <article class="announcement-row">
+                <div><h3>@item.Title</h3><p>@(item.Terms.Count == 0 ? "All terms" : string.Join(", ", item.Terms)) · @item.Audience · @(item.IsPublished ? "Published" : "Draft")</p><small>@CampusFlow.Web.Pages.Admin.AnnouncementsModel.ToCentral(item.StartsAtUtc).ToString("MMM d, yyyy h:mm tt") – @CampusFlow.Web.Pages.Admin.AnnouncementsModel.ToCentral(item.EndsAtUtc).ToString("MMM d, yyyy h:mm tt") Central</small></div>
+                <div class="announcement-row-actions"><a asp-page="/Admin/Announcements" asp-route-edit="@item.Id">Edit</a><form method="post" asp-page-handler="Delete" onsubmit="return confirm('Delete this announcement?')"><input type="hidden" name="id" value="@item.Id" /><button type="submit">Delete</button></form></div>
+            </article>
+        }
+    </section>
+</main>
+@section scripts { <abp-script src="/Pages/Admin/Announcements.js" /> }

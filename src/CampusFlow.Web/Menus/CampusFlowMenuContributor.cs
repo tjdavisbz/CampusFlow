@@ -13,6 +13,7 @@ using Volo.Abp.Users;
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using CampusFlow.Web.Portals;
 namespace CampusFlow.Web.Menus;
 public class CampusFlowMenuContributor : IMenuContributor
@@ -29,7 +30,10 @@ public class CampusFlowMenuContributor : IMenuContributor
         var l = context.GetLocalizer<CampusFlowResource>();
         var currentUser = context.ServiceProvider.GetRequiredService<ICurrentUser>();
         var currentStudentView = context.ServiceProvider.GetRequiredService<ICurrentStudentView>();
-        var hasStudentProfile = await currentStudentView.GetProfileAsync() is not null;
+        var facultyReader = context.ServiceProvider.GetRequiredService<FacultyPortalReader>();
+        var advisingReader = context.ServiceProvider.GetRequiredService<FacultyAdvisingReader>();
+        var studentProfile = await currentStudentView.GetProfileAsync();
+        var hasStudentProfile = studentProfile is not null;
 
         if (hasStudentProfile)
         {
@@ -84,6 +88,29 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 7
             )
             );
+            if (studentProfile?.Provider == CampusFlow.StudentInformationSystems.StudentInformationSystemProvider.ThesisElements &&
+                string.Equals(context.ServiceProvider.GetRequiredService<Volo.Abp.MultiTenancy.ICurrentTenant>().Name,
+                    "nelson", StringComparison.OrdinalIgnoreCase))
+            {
+                student.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.Documents,
+                    "My Documents",
+                    "~/Documents",
+                    icon: "fa fa-file-lines",
+                    order: 8));
+            }
+            if (!currentStudentView.IsImpersonating &&
+                studentProfile?.Provider == CampusFlow.StudentInformationSystems.StudentInformationSystemProvider.ThesisElements &&
+                string.Equals(context.ServiceProvider.GetRequiredService<Volo.Abp.MultiTenancy.ICurrentTenant>().Name,
+                    "nelson", StringComparison.OrdinalIgnoreCase))
+            {
+                student.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.PrivacyPasswords,
+                    "FERPA / Privacy Passwords",
+                    "~/PrivacyPasswords",
+                    icon: "fa fa-lock",
+                    order: 9));
+            }
             context.Menu.AddItem(student);
         }
 
@@ -104,8 +131,47 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(advisor);
         }
 
-        var impersonationAccess = context.ServiceProvider.GetRequiredService<StudentImpersonationAccessService>();
-        var canImpersonate = await impersonationAccess.EnsureAccessAsync();
+        FacultyIdentity? facultyIdentity = null;
+        var httpContext = context.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>().HttpContext;
+        var viewedFacultyId = httpContext is null ? null : FacultyViewSession.GetFacultyId(httpContext);
+        if (!currentStudentView.IsImpersonating && currentUser.IsAuthenticated)
+        {
+            try
+            {
+                facultyIdentity = viewedFacultyId.HasValue
+                    ? await facultyReader.FindByIdAsync(viewedFacultyId.Value, default)
+                    : await facultyReader.FindFacultyAsync(currentUser.Email, default);
+            }
+            catch (Exception exception)
+            {
+                context.ServiceProvider.GetRequiredService<ILogger<CampusFlowMenuContributor>>()
+                    .LogWarning(exception, "Unable to check faculty portal access for the menu.");
+            }
+        }
+        if (facultyIdentity is not null)
+        {
+            var faculty = new ApplicationMenuItem("CampusFlow.Faculty", "Faculty", icon: "fa fa-chalkboard-user", order: 2);
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.home", "Home", "~/Faculty", icon: "fa fa-home", order: 1));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.students", "My Students", "~/Faculty/students", icon: "fa fa-users", order: 2));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.schedule", "My Schedule", "~/Faculty/schedule", icon: "fa fa-calendar-days", order: 3));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.roster", "Class Roster", "~/Faculty/roster", icon: "fa fa-list", order: 4));
+            faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.courses", "My Courses", "~/Faculty/courses", icon: "fa fa-book", order: 5));
+            try
+            {
+                if (await advisingReader.HasAdvisorAccessAsync(facultyIdentity.FacultyId, default))
+                    faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.advising", "My Advisees", "~/Faculty/advising", icon: "fa fa-user-check", order: 6));
+            }
+            catch (Exception exception)
+            {
+                context.ServiceProvider.GetRequiredService<ILogger<CampusFlowMenuContributor>>()
+                    .LogWarning(exception, "Unable to check faculty advising access for the menu.");
+            }
+            if (!viewedFacultyId.HasValue)
+                faculty.AddItem(new ApplicationMenuItem("CampusFlow.Faculty.email", "Email Students", "~/Faculty/email", icon: "fa fa-envelope", order: 7));
+            context.Menu.AddItem(faculty);
+        }
+
+        var canImpersonate = await context.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
         var canManagePlans = await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
@@ -113,14 +179,21 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageAdvisorRouting = await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ManageRouting);
         var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
+        var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
-        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing)
+        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
+            if (canManageBibliu)
+                admin.AddItem(new ApplicationMenuItem("CampusFlow.Bibliu", "BibliU Bookstore", "~/Admin/Bibliu", icon: "fa fa-book", order: 8));
             if (canManageGlobalConfiguration)
+            {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.GlobalConfiguration, "Global Configuration",
                     "~/Admin/GlobalConfiguration", icon: "fa fa-globe", order: 1));
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.Announcements, "Announcements",
+                    "~/Admin/Announcements", icon: "fa fa-bullhorn", order: 2));
+            }
             var studentBilling = new ApplicationMenuItem(CampusFlowMenus.StudentBillingAdmin, "Student Billing",
                 icon: "fa fa-file-invoice-dollar", order: 4);
             if (canManagePlans)
@@ -160,8 +233,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AdvisorVisibility, "Advisor Assignments",
                     "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 3));
             if (canImpersonate)
+            {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
                     "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 7));
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateFaculty, "Impersonate Faculty",
+                    "~/Admin/ImpersonateFaculty", icon: "fa fa-chalkboard-user", order: 8));
+            }
             context.Menu.AddItem(admin);
         }
         //Administration

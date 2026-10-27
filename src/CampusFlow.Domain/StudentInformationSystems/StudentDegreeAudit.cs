@@ -37,7 +37,8 @@ public sealed record StudentDegreeAuditCourse(
     string Grade,
     decimal Credits,
     string Term,
-    string MatchedCourseCode);
+    string MatchedCourseCode,
+    int MatchedAcademicId = 0);
 
 public sealed record StudentDegreeAuditDetail(
     StudentDegreeAuditSummary Summary,

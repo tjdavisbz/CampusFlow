@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentPurposeInput = document.querySelector('#paymentPurposeInput');
     const paymentAmountLabel = document.querySelector('#paymentAmountLabel');
     const paymentAmountValue = document.querySelector('#paymentAmountValue');
+    const paymentFeeValue = document.querySelector('#paymentFeeValue');
+    const paymentTotalValue = document.querySelector('#paymentTotalValue');
     const paymentSubmitText = document.querySelector('#paymentSubmitButton span');
+    const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
     const updatePaymentAction = () => {
         const selectedChoice = document.querySelector('[name="paymentChoice"]:checked');
         const isDeferred = selectedChoice?.value === 'Deferred';
@@ -37,10 +40,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (paymentForm) paymentForm.hidden = !requiresPayment;
         if (deferredContinue) deferredContinue.hidden = !isDeferred || deferredPaymentDue;
         if (paymentPurposeInput) paymentPurposeInput.value = isDeferred ? 'Deferred' : 'PayNow';
-        const amount = isDeferred ? paymentForm?.dataset.deferredAmount : paymentForm?.dataset.payNowAmount;
+        const amount = Number(isDeferred ? paymentForm?.dataset.deferredAmount : paymentForm?.dataset.payNowAmount) || 0;
+        const feeRate = (Number(paymentForm?.dataset.feeRate) || 0) / 100;
+        const fee = Math.round((amount * feeRate + Number.EPSILON) * 100) / 100;
+        const total = amount + fee;
         if (paymentAmountLabel) paymentAmountLabel.textContent = isDeferred ? 'Payment-plan amount due today' : 'Payment amount';
-        if (paymentAmountValue && amount) paymentAmountValue.textContent = amount;
-        if (paymentSubmitText && amount) paymentSubmitText.textContent = `Pay ${amount} securely`;
+        if (paymentAmountValue) paymentAmountValue.textContent = currency.format(amount);
+        if (paymentFeeValue) paymentFeeValue.textContent = currency.format(fee);
+        if (paymentTotalValue) paymentTotalValue.textContent = currency.format(total);
+        if (paymentSubmitText) paymentSubmitText.textContent = `Pay ${currency.format(total)} securely`;
         if (planPreview) planPreview.hidden = !isDeferred;
     };
     document.querySelectorAll('[name="paymentChoice"]').forEach(choice => choice.addEventListener('change', () => {

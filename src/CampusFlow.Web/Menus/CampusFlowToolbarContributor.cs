@@ -5,6 +5,8 @@ using Volo.Abp.Users;
 using CampusFlow.Web.Components.Toolbar.LoginLink;
 using CampusFlow.Students;
 using CampusFlow.Web.Components.Toolbar.StudentView;
+using CampusFlow.Web.Components.Toolbar.FacultyView;
+using CampusFlow.Web.Portals;
 using Microsoft.AspNetCore.Http;
 using System.Linq;
 
@@ -28,6 +30,10 @@ public class CampusFlowToolbarContributor : IToolbarContributor
         if (httpContext?.User.Claims.Any(x => x.Type == StudentViewClaimTypes.ExternalStudentId) == true)
         {
             context.Toolbar.Items.Add(new ToolbarItem(typeof(StudentViewViewComponent), order: -100));
+        }
+        if (httpContext?.User.Claims.Any(x => x.Type == FacultyViewClaimTypes.FacultyId) == true)
+        {
+            context.Toolbar.Items.Add(new ToolbarItem(typeof(FacultyViewViewComponent), order: -100));
         }
 		
         return Task.CompletedTask;
