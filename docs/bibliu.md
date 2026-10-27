@@ -18,6 +18,8 @@ optimistic concurrency. A stale form must be reloaded before saving. There are
 no seeded production terms. Apply migration `AddBibliuConfiguration` to the
 intended CampusFlow database before using the screen. Production migration and
 test-configuration status are recorded in the [test setup record](discovery/bibliu-power-automate-test-setup.md).
+Production flow cutover and delivery verification are recorded in the
+[cutover record](discovery/bibliu-production-cutover.md).
 
 ## Export API
 
@@ -67,9 +69,9 @@ occur between reads. `generatedAtUtc` is generation time, not replica freshness.
 There is no saved run/snapshot API in this initial implementation.
 
 Rows preserve fixed-width POS fields before the existing flows' formatting steps.
-The API does not generate final files or perform SFTP delivery. The existing flows
-must eventually consume `exports.<kind>` instead of SQL `body/value`; do not wire
-this response directly into SFTP without retaining and testing the formatting.
+The API does not generate final files or perform SFTP delivery. The production
+flows consume `exports.<kind>` and retain the verified Power Automate formatting
+steps before delivery through their existing SFTP connection.
 Do not trim spaces from POS fields. Dates use the legacy MM/dd/yyyy text format.
 
 Missing/disabled configuration, missing terms, source failure, invalid POS
@@ -90,7 +92,7 @@ retained in ordinary run logs.
   native record exists for that student/term. Drafts and AwaitingPayment do not qualify
   or fall back to legacy approval. Legacy false flags, missing acceptance dates and
   unspecified term 0 do not qualify. Legacy approval-table existence alone is insufficient.
-  See [legacy import preparation](discovery/legacy-bill-approval-import.md) for rollout status.
+  See [legacy import record](discovery/legacy-bill-approval-import.md) for rollout status.
 * Amount is `max(0, max(500, -balanceIncludingPendingAid) - max(0, BOOK usage))`.
   Balance includes the billing term plus previous terms, with legacy report,
   void/reversal and pending-aid eligibility filters. Current balance and usage
@@ -115,9 +117,10 @@ logging controls. All four query shapes were validated against the reporting
 replica; readers were exercised without delivery, including a synthetic voucher
 eligibility preview whose identities and amounts were suppressed.
 
-Production flows remain unchanged. Before cutover, verify identifier continuity
-and final formatted files with BibliU and test through an approved staging
-destination. See the test setup record for completed provisioning, validation,
-and remaining rollout work. Test copies contain no SFTP delivery actions.
+After verification of all four formatted files and explicit user authorization,
+the three existing production flows were switched to the CampusFlow export API.
+Their original recurrence schedules, SFTP connection, folders and filenames were
+retained. See the cutover record for live delivery results and rollback details.
+Test copies remain stopped and contain no SFTP delivery actions.
 
 See [discovery findings](discovery/bibliu-elements-migration.md) for source mapping.

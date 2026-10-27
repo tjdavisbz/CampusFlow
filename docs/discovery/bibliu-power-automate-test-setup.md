@@ -77,9 +77,9 @@ All four source-based private file reconstructions matched the new Power Automat
 
 Final management readback confirmed all three originals still matched their preserved definitions, connection references, names and states. All three test copies were `Stopped`, manual-only, protected and connected only to the dedicated Key Vault connection, with no delivery actions.
 
-## Remaining before cutover
+## Subsequent production cutover
 
-The voucher-bearing file is now verified through the manual test copy. Review the four current files with the bookstore/BibliU owner and test delivery through an approved staging destination. Production flow changes and BibliU delivery remain outside this completed test setup and require the user's cutover instruction.
+After the voucher-bearing file was verified, the user accepted the format/rule checks and explicitly authorized production cutover. The three existing production flows now use the verified API steps and original delivery destinations/schedules. All three live runs and all four SFTP uploads succeeded; the test copies remain stopped. See the [production cutover record](bibliu-production-cutover.md) for current state, run IDs, file checks and rollback details.
 
 
 Private original/test definitions and manifests are retained under ignored `tools/local/bibliu-flow-test/`; credentials and student rows are not included in this document.

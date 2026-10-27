@@ -2,7 +2,7 @@
 
 ## Scope and current state
 
-With explicit user approval, the history migration and all 83,167 source records were applied to the nelson production tenant (`3a236d25-0541-8fa3-25ec-fecc83432a1a`). Commit `45fcb2726bfc04e714a4030fea03f938f32954d1` was deployed successfully through [production run 40444333879](https://github.com/tjdavisbz/CampusFlow/actions/runs/40444333879) on October 26, 2026 (Central time). Production Power Automate flows and BibliU delivery remain unchanged.
+With explicit user approval, the history migration and all 83,167 source records were applied to the nelson production tenant (`3a236d25-0541-8fa3-25ec-fecc83432a1a`). Commit `45fcb2726bfc04e714a4030fea03f938f32954d1` was deployed successfully through [production run 40444333879](https://github.com/tjdavisbz/CampusFlow/actions/runs/40444333879) on October 26, 2026 (Central time). Production Power Automate flows and BibliU delivery were unchanged during this import/deployment; the subsequent separately authorized [production cutover](bibliu-production-cutover.md) is now complete.
 
 The supplied tab-separated export is from custom legacy `SAGU_ApprovedBills`, not the Elements reporting replica. Its header is `StudentUID`, `TermCalendarID`, `Approved`, `LoginTime`, `AcceptTime`. Source SHA-256: `1bd80658c5a09a3501b213356365e76eb476f5a8ebf9839a3860d6cc7b6d5f4f`. The source file and student mappings remain private; neither is committed.
 
