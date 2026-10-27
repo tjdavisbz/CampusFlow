@@ -109,9 +109,14 @@
                         <p>@DegreeAuditModel.StatusLabel(requirement.Key.RequirementStatus) · @DegreeAuditModel.Number(requirement.Key.RequirementCreditsCompleted) of @DegreeAuditModel.Number(requirement.Key.RequirementCreditsRequired) credits</p>
                         @foreach (var group in requirement.GroupBy(x => new { x.GroupName, x.GroupSortOrder, x.GroupStatus, x.GroupCreditsRequired, x.GroupCreditsCompleted }).OrderBy(x => x.Key.GroupSortOrder))
                         {
+                            var visibleCourses = DegreeAuditDisplay.CoursesForGroup(group, Model.SelectedAudit.Courses);
                             <h4>@group.Key.GroupName <small>· @DegreeAuditModel.StatusLabel(group.Key.GroupStatus) · @DegreeAuditModel.Number(group.Key.GroupCreditsCompleted) / @DegreeAuditModel.Number(group.Key.GroupCreditsRequired) credits</small></h4>
                             <div class="faculty-table-wrap"><table><thead><tr><th>Course</th><th>Name</th><th>Term</th><th>Credits</th><th>Grade</th><th>Status</th></tr></thead><tbody>
-                                @foreach (var course in group)
+                                @if (visibleCourses.Count == 0)
+                                {
+                                    <tr><td colspan="6">No electives completed or in progress yet.</td></tr>
+                                }
+                                @foreach (var course in visibleCourses)
                                 {
                                     <tr><td>@(string.IsNullOrWhiteSpace(course.CourseCode) ? "Requirement" : course.CourseCode)</td><td>@course.CourseName</td><td>@course.Term</td>
                                         <td>@DegreeAuditModel.Number(course.Credits)</td><td>@course.Grade</td><td>@DegreeAuditModel.StatusLabel(course.CourseStatus)</td></tr>

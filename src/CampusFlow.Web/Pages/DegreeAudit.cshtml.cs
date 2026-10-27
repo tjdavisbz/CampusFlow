@@ -182,7 +182,8 @@ public class DegreeAuditModel : CampusFlowPageModel
                     .Select(group => new CourseGroup(
                         group.Key.GroupName, group.Key.GroupStatus, group.Key.GroupCreditsRequired,
                         group.Key.GroupCreditsCompleted, group.Key.GroupMinimumGpa,
-                        group.Key.GroupGpaAttained, group.ToArray()))
+                        group.Key.GroupGpaAttained,
+                        DegreeAuditDisplay.CoursesForGroup(group, courses)))
                     .ToArray()))
             .ToArray();
 
