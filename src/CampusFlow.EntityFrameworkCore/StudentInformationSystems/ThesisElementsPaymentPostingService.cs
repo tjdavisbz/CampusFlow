@@ -34,13 +34,14 @@ public sealed class ThesisElementsPaymentPostingService :
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
 
     public async Task<StudentPaymentPostingResult> PostAsync(string externalStudentId, int termCalendarId,
-        decimal amount, string externalReference, bool isTest, DateTime transactionDate,
+        decimal amount, decimal convenienceFee, string externalReference, bool isTest, DateTime transactionDate,
         CancellationToken cancellationToken = default)
     {
         if (!int.TryParse(externalStudentId, out var studentUid))
             throw new ArgumentException("The Thesis Elements student identifier is invalid.", nameof(externalStudentId));
         if (termCalendarId <= 0) throw new ArgumentOutOfRangeException(nameof(termCalendarId));
         if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        if (convenienceFee < 0) throw new ArgumentOutOfRangeException(nameof(convenienceFee));
         if (string.IsNullOrWhiteSpace(externalReference))
             throw new ArgumentException("A gateway reference is required.", nameof(externalReference));
 
@@ -56,38 +57,68 @@ public sealed class ThesisElementsPaymentPostingService :
         if (batchId is null)
             throw new InvalidOperationException("Elements created the payment batch but did not return it in the batch list.");
 
-        var existingBillingBatchId = await FindExistingEntryAsync(token, studentUid, batchId.Value,
-            externalReference, cancellationToken);
-        if (existingBillingBatchId is not null)
-            return new StudentPaymentPostingResult(batchId.Value, existingBillingBatchId.Value);
+        var paymentReference = externalReference.Trim();
+        var billingBatchId = await FindExistingEntryAsync(token, studentUid, batchId.Value,
+                                 paymentReference, cancellationToken)
+                             ?? await CreateEntryAsync(token, studentUid, termCalendarId, batchId.Value,
+                                 amount, paymentReference, transactionDate,
+                                 Posting("TransactionType"), PostingInt("TransactionDocumentId"),
+                                 PostingInt("ArTypeId"), Posting("Description"), "payment", cancellationToken);
 
+        int? feeBillingBatchId = null;
+        if (convenienceFee > 0)
+        {
+            var feeReference = FeeReference(paymentReference);
+            feeBillingBatchId = await FindExistingEntryAsync(token, studentUid, batchId.Value,
+                                    feeReference, cancellationToken)
+                                ?? await CreateEntryAsync(token, studentUid, termCalendarId, batchId.Value,
+                                    convenienceFee, feeReference, transactionDate,
+                                    Posting("ConvenienceFeeTransactionType"),
+                                    PostingInt("ConvenienceFeeTransactionDocumentId"),
+                                    PostingInt("ConvenienceFeeArTypeId"),
+                                    Posting("ConvenienceFeeDescription"), "convenience-fee", cancellationToken);
+        }
+
+        return new StudentPaymentPostingResult(batchId.Value, billingBatchId, feeBillingBatchId);
+    }
+
+    private async Task<int> CreateEntryAsync(string token, int studentUid, int termCalendarId,
+        int batchMasterId, decimal amount, string reference, DateTime transactionDate,
+        string transactionType, int transactionDocumentId, int arTypeId, string description,
+        string operation, CancellationToken cancellationToken)
+    {
         using var request = CreateRequest(HttpMethod.Post, "/api/billing/batch/student/batch", token);
         request.Content = JsonContent(new
         {
-            batchMasterID = batchId.Value,
+            batchMasterID = batchMasterId,
             billingBatchID = 0,
             allClear = string.Empty,
             studentID = studentUid,
             termID = termCalendarId,
-            transactionTypeID = Posting("TransactionType"),
+            transactionTypeID = transactionType,
             currencyTypeID = (int?)null,
             extendedDocID = PostingInt("ExtendedDocumentId"),
-            transDocID = PostingInt("TransactionDocumentId"),
+            transDocID = transactionDocumentId,
             transactionDate,
             amount,
             currencyTypeAmt = (decimal?)null,
-            arTypeID = PostingInt("ArTypeId"),
-            description = Posting("Description"),
+            arTypeID = arTypeId,
+            description,
             paymentPlanID = 0,
-            refNo = externalReference.Trim()
+            refNo = reference
         });
         using var response = await HttpClient.SendAsync(request, cancellationToken);
-        var root = await ReadRootAsync(response, "payment entry", cancellationToken);
+        var root = await ReadRootAsync(response, $"{operation} entry", cancellationToken);
         var billingBatchId = ReadInt(root["data"]);
         if (root["isSuccess"]?.GetValue<bool>() != true || billingBatchId <= 0)
-            throw new InvalidOperationException(ReadApiError(root, "Elements did not accept the payment entry."));
+            throw new InvalidOperationException(ReadApiError(root, $"Elements did not accept the {operation} entry."));
+        return billingBatchId;
+    }
 
-        return new StudentPaymentPostingResult(batchId.Value, billingBatchId);
+    private static string FeeReference(string paymentReference)
+    {
+        const string suffix = "-FEE";
+        return paymentReference[..Math.Min(paymentReference.Length, 64 - suffix.Length)] + suffix;
     }
 
     private async Task<int?> FindBatchAsync(string token, string comment, CancellationToken cancellationToken)

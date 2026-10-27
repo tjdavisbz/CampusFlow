@@ -72,6 +72,10 @@
                             <article class="audit-group">
                                 <header><div><h3>@group.Name</h3><span>@DegreeAuditModel.Number(group.CreditsCompleted) of @DegreeAuditModel.Number(group.CreditsRequired) credits · Minimum GPA @group.MinimumGpa.ToString("0.00")</span></div><span class="status-pill @DegreeAuditModel.StatusClass(group.Status)">@DegreeAuditModel.StatusLabel(group.Status)</span></header>
                                 <div class="course-list">
+                                    @if (group.Courses.Count == 0)
+                                    {
+                                        <p class="audit-empty-group">No electives completed or in progress yet.</p>
+                                    }
                                     @foreach (var course in group.Courses)
                                     {
                                         <div class="audit-course"><div><strong>@(string.IsNullOrWhiteSpace(course.CourseCode) ? "Course requirement" : course.CourseCode)</strong><span>@course.CourseName</span></div><div class="course-facts"><span>@(string.IsNullOrWhiteSpace(course.Term) ? "Not yet completed" : course.Term)</span><span>@DegreeAuditModel.Number(course.Credits) credits</span>@if (!string.IsNullOrWhiteSpace(course.Grade)){<span>Grade @course.Grade</span>}<span class="status-pill @DegreeAuditModel.StatusClass(course.CourseStatus)">@DegreeAuditModel.StatusLabel(course.CourseStatus)</span></div></div>

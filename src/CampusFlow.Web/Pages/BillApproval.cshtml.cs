@@ -54,6 +54,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly IPayflowGateway _payflowGateway;
     private readonly PayflowOptions _payflowOptions;
     private readonly ILogger<BillApprovalModel> _logger;
+    private readonly ILegacyBillApprovalLookup _legacyApprovals;
 
     public BillApprovalModel(
         ITenantThemeProvider themeProvider,
@@ -80,7 +81,8 @@ public class BillApprovalModel : CampusFlowPageModel
         IRepository<PayflowPayment, Guid> payflowPayments,
         IPayflowGateway payflowGateway,
         IOptions<PayflowOptions> payflowOptions,
-        ILogger<BillApprovalModel> logger)
+        ILogger<BillApprovalModel> logger,
+        ILegacyBillApprovalLookup legacyApprovals)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
@@ -107,6 +109,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _payflowGateway = payflowGateway;
         _payflowOptions = payflowOptions.Value;
         _logger = logger;
+        _legacyApprovals = legacyApprovals;
     }
 
     public TenantTheme Theme { get; private set; } = new(
@@ -125,6 +128,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public StudentPaymentPlan? PaymentPlan { get; private set; }
     public AgreementTemplate? Agreement { get; private set; }
     public bool IsAlreadyAccepted { get; private set; }
+    public LegacyBillApproval? LegacyApproval { get; private set; }
     public bool PdfAvailable { get; private set; }
     public bool DocumentTrackingCompleted { get; private set; }
     public string? PdfFileName { get; private set; }
@@ -145,7 +149,10 @@ public class BillApprovalModel : CampusFlowPageModel
     public string InitialStep { get; private set; } = "review";
     public string InitialPaymentChoice { get; private set; } = "PayNow";
     public bool IsPayflowTestMode => _payflowOptions.TestMode;
+    public decimal ConvenienceFeePercent => _payflowOptions.ConvenienceFeeRate * 100m;
     public decimal DeferredDueToday => PaymentPlan?.Installments.FirstOrDefault()?.Amount ?? 0m;
+    public decimal ConvenienceFee(decimal amount) => _payflowOptions.CalculateConvenienceFee(amount);
+    public decimal TotalCardCharge(decimal amount) => amount + ConvenienceFee(amount);
     public decimal TotalCredits => Courses.Sum(x => x.Credits);
     public decimal ChargesTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Debit);
     public decimal CreditsTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Credit);
@@ -216,8 +223,9 @@ public class BillApprovalModel : CampusFlowPageModel
             Courses = allCourses.Where(x => x.TermCode == TermCode)
                 .OrderBy(x => x.Department).ThenBy(x => x.CourseNumber).ToArray();
             var courseTerm = Courses.FirstOrDefault();
-            TermName = courseTerm?.TermName ?? currentTerm?.DisplayName ?? "Current term";
+            TermName = courseTerm?.TermName ?? termConfiguration?.TermName ?? currentTerm?.DisplayName ?? "Current term";
             ExternalTermId = courseTerm?.ExternalTermId;
+            ExternalTermId ??= termConfiguration?.ExternalTermId;
 
             var allTransactions = await billingTask;
             Charges = allTransactions.Where(x => x.TermCode == TermCode)
@@ -258,6 +266,12 @@ public class BillApprovalModel : CampusFlowPageModel
                         PdfFileName = artifact?.PdfFileName;
                     }
                 }
+                if (!IsAlreadyAccepted && profile.Provider == StudentInformationSystemProvider.ThesisElements &&
+                    !await _billApprovals.AnyAsync(x => x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId))
+                {
+                    LegacyApproval = await _legacyApprovals.FindAsync(profile.ExternalStudentId, ExternalTermId, HttpContext.RequestAborted);
+                    IsAlreadyAccepted = LegacyApproval?.CountsAsApproved == true;
+                }
             }
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -271,6 +285,7 @@ public class BillApprovalModel : CampusFlowPageModel
     {
         InitialStep = "payment";
         await OnGetAsync(term, InitialStep, PaymentPurposeInput);
+        if (LegacyApproval?.CountsAsApproved == true) return RedirectToPage(new { term });
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (_currentStudentView.IsImpersonating || CurrentUser.Id is null || profile is null)
             return Unauthorized();
@@ -303,16 +318,20 @@ public class BillApprovalModel : CampusFlowPageModel
             return Page();
         }
         var id = _guidGenerator.Create();
+        var convenienceFee = _payflowOptions.CalculateConvenienceFee(amount);
+        var totalCharge = amount + convenienceFee;
         var payment = new PayflowPayment(id, CurrentTenant.Id, CurrentUser.Id.Value, profile.Id,
-            profile.ExternalStudentId, amount, _payflowOptions.Currency, Guid.NewGuid().ToString("N"),
+            profile.ExternalStudentId, amount, convenienceFee, _payflowOptions.Currency, Guid.NewGuid().ToString("N"),
             _payflowOptions.TestMode);
         await _payflowPayments.InsertAsync(payment, autoSave: true);
         try
         {
             var number = Regex.Replace(PaymentCardNumber, @"[\s-]", string.Empty);
-            var response = await _payflowGateway.SaleAsync(amount, $"CF{id:N}"[..20],
+            var response = await _payflowGateway.SaleAsync(totalCharge, $"CF{id:N}"[..20],
                 new PayflowCard(number, PaymentExpirationMonth, PaymentExpirationYear,
-                    PaymentSecurityCode, PaymentPostalCode), HttpContext.RequestAborted);
+                    PaymentSecurityCode, PaymentPostalCode),
+                new PayflowCustomer(profile.StudentId, profile.FirstName, profile.LastName),
+                HttpContext.RequestAborted);
             payment.Complete(response.IsDirectSaleApproved, response.Result, response.Message, response.Reference);
             await _payflowPayments.UpdateAsync(payment, autoSave: true);
             _logger.LogInformation(
@@ -331,9 +350,10 @@ public class BillApprovalModel : CampusFlowPageModel
             {
                 var postingService = _paymentPostingServices.Single(x => x.Provider == profile.Provider);
                 var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId, amount,
-                    response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
+                    convenienceFee, response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
                     HttpContext.RequestAborted);
-                payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId);
+                payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId,
+                    posting.ConvenienceFeeBillingBatchId);
                 await _payflowPayments.UpdateAsync(payment, autoSave: true);
             }
             catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -346,10 +366,10 @@ public class BillApprovalModel : CampusFlowPageModel
             }
 
             StatusMessage = accountUpdatePending
-                ? $"Your payment of {Currency(amount)} was received. Your student account is still updating, but you can continue reviewing the agreement."
+                ? $"Your card charge of {Currency(totalCharge)} ({Currency(amount)} payment plus {Currency(convenienceFee)} convenience fee) was received. Your student account is still updating, but you can continue reviewing the agreement."
                 : isDeferredPayment
-                    ? $"Your payment-plan amount of {Currency(amount)} due today was received. You can now review and record your agreement."
-                    : $"Your payment of {Currency(amount)} was received. You can now review and record your agreement.";
+                    ? $"Your payment-plan card charge of {Currency(totalCharge)} ({Currency(amount)} payment plus {Currency(convenienceFee)} convenience fee) was received. You can now review and record your agreement."
+                    : $"Your card charge of {Currency(totalCharge)} ({Currency(amount)} payment plus {Currency(convenienceFee)} convenience fee) was received. You can now review and record your agreement.";
             ClearPaymentFields();
             return RedirectToPage(new { term, step = "agreement", choice = isDeferredPayment ? "Deferred" : "PayNow" });
         }
@@ -367,6 +387,11 @@ public class BillApprovalModel : CampusFlowPageModel
     public async Task<IActionResult> OnPostAsync([FromQuery] string? term = null)
     {
         await OnGetAsync(term);
+        if (LegacyApproval?.CountsAsApproved == true)
+        {
+            StatusMessage = "Your legacy bill approval is already recorded.";
+            return RedirectToPage(new { term });
+        }
         if (IsUnavailable || CurrentUser.Id is null || string.IsNullOrWhiteSpace(ExternalTermId) || Agreement is null)
         {
             StatusMessage = "Your agreement could not be saved. Please reload the page and try again.";

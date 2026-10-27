@@ -18,7 +18,6 @@ namespace CampusFlow.Web.Pages.Admin;
 [Authorize]
 public class ImpersonateStudentModel : CampusFlowPageModel
 {
-    private readonly StudentImpersonationAccessService _access;
     private readonly StudentViewSession _session;
     private readonly IPermissionChecker _permissionChecker;
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _lookups;
@@ -26,14 +25,12 @@ public class ImpersonateStudentModel : CampusFlowPageModel
     private readonly ITenantThemeProvider _tenantThemeProvider;
 
     public ImpersonateStudentModel(
-        StudentImpersonationAccessService access,
         StudentViewSession session,
         IPermissionChecker permissionChecker,
         IEnumerable<IStudentInformationSystemStudentLookup> lookups,
         ILogger<ImpersonateStudentModel> logger,
         ITenantThemeProvider tenantThemeProvider)
     {
-        _access = access;
         _session = session;
         _permissionChecker = permissionChecker;
         _lookups = lookups.ToArray();
@@ -97,9 +94,8 @@ public class ImpersonateStudentModel : CampusFlowPageModel
         return RedirectToPage("/Index");
     }
 
-    private async Task<bool> CanUseAsync() =>
-        await _access.EnsureAccessAsync() &&
-        await _permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
+    private Task<bool> CanUseAsync() =>
+        _permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
 
     private static string GetSearchType(string query) =>
         query.Contains('@', StringComparison.Ordinal) ? "email" :

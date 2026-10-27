@@ -1,0 +1,80 @@
+@page
+@model CampusFlow.Web.Pages.DocumentsModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "My Documents";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.Documents;
+}
+
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl)) { <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" /> }
+    <abp-style src="/Pages/Documents.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
+}
+
+<main class="documents-page">
+    <header class="documents-hero">
+        <span>Student records</span>
+        <h1>My Documents</h1>
+        <p>Track documents requested by Nelson and open files that have been made available to you.</p>
+    </header>
+
+    <section class="documents-panel" aria-labelledby="documents-heading">
+        <div class="documents-toolbar">
+            <div><span>Document tracking</span><h2 id="documents-heading">@(Model.ShowAll ? "All documents" : "Outstanding documents")</h2></div>
+            <form method="get">
+                <label class="documents-toggle" for="show-all">
+                    <input id="show-all" type="checkbox" name="showAll" value="true" checked="@Model.ShowAll" onchange="this.form.submit()" />
+                    Include completed items
+                </label>
+                <noscript><button type="submit">Apply</button></noscript>
+            </form>
+        </div>
+
+        @if (Model.IsUnavailable)
+        {
+            <div class="documents-empty" role="status"><h3>Documents are temporarily unavailable</h3><p>Please try again shortly.</p></div>
+        }
+        else if (Model.Documents.Count == 0)
+        {
+            <div class="documents-empty"><h3>No documents to display</h3><p>@(Model.ShowAll ? "No documents are currently listed for your student record." : "You have no outstanding documents. Select ‘Include completed items’ to see your history.")</p></div>
+        }
+        else
+        {
+            <div class="documents-table-wrap">
+                <table class="documents-table">
+                    <thead><tr><th>Department</th><th>Date</th><th>Document</th><th>Description</th><th>Status</th><th>Completed</th><th>Available files</th></tr></thead>
+                    <tbody>
+                    @foreach (var document in Model.Documents)
+                    {
+                        <tr>
+                            <td data-label="Department">@document.Department</td>
+                            <td data-label="Date">@(document.Date?.ToString("MMM d, yyyy") ?? "—")</td>
+                            <td data-label="Document"><strong>@document.Name</strong></td>
+                            <td data-label="Description">@(string.IsNullOrWhiteSpace(document.Description) ? "—" : document.Description)</td>
+                            <td data-label="Status"><span class="documents-status @(document.CompletedAt.HasValue ? "complete" : "pending")">@document.Status</span></td>
+                            <td data-label="Completed">@(document.CompletedAt?.ToString("MMM d, yyyy") ?? "—")</td>
+                            <td data-label="Available files">
+                                @if (document.Images.Count == 0) { <span class="documents-no-file">—</span> }
+                                else
+                                {
+                                    <div class="documents-files">
+                                    @foreach (var image in document.Images)
+                                    {
+                                        <a asp-page="/Documents" asp-page-handler="Image" asp-route-imageId="@image.Id" target="_blank" rel="noopener noreferrer" title="@image.FileName" aria-label="View @image.FileName"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> View file</a>
+                                    }
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</main>

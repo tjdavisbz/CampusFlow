@@ -51,6 +51,7 @@
     <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.3" />
   </ItemGroup>
 
   <ItemGroup>

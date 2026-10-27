@@ -30,6 +30,10 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:Admin.RegistrationRules"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.AccessManagement,
             L("Permission:Admin.AccessManagement"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.BibliuConfiguration,
+            new FixedLocalizableString("Manage BibliU configuration"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.BibliuExport,
+            new FixedLocalizableString("Read BibliU exports"), MultiTenancySides.Tenant);
         var studentBilling = admin.AddChild(CampusFlowPermissions.Admin.StudentBilling,
             L("Permission:Admin.StudentBilling"), MultiTenancySides.Tenant);
         studentBilling.AddChild(CampusFlowPermissions.Admin.ResetIndividualBillApproval,

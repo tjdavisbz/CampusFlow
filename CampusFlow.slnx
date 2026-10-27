@@ -6,6 +6,7 @@
         <Project Path="src/CampusFlow.Domain/CampusFlow.Domain.csproj" />
         <Project Path="src/CampusFlow.Application/CampusFlow.Application.csproj" />
         <Project Path="src/CampusFlow.EntityFrameworkCore/CampusFlow.EntityFrameworkCore.csproj" />
+        <Project Path="src/CampusFlow.LegacyBillApprovalImport/CampusFlow.LegacyBillApprovalImport.csproj" />
         <Project Path="src/CampusFlow.Web/CampusFlow.Web.csproj" />
         <Project Path="src/CampusFlow.Domain.Shared/CampusFlow.Domain.Shared.csproj" />
         <Project Path="src/CampusFlow.Application.Contracts/CampusFlow.Application.Contracts.csproj" />

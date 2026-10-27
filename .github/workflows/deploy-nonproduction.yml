@@ -1,0 +1,112 @@
+name: Deploy non-production
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: campusflow-nonproduction
+  cancel-in-progress: false
+
+env:
+  AZURE_WEBAPP_NAME: app-campusflow-nonprod-001
+  DOTNET_VERSION: 10.0.x
+  WEB_PROJECT: src/CampusFlow.Web/CampusFlow.Web.csproj
+  PUBLISH_DIRECTORY: ${{ github.workspace }}/publish
+
+jobs:
+  build-test-deploy:
+    name: Build, test, and deploy
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment:
+      name: nonproduction
+      url: ${{ steps.deploy.outputs.webapp-url }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Restore dependencies
+        run: dotnet restore CampusFlow.slnx
+
+      - name: Install client-side libraries
+        run: |
+          dotnet tool install --global Volo.Abp.Studio.Cli --version 3.0.7
+          abp install-libs
+
+      - name: Run tests
+        run: dotnet test CampusFlow.slnx --configuration Release --no-restore
+
+      - name: Restore non-production OpenIddict certificate
+        shell: bash
+        env:
+          OPENIDDICT_PFX_BASE64: ${{ secrets.OPENIDDICT_PFX_BASE64 }}
+        run: |
+          if [ -z "$OPENIDDICT_PFX_BASE64" ]; then
+            echo "OPENIDDICT_PFX_BASE64 is not configured in the nonproduction environment." >&2
+            exit 1
+          fi
+          printf '%s' "$OPENIDDICT_PFX_BASE64" | base64 --decode > src/CampusFlow.Web/openiddict.pfx
+
+      - name: Publish web application
+        run: >-
+          dotnet publish "${{ env.WEB_PROJECT }}"
+          --configuration Release
+          --no-restore
+          --output "${{ env.PUBLISH_DIRECTORY }}"
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify non-production configuration is ready
+        shell: bash
+        run: |
+          ready=$(az webapp config appsettings list \
+            --resource-group rg_campusflow --name "$AZURE_WEBAPP_NAME" \
+            --query "[?name=='CampusFlow__NonProductionReady'].value | [0]" -o tsv)
+          if [ "$ready" != "true" ]; then
+            echo "Non-production database, Elements endpoints, and authentication must be verified before deployment." >&2
+            exit 1
+          fi
+
+      - name: Deploy to non-production App Service
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          slot-name: production
+          package: ${{ env.PUBLISH_DIRECTORY }}
+
+      - name: Verify deployed health endpoint
+        shell: bash
+        env:
+          APP_URL: ${{ steps.deploy.outputs.webapp-url }}
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            --retry-delay 10 --max-time 30 "${APP_URL%/}/health-status"
+
+      - name: Sign out of Azure
+        if: always()
+        continue-on-error: true
+        run: az logout

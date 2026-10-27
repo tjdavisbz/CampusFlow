@@ -14,6 +14,8 @@ public class PayflowPayment : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public Guid StudentProfileId { get; private set; }
     public string ExternalStudentId { get; private set; } = null!;
     public decimal Amount { get; private set; }
+    public decimal ConvenienceFee { get; private set; }
+    public decimal TotalCharged => Amount + ConvenienceFee;
     public string Currency { get; private set; } = null!;
     public string SecureTokenId { get; private set; } = null!;
     public string? SecureToken { get; private set; }
@@ -26,19 +28,22 @@ public class PayflowPayment : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public int ElementsPostingAttempts { get; private set; }
     public int? ElementsBatchMasterId { get; private set; }
     public int? ElementsBillingBatchId { get; private set; }
+    public int? ElementsFeeBillingBatchId { get; private set; }
     public string? ElementsPostingError { get; private set; }
     public DateTime? ElementsPostedAt { get; private set; }
 
     protected PayflowPayment() { }
 
     public PayflowPayment(Guid id, Guid? tenantId, Guid userId, Guid studentProfileId,
-        string externalStudentId, decimal amount, string currency, string secureTokenId, bool isTest) : base(id)
+        string externalStudentId, decimal amount, decimal convenienceFee, string currency, string secureTokenId,
+        bool isTest) : base(id)
     {
         TenantId = tenantId;
         UserId = userId;
         StudentProfileId = studentProfileId;
         ExternalStudentId = externalStudentId;
         Amount = amount;
+        ConvenienceFee = convenienceFee;
         Currency = currency;
         SecureTokenId = secureTokenId;
         IsTest = isTest;
@@ -52,11 +57,12 @@ public class PayflowPayment : FullAuditedAggregateRoot<Guid>, IMultiTenant
         Status = approved ? PayflowPaymentStatus.Approved : PayflowPaymentStatus.Declined;
         ElementsPostingStatus = approved ? ElementsPaymentPostingStatus.Pending : ElementsPaymentPostingStatus.NotRequired;
     }
-    public void MarkElementsPosted(int batchMasterId, int billingBatchId)
+    public void MarkElementsPosted(int batchMasterId, int billingBatchId, int? feeBillingBatchId)
     {
         ElementsPostingAttempts++;
         ElementsBatchMasterId = batchMasterId;
         ElementsBillingBatchId = billingBatchId;
+        ElementsFeeBillingBatchId = feeBillingBatchId;
         ElementsPostingError = null;
         ElementsPostedAt = DateTime.UtcNow;
         ElementsPostingStatus = ElementsPaymentPostingStatus.Posted;

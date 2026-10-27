@@ -19,8 +19,10 @@ using CampusFlow.Permissions;
 using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Identity;
 using CampusFlow.BillApprovals;
+using CampusFlow.Web.BillApprovals;
 using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
+using CampusFlow.Announcements;
 
 namespace CampusFlow.Web.Pages;
 
@@ -46,6 +48,8 @@ public class IndexModel : CampusFlowPageModel
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
     private readonly IConfiguration _configuration;
+    private readonly IRepository<PortalAnnouncement, Guid> _announcements;
+    private readonly ILegacyBillApprovalLookup _legacyApprovals;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -66,7 +70,9 @@ public class IndexModel : CampusFlowPageModel
         IRepository<BillApprovalTermConfiguration, Guid> billApprovalTermConfigurations,
         IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IRepository<PortalAnnouncement, Guid> announcements,
+        ILegacyBillApprovalLookup legacyApprovals)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -87,6 +93,8 @@ public class IndexModel : CampusFlowPageModel
         _billingLookups = billingLookups.ToArray();
         _scheduleLookups = scheduleLookups.ToArray();
         _configuration = configuration;
+        _announcements = announcements;
+        _legacyApprovals = legacyApprovals;
     }
 
     public string? TenantName { get; private set; }
@@ -104,6 +112,8 @@ public class IndexModel : CampusFlowPageModel
     public int AdvisorStudentCount { get; private set; }
     public int AdvisorCourseCount { get; private set; }
     public RegistrationJourneyViewModel? RegistrationJourney { get; private set; }
+    public IReadOnlyList<PortalAnnouncement> VisibleAnnouncements { get; private set; } = [];
+    public IReadOnlyList<DashboardTermOption> AnnouncementTerms { get; private set; } = [];
 
     public async Task OnGetAsync([FromQuery] string? term = null)
     {
@@ -160,6 +170,11 @@ public class IndexModel : CampusFlowPageModel
             StudentIdentifier = profile.StudentId;
             StudentDisplayName = profile.DisplayName;
 
+            var now = DateTime.UtcNow;
+            var activeAnnouncements = (await _announcements.GetListAsync())
+                .Where(x => x.IsPublished && x.StartsAtUtc <= now && now < x.EndsAtUtc &&
+                    x.Audience.HasFlag(AnnouncementAudience.Student)).ToArray();
+
             var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             if (termLookup is not null)
             {
@@ -168,24 +183,39 @@ public class IndexModel : CampusFlowPageModel
                     var sisTerms = await termLookup.GetTermsAsync(HttpContext.RequestAborted);
                     var configuredTerms = (await _registrationTermConfigurations.GetListAsync())
                         .Where(x => x.IsStudentSelectable).OrderByDescending(x => x.TermCode).ToArray();
-                    DashboardTerms = configuredTerms.Select(configuration =>
+                    var configuredOptions = configuredTerms.Select(configuration =>
                     {
                         var sisTerm = sisTerms.FirstOrDefault(x => x.ExternalTermId == configuration.ExternalTermId);
                         return new DashboardTermOption(configuration.ExternalTermId, configuration.TermName,
                             sisTerm?.StartDate, sisTerm?.EndDate);
                     }).ToArray();
+                    var announcementOptions = sisTerms.Where(sisTerm =>
+                            activeAnnouncements.Any(announcement => announcement.Terms.Contains(
+                                sisTerm.DisplayName, StringComparer.OrdinalIgnoreCase)) &&
+                            configuredOptions.All(option => option.ExternalTermId != sisTerm.ExternalTermId))
+                        .Select(sisTerm => new DashboardTermOption(sisTerm.ExternalTermId,
+                            sisTerm.DisplayName, sisTerm.StartDate, sisTerm.EndDate));
+                    DashboardTerms = configuredOptions.Concat(announcementOptions).ToArray();
                     var selectedId = !string.IsNullOrWhiteSpace(term) && DashboardTerms.Any(x => x.ExternalTermId == term)
                         ? term
                         : configuredTerms.FirstOrDefault(x => x.IsDashboardDefault)?.ExternalTermId;
                     selectedId ??= (await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted))?.ExternalTermId;
                     selectedId ??= DashboardTerms.FirstOrDefault()?.ExternalTermId;
                     CurrentTerm = sisTerms.FirstOrDefault(x => x.ExternalTermId == selectedId);
+                    AnnouncementTerms = DashboardTerms.Where(option =>
+                        option.ExternalTermId != selectedId && activeAnnouncements.Any(announcement =>
+                            announcement.Terms.Contains(option.DisplayName, StringComparer.OrdinalIgnoreCase)))
+                        .ToArray();
                 }
                 catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
                 {
                     _logger.LogWarning(exception, "Unable to resolve the current academic term.");
                 }
             }
+
+            VisibleAnnouncements = activeAnnouncements
+                .Where(x => x.IsVisible(now, AnnouncementAudience.Student, CurrentTerm?.DisplayName))
+                .OrderByDescending(x => x.StartsAtUtc).ToArray();
 
             if (CurrentTerm is not null)
             {
@@ -321,6 +351,8 @@ public class IndexModel : CampusFlowPageModel
             journey.BillApproved = approval?.Status is BillApprovalStatus.Approved
                 or BillApprovalStatus.DocumentPending
                 or BillApprovalStatus.Completed;
+            if (billTerm is not null && approval is null && profile.Provider == StudentInformationSystemProvider.ThesisElements)
+                journey.BillApproved = (await _legacyApprovals.FindAsync(profile.ExternalStudentId, term.ExternalTermId))?.CountsAsApproved == true;
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {

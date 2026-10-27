@@ -65,7 +65,10 @@ using CampusFlow.Web.Portals;
 using CampusFlow.Branding;
 using CampusFlow.Web.Branding;
 using CampusFlow.Web.Observability;
+using CampusFlow.Web.Maintenance;
 using CampusFlow.Students;
+using CampusFlow.Bibliu;
+using Volo.Abp.Authorization.Permissions;
 
 namespace CampusFlow.Web;
 
@@ -132,6 +135,11 @@ public class CampusFlowWebModule : AbpModule
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
+        Configure<AbpPermissionOptions>(options =>
+            options.ValueProviders.Add<BibliuClientPermissionValueProvider>());
+        Configure<AbpOpenIddictClaimsPrincipalOptions>(options =>
+            options.ClaimsPrincipalHandlers.Add<BibliuClientClaimsPrincipalHandler>());
+
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
         context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
         context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
@@ -139,6 +147,8 @@ public class CampusFlowWebModule : AbpModule
         context.Services.AddHttpClient<IPayflowGateway, PayflowGateway>(client =>
             client.Timeout = TimeSpan.FromSeconds(30));
         context.Services.AddHttpContextAccessor();
+        context.Services.Configure<MaintenanceModeOptions>(
+            configuration.GetSection(MaintenanceModeOptions.SectionName));
         context.Services.Configure<PerformanceLoggingOptions>(
             configuration.GetSection(PerformanceLoggingOptions.SectionName));
         context.Services.AddSingleton<DependencyPerformanceListener>();
@@ -395,7 +405,9 @@ public class CampusFlowWebModule : AbpModule
         }
 
         app.UseCorrelationId();
+        app.UseMiddleware<LegacyPortalHomeRedirectMiddleware>();
         app.UseRouting();
+        app.UseMiddleware<MaintenanceModeMiddleware>();
         app.Use(async (httpContext, next) =>
         {
             var isLegacyLoginPage = httpContext.Request.Path.Equals(
@@ -445,6 +457,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseDynamicClaims();
         app.UseAuthorization();
         app.UseMiddleware<StudentViewContextMiddleware>();
+        app.UseMiddleware<FacultyViewContextMiddleware>();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {
