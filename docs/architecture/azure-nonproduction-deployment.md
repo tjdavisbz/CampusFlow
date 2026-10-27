@@ -1,6 +1,6 @@
 # Azure non-production operations
 
-Updated October 27, 2026 (America/Chicago). Launch work is in progress.
+Updated October 27, 2026 (America/Chicago). Application deployed; final launch checks are in progress.
 The owner authorized completing the non-production site at `https://my-np.nelson.edu`
 and copying the production PostgreSQL application database **into non-production only**.
 
@@ -22,7 +22,11 @@ reporting migration. Unrelated work in the primary checkout is left untouched.
 `.github/workflows/deploy-nonproduction.yml` is restricted to `staging`, including its
 manual-dispatch job condition. GitHub environment is `nonproduction`. Its default
 `slot-name: production` denotes the default slot of the **non-production app**.
-A readiness setting blocks deployment until environment setup is verified.
+A readiness setting blocks deployment until environment setup is verified. The
+nonproduction GitHub environment also restricts deployment branches to `staging`.
+The deployment identity trust matches GitHub's current subject, including immutable
+owner/repository IDs; the older name-only subject caused the first launch attempt to
+fail at sign-in and was corrected before retry.
 
 ## Azure resources
 
@@ -31,7 +35,7 @@ Subscription `3cc0ce6b-9bac-4bc8-81c2-8b22bd8d5059`, resource group `rg_campusfl
 | Resource | Configuration |
 | --- | --- |
 | `asp-campusflow-nonprod-001` | Dedicated Central US Linux B1 plan; additional Azure hosting charges |
-| `app-campusflow-nonprod-001` | .NET 10, Staging environment, HTTPS only, TLS 1.2 minimum, FTP disabled, Always On; `/health-status` |
+| `app-campusflow-nonprod-001` | .NET 10, Staging environment, HTTPS only, TLS 1.2 minimum, FTP disabled, Always On; `/health-status`; startup `dotnet CampusFlow.Web.dll` |
 | `campusflow_nonprod` | Separate database on shared `psql-campusflow-prod-001`; dedicated login `campusflow_nonprod_app` |
 | `id-github-campusflow-nonprod-001` | GitHub environment OIDC identity; Website Contributor on non-production app only |
 | Entra `CampusFlow Non-Production` | Separate app registration `b61e876d-9316-4dfa-bed8-034528234d73`; separate secret |
@@ -69,7 +73,8 @@ one year; plan their renewal. Signing credentials are separate from public TLS.
 
 - SQL server: `sql-elm-nonprod-usc-replica.database.windows.net`; database `EL-NP-NEL-DB`.
   Existing replica credentials reused privately as authorized. Connection and SELECT
-  access verified from the local network; 1,512 tables visible. Verify from Azure too.
+  access verified both locally and from the non-production Azure app console;
+  1,512 tables visible. No SQL write was invoked.
 - Tenant: `el-np-nel.thesiscloud.com`.
 - Integration API: `https://app-elm-nonprod-usc-integrationapi.azurewebsites.net`.
 - Gateway: `https://np-usc-gateway.thesiscloud.com`.
@@ -99,14 +104,19 @@ Safeguards:
 - Subscription, app names, database names, host, and destination role are fixed and
   checked before operations. Source sessions enforce transaction read-only.
 - `pg_restore` receives only the non-production role, whose production table write and
-  ownership privileges are checked to be zero. No production credentials are supplied
+  ownership privileges are checked to be zero; production schema/database CREATE
+  privileges must also be absent. No production credentials are supplied
   to the restore command. No reverse-refresh operation is implemented.
-- Non-production maintenance must be enabled. Keep it closed during the refresh.
+- Non-production maintenance must be enabled. The tool stops only the non-production
+  app during restore/validation and restarts only that app on success, still in
+  maintenance. On failure it stays stopped for investigation.
 - A private rollback dump of the previous non-production database is retained before
   a consistent production snapshot is taken. Dumps and diagnostics stay outside Git
   in a private temporary folder and contain sensitive production data.
 - Restore uses full TLS validation, no source ownership/ACLs, exit-on-error and a single
-  transaction. All source-dump table row counts are compared with the restored target.
+  transaction. Azure-managed `azure` and `pgaadauth` extensions are excluded so platform
+  components are never dropped/recreated. All source-dump table row counts are compared
+  with the restored target.
 - Non-production tenant connection-string overrides are removed after restoration so
   a copied tenant cannot redirect the site to a production database.
 
@@ -124,3 +134,17 @@ verify health and tenant access before reopening. Never restore non-production t
   non-production Elements authentication verified.
 - Deployment, the requested production-to-nonproduction refresh, Azure-side replica
   access, interactive sign-in/out and final reopening results will be recorded below.
+
+Startup note: the first deployment retained the Azure placeholder until the explicit
+CampusFlow startup command was configured. Health-check retries allow five minutes
+for the dedicated B1 plan to warm up. The earlier failed deployment attempts did not
+deploy anything to production.
+
+October 27, approximately 11:14 a.m. Central: production PostgreSQL `postgres` was
+copied into `campusflow_nonprod`. All 61 application-table row counts matched the
+captured source snapshot. Source transactions were read-only and the restricted restore
+role passed all production write/create isolation checks. Zero tenant DB overrides
+were present. A first restore attempt encountered an Azure platform extension and
+rolled back transactionally; the corrected refresh excludes those extensions.
+Private source and pre-refresh rollback dumps remain in the protected temporary
+`campusflow-prod-to-nonprod-ootr31s9` evidence folder; do not commit or share them.
