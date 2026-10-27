@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CampusFlow.BillApprovals;
 using CampusFlow.StudentInformationSystems;
+using CampusFlow.Web.BillApprovals;
 using Volo.Abp;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
@@ -18,7 +19,7 @@ public sealed record BibliuExportResult(Guid ConfigurationId, string Configurati
 
 public sealed class BibliuExportService(IRepository<BibliuConfiguration, Guid> configurations,
     IRepository<BillApproval, Guid> approvals, IEnumerable<IStudentInformationSystemTermLookup> termLookups,
-    IBibliuExportReader reader, ICurrentTenant tenant) : ITransientDependency
+    IBibliuExportReader reader, ICurrentTenant tenant, ILegacyBillApprovalLookup legacyApprovals) : ITransientDependency
 {
     public async Task<BibliuExportResult> ExportAsync(string kind, CancellationToken cancellationToken)
     {
@@ -32,10 +33,17 @@ public sealed class BibliuExportService(IRepository<BibliuConfiguration, Guid> c
         var bibliu = terms.SingleOrDefault(x => x.ExternalTermId == config.BibliuTermId);
         if (billing is null || bibliu is null) throw new UserFriendlyException("A configured BibliU term is unavailable in Elements. Review the configuration.");
         var expanded = BibliuRules.ExpandedTerms(bibliu.DisplayName).Where(n => terms.Any(t => t.DisplayName == n)).ToArray();
-        var approvedIds = kind is "users" or "all"
-            ? (await approvals.GetListAsync(x => x.TenantId == tenant.Id && x.ExternalTermId == config.BillingTermId &&
-                x.AcceptedAt != null && x.Status == BillApprovalStatus.Approved, cancellationToken: cancellationToken))
-                .Select(x => x.ExternalStudentId).Distinct().ToArray() : [];
+        string[] approvedIds = [];
+        if (kind is "users" or "all")
+        {
+            var native = await approvals.GetListAsync(x => x.TenantId == tenant.Id &&
+                x.ExternalTermId == config.BillingTermId, cancellationToken: cancellationToken);
+            var nativeStudents = native.Select(x => x.ExternalStudentId).ToHashSet();
+            approvedIds = native.Where(x => x.AcceptedAt != null && x.Status == BillApprovalStatus.Approved)
+                .Select(x => x.ExternalStudentId)
+                .Concat((await legacyApprovals.ApprovedStudentIdsAsync(config.BillingTermId, cancellationToken))
+                    .Where(id => !nativeStudents.Contains(id))).Distinct().ToArray();
+        }
         var request = new BibliuExportRequest(int.Parse(config.BillingTermId, CultureInfo.InvariantCulture),
             int.Parse(config.BibliuTermId, CultureInfo.InvariantCulture), config.StoreNumber, expanded, approvedIds);
         var exports = new Dictionary<string,IReadOnlyList<Dictionary<string,string?>>>();

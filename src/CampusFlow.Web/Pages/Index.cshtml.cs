@@ -19,6 +19,7 @@ using CampusFlow.Permissions;
 using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Identity;
 using CampusFlow.BillApprovals;
+using CampusFlow.Web.BillApprovals;
 using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
 using CampusFlow.Announcements;
@@ -48,6 +49,7 @@ public class IndexModel : CampusFlowPageModel
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
     private readonly IConfiguration _configuration;
     private readonly IRepository<PortalAnnouncement, Guid> _announcements;
+    private readonly ILegacyBillApprovalLookup _legacyApprovals;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -69,7 +71,8 @@ public class IndexModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
         IConfiguration configuration,
-        IRepository<PortalAnnouncement, Guid> announcements)
+        IRepository<PortalAnnouncement, Guid> announcements,
+        ILegacyBillApprovalLookup legacyApprovals)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -91,6 +94,7 @@ public class IndexModel : CampusFlowPageModel
         _scheduleLookups = scheduleLookups.ToArray();
         _configuration = configuration;
         _announcements = announcements;
+        _legacyApprovals = legacyApprovals;
     }
 
     public string? TenantName { get; private set; }
@@ -347,6 +351,8 @@ public class IndexModel : CampusFlowPageModel
             journey.BillApproved = approval?.Status is BillApprovalStatus.Approved
                 or BillApprovalStatus.DocumentPending
                 or BillApprovalStatus.Completed;
+            if (billTerm is not null && approval is null && profile.Provider == StudentInformationSystemProvider.ThesisElements)
+                journey.BillApproved = (await _legacyApprovals.FindAsync(profile.ExternalStudentId, term.ExternalTermId))?.CountsAsApproved == true;
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {

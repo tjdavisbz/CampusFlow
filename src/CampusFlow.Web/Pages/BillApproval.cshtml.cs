@@ -54,6 +54,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly IPayflowGateway _payflowGateway;
     private readonly PayflowOptions _payflowOptions;
     private readonly ILogger<BillApprovalModel> _logger;
+    private readonly ILegacyBillApprovalLookup _legacyApprovals;
 
     public BillApprovalModel(
         ITenantThemeProvider themeProvider,
@@ -80,7 +81,8 @@ public class BillApprovalModel : CampusFlowPageModel
         IRepository<PayflowPayment, Guid> payflowPayments,
         IPayflowGateway payflowGateway,
         IOptions<PayflowOptions> payflowOptions,
-        ILogger<BillApprovalModel> logger)
+        ILogger<BillApprovalModel> logger,
+        ILegacyBillApprovalLookup legacyApprovals)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
@@ -107,6 +109,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _payflowGateway = payflowGateway;
         _payflowOptions = payflowOptions.Value;
         _logger = logger;
+        _legacyApprovals = legacyApprovals;
     }
 
     public TenantTheme Theme { get; private set; } = new(
@@ -125,6 +128,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public StudentPaymentPlan? PaymentPlan { get; private set; }
     public AgreementTemplate? Agreement { get; private set; }
     public bool IsAlreadyAccepted { get; private set; }
+    public LegacyBillApproval? LegacyApproval { get; private set; }
     public bool PdfAvailable { get; private set; }
     public bool DocumentTrackingCompleted { get; private set; }
     public string? PdfFileName { get; private set; }
@@ -219,8 +223,9 @@ public class BillApprovalModel : CampusFlowPageModel
             Courses = allCourses.Where(x => x.TermCode == TermCode)
                 .OrderBy(x => x.Department).ThenBy(x => x.CourseNumber).ToArray();
             var courseTerm = Courses.FirstOrDefault();
-            TermName = courseTerm?.TermName ?? currentTerm?.DisplayName ?? "Current term";
+            TermName = courseTerm?.TermName ?? termConfiguration?.TermName ?? currentTerm?.DisplayName ?? "Current term";
             ExternalTermId = courseTerm?.ExternalTermId;
+            ExternalTermId ??= termConfiguration?.ExternalTermId;
 
             var allTransactions = await billingTask;
             Charges = allTransactions.Where(x => x.TermCode == TermCode)
@@ -261,6 +266,12 @@ public class BillApprovalModel : CampusFlowPageModel
                         PdfFileName = artifact?.PdfFileName;
                     }
                 }
+                if (!IsAlreadyAccepted && profile.Provider == StudentInformationSystemProvider.ThesisElements &&
+                    !await _billApprovals.AnyAsync(x => x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId))
+                {
+                    LegacyApproval = await _legacyApprovals.FindAsync(profile.ExternalStudentId, ExternalTermId, HttpContext.RequestAborted);
+                    IsAlreadyAccepted = LegacyApproval?.CountsAsApproved == true;
+                }
             }
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -274,6 +285,7 @@ public class BillApprovalModel : CampusFlowPageModel
     {
         InitialStep = "payment";
         await OnGetAsync(term, InitialStep, PaymentPurposeInput);
+        if (LegacyApproval?.CountsAsApproved == true) return RedirectToPage(new { term });
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (_currentStudentView.IsImpersonating || CurrentUser.Id is null || profile is null)
             return Unauthorized();
@@ -375,6 +387,11 @@ public class BillApprovalModel : CampusFlowPageModel
     public async Task<IActionResult> OnPostAsync([FromQuery] string? term = null)
     {
         await OnGetAsync(term);
+        if (LegacyApproval?.CountsAsApproved == true)
+        {
+            StatusMessage = "Your legacy bill approval is already recorded.";
+            return RedirectToPage(new { term });
+        }
         if (IsUnavailable || CurrentUser.Id is null || string.IsNullOrWhiteSpace(ExternalTermId) || Agreement is null)
         {
             StatusMessage = "Your agreement could not be saved. Please reload the page and try again.";

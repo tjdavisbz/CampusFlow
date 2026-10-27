@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CampusFlow.BillApprovals;
+using CampusFlow.Web.BillApprovals;
 using CampusFlow.Permissions;
 using CampusFlow.StudentInformationSystems;
 using Microsoft.AspNetCore.Authorization;
@@ -27,7 +28,7 @@ public class BibliuExportServiceTests
         var reader=Substitute.For<IBibliuExportReader>();
         var tenant=Substitute.For<ICurrentTenant>();
         tenant.Id.Returns((Guid?)null);
-        var service=new BibliuExportService(configurations,approvals,Array.Empty<IStudentInformationSystemTermLookup>(),reader,tenant);
+        var service=new BibliuExportService(configurations,approvals,Array.Empty<IStudentInformationSystemTermLookup>(),reader,tenant,Substitute.For<ILegacyBillApprovalLookup>());
         await Should.ThrowAsync<UserFriendlyException>(()=>service.ExportAsync("all",CancellationToken.None));
         reader.ReceivedCalls().ShouldBeEmpty();
         configurations.ReceivedCalls().ShouldBeEmpty();
@@ -41,7 +42,7 @@ public class BibliuExportServiceTests
             .Returns(new BibliuConfiguration(Guid.NewGuid(),tenantId));
         var reader=Substitute.For<IBibliuExportReader>();
         var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(tenantId);
-        var service=new BibliuExportService(configurations,Substitute.For<IRepository<BillApproval,Guid>>(),Array.Empty<IStudentInformationSystemTermLookup>(),reader,tenant);
+        var service=new BibliuExportService(configurations,Substitute.For<IRepository<BillApproval,Guid>>(),Array.Empty<IStudentInformationSystemTermLookup>(),reader,tenant,Substitute.For<ILegacyBillApprovalLookup>());
         await Should.ThrowAsync<UserFriendlyException>(()=>service.ExportAsync("users",CancellationToken.None));
         reader.ReceivedCalls().ShouldBeEmpty();
     }
@@ -76,14 +77,18 @@ public class BibliuExportServiceTests
         reader.ReadAsync(Arg.Any<string>(),Arg.Any<BibliuExportRequest>(),Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Dictionary<string,string?>>());
         var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(tenantId);
-        var service=new BibliuExportService(configurations,approvals,new[]{lookup},reader,tenant);
+        var legacy=Substitute.For<ILegacyBillApprovalLookup>();
+        // The imported record cannot override a newer native draft or duplicate an approved native record.
+        legacy.ApprovedStudentIdsAsync("268",Arg.Any<CancellationToken>())
+            .Returns(new[]{"legacy-only",eligible.ExternalStudentId,bills[1].ExternalStudentId});
+        var service=new BibliuExportService(configurations,approvals,new[]{lookup},reader,tenant,legacy);
         var result=await service.ExportAsync("all",CancellationToken.None);
         result.ConfigurationId.ShouldBe(config.Id);
         result.ConfigurationVersion.ShouldBe(config.ConcurrencyStamp);
         result.ExpandedTerms.ShouldBe(new[]{"Fall 2026","Spring 2027","Summer 2027"});
         result.Exports.Count.ShouldBe(4);
         await reader.Received(4).ReadAsync(Arg.Any<string>(),Arg.Is<BibliuExportRequest>(r=>
-            r.BillingTermId==268 && r.BibliuTermId==269 && r.ApprovedStudentIds.Count==1 && r.ApprovedStudentIds[0]==eligible.ExternalStudentId),Arg.Any<CancellationToken>());
+            r.BillingTermId==268 && r.BibliuTermId==269 && r.ApprovedStudentIds.Count==2 && r.ApprovedStudentIds.Contains(eligible.ExternalStudentId) && r.ApprovedStudentIds.Contains("legacy-only")),Arg.Any<CancellationToken>());
     }
     [Fact]
     public void Export_requires_its_own_permission_and_disables_payload_auditing()

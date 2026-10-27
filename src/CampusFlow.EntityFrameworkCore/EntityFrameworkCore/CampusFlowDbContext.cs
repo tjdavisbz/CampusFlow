@@ -38,6 +38,7 @@ public class CampusFlowDbContext :
     public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
     public DbSet<BillApprovalTermConfiguration> BillApprovalTermConfigurations { get; set; }
     public DbSet<BillApproval> BillApprovals { get; set; }
+    public DbSet<LegacyBillApproval> LegacyBillApprovals { get; set; }
     public DbSet<BillApprovalArtifact> BillApprovalArtifacts { get; set; }
     public DbSet<CourseSelectionPolicy> CourseSelectionPolicies { get; set; }
     public DbSet<RegistrationTermConfiguration> RegistrationTermConfigurations { get; set; }
@@ -220,6 +221,23 @@ public class CampusFlowDbContext :
             b.HasIndex(x => new { x.TenantId, x.UserId, x.ExternalTermId }).IsUnique();
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<AgreementTemplate>().WithMany().HasForeignKey(x => x.AgreementTemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<LegacyBillApproval>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "LegacyBillApprovals", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TermCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.SourceSha256).IsRequired().HasMaxLength(64);
+            b.Property(x => x.LoginTime).HasColumnType("timestamp without time zone");
+            b.Property(x => x.AcceptTime).HasColumnType("timestamp without time zone");
+            b.Ignore(x => x.CountsAsApproved);
+            b.HasIndex(x => new { x.TenantId, x.ExternalStudentId, x.ExternalTermId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.ExternalTermId, x.SourceApproved });
         });
 
         builder.Entity<BillApprovalArtifact>(b =>

@@ -85,9 +85,12 @@ retained in ordinary run logs.
 * Identity names and POS courses use the selected BibliU term. Schedule/enrollment
   expands Spring Y to Fall Y-1/Spring Y/Summer Y, Summer Y to Spring/Summer/Fall Y,
   and Fall Y to Summer Y/Fall Y/Spring Y+1; only existing terms are included.
-* Vouchers require an accepted CampusFlow bill with `Status=Approved` for the
-  same tenant and billing term. Drafts and AwaitingPayment do not qualify. Legacy
-  approval-table existence is deliberately replaced with this agreed approval rule.
+* Vouchers use an accepted native CampusFlow bill with `Status=Approved` for the
+  same tenant and billing term, or a dated approved imported legacy record when no
+  native record exists for that student/term. Drafts and AwaitingPayment do not qualify
+  or fall back to legacy approval. Legacy false flags, missing acceptance dates and
+  unspecified term 0 do not qualify. Legacy approval-table existence alone is insufficient.
+  See [legacy import preparation](discovery/legacy-bill-approval-import.md) for rollout status.
 * Amount is `max(0, max(500, -balanceIncludingPendingAid) - max(0, BOOK usage))`.
   Balance includes the billing term plus previous terms, with legacy report,
   void/reversal and pending-aid eligibility filters. Current balance and usage

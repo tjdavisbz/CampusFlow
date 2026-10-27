@@ -25,6 +25,7 @@
             <span class="eyebrow">Registration checkout</span>
             <h1>Review and approve your bill</h1>
             <p>Confirm your classes, funding@(Model.RemainingBalance > 0 ? ", payment choice," : ",") and agreement in one guided review.</p>
+            <a asp-page="/BillApprovalHistory">View bill approval history</a>
         </div>
         <div class="student-chip"><span>@Model.StudentName</span><strong>ID @Model.StudentId</strong></div>
     </header>
@@ -41,7 +42,11 @@
                 <div class="finish-icon"><i class="fa-solid fa-file-circle-check"></i></div>
                 <span class="eyebrow">Approval complete</span>
                 <h2>Your bill has been approved</h2>
-                @if (Model.PdfAvailable)
+                @if (Model.LegacyApproval?.CountsAsApproved == true)
+                {
+                    <p>This approval was recorded in the previous student portal on @Model.LegacyApproval.AcceptTime?.ToString("MMMM d, yyyy"). Historical agreement files are not included in this import.</p>
+                }
+                else if (Model.PdfAvailable)
                 {
                     <p>Your agreement is complete. You can download a copy for your records.</p>
                     <a class="primary document-download" asp-page-handler="Pdf" asp-route-term="@Model.TermCode"><i class="fa-solid fa-download"></i> Download your agreement</a>
