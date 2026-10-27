@@ -105,7 +105,6 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
             var studentUser = await UserManager.FindByEmailAsync(result.Student.Email);
             if (studentUser is not null)
             {
-                await EnsureConfiguredFullAdministratorAsync(studentUser, result.Student.Email);
                 await _studentProfileRepository.InsertAsync(new StudentProfile(
                     _guidGenerator.Create(), CurrentTenant.Id, studentUser.Id, result.Student));
             }

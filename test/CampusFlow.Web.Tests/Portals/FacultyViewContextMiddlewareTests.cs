@@ -33,6 +33,8 @@ public class FacultyViewContextMiddlewareTests
         context.Request.Headers.Cookie = startContext.Response.Headers.SetCookie.ToString().Split(';')[0];
         var permissionChecker = Substitute.For<IPermissionChecker>();
         permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default)
+            .Returns(Task.FromResult(true));
+        permissionChecker.IsGrantedAsync(CampusFlowPermissions.FacultyImpersonation.Default)
             .Returns(Task.FromResult(false));
         var continued = false;
         var middleware = new FacultyViewContextMiddleware(_ =>
@@ -77,7 +79,7 @@ public class FacultyViewContextMiddlewareTests
             actorId.ToString())], "Test"));
 
         var permissionChecker = Substitute.For<IPermissionChecker>();
-        permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default)
+        permissionChecker.IsGrantedAsync(CampusFlowPermissions.FacultyImpersonation.Default)
             .Returns(Task.FromResult(true));
         var logger = Substitute.For<ILogger<FacultyViewContextMiddleware>>();
         var continued = false;

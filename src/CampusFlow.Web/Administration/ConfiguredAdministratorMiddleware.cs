@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Identity;
 using Volo.Abp.Security.Claims;
+using CampusFlow.Web.Portals;
 
 namespace CampusFlow.Web.Administration;
 
@@ -25,6 +26,7 @@ public sealed class ConfiguredAdministratorMiddleware
         IdentityUserManager userManager,
         IdentityRoleManager roleManager,
         IConfiguration configuration,
+        StudentOnlyAccountAccess accountAccess,
         ILogger<ConfiguredAdministratorMiddleware> logger)
     {
         if (context.User.Identity?.IsAuthenticated == true &&
@@ -37,7 +39,8 @@ public sealed class ConfiguredAdministratorMiddleware
                 .Get<string[]>() ?? [];
 
             if (!string.IsNullOrWhiteSpace(email) &&
-                administratorEmails.Contains(email, StringComparer.OrdinalIgnoreCase))
+                administratorEmails.Contains(email, StringComparer.OrdinalIgnoreCase) &&
+                !await accountAccess.IsStudentOnlyAsync())
             {
                 var user = await userManager.FindByEmailAsync(email);
                 var role = await roleManager.FindByNameAsync(AdministratorRoleName);

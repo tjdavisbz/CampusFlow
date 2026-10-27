@@ -18,6 +18,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:AdvisorPortal.ManageRouting"), MultiTenancySides.Tenant);
         group.AddPermission(CampusFlowPermissions.StudentImpersonation.Default,
             L("Permission:StudentImpersonation"), MultiTenancySides.Tenant);
+        group.AddPermission(CampusFlowPermissions.FacultyImpersonation.Default,
+            L("Permission:FacultyImpersonation"), MultiTenancySides.Tenant);
         var admin = group.AddPermission(CampusFlowPermissions.Admin.Default,
             L("Permission:Admin"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.GlobalConfiguration,
