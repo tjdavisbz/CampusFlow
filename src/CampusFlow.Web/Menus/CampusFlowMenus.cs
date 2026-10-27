@@ -12,6 +12,7 @@ public class CampusFlowMenus
     public const string CourseSelection = Prefix + ".CourseSelection";
     public const string DegreeAudit = Prefix + ".DegreeAudit";
     public const string PrivacyPasswords = Prefix + ".PrivacyPasswords";
+    public const string Documents = Prefix + ".Documents";
     public const string Housing = Prefix + ".Housing";
     public const string FinancialAid = Prefix + ".FinancialAid";
     public const string BillApproval = Prefix + ".BillApproval";

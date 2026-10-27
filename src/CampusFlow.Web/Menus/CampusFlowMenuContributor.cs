@@ -88,6 +88,17 @@ public class CampusFlowMenuContributor : IMenuContributor
                 order: 7
             )
             );
+            if (studentProfile?.Provider == CampusFlow.StudentInformationSystems.StudentInformationSystemProvider.ThesisElements &&
+                string.Equals(context.ServiceProvider.GetRequiredService<Volo.Abp.MultiTenancy.ICurrentTenant>().Name,
+                    "nelson", StringComparison.OrdinalIgnoreCase))
+            {
+                student.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.Documents,
+                    "My Documents",
+                    "~/Documents",
+                    icon: "fa fa-file-lines",
+                    order: 8));
+            }
             if (!currentStudentView.IsImpersonating &&
                 studentProfile?.Provider == CampusFlow.StudentInformationSystems.StudentInformationSystemProvider.ThesisElements &&
                 string.Equals(context.ServiceProvider.GetRequiredService<Volo.Abp.MultiTenancy.ICurrentTenant>().Name,
@@ -98,7 +109,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                     "FERPA / Privacy Passwords",
                     "~/PrivacyPasswords",
                     icon: "fa fa-lock",
-                    order: 8));
+                    order: 9));
             }
             context.Menu.AddItem(student);
         }
