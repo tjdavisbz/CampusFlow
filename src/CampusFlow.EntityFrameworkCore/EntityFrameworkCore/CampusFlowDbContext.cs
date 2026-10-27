@@ -34,6 +34,7 @@ public class CampusFlowDbContext :
 {
     public DbSet<BibliuConfiguration> BibliuConfigurations { get; set; }
     public DbSet<StudentProfile> StudentProfiles { get; set; }
+    public DbSet<StaffStudentLink> StaffStudentLinks { get; set; }
     public DbSet<AgreementTemplate> AgreementTemplates { get; set; }
     public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
     public DbSet<BillApprovalTermConfiguration> BillApprovalTermConfigurations { get; set; }
@@ -134,6 +135,17 @@ public class CampusFlowDbContext :
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasIndex(x => x.UserId).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Provider, x.ExternalStudentId }).IsUnique();
+        });
+
+        builder.Entity<StaffStudentLink>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "StaffStudentLinks", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.HasOne<IdentityUser>().WithMany().HasForeignKey(x => x.StaffUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.TenantId, x.StaffUserId }).IsUnique();
         });
 
         builder.Entity<PayflowPayment>(b =>

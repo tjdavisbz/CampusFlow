@@ -255,7 +255,16 @@ public class CampusFlowMenuContributor : IMenuContributor
         administration.SetSubItemOrder(IdentityMenuNames.GroupName, 1);
         var identityManagement = administration.Items.FirstOrDefault(x => x.Name == IdentityMenuNames.GroupName);
         if (identityManagement is not null)
+        {
             identityManagement.DisplayName = "Users & Access";
+            if (await context.IsGrantedAsync(CampusFlowPermissions.Admin.AccessManagement))
+                identityManagement.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.AccessManagement,
+                    "Staff–student links",
+                    "~/Admin/StaffStudentLinks",
+                    icon: "fa fa-link",
+                    order: 10));
+        }
 
         if (MultiTenancyConsts.IsEnabled)
         {

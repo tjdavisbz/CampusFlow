@@ -31,7 +31,7 @@ public class BillApprovalHistoryTests : CampusFlowWebTestBase
             new StudentInformationSystemStudent(StudentInformationSystemProvider.ThesisElements,"10","100","student@example.test","Test",null,"Student"));
         var current=Substitute.For<ICurrentStudentView>();current.GetProfileAsync(Arg.Any<CancellationToken>()).Returns(profile);
         var repo=Substitute.For<IRepository<BillApproval,Guid>>();
-        var rows=new[]{new BillApproval(Guid.NewGuid(),owner,profile.UserId,profile.Id,"10","100","268","B26Q","Fall 2026"),
+        var rows=new[]{new BillApproval(Guid.NewGuid(),owner,profile.UserId!.Value,profile.Id,"10","100","268","B26Q","Fall 2026"),
             new BillApproval(Guid.NewGuid(),owner,Guid.NewGuid(),Guid.NewGuid(),"11","101","268","B26Q","Fall 2026")};
         repo.GetListAsync(Arg.Any<Expression<Func<BillApproval,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>())
             .Returns(c=>rows.Where(c.Arg<Expression<Func<BillApproval,bool>>>().Compile()).ToList());

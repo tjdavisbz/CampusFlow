@@ -1,0 +1,92 @@
+@page "/Admin/StaffStudentLinks"
+@model CampusFlow.Web.Pages.Admin.StaffStudentLinksModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Staff–student links";
+    PageLayout.Content.MenuItemName = CampusFlowMenus.AccessManagement;
+}
+@section styles { <abp-style src="/Pages/Admin/StaffStudentLinks.css" /> }
+
+<main class="staff-link-shell">
+    <header class="staff-link-hero">
+        <span>Users &amp; Access</span>
+        <h1>Link a staff account to a student</h1>
+        <p>A staff member can sign in with their staff email and use the Student section for their own student record.</p>
+    </header>
+    <div class="alert alert-warning" role="note">
+        This grants normal student-portal access, including student actions—not a read-only preview. Link only accounts whose owner is the selected student.
+    </div>
+
+    <section class="staff-link-card">
+        <h2>1. Find the staff account</h2>
+        <form method="get" class="staff-link-search">
+            <label for="staff-search">Staff name or email</label>
+            <div><input id="staff-search" name="search" value="@Model.Search" minlength="2" required placeholder="Search staff accounts" /><button type="submit">Search</button></div>
+        </form>
+        @if (Model.StaffResults.Count > 0)
+        {
+            <div class="staff-link-list">
+                @foreach (var staff in Model.StaffResults)
+                {
+                    <a href="/Admin/StaffStudentLinks?userId=@staff.Id" class="staff-link-result">
+                        <strong>@staff.DisplayName</strong><span>@staff.Email</span><i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                }
+            </div>
+        }
+        else if (Model.Search.Length >= 2)
+        {
+            <p class="staff-link-muted">No matching CampusFlow staff users were found.</p>
+        }
+    </section>
+
+    @if (Model.SelectedStaff is not null)
+    {
+        <section class="staff-link-card">
+            <h2>2. Choose the student for @Model.SelectedStaff.DisplayName</h2>
+            <p class="staff-link-muted">Staff login: @Model.SelectedStaff.Email</p>
+            @if (Model.LinkedStudent is not null)
+            {
+                <div class="staff-link-current">
+                    <div><small>Currently linked student</small><strong>@Model.LinkedStudent.DisplayName</strong><span>ID @Model.LinkedStudent.StudentId · @Model.LinkedStudent.Email</span></div>
+                    <form method="post" asp-page-handler="Unlink">
+                        <input type="hidden" asp-for="StaffUserId" />
+                        <button type="submit" class="staff-link-secondary" onclick="return confirm('Remove this staff-to-student link?')">Remove link</button>
+                    </form>
+                </div>
+            }
+            else
+            {
+                <p class="staff-link-muted">No student is linked to this staff account.</p>
+            }
+            <form method="get" class="staff-link-search">
+                <input type="hidden" name="userId" value="@Model.SelectedStaff.Id" />
+                <label for="student-search">Search student by name, student ID, Elements ID, or email</label>
+                <div><input id="student-search" name="studentSearch" value="@Model.StudentSearch" minlength="2" required placeholder="Find a student record" /><button type="submit">Search students</button></div>
+            </form>
+            @if (Model.StudentResults.Count > 0)
+            {
+                <div class="staff-link-list">
+                    @foreach (var student in Model.StudentResults)
+                    {
+                        var name = $"{(string.IsNullOrWhiteSpace(student.PreferredName) ? student.FirstName : student.PreferredName)} {student.LastName}";
+                        <div class="staff-link-result">
+                            <div><strong>@name</strong><span>ID @student.StudentId · @student.Email</span></div>
+                            <form method="post" asp-page-handler="Link">
+                                <input type="hidden" asp-for="StaffUserId" />
+                                <input type="hidden" name="ExternalStudentId" value="@student.ExternalStudentId" />
+                                <button type="submit" onclick="return confirm('Link this staff login to student @student.StudentId?')">@(Model.LinkedStudent is null ? "Link student" : "Change link")</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+            else if (Model.StudentSearch.Length >= 2)
+            {
+                <p class="staff-link-muted">No matching students were found.</p>
+            }
+        </section>
+    }
+</main>

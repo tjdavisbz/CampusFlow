@@ -52,6 +52,20 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
         return (int)(await command.ExecuteScalarAsync(cancellationToken) ?? 0) == 1;
     }
 
+    public async Task<bool> HasActiveStaffIdentityAsync(string email, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT CASE WHEN EXISTS (
+                SELECT 1 FROM dbo.CAMSUser u
+                WHERE u.DisableLogin = 0 AND LOWER(LTRIM(RTRIM(u.EmailAddress))) = LOWER(@Email))
+            THEN 1 ELSE 0 END
+            """;
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@Email", SqlDbType.VarChar, 256).Value = email.Trim();
+        return (int)(await command.ExecuteScalarAsync(cancellationToken) ?? 0) == 1;
+    }
+
     public async Task<FacultyIdentity?> FindFacultyAsync(string? email, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(email)) return null;

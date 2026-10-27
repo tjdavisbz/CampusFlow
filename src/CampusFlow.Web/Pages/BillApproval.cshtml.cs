@@ -252,11 +252,11 @@ public class BillApprovalModel : CampusFlowPageModel
             if (!string.IsNullOrWhiteSpace(ExternalTermId))
             {
                 IsAlreadyAccepted = await _billApprovals.AnyAsync(x =>
-                    x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
+                    x.StudentProfileId == profile.Id && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
                 if (IsAlreadyAccepted)
                 {
                     var accepted = await _billApprovals.FindAsync(x =>
-                        x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
+                        x.StudentProfileId == profile.Id && x.ExternalTermId == ExternalTermId && x.AcceptedAt != null);
                     if (accepted is not null)
                     {
                         var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == accepted.Id);
@@ -267,7 +267,7 @@ public class BillApprovalModel : CampusFlowPageModel
                     }
                 }
                 if (!IsAlreadyAccepted && profile.Provider == StudentInformationSystemProvider.ThesisElements &&
-                    !await _billApprovals.AnyAsync(x => x.UserId == profile.UserId && x.ExternalTermId == ExternalTermId))
+                    !await _billApprovals.AnyAsync(x => x.StudentProfileId == profile.Id && x.ExternalTermId == ExternalTermId))
                 {
                     LegacyApproval = await _legacyApprovals.FindAsync(profile.ExternalStudentId, ExternalTermId, HttpContext.RequestAborted);
                     IsAlreadyAccepted = LegacyApproval?.CountsAsApproved == true;
@@ -418,7 +418,7 @@ public class BillApprovalModel : CampusFlowPageModel
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null) return Unauthorized();
         var approval = await _billApprovals.FindAsync(x =>
-            x.UserId == CurrentUser.Id.Value && x.ExternalTermId == ExternalTermId);
+            x.StudentProfileId == profile.Id && x.ExternalTermId == ExternalTermId);
         if (approval?.AcceptedAt is not null)
         {
             StatusMessage = "Your bill agreement was already recorded.";
@@ -487,8 +487,10 @@ public class BillApprovalModel : CampusFlowPageModel
     public async Task<IActionResult> OnPostGeneratePdfAsync([FromQuery] string term)
     {
         if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term)) return NotFound();
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
+        if (profile is null) return NotFound();
         var approval = await _billApprovals.FindAsync(x =>
-            x.UserId == CurrentUser.Id.Value && x.TermCode == term && x.AcceptedAt != null);
+            x.StudentProfileId == profile.Id && x.TermCode == term && x.AcceptedAt != null);
         if (approval is null) return NotFound();
         var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
         if (artifact is null)
@@ -530,7 +532,7 @@ public class BillApprovalModel : CampusFlowPageModel
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null) return NotFound();
         var approval = await _billApprovals.FindAsync(x =>
-            x.UserId == profile.UserId && x.TermCode == term && x.AcceptedAt != null);
+            x.StudentProfileId == profile.Id && x.TermCode == term && x.AcceptedAt != null);
         if (approval is null) return NotFound();
         var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
         if (artifact?.PdfStatus != BillArtifactOperationStatus.Completed ||

@@ -8,7 +8,7 @@ namespace CampusFlow.Students;
 public class StudentProfile : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
     public Guid? TenantId { get; private set; }
-    public Guid UserId { get; private set; }
+    public Guid? UserId { get; private set; }
     public StudentInformationSystemProvider Provider { get; private set; }
     public string ExternalStudentId { get; private set; } = null!;
     public string StudentId { get; private set; } = null!;
@@ -24,13 +24,20 @@ public class StudentProfile : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public StudentProfile(
         Guid id,
         Guid? tenantId,
-        Guid userId,
+        Guid? userId,
         StudentInformationSystemStudent student)
         : base(id)
     {
         TenantId = tenantId;
         UserId = userId;
         Update(student);
+    }
+
+    public void AssignUser(Guid userId)
+    {
+        if (UserId.HasValue && UserId != userId)
+            throw new InvalidOperationException("This student record is already linked to another login.");
+        UserId = userId;
     }
 
     public void Update(StudentInformationSystemStudent student)

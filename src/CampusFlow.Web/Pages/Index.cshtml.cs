@@ -148,11 +148,19 @@ public class IndexModel : CampusFlowPageModel
                 {
                     if (profile is null)
                     {
-                        profile = await _studentProfileRepository.InsertAsync(new StudentProfile(
-                            _guidGenerator.Create(),
-                            CurrentTenant.Id,
-                            CurrentUser.Id.Value,
-                            result.Student));
+                        var existing = await _studentProfileRepository.FindAsync(x =>
+                            x.Provider == result.Student.Provider &&
+                            x.ExternalStudentId == result.Student.ExternalStudentId);
+                        if (existing is null)
+                            profile = await _studentProfileRepository.InsertAsync(new StudentProfile(
+                                _guidGenerator.Create(), CurrentTenant.Id,
+                                CurrentUser.Id.Value, result.Student));
+                        else
+                        {
+                            existing.AssignUser(CurrentUser.Id.Value);
+                            existing.Update(result.Student);
+                            profile = await _studentProfileRepository.UpdateAsync(existing);
+                        }
                     }
                     else if (profile.Provider == result.Student.Provider &&
                              profile.ExternalStudentId == result.Student.ExternalStudentId)
