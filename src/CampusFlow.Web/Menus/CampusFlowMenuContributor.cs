@@ -168,11 +168,14 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageAdvisorRouting = await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ManageRouting);
         var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
+        var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
-        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing)
+        if (canImpersonate || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu)
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
+            if (canManageBibliu)
+                admin.AddItem(new ApplicationMenuItem("CampusFlow.Bibliu", "BibliU Bookstore", "~/Admin/Bibliu", icon: "fa fa-book", order: 8));
             if (canManageGlobalConfiguration)
             {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.GlobalConfiguration, "Global Configuration",

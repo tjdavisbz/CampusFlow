@@ -20,6 +20,7 @@ using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
 using CampusFlow.Payments;
 using CampusFlow.Announcements;
+using CampusFlow.Bibliu;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -31,6 +32,7 @@ public class CampusFlowDbContext :
     ITenantManagementDbContext,
     IIdentityDbContext
 {
+    public DbSet<BibliuConfiguration> BibliuConfigurations { get; set; }
     public DbSet<StudentProfile> StudentProfiles { get; set; }
     public DbSet<AgreementTemplate> AgreementTemplates { get; set; }
     public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
@@ -102,6 +104,18 @@ public class CampusFlowDbContext :
         builder.ConfigureBlobStoring();
 
         /* Configure your own tables/entities inside here */
+
+        builder.Entity<BibliuConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "BibliuConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.TenantId).IsRequired();
+            b.Property(x => x.BillingTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.BibliuTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StoreNumber).IsRequired().HasMaxLength(3);
+            b.Property(x => x.InSiteStoreNumber).IsRequired().HasMaxLength(3);
+            b.HasIndex(x => x.TenantId).IsUnique().HasFilter("\"IsDeleted\" = false");
+        });
 
         builder.Entity<StudentProfile>(b =>
         {

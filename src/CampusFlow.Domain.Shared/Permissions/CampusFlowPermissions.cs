@@ -28,6 +28,8 @@ public static class CampusFlowPermissions
         public const string ResetIndividualBillApproval = StudentBilling + ".ResetIndividualBillApproval";
         public const string BusinessServices = Default + ".BusinessServices";
         public const string AddStudentMealPlan = BusinessServices + ".AddStudentMealPlan";
+        public const string BibliuConfiguration = Default + ".BibliuConfiguration";
+        public const string BibliuExport = Default + ".BibliuExport";
         public const string HousingAssignments = Default + ".HousingAssignments";
     }
 }

@@ -1,0 +1,39 @@
+@page "/Admin/Bibliu"
+@model CampusFlow.Web.Pages.Admin.BibliuModel
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{ PageLayout.Content.Title="BibliU bookstore"; PageLayout.Content.MenuItemName="CampusFlow.Bibliu"; }
+@section styles {
+ <abp-style src="/Pages/Admin/AdminConfiguration.css" />
+ <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+<main class="admin-config-shell">
+ <header class="admin-config-hero"><div><span>Admin portal · Integrations</span><h1>BibliU bookstore</h1><p>Choose the terms used for bookstore exports.</p></div><i class="fa-solid fa-book"></i></header>
+ <form method="post" asp-page-handler="Save" class="config-card">
+  <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+  <input asp-for="Input.ConcurrencyStamp" type="hidden" />
+  <div class="section-heading"><h2>Export settings</h2><p>These settings control the CampusFlow export API. Existing Power Automate flows remain unchanged.</p></div>
+  <label class="block-field"><span>Billing and voucher term</span><select asp-for="Input.BillingTermId" class="form-select"><option value="">Choose a term…</option>@foreach(var term in Model.Terms){<option value="@term.ExternalTermId">@term.DisplayName</option>}</select><small>Approved bills, balances and bookstore usage are evaluated for this term.</small></label>
+  <label class="block-field"><span>BibliU term</span><select asp-for="Input.BibliuTermId" class="form-select" id="bibliu-term"><option value="">Choose a term…</option>@foreach(var term in Model.Terms){<option value="@term.ExternalTermId" data-name="@term.DisplayName">@term.DisplayName</option>}</select><small>User names and the POS course file use this single term.</small></label>
+  <div class="section-heading"><h3>Schedule and enrollment terms</h3><p id="expanded-terms" aria-live="polite">@(Model.ExpandedTerms.Count==0 ? "Choose a BibliU term to preview its related terms." : string.Join(", ",Model.ExpandedTerms))</p></div>
+  <label class="block-field"><span>Store number</span><input asp-for="Input.StoreNumber" class="form-control" inputmode="numeric" maxlength="3" /></label>
+  <label class="block-field"><span>InSite store number</span><input asp-for="Input.InSiteStoreNumber" class="form-control" inputmode="numeric" maxlength="3" /><small>Retained for compatibility; the four current export files do not use this value.</small></label>
+  <label class="block-field"><span><input asp-for="Input.IsEnabled" /> Enable CampusFlow exports</span><small>Does not run a flow or upload a file.</small></label>
+  <p>Approved bills qualify for a $500 baseline or a larger credit balance including pending aid, less bookstore charges already used. Remaining vouchers cannot be negative.</p>
+  <button class="primary-action" type="submit">Save BibliU settings</button>
+ </form>
+</main>
+@section scripts {
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+ const select=document.getElementById('bibliu-term'), preview=document.getElementById('expanded-terms');
+ const names=new Set(Array.from(select.options).map(o=>o.dataset.name));
+ select.addEventListener('change',()=>{
+  const name=select.selectedOptions[0]?.dataset.name, match=/^(Spring|Summer|Fall) (\d{4})$/.exec(name||'');
+  if(!match){preview.textContent='Choose a Spring, Summer or Fall term.';return;}
+  const y=Number(match[2]), terms=match[1]==='Spring'?[`Fall ${y-1}`,`Spring ${y}`,`Summer ${y}`]:match[1]==='Summer'?[`Spring ${y}`,`Summer ${y}`,`Fall ${y}`]:[`Summer ${y}`,`Fall ${y}`,`Spring ${y+1}`];
+  preview.textContent=terms.filter(t=>names.has(t)).join(', ');
+ });
+});
+</script>
+}
