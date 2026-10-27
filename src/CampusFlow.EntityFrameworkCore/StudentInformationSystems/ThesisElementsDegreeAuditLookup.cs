@@ -107,6 +107,7 @@ public sealed class ThesisElementsDegreeAuditLookup :
                     WHEN M.Completed = 'Yes' THEN 'C'
                     WHEN M.[Status] = 'In Progress' THEN 'InP'
                     WHEN C.Completed = 'Yes' THEN 'C'
+                    WHEN C.[Status] = 'In Progress' THEN 'InP'
                     WHEN C.Completed = 'No' THEN 'R'
                     ELSE 'NN'
                 END AS CrsStatus,
@@ -116,7 +117,9 @@ public sealed class ThesisElementsDegreeAuditLookup :
                 COALESCE(A.Department, '') AS Department,
                 COALESCE(A.CourseID, '') AS CourseID,
                 COALESCE(A.CourseType, '') AS CourseType,
-                COALESCE(A.[Section], '') AS [Section]
+                COALESCE(A.[Section], '') AS [Section],
+                COALESCE(NULLIF(M.SRAcademicIDMatch, 0), NULLIF(C.SRAcademicIDMatch, 0), 0)
+                    AS MatchedAcademicId
             FROM dbo.StudentAudReq R
             INNER JOIN dbo.StudentAudGrp G
                 ON G.StudentUID = R.StudentUID
@@ -167,7 +170,8 @@ public sealed class ThesisElementsDegreeAuditLookup :
                     Text(reader, "AuditCourse"), Text(reader, "CourseName"),
                     Text(reader, "CrsStatus"), Text(reader, "Grade"),
                     Decimal(reader, "Credits"), Text(reader, "Term"),
-                    $"{Text(reader, "Department")}{Text(reader, "CourseID")}{Text(reader, "CourseType")}{Text(reader, "Section")}"));
+                    $"{Text(reader, "Department")}{Text(reader, "CourseID")}{Text(reader, "CourseType")}{Text(reader, "Section")}",
+                    Integer(reader, "MatchedAcademicId")));
             }
         }
 
