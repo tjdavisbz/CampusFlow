@@ -1,6 +1,6 @@
 # Azure non-production operations
 
-Updated October 27, 2026 (America/Chicago). Launch work is in progress.
+Updated October 27, 2026 (America/Chicago). Application deployed; final launch checks are in progress.
 The owner authorized completing the non-production site at `https://my-np.nelson.edu`
 and copying the production PostgreSQL application database **into non-production only**.
 
@@ -114,7 +114,9 @@ Safeguards:
   a consistent production snapshot is taken. Dumps and diagnostics stay outside Git
   in a private temporary folder and contain sensitive production data.
 - Restore uses full TLS validation, no source ownership/ACLs, exit-on-error and a single
-  transaction. All source-dump table row counts are compared with the restored target.
+  transaction. Azure-managed `azure` and `pgaadauth` extensions are excluded so platform
+  components are never dropped/recreated. All source-dump table row counts are compared
+  with the restored target.
 - Non-production tenant connection-string overrides are removed after restoration so
   a copied tenant cannot redirect the site to a production database.
 
@@ -137,3 +139,12 @@ Startup note: the first deployment retained the Azure placeholder until the expl
 CampusFlow startup command was configured. Health-check retries allow five minutes
 for the dedicated B1 plan to warm up. The earlier failed deployment attempts did not
 deploy anything to production.
+
+October 27, approximately 11:14 a.m. Central: production PostgreSQL `postgres` was
+copied into `campusflow_nonprod`. All 61 application-table row counts matched the
+captured source snapshot. Source transactions were read-only and the restricted restore
+role passed all production write/create isolation checks. Zero tenant DB overrides
+were present. A first restore attempt encountered an Azure platform extension and
+rolled back transactionally; the corrected refresh excludes those extensions.
+Private source and pre-refresh rollback dumps remain in the protected temporary
+`campusflow-prod-to-nonprod-ootr31s9` evidence folder; do not commit or share them.

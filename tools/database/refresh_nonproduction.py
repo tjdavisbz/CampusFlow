@@ -163,8 +163,8 @@ def main():
             result = subprocess.run(command, env=env, stdout=output, stderr=subprocess.STDOUT)
             if result.returncode:
                 raise RuntimeError(f'Refresh stopped; private diagnostics and rollback dump: {evidence}')
-        run([client('pg_dump'), '--format=custom', '--no-owner', '--no-acl', '--file', str(rollback)], target_env)
-        run([client('pg_dump'), '--format=custom', '--no-owner', '--no-acl', '--file', str(dump)], source_env)
+        run([client('pg_dump'), '--format=custom', '--no-owner', '--no-acl', '--exclude-extension=azure', '--exclude-extension=pgaadauth', '--file', str(rollback)], target_env)
+        run([client('pg_dump'), '--format=custom', '--no-owner', '--no-acl', '--exclude-extension=azure', '--exclude-extension=pgaadauth', '--file', str(dump)], source_env)
         # No connection overrides, --create, or production credentials reach pg_restore.
         run([client('pg_restore'), '--dbname', TARGET_DATABASE, '--clean', '--if-exists',
              '--no-owner', '--no-acl', '--exit-on-error', '--single-transaction', str(dump)], target_env)
