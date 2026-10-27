@@ -1,8 +1,5 @@
-// The Identity Users edit modal is supplied by ABP. Enhance that modal without
-// replacing its account, role, and audit forms.
+// Bind the student selector rendered in the Identity Users edit modal.
 (function () {
-    if (typeof abp === 'undefined' || typeof $ === 'undefined') return;
-    if (!abp.auth.isGranted('CampusFlow.Admin.AccessManagement')) return;
     if (!window.location.pathname.toLowerCase().startsWith('/identity/users')) return;
 
     function element(tag, className, text) {
@@ -13,7 +10,7 @@
     }
 
     function request(url, method, data) {
-        return abp.ajax({
+        return window.abp.ajax({
             url: url,
             type: method,
             contentType: 'application/json',
@@ -21,29 +18,14 @@
         });
     }
 
-    $(document).on('shown.bs.modal', '.modal', function () {
-        const modal = this;
-        const userId = modal.querySelector('input[name="UserInfo.Id"]')?.value;
-        if (!userId || modal.querySelector('.staff-student-editor')) return;
-
-        const firstTab = modal.querySelector('.tab-pane');
-        if (!firstTab) return;
-
-        const section = element('section', 'staff-student-editor border-top mt-4 pt-3');
-        section.appendChild(element('h5', 'mb-2', 'Student portal account'));
-        section.appendChild(element('p', 'text-muted small mb-3',
-            'Link this staff login to the person’s own student record. This grants normal student portal access, not a read-only preview.'));
-        const status = element('div', 'mb-3');
-        status.setAttribute('role', 'status');
-        const searchLabel = element('label', 'form-label', 'Find student by name, ID, or email');
-        const search = element('input', 'form-control', undefined);
-        search.type = 'search';
-        search.placeholder = 'Search Elements students';
-        search.minLength = 2;
-        searchLabel.appendChild(search);
-        const results = element('div', 'mt-2');
-        section.append(status, searchLabel, results);
-        firstTab.appendChild(section);
+    function initialize(section) {
+        if (section.dataset.initialized || !window.abp?.ajax) return;
+        const userId = section.dataset.staffUserId;
+        if (!userId) return;
+        section.dataset.initialized = 'true';
+        const status = section.querySelector('.staff-student-editor-status');
+        const search = section.querySelector('.staff-student-editor-search');
+        const results = section.querySelector('.staff-student-editor-results');
 
         const baseUrl = '/api/admin/staff-student-links/' + encodeURIComponent(userId);
 
@@ -70,7 +52,7 @@
                     try {
                         await request(baseUrl, 'DELETE');
                         await refresh();
-                        abp.notify.success('Student link removed.');
+                        window.abp.notify.success('Student link removed.');
                     } catch (_) {
                         remove.disabled = false;
                     }
@@ -112,7 +94,7 @@
                             search.value = '';
                             results.replaceChildren();
                             await refresh();
-                            abp.notify.success('Student portal account linked.');
+                            window.abp.notify.success('Student portal account linked.');
                         } catch (_) {
                             select.disabled = false;
                         }
@@ -131,5 +113,19 @@
             searchTimer = window.setTimeout(findStudents, 300);
         });
         refresh();
-    });
+
+    }
+
+    function start() {
+        const scan = () => document.querySelectorAll('.staff-student-editor').forEach(initialize);
+        new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+        scan();
+        window.addEventListener('load', scan, { once: true });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+        start();
+    }
 })();
