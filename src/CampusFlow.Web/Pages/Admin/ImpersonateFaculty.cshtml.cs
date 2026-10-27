@@ -12,7 +12,7 @@ using Volo.Abp.Authorization.Permissions;
 
 namespace CampusFlow.Web.Pages.Admin;
 
-[Authorize]
+[Authorize(CampusFlowPermissions.FacultyImpersonation.Default)]
 public class ImpersonateFacultyModel(
     FacultyPortalReader facultyReader,
     FacultyViewSession session,
@@ -67,5 +67,5 @@ public class ImpersonateFacultyModel(
     }
 
     private Task<bool> CanUseAsync() =>
-        permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
+        permissionChecker.IsGrantedAsync(CampusFlowPermissions.FacultyImpersonation.Default);
 }

@@ -455,6 +455,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseUnitOfWork();
         app.UseMiddleware<ConfiguredAdministratorMiddleware>();
         app.UseDynamicClaims();
+        app.UseMiddleware<StudentOnlyPortalMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<StudentViewContextMiddleware>();
         app.UseMiddleware<FacultyViewContextMiddleware>();

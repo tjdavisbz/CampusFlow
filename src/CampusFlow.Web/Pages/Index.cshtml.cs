@@ -38,6 +38,7 @@ public class IndexModel : CampusFlowPageModel
     private readonly ILogger<IndexModel> _logger;
     private readonly IAdvisorPortalAppService _advisorPortal;
     private readonly IPermissionChecker _permissionChecker;
+    private readonly StudentOnlyAccountAccess _studentOnlyAccountAccess;
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
     private readonly IdentityUserManager _userManager;
     private readonly ICourseSelectionAppService _courseSelection;
@@ -61,6 +62,7 @@ public class IndexModel : CampusFlowPageModel
         ILogger<IndexModel> logger,
         IAdvisorPortalAppService advisorPortal,
         IPermissionChecker permissionChecker,
+        StudentOnlyAccountAccess studentOnlyAccountAccess,
         IStudentInformationSystemAdvisorLookup advisorLookup,
         IdentityUserManager userManager,
         ICourseSelectionAppService courseSelection,
@@ -83,6 +85,7 @@ public class IndexModel : CampusFlowPageModel
         _logger = logger;
         _advisorPortal = advisorPortal;
         _permissionChecker = permissionChecker;
+        _studentOnlyAccountAccess = studentOnlyAccountAccess;
         _advisorLookup = advisorLookup;
         _userManager = userManager;
         _courseSelection = courseSelection;
@@ -126,7 +129,8 @@ public class IndexModel : CampusFlowPageModel
             return;
         }
 
-        HasAdvisorAccess = !_currentStudentView.IsImpersonating && await _permissionChecker.IsGrantedAsync(
+        HasAdvisorAccess = !_currentStudentView.IsImpersonating &&
+            !await _studentOnlyAccountAccess.IsStudentOnlyAsync() && await _permissionChecker.IsGrantedAsync(
             CampusFlowPermissions.AdvisorPortal.Default);
 
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);

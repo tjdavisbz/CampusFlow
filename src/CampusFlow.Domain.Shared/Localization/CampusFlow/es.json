@@ -42,6 +42,7 @@
     "TakePhoto": "Tomar foto",
     "ChoosePhoto": "Escoge una foto",
     "Permission:StudentImpersonation": "Ver el portal estudiantil como un estudiante",
+    "Permission:FacultyImpersonation": "Ver el portal docente como un docente",
     "Permission:Admin": "Acceder al portal administrativo de CampusFlow",
     "Permission:Admin.GlobalConfiguration": "Administrar la configuración global del portal",
     "Permission:Admin.PaymentPlans": "Administrar la configuración de planes de pago",

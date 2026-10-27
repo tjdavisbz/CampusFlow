@@ -18,7 +18,7 @@ public sealed class FacultyViewContextMiddleware(RequestDelegate next)
             return;
         }
 
-        if (!await permissionChecker.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default))
+        if (!await permissionChecker.IsGrantedAsync(CampusFlowPermissions.FacultyImpersonation.Default))
         {
             session.End(context);
             await next(context);
