@@ -37,22 +37,33 @@ public sealed class StudentOnlyAccountAccess(
         {
             try
             {
-                var isStudent = currentUser.Id.HasValue &&
-                    await profiles.AnyAsync(x => x.UserId == currentUser.Id.Value);
-                if (!isStudent)
+                // Student mailboxes are never staff logins, even if the address appears
+                // on a staff record. For other addresses, verify staff identity first:
+                // a staff member may also be a student, and a student API outage must
+                // not lock that staff member out of administration.
+                if (IsNelsonStudentMailbox(currentUser.Email!))
                 {
-                    var lookup = studentLookups.SingleOrDefault(x =>
-                        x.Provider == StudentInformationSystemProvider.ThesisElements);
-                    if (lookup is null) throw new InvalidOperationException("Elements student lookup is unavailable.");
-                    var match = await lookup.FindByEmailAsync(currentUser.Email!, context?.RequestAborted ?? default);
-                    isStudent = match.Status != StudentLookupStatus.NotFound;
+                    studentOnly = true;
                 }
-                // A Nelson student mailbox is a student login even if its address was
-                // also copied into a staff/faculty record. Staff should use their staff login.
-                studentOnly = isStudent &&
-                    (IsNelsonStudentMailbox(currentUser.Email!) ||
-                     !await facultyReader.HasStaffOrFacultyIdentityAsync(
-                         currentUser.Email!, context?.RequestAborted ?? default));
+                else if (await facultyReader.HasStaffOrFacultyIdentityAsync(
+                    currentUser.Email!, context?.RequestAborted ?? default))
+                {
+                    studentOnly = false;
+                }
+                else
+                {
+                    var isStudent = currentUser.Id.HasValue &&
+                        await profiles.AnyAsync(x => x.UserId == currentUser.Id.Value);
+                    if (!isStudent)
+                    {
+                        var lookup = studentLookups.SingleOrDefault(x =>
+                            x.Provider == StudentInformationSystemProvider.ThesisElements);
+                        if (lookup is null) throw new InvalidOperationException("Elements student lookup is unavailable.");
+                        var match = await lookup.FindByEmailAsync(currentUser.Email!, context?.RequestAborted ?? default);
+                        isStudent = match.Status != StudentLookupStatus.NotFound;
+                    }
+                    studentOnly = isStudent;
+                }
             }
             catch (Exception exception) when (context?.RequestAborted.IsCancellationRequested != true)
             {

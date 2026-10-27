@@ -12,6 +12,7 @@ public sealed class StudentOnlyPortalMiddleware(RequestDelegate next)
             await accountAccess.IsStudentOnlyAsync())
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "text/plain; charset=utf-8";
             await context.Response.WriteAsync("This account has access to the student portal only.");
             return;
         }
