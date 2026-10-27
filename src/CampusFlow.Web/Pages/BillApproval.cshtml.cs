@@ -350,7 +350,7 @@ public class BillApprovalModel : CampusFlowPageModel
             {
                 var postingService = _paymentPostingServices.Single(x => x.Provider == profile.Provider);
                 var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId, amount,
-                    convenienceFee, response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
+                    convenienceFee, response.Reference ?? string.Empty, payment.IsTest, payment.CreationTime,
                     HttpContext.RequestAborted);
                 payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId,
                     posting.ConvenienceFeeBillingBatchId);

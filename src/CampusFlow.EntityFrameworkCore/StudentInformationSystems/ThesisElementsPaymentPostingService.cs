@@ -21,12 +21,16 @@ public sealed class ThesisElementsPaymentPostingService :
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api";
     private const string PostingPath = "Payments:Payflow:ElementsPosting";
     private const string TokenCacheKey = "ThesisElements:PaymentPosting:IntegrationToken";
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient SharedHttpClient = new();
+    private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
 
-    public ThesisElementsPaymentPostingService(IConfiguration configuration, IMemoryCache cache)
+    public ThesisElementsPaymentPostingService(IConfiguration configuration, IMemoryCache cache) : this(configuration, cache, SharedHttpClient) { }
+
+    internal ThesisElementsPaymentPostingService(IConfiguration configuration, IMemoryCache cache, HttpClient httpClient)
     {
+        _httpClient = httpClient;
         _configuration = configuration;
         _cache = cache;
     }
@@ -45,25 +49,49 @@ public sealed class ThesisElementsPaymentPostingService :
         if (string.IsNullOrWhiteSpace(externalReference))
             throw new ArgumentException("A gateway reference is required.", nameof(externalReference));
 
+        // Persist a business date, not a UTC instant, in Elements' date-only accounting field.
+        var utc = transactionDate.Kind == DateTimeKind.Local
+            ? transactionDate.ToUniversalTime()
+            : DateTime.SpecifyKind(transactionDate, DateTimeKind.Utc);
+        var businessDate = DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(utc,
+            TimeZoneInfo.FindSystemTimeZoneById(_configuration[$"{PostingPath}:TimeZoneId"]
+                                               ?? "America/Chicago")).Date, DateTimeKind.Unspecified);
         var token = await GetTokenAsync(cancellationToken);
         var batchComment = isTest ? Posting("TestBatchComment") : Posting("LiveBatchComment");
-        var batchId = await FindBatchAsync(token, batchComment, cancellationToken);
+        var datedComment = batchComment + " - " + businessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var paymentReference = externalReference.Trim();
+        var batches = await GetBatchesAsync(token, cancellationToken);
+        int? batchId = null;
+        int? billingBatchId = null;
+        // Older versions could post a payment in yesterday's batch. Find that reference
+        // before choosing a new daily batch, including retries after a partial posting.
+        foreach (var batch in batches.Where(b => IsPaymentBatch(b, batchComment)))
+        {
+            var id = ReadInt(batch["batchMasterID"]);
+            if (id <= 0) continue;
+            var existing = await FindExistingEntryAsync(token, studentUid, id, paymentReference, cancellationToken);
+            if (existing is null) continue;
+            if (billingBatchId is not null)
+                throw new InvalidOperationException("The payment reference occurs in multiple batches; manual review is required.");
+            batchId = id;
+            billingBatchId = existing;
+        }
         if (batchId is null)
         {
-            await CreateBatchAsync(token, batchComment, cancellationToken);
-            batchId = await FindBatchAsync(token, batchComment, cancellationToken);
+            batchId = FindDailyBatch(batches, batchComment, datedComment, businessDate);
+            if (batchId is null)
+            {
+                await CreateBatchAsync(token, datedComment, cancellationToken);
+                batchId = FindDailyBatch(await GetBatchesAsync(token, cancellationToken),
+                    batchComment, datedComment, businessDate);
+            }
         }
-
         if (batchId is null)
             throw new InvalidOperationException("Elements created the payment batch but did not return it in the batch list.");
-
-        var paymentReference = externalReference.Trim();
-        var billingBatchId = await FindExistingEntryAsync(token, studentUid, batchId.Value,
-                                 paymentReference, cancellationToken)
-                             ?? await CreateEntryAsync(token, studentUid, termCalendarId, batchId.Value,
-                                 amount, paymentReference, transactionDate,
-                                 Posting("TransactionType"), PostingInt("TransactionDocumentId"),
-                                 PostingInt("ArTypeId"), Posting("Description"), "payment", cancellationToken);
+        billingBatchId ??= await CreateEntryAsync(token, studentUid, termCalendarId, batchId.Value,
+            amount, paymentReference, businessDate, Posting("TransactionType"),
+            PostingInt("TransactionDocumentId"), PostingInt("ArTypeId"), Posting("Description"),
+            "payment", cancellationToken);
 
         int? feeBillingBatchId = null;
         if (convenienceFee > 0)
@@ -72,14 +100,14 @@ public sealed class ThesisElementsPaymentPostingService :
             feeBillingBatchId = await FindExistingEntryAsync(token, studentUid, batchId.Value,
                                     feeReference, cancellationToken)
                                 ?? await CreateEntryAsync(token, studentUid, termCalendarId, batchId.Value,
-                                    convenienceFee, feeReference, transactionDate,
+                                    convenienceFee, feeReference, businessDate,
                                     Posting("ConvenienceFeeTransactionType"),
                                     PostingInt("ConvenienceFeeTransactionDocumentId"),
                                     PostingInt("ConvenienceFeeArTypeId"),
                                     Posting("ConvenienceFeeDescription"), "convenience-fee", cancellationToken);
         }
 
-        return new StudentPaymentPostingResult(batchId.Value, billingBatchId, feeBillingBatchId);
+        return new StudentPaymentPostingResult(batchId.Value, billingBatchId.Value, feeBillingBatchId);
     }
 
     private async Task<int> CreateEntryAsync(string token, int studentUid, int termCalendarId,
@@ -107,7 +135,7 @@ public sealed class ThesisElementsPaymentPostingService :
             paymentPlanID = 0,
             refNo = reference
         });
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         var root = await ReadRootAsync(response, $"{operation} entry", cancellationToken);
         var billingBatchId = ReadInt(root["data"]);
         if (root["isSuccess"]?.GetValue<bool>() != true || billingBatchId <= 0)
@@ -121,23 +149,37 @@ public sealed class ThesisElementsPaymentPostingService :
         return paymentReference[..Math.Min(paymentReference.Length, 64 - suffix.Length)] + suffix;
     }
 
-    private async Task<int?> FindBatchAsync(string token, string comment, CancellationToken cancellationToken)
+    private async Task<List<JsonObject>> GetBatchesAsync(string token, CancellationToken cancellationToken)
     {
         using var request = CreateRequest(HttpMethod.Get, "/api/billing/cashier-entry/select-items", token);
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         var root = await ReadRootAsync(response, "batch lookup", cancellationToken);
         if (root["isSuccess"]?.GetValue<bool>() != true)
             throw new InvalidOperationException(ReadApiError(root, "Elements could not load payment batches."));
+        if (root["data"]?["batchMasterList"] is not JsonArray list)
+            throw new InvalidOperationException("Elements returned an invalid payment batch list.");
+        return list.OfType<JsonObject>().ToList();
+    }
 
-        var list = root["data"]?["batchMasterList"] as JsonArray;
-        if (list is null) return null;
-        foreach (var item in list.OfType<JsonObject>())
-        {
-            if (!string.Equals(ReadString(item, "comment"), comment, StringComparison.OrdinalIgnoreCase)) continue;
-            var id = ReadInt(item["batchMasterID"]);
-            if (id > 0) return id;
-        }
-        return null;
+    private static bool IsPaymentBatch(JsonObject batch, string comment)
+    {
+        var actual = ReadString(batch, "comment") ?? "";
+        return actual.Equals(comment, StringComparison.OrdinalIgnoreCase)
+               || actual.StartsWith(comment + " - ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int? FindDailyBatch(IEnumerable<JsonObject> batches, string comment,
+        string datedComment, DateTime businessDate)
+    {
+        var matches = batches.Where(batch =>
+            string.Equals(ReadString(batch, "comment"), datedComment, StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(ReadString(batch, "comment"), comment, StringComparison.OrdinalIgnoreCase)
+                && (ReadString(batch, "batchName") ?? "").StartsWith(
+                    businessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), StringComparison.Ordinal)))
+            .Select(batch => ReadInt(batch["batchMasterID"])).Where(id => id > 0).Distinct().ToList();
+        if (matches.Count > 1)
+            throw new InvalidOperationException("Multiple online payment batches exist for this date; manual review is required.");
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     private async Task CreateBatchAsync(string token, string comment, CancellationToken cancellationToken)
@@ -151,7 +193,7 @@ public sealed class ThesisElementsPaymentPostingService :
             mod = PostingInt("SourceModuleId"),
             termBased = true
         });
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         var root = await ReadRootAsync(response, "batch creation", cancellationToken);
         if (root["isSuccess"]?.GetValue<bool>() != true || root["data"]?.GetValue<bool>() != true)
             throw new InvalidOperationException(ReadApiError(root, "Elements did not create the payment batch."));
@@ -162,7 +204,7 @@ public sealed class ThesisElementsPaymentPostingService :
     {
         using var request = CreateRequest(HttpMethod.Get,
             $"/api/billing/cashier-entry/batches/batch-entries-list/{studentUid}/{batchMasterId}", token);
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         var root = await ReadRootAsync(response, "batch entry lookup", cancellationToken);
         if (root["isSuccess"]?.GetValue<bool>() != true)
             throw new InvalidOperationException(ReadApiError(root, "Elements could not check the payment batch."));
@@ -186,7 +228,7 @@ public sealed class ThesisElementsPaymentPostingService :
         request.Headers.Add("TenantHost", Api("TenantHost"));
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Api("Username")}:{Api("Password")}")));
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         var root = await ReadRootAsync(response, "authentication", cancellationToken);
         var token = root["data"]?["token"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(token)) throw new InvalidOperationException("Elements authentication returned no token.");

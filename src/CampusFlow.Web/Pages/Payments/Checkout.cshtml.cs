@@ -124,7 +124,7 @@ public class CheckoutModel : CampusFlowPageModel
                         throw new InvalidOperationException("The current Elements term identifier is invalid.");
                     var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId,
                         payment.Amount, payment.ConvenienceFee, response.Reference ?? string.Empty, payment.IsTest,
-                        DateTime.UtcNow,
+                        payment.CreationTime,
                         HttpContext.RequestAborted);
                     payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId,
                         posting.ConvenienceFeeBillingBatchId);
