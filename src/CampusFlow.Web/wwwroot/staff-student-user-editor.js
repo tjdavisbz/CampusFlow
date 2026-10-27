@@ -29,7 +29,7 @@
 
         const baseUrl = '/api/admin/staff-student-links/' + encodeURIComponent(userId);
 
-        async function refresh() {
+        const refresh = async () => {
             status.textContent = 'Loading student link…';
             try {
                 const info = await request(baseUrl, 'GET');
@@ -62,9 +62,9 @@
             } catch (_) {
                 status.textContent = 'Unable to load the student link for this user.';
             }
-        }
+        };
 
-        async function findStudents() {
+        const findStudents = async () => {
             const query = search.value.trim();
             results.replaceChildren();
             if (query.length < 2) return;
@@ -105,7 +105,7 @@
             } catch (_) {
                 results.textContent = 'Student search failed. Please try again.';
             }
-        }
+        };
 
         let searchTimer;
         search.addEventListener('input', () => {
