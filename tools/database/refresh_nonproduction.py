@@ -76,7 +76,7 @@ def az(*args):
                              '--only-show-errors', '-o', 'json'], capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError('Azure operation failed; credential-bearing output withheld')
-    return json.loads(result.stdout)
+    return json.loads(result.stdout) if result.stdout.strip() else None
 
 
 def setting(name):
@@ -141,6 +141,9 @@ def main():
     write_access = query(restricted_source, "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND (has_table_privilege(current_user,quote_ident(schemaname)||'.'||quote_ident(tablename),'INSERT') OR has_table_privilege(current_user,quote_ident(schemaname)||'.'||quote_ident(tablename),'UPDATE') OR has_table_privilege(current_user,quote_ident(schemaname)||'.'||quote_ident(tablename),'DELETE') OR pg_has_role(current_user,tableowner,'MEMBER'))")
     if write_access != '0':
         raise RuntimeError('Restore-role production-write isolation check failed')
+    can_create = query(restricted_source, "SELECT has_database_privilege(current_user,current_database(),'CREATE') OR has_schema_privilege(current_user,'public','CREATE')")
+    if can_create != 'f':
+        raise RuntimeError('Restore role must not create production schemas or objects')
     if str(setting('MaintenanceMode__Enabled')).lower() != 'true':
         raise RuntimeError('Enable NONPRODUCTION maintenance mode before refreshing')
     print(f'Verified one-way refresh: {SOURCE_APP}/{SOURCE_DATABASE} -> {TARGET_APP}/{TARGET_DATABASE}')
@@ -148,6 +151,8 @@ def main():
     if not args.apply:
         print('Preview only. Use --apply to replace only the dedicated nonproduction database contents.')
         return
+    az('webapp', 'stop', '-g', GROUP, '-n', TARGET_APP)
+    print('Stopped only the nonproduction app for a consistent restore and validation.')
     os.umask(0o077)
     evidence = Path(tempfile.mkdtemp(prefix='campusflow-prod-to-nonprod-'))
     dump = evidence / 'production.dump'
@@ -196,6 +201,8 @@ def main():
     query(target_env, 'DELETE FROM "AbpTenantConnectionStrings"')
     print('Production snapshot restored successfully into nonproduction only.')
     print('Removed nonproduction tenant connection overrides:', tenant_overrides)
+    az('webapp', 'start', '-g', GROUP, '-n', TARGET_APP)
+    print('Restarted only the nonproduction app; maintenance remains enabled.')
     print('Private snapshot and pre-refresh rollback files:', evidence)
 
 
