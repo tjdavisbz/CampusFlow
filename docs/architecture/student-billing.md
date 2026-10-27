@@ -102,9 +102,11 @@ merchant account supports it; otherwise the direct Payflow API can reproduce the
 server-hosted flow with the corresponding PCI obligations.
 
 CampusFlow must never persist or log card numbers or CVV values. It should retain only safe
-payment-attempt metadata such as amount, status, CampusFlow idempotency key, Payflow
-transaction identifiers, and timestamps. Convenience-fee policy (currently 2.85% in the
-legacy portal) must be tenant configuration rather than hard-coded billing logic.
+payment-attempt metadata such as payment amount, convenience-fee amount, status, CampusFlow
+idempotency key, Payflow transaction identifiers, and timestamps. Convenience-fee policy
+(currently 2.85%) is configuration rather than hard-coded billing logic. Payflow receives one
+combined card charge; Elements receives separate, idempotent `PAYWEB` payment and `CC FEE`
+convenience-fee batch entries.
 
 ## Development data caveat
 

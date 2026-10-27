@@ -4,7 +4,10 @@ using System.Threading.Tasks;
 
 namespace CampusFlow.StudentInformationSystems;
 
-public sealed record StudentPaymentPostingResult(int BatchMasterId, int BillingBatchId);
+public sealed record StudentPaymentPostingResult(
+    int BatchMasterId,
+    int BillingBatchId,
+    int? ConvenienceFeeBillingBatchId);
 
 public interface IStudentInformationSystemPaymentPostingService
 {
@@ -14,6 +17,7 @@ public interface IStudentInformationSystemPaymentPostingService
         string externalStudentId,
         int termCalendarId,
         decimal amount,
+        decimal convenienceFee,
         string externalReference,
         bool isTest,
         DateTime transactionDate,

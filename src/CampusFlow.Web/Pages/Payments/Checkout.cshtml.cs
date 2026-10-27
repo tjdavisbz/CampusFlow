@@ -54,6 +54,9 @@ public class CheckoutModel : CampusFlowPageModel
     [BindProperty, StringLength(20), Display(Name = "Billing ZIP/postal code")]
     public string? PostalCode { get; set; }
     public decimal OutstandingBalance { get; private set; }
+    public decimal ConvenienceFee => _options.CalculateConvenienceFee(Amount);
+    public decimal TotalCharge => Amount + ConvenienceFee;
+    public decimal ConvenienceFeePercent => _options.ConvenienceFeeRate * 100m;
     public bool IsTestMode => _options.TestMode;
     public string? ResultTitle { get; private set; }
     public string? ResultMessage { get; private set; }
@@ -90,14 +93,17 @@ public class CheckoutModel : CampusFlowPageModel
 
         var id = GuidGenerator.Create();
         var tokenId = Guid.NewGuid().ToString("N");
+        var convenienceFee = _options.CalculateConvenienceFee(Amount);
+        var totalCharge = Amount + convenienceFee;
         var payment = new PayflowPayment(id, CurrentTenant.Id, CurrentUser.Id!.Value, profile.Id,
-            profile.ExternalStudentId, Amount, _options.Currency, tokenId, _options.TestMode);
+            profile.ExternalStudentId, Amount, convenienceFee, _options.Currency, tokenId, _options.TestMode);
         await _payments.InsertAsync(payment, autoSave: true);
         try
         {
             var number = Regex.Replace(CardNumber, @"[\s-]", string.Empty);
-            var response = await _gateway.SaleAsync(Amount, $"CF{id:N}"[..20],
+            var response = await _gateway.SaleAsync(totalCharge, $"CF{id:N}"[..20],
                 new PayflowCard(number, ExpirationMonth, ExpirationYear, SecurityCode, PostalCode),
+                new PayflowCustomer(profile.StudentId, profile.FirstName, profile.LastName),
                 HttpContext.RequestAborted);
             _logger.LogInformation(
                 "Payflow sale completed for payment {PaymentId}. Result={GatewayResult}, Message={GatewayMessage}, Reference={GatewayReference}",
@@ -117,9 +123,11 @@ public class CheckoutModel : CampusFlowPageModel
                     if (!int.TryParse(term.ExternalTermId, out var termCalendarId))
                         throw new InvalidOperationException("The current Elements term identifier is invalid.");
                     var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId,
-                        payment.Amount, response.Reference ?? string.Empty, payment.IsTest, DateTime.UtcNow,
+                        payment.Amount, payment.ConvenienceFee, response.Reference ?? string.Empty, payment.IsTest,
+                        DateTime.UtcNow,
                         HttpContext.RequestAborted);
-                    payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId);
+                    payment.MarkElementsPosted(posting.BatchMasterId, posting.BillingBatchId,
+                        posting.ConvenienceFeeBillingBatchId);
                     await _payments.UpdateAsync(payment, autoSave: true);
                     _logger.LogInformation(
                         "Posted Payflow payment {PaymentId} to Elements batch {BatchMasterId}, entry {BillingBatchId}",
@@ -137,8 +145,8 @@ public class CheckoutModel : CampusFlowPageModel
             ResultTitle = WasApproved ? "Payment received" : "Payment was not approved";
             ResultMessage = WasApproved
                 ? accountUpdatePending
-                    ? $"Your payment of {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.Amount)} was approved. Reference: {response.Reference}. Your student account will update shortly."
-                    : $"Your payment of {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.Amount)} was approved and added to your student account. Reference: {response.Reference}"
+                        ? $"Your card charge of {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.TotalCharged)} ({CampusFlow.Web.Formatting.UsdCurrency.Format(payment.Amount)} payment plus {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.ConvenienceFee)} convenience fee) was approved. Reference: {response.Reference}. Your student account will update shortly."
+                    : $"Your card charge of {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.TotalCharged)} ({CampusFlow.Web.Formatting.UsdCurrency.Format(payment.Amount)} payment plus {CampusFlow.Web.Formatting.UsdCurrency.Format(payment.ConvenienceFee)} convenience fee) was approved and added to your student account. Reference: {response.Reference}"
                 : "No payment was made. Please review your card details or try another payment method.";
             ClearSensitiveFields();
             return Page();
@@ -187,9 +195,11 @@ public class CheckoutModel : CampusFlowPageModel
             try
             {
                 var result = await postingService.PostAsync(payment.ExternalStudentId, termCalendarId,
-                    payment.Amount, payment.PayflowReference!, payment.IsTest, payment.CreationTime,
+                    payment.Amount, payment.ConvenienceFee, payment.PayflowReference!, payment.IsTest,
+                    payment.CreationTime,
                     HttpContext.RequestAborted);
-                payment.MarkElementsPosted(result.BatchMasterId, result.BillingBatchId);
+                payment.MarkElementsPosted(result.BatchMasterId, result.BillingBatchId,
+                    result.ConvenienceFeeBillingBatchId);
                 await _payments.UpdateAsync(payment, autoSave: true);
             }
             catch (Exception ex) when (!HttpContext.RequestAborted.IsCancellationRequested)

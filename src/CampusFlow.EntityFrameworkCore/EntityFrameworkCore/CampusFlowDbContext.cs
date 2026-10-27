@@ -20,6 +20,8 @@ using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
 using CampusFlow.Payments;
 using CampusFlow.Reporting;
+using CampusFlow.Announcements;
+using CampusFlow.Bibliu;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -31,11 +33,13 @@ public class CampusFlowDbContext :
     ITenantManagementDbContext,
     IIdentityDbContext
 {
+    public DbSet<BibliuConfiguration> BibliuConfigurations { get; set; }
     public DbSet<StudentProfile> StudentProfiles { get; set; }
     public DbSet<AgreementTemplate> AgreementTemplates { get; set; }
     public DbSet<PaymentPlanPolicy> PaymentPlanPolicies { get; set; }
     public DbSet<BillApprovalTermConfiguration> BillApprovalTermConfigurations { get; set; }
     public DbSet<BillApproval> BillApprovals { get; set; }
+    public DbSet<LegacyBillApproval> LegacyBillApprovals { get; set; }
     public DbSet<BillApprovalArtifact> BillApprovalArtifacts { get; set; }
     public DbSet<CourseSelectionPolicy> CourseSelectionPolicies { get; set; }
     public DbSet<RegistrationTermConfiguration> RegistrationTermConfigurations { get; set; }
@@ -49,6 +53,7 @@ public class CampusFlowDbContext :
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
     public DbSet<TexasCountryCode> TexasCountryCodes { get; set; }
+    public DbSet<PortalAnnouncement> PortalAnnouncements { get; set; }
 
     #region Entities from the modules
 
@@ -103,6 +108,18 @@ public class CampusFlowDbContext :
 
         /* Configure your own tables/entities inside here */
 
+        builder.Entity<BibliuConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "BibliuConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.TenantId).IsRequired();
+            b.Property(x => x.BillingTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.BibliuTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StoreNumber).IsRequired().HasMaxLength(3);
+            b.Property(x => x.InSiteStoreNumber).IsRequired().HasMaxLength(3);
+            b.HasIndex(x => x.TenantId).IsUnique().HasFilter("\"IsDeleted\" = false");
+        });
+
         builder.Entity<StudentProfile>(b =>
         {
             b.ToTable(CampusFlowConsts.DbTablePrefix + "StudentProfiles", CampusFlowConsts.DbSchema);
@@ -127,6 +144,7 @@ public class CampusFlowDbContext :
             b.ConfigureByConvention();
             b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
             b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.ConvenienceFee).HasPrecision(18, 2);
             b.Property(x => x.Currency).IsRequired().HasMaxLength(3);
             b.Property(x => x.SecureTokenId).IsRequired().HasMaxLength(36);
             b.Property(x => x.SecureToken).HasMaxLength(256);
@@ -147,6 +165,16 @@ public class CampusFlowDbContext :
             b.Property(x => x.AllowedMergeFieldsJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.Name, x.Version }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.IsPublished, x.EffectiveFrom });
+        });
+
+        builder.Entity<PortalAnnouncement>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "PortalAnnouncements", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Title).IsRequired().HasMaxLength(160);
+            b.Property(x => x.ContentHtml).IsRequired();
+            b.Property(x => x.TermsJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.IsPublished, x.StartsAtUtc, x.EndsAtUtc });
         });
 
         builder.Entity<PaymentPlanPolicy>(b =>
@@ -195,6 +223,23 @@ public class CampusFlowDbContext :
             b.HasIndex(x => new { x.TenantId, x.UserId, x.ExternalTermId }).IsUnique();
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<AgreementTemplate>().WithMany().HasForeignKey(x => x.AgreementTemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<LegacyBillApproval>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "LegacyBillApprovals", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalStudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TermCode).IsRequired().HasMaxLength(32);
+            b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.SourceSha256).IsRequired().HasMaxLength(64);
+            b.Property(x => x.LoginTime).HasColumnType("timestamp without time zone");
+            b.Property(x => x.AcceptTime).HasColumnType("timestamp without time zone");
+            b.Ignore(x => x.CountsAsApproved);
+            b.HasIndex(x => new { x.TenantId, x.ExternalStudentId, x.ExternalTermId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.ExternalTermId, x.SourceApproved });
         });
 
         builder.Entity<BillApprovalArtifact>(b =>

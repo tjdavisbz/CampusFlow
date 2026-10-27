@@ -25,6 +25,7 @@
             <span class="eyebrow">Registration checkout</span>
             <h1>Review and approve your bill</h1>
             <p>Confirm your classes, funding@(Model.RemainingBalance > 0 ? ", payment choice," : ",") and agreement in one guided review.</p>
+            <a asp-page="/BillApprovalHistory">View bill approval history</a>
         </div>
         <div class="student-chip"><span>@Model.StudentName</span><strong>ID @Model.StudentId</strong></div>
     </header>
@@ -41,7 +42,11 @@
                 <div class="finish-icon"><i class="fa-solid fa-file-circle-check"></i></div>
                 <span class="eyebrow">Approval complete</span>
                 <h2>Your bill has been approved</h2>
-                @if (Model.PdfAvailable)
+                @if (Model.LegacyApproval?.CountsAsApproved == true)
+                {
+                    <p>This approval was recorded in the previous student portal on @Model.LegacyApproval.AcceptTime?.ToString("MMMM d, yyyy"). Historical agreement files are not included in this import.</p>
+                }
+                else if (Model.PdfAvailable)
                 {
                     <p>Your agreement is complete. You can download a copy for your records.</p>
                     <a class="primary document-download" asp-page-handler="Pdf" asp-route-term="@Model.TermCode"><i class="fa-solid fa-download"></i> Download your agreement</a>
@@ -108,11 +113,17 @@
                         </section>
                     }
                     <form method="post" asp-page-handler="Payment" asp-route-term="@Model.TermCode" id="billPaymentForm" class="bill-payment-form" autocomplete="on"
-                          data-pay-now-amount="@BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0))"
-                          data-deferred-amount="@BillApprovalModel.Currency(Model.DeferredDueToday)"
+                          data-pay-now-amount="@Math.Max(Model.RemainingBalance, 0).ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                          data-deferred-amount="@Model.DeferredDueToday.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                          data-fee-rate="@Model.ConvenienceFeePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
                           data-deferred-due-today="@(Model.DeferredDueToday > 0 ? "true" : "false")">
                         <input type="hidden" asp-for="PaymentPurposeInput" id="paymentPurposeInput" />
-                        <div class="payment-amount"><span id="paymentAmountLabel">Payment amount</span><strong id="paymentAmountValue">@BillApprovalModel.Currency(Model.InitialPaymentChoice == "Deferred" ? Model.DeferredDueToday : Math.Max(Model.RemainingBalance, 0))</strong></div>
+                        @{ var initialPaymentAmount = Model.InitialPaymentChoice == "Deferred" ? Model.DeferredDueToday : Math.Max(Model.RemainingBalance, 0); }
+                        <dl class="payment-amount">
+                            <div><dt id="paymentAmountLabel">Payment amount</dt><dd id="paymentAmountValue">@BillApprovalModel.Currency(initialPaymentAmount)</dd></div>
+                            <div><dt>Convenience fee (@Model.ConvenienceFeePercent.ToString("0.##")%)</dt><dd id="paymentFeeValue">@BillApprovalModel.Currency(Model.ConvenienceFee(initialPaymentAmount))</dd></div>
+                            <div class="total"><dt>Total card charge</dt><dd id="paymentTotalValue">@BillApprovalModel.Currency(Model.TotalCardCharge(initialPaymentAmount))</dd></div>
+                        </dl>
                         <div class="card-fields">
                             <label class="full-field">Card number
                                 <input asp-for="PaymentCardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="Card number" />
@@ -146,7 +157,7 @@
                         <div class="integration-note"><i class="fa-solid fa-shield-halved"></i><span>Your card information is sent securely to PayPal and is never stored by CampusFlow.</span></div>
                         <div class="step-actions">
                             <button class="secondary" type="button" data-next="review">Back</button>
-                            <button class="primary" type="submit" id="paymentSubmitButton"><span>Pay @BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0)) securely</span> <i class="fa-solid fa-lock"></i></button>
+                            <button class="primary" type="submit" id="paymentSubmitButton"><span>Pay @BillApprovalModel.Currency(Model.TotalCardCharge(initialPaymentAmount)) securely</span> <i class="fa-solid fa-lock"></i></button>
                         </div>
                     </form>
                     <div id="deferredContinue" hidden>

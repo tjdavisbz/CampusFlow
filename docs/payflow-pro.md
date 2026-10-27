@@ -14,6 +14,7 @@ Payments__Payflow__Vendor=<vendor login>
 Payments__Payflow__User=<optional separate user; otherwise vendor is used>
 Payments__Payflow__Password=<secret>
 Payments__Payflow__Currency=USD
+Payments__Payflow__ConvenienceFeeRate=0.0285
 ```
 
 Test mode always uses PayPal's `pilot-payflowpro` API. Live mode uses the production endpoint. Never put the password in a committed settings file.
@@ -25,7 +26,7 @@ Test mode always uses PayPal's `pilot-payflowpro` API. Live mode uses the produc
 3. On the CampusFlow payment page use Visa `4111 1111 1111 1111`, a future expiration date, and the test-account CVV rules.
 4. Confirm that the CampusFlow result page shows an approved transaction and a Payflow reference.
 
-CampusFlow recalculates the student's balance on the server, rejects amounts above that balance, sends the sale directly to Payflow Pro, and records the immediate gateway result. Payment attempts retain only operational status, amount, gateway result, and Payflow reference—never card data.
+CampusFlow recalculates the student's balance on the server, rejects payment amounts above that balance, adds the configured convenience fee, sends the combined total as one sale to Payflow Pro, and records the immediate gateway result. The checkout displays the payment, fee, and total card charge separately. Payment attempts retain only operational status, payment amount, convenience-fee amount, gateway result, and Payflow reference—never card data.
 
 Because the direct flow sends card data through CampusFlow, production hosting must enforce HTTPS and the deployment must be included in the university's PCI compliance review.
 
@@ -33,6 +34,6 @@ Because the direct flow sends card data through CampusFlow, production hosting m
 
 Run the database migrator after deploying this feature. The migration adds `AppPayflowPayments`, which provides a durable audit trail and safe recovery path when a browser or gateway response is interrupted.
 
-Approved payments are posted to Elements through its Billing API using transaction document `PAYWEB` (203), AR type 8048, and the Payflow reference as the batch-entry reference. Live payments use the batch comment `Online Credit Card Payments`; test payments use `Test Online Credit Card Payments`. CampusFlow creates the appropriate batch when it is absent and checks the reference before inserting, so retrying an interrupted account update does not duplicate the payment.
+Approved card charges are posted to Elements through its Billing API as two batch entries: the payment uses `PAYWEB` (203), AR type 8048, and the convenience fee uses `CC FEE` (1755), AR type 0. The Payflow reference identifies the payment entry and the same reference with a `-FEE` suffix identifies the fee entry. Live payments use the batch comment `Online Credit Card Payments`; test payments use `Test Online Credit Card Payments`. CampusFlow creates the appropriate batch when it is absent and checks each reference before inserting, so retrying an interrupted account update cannot duplicate either entry.
 
 Gateway approval and Elements posting are deliberately tracked separately. If Elements is temporarily unavailable, CampusFlow still reports the payment as received and retries the account update when the student next opens checkout. Never ask a student to submit the card again after Payflow has returned an approval.

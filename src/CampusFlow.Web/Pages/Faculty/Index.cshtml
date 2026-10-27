@@ -1,0 +1,116 @@
+@page "/Faculty/{view?}"
+@model CampusFlow.Web.Pages.Faculty.IndexModel
+@using CampusFlow.Web.Pages.Faculty
+@using CampusFlow.Web.Menus
+@using CampusFlow.Web.Announcements
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    var title = Model.ViewName switch { "students" => "My Students", "schedule" => "My Schedule", "roster" => "Class Roster", "courses" => "My Courses", _ => "Faculty Home" };
+    PageLayout.Content.Title = title;
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = "CampusFlow.Faculty." + Model.ViewName;
+}
+
+@section styles { <abp-style src="/Pages/Faculty/Faculty.css" /> }
+
+<main class="faculty-shell">
+    <header class="faculty-hero"><span>Faculty portal</span><h1>@title</h1><p>Welcome, @Model.Faculty.DisplayName.</p></header>
+    <nav class="faculty-tabs" aria-label="Faculty pages">
+        <a class="@(Model.ViewName == "home" ? "active" : "")" href="/Faculty?term=@Model.SelectedTerm?.Id">Home</a>
+        <a class="@(Model.ViewName == "students" ? "active" : "")" href="/Faculty/students?term=@Model.SelectedTerm?.Id">My Students</a>
+        <a class="@(Model.ViewName == "schedule" ? "active" : "")" href="/Faculty/schedule?term=@Model.SelectedTerm?.Id">My Schedule</a>
+        <a class="@(Model.ViewName == "roster" ? "active" : "")" href="/Faculty/roster?term=@Model.SelectedTerm?.Id">Class Roster</a>
+        <a class="@(Model.ViewName == "courses" ? "active" : "")" href="/Faculty/courses?term=@Model.SelectedTerm?.Id">My Courses</a>
+        @if (Model.HasAdvisingAccess)
+        {
+            <a href="/Faculty/advising?term=@Model.SelectedTerm?.Id">My Advisees</a>
+        }
+        @if (!CampusFlow.Web.Portals.FacultyViewSession.GetFacultyId(ViewContext.HttpContext).HasValue)
+        {
+            <a href="/Faculty/email?term=@Model.SelectedTerm?.Id">Email Students</a>
+        }
+    </nav>
+
+    <form method="get" class="faculty-term"><label for="faculty-term">Term</label>
+        <select id="faculty-term" name="term" onchange="this.form.submit()">
+            @foreach (var option in Model.Terms)
+            {
+                <option value="@option.Id" selected="@(option.Id == Model.SelectedTerm?.Id)">@option.Name</option>
+            }
+        </select>
+        <noscript><button type="submit">Show term</button></noscript>
+    </form>
+
+    @if (Model.SelectedTerm is null)
+    {
+        <section class="faculty-card"><p>No faculty terms are available yet.</p></section>
+    }
+    else if (Model.ViewName == "home")
+    {
+        <section class="faculty-summary">
+            <a href="/Faculty/courses?term=@Model.SelectedTerm.Id"><strong>@Model.Courses.Count</strong><span>Courses</span></a>
+            <a href="/Faculty/schedule?term=@Model.SelectedTerm.Id"><strong>@Model.Meetings.Count</strong><span>Class meetings</span></a>
+            <a href="/Faculty/roster?term=@Model.SelectedTerm.Id"><strong>@Model.Courses.Sum(x => x.StudentCount)</strong><span>Course enrollments</span></a>
+        </section>
+        <section class="faculty-card"><h2>Announcements</h2>
+            @if (Model.VisibleAnnouncements.Count == 0) { <p>No announcements for @Model.SelectedTerm.Name.</p> }
+            @foreach (var item in Model.VisibleAnnouncements)
+            {
+                <article class="faculty-announcement"><h3>@item.Title</h3>@Html.Raw(AnnouncementHtml.Sanitize(item.ContentHtml))</article>
+            }
+        </section>
+        <section class="faculty-card"><h2>Upcoming classes</h2>
+            @if (Model.Meetings.Count == 0) { <p>No class meetings are listed for this term.</p> }
+            else { <ul class="faculty-meetings">@foreach (var meeting in Model.Meetings.Take(8)) { <li><strong>@meeting.CourseCode @meeting.Section</strong><span>@meeting.Days · @IndexModel.FormatTime(meeting.StartsAt)–@IndexModel.FormatTime(meeting.EndsAt)</span></li> }</ul> }
+        </section>
+    }
+    else if (Model.ViewName == "courses")
+    {
+        <section class="faculty-card"><h2>Courses · @Model.SelectedTerm.Name</h2>
+            @if (Model.Courses.Count == 0) { <p>No courses are assigned to you for this term.</p> }
+            else { <div class="faculty-table-wrap"><table><thead><tr><th>Course</th><th>Name</th><th>Section</th><th>Students</th><th>Dates</th></tr></thead><tbody>
+            @foreach (var course in Model.Courses) { <tr><td><strong>@course.Code</strong></td><td>@course.Name</td><td>@course.Section</td><td><a href="/Faculty/roster?term=@Model.SelectedTerm.Id&amp;course=@course.OfferId">@course.StudentCount</a></td><td>@course.StartsAt?.ToString("MMM d") – @course.EndsAt?.ToString("MMM d")</td></tr> }
+            </tbody></table></div> }
+        </section>
+    }
+    else if (Model.ViewName == "schedule")
+    {
+        <section class="faculty-card"><h2>Class meetings · @Model.SelectedTerm.Name</h2>
+            @if (Model.Meetings.Count == 0) { <p>No class meetings are listed for this term.</p> }
+            else { <div class="faculty-table-wrap"><table><thead><tr><th>Course</th><th>Days</th><th>Begins</th><th>Ends</th></tr></thead><tbody>
+            @foreach (var meeting in Model.Meetings) { <tr><td><strong>@meeting.CourseCode @meeting.Section</strong></td><td>@(meeting.Days ?? "Not scheduled")</td><td>@IndexModel.FormatTime(meeting.StartsAt)</td><td>@IndexModel.FormatTime(meeting.EndsAt)</td></tr> }
+            </tbody></table></div> }
+        </section>
+    }
+    else if (Model.ViewName == "students")
+    {
+        <section class="faculty-card"><h2>Students in your courses · @Model.SelectedTerm.Name</h2>
+            @{ var groupedStudents = Model.Students.GroupBy(x => x.StudentUid).OrderBy(x => x.First().Name).ToArray(); }
+            @if (groupedStudents.Length == 0) { <p>No registered students are in your courses for this term.</p> }
+            else { <div class="faculty-table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Courses with you</th></tr></thead><tbody>
+            @foreach (var student in groupedStudents) { <tr><td><strong>@student.First().Name</strong></td><td>@student.First().StudentId</td><td>@string.Join(", ", student.Select(x => $"{x.CourseCode} {x.Section}".Trim()).Distinct())</td></tr> }
+            </tbody></table></div> }
+        </section>
+    }
+    else
+    {
+        <section class="faculty-card"><h2>Class roster · @Model.SelectedTerm.Name</h2>
+            @if (Model.Courses.Count == 0) { <p>No courses are assigned to you for this term.</p> }
+            else
+            {
+                var requestedCourse = int.TryParse(ViewContext.HttpContext.Request.Query["course"], out var courseId) ? courseId : Model.Courses[0].OfferId;
+                var selectedCourse = Model.Courses.FirstOrDefault(x => x.OfferId == requestedCourse) ?? Model.Courses[0];
+                var roster = Model.Students.Where(x => x.OfferId == selectedCourse.OfferId).ToArray();
+                <form method="get" class="faculty-course-select"><label for="roster-course">Course</label><select id="roster-course" name="course" onchange="this.form.submit()">
+                    @foreach (var option in Model.Courses) { <option value="@option.OfferId" selected="@(option.OfferId == selectedCourse.OfferId)">@option.Code @option.Section · @option.Name</option> }
+                </select><input type="hidden" name="term" value="@Model.SelectedTerm.Id" /><noscript><button type="submit">Show roster</button></noscript></form>
+                <p>@roster.Length registered students</p>
+                <div class="faculty-table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Status</th></tr></thead><tbody>
+                @foreach (var student in roster) { <tr><td><strong>@student.Name</strong></td><td>@student.StudentId</td><td>@student.RegistrationStatus</td></tr> }
+                </tbody></table></div>
+            }
+        </section>
+    }
+</main>
