@@ -54,12 +54,18 @@ public class RegistrationRulesModel : CampusFlowPageModel
         {
             Input.Id = null;
             Input.ExternalTermId = string.Empty;
+            Input.StudentIdsText = string.Empty;
         }
     }
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
         await LoadListsAsync();
+        var studentIds = ParseStudentIds(Input.StudentIdsText);
+        if (studentIds.Length > 1000)
+            ModelState.AddModelError("Input.StudentIdsText", "Enter no more than 1,000 Student IDs per term.");
+        if (studentIds.Any(x => x.Length > 64 || !x.All(char.IsAsciiDigit)))
+            ModelState.AddModelError("Input.StudentIdsText", "Use numeric Student IDs, separated by lines, spaces, commas, or semicolons.");
         var term = Terms.FirstOrDefault(x => x.Value == Input.ExternalTermId);
         if (term is null) ModelState.AddModelError("Input.ExternalTermId", "Choose a term from Elements.");
         if (Input.RegistrationClosesAt <= Input.RegistrationOpensAt)
@@ -82,6 +88,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
             var existing = await _configurations.GetAsync(Input.Id.Value);
             existing.Update(Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
                 Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
+            existing.ConfigureStudentAccess(studentIds);
             await _configurations.UpdateAsync(existing, autoSave: true);
             Alerts.Success($"{existing.TermName} registration was updated.");
         }
@@ -91,6 +98,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
                 CurrentTenant.Id, selected.ExternalTermId, selected.TermCode, selected.DisplayName,
                 Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
                 Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
+            configuration.ConfigureStudentAccess(studentIds);
             await _configurations.InsertAsync(configuration, autoSave: true);
             Alerts.Success($"{selected.DisplayName} registration was configured.");
         }
@@ -115,9 +123,14 @@ public class RegistrationRulesModel : CampusFlowPageModel
             RegistrationOpensAt = source.RegistrationOpensAt, RegistrationClosesAt = source.RegistrationClosesAt,
             IsEnabled = source.IsEnabled, RequireAdvisorReview = source.RequireAdvisorReview,
             EnforceSectionCapacity = source.EnforceSectionCapacity,
+            StudentIdsText = string.Join(Environment.NewLine, source.GetStudentAccessIds()),
             Mappings = mappings.Select(x => new MappingInput { StudentAttendanceType = x.StudentAttendanceType,
                 CourseAttendanceType = x.CourseAttendanceType }).ToList() };
     }
+
+    private static string[] ParseStudentIds(string? value) =>
+        (value ?? string.Empty).Split(['\r', '\n', '\t', ' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal).ToArray();
 
     public class InputModel
     {
@@ -128,6 +141,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
         public bool IsEnabled { get; set; } = true;
         public bool RequireAdvisorReview { get; set; } = true;
         public bool EnforceSectionCapacity { get; set; } = true;
+        public string StudentIdsText { get; set; } = string.Empty;
         public List<MappingInput> Mappings { get; set; } = [];
     }
     public class MappingInput

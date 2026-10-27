@@ -30,6 +30,51 @@ public class RegistrationTermConfigurationTests
             .IsOpen(new DateTime(2026, 4, 1)).ShouldBeFalse();
 
     [Fact]
+    public void Specific_students_can_select_outside_the_general_window()
+    {
+        var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);
+        term.ConfigureStudentAccess(["20000041293", "20000041293", "20000049999"]);
+        var afterWindow = new DateTime(2026, 6, 1);
+
+        term.GetStudentAccessIds().Count.ShouldBe(2);
+        term.IsOpen(afterWindow).ShouldBeFalse();
+        term.IsOpenForStudent(new DateTime(2026, 4, 1), "20000040000").ShouldBeTrue();
+        term.IsOpenForStudent(afterWindow, "20000041293").ShouldBeTrue();
+        term.IsOpenForStudent(afterWindow, "20000049999").ShouldBeTrue();
+        term.IsOpenForStudent(afterWindow, "20000040000").ShouldBeFalse();
+        term.CreatePolicy().GetEligibilityRules().IsOpen(afterWindow).ShouldBeFalse();
+        term.CreatePolicy(allowOutsideWindow: true).GetEligibilityRules().IsOpen(afterWindow).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Disabling_the_term_also_closes_student_specific_access()
+    {
+        var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), false);
+        term.ConfigureStudentAccess(["20000041293"]);
+
+        term.IsOpenForStudent(new DateTime(2026, 6, 1), "20000041293").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Removing_a_student_id_revokes_its_exception()
+    {
+        var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);
+        term.ConfigureStudentAccess(["20000041293"]);
+        term.ConfigureStudentAccess([]);
+
+        term.IsOpenForStudent(new DateTime(2026, 6, 1), "20000041293").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Student_specific_access_does_not_match_an_elements_student_uid()
+    {
+        var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);
+        term.ConfigureStudentAccess(["20000041293"]);
+
+        term.IsOpenForStudent(new DateTime(2026, 6, 1), "41293").ShouldBeFalse();
+    }
+
+    [Fact]
     public void Dashboard_default_must_also_be_student_selectable()
     {
         var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);

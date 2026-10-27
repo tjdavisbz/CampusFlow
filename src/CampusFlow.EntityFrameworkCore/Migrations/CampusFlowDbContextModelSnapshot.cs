@@ -1505,6 +1505,10 @@ namespace CampusFlow.Migrations
                     b.Property<bool>("RequireAdvisorReview")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("StudentAccessIdsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("TenantId");

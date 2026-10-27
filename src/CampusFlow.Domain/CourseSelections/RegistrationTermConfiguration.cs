@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
@@ -19,6 +21,7 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
     public bool IsStudentSelectable { get; private set; }
     public bool IsDashboardDefault { get; private set; }
     public string AttendanceTypeMappingsJson { get; private set; } = "[]";
+    public string StudentAccessIdsJson { get; private set; } = "[]";
 
     protected RegistrationTermConfiguration() { }
 
@@ -48,14 +51,39 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
 
     public bool IsOpen(DateTime at) => IsEnabled && RegistrationOpensAt <= at && RegistrationClosesAt >= at;
 
+    public bool IsOpenForStudent(DateTime at, string studentId) =>
+        IsEnabled && (IsOpen(at) || GetStudentAccessIds().Contains(studentId?.Trim(), StringComparer.Ordinal));
+
+    public IReadOnlyList<string> GetStudentAccessIds()
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<string[]>(StudentAccessIdsJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    public void ConfigureStudentAccess(IEnumerable<string> studentIds)
+    {
+        ArgumentNullException.ThrowIfNull(studentIds);
+        var ids = studentIds.Select(x => x?.Trim() ?? string.Empty).ToArray();
+        if (ids.Any(x => x.Length is < 1 or > 64 || !x.All(char.IsAsciiDigit)))
+            throw new ArgumentException("Student access requires numeric Student IDs of at most 64 digits.", nameof(studentIds));
+        StudentAccessIdsJson = JsonSerializer.Serialize(ids.Distinct(StringComparer.Ordinal).OrderBy(x => x).ToArray());
+    }
+
     public void ConfigureDashboard(bool isStudentSelectable, bool isDashboardDefault)
     {
         IsStudentSelectable = isStudentSelectable;
         IsDashboardDefault = isStudentSelectable && isDashboardDefault;
     }
 
-    public CourseSelectionPolicy CreatePolicy() => new(Id, TenantId, TermName, 1,
+    public CourseSelectionPolicy CreatePolicy(bool allowOutsideWindow = false) => new(Id, TenantId, TermName, 1,
         RegistrationOpensAt, IsEnabled, RequireAdvisorReview, EnforceSectionCapacity,
         AttendanceTypeMappingsJson, JsonSerializer.Serialize(new CourseSelectionEligibilityRules(
-            RegistrationOpensAt: RegistrationOpensAt, RegistrationClosesAt: RegistrationClosesAt)));
+            RegistrationOpensAt: allowOutsideWindow ? null : RegistrationOpensAt,
+            RegistrationClosesAt: allowOutsideWindow ? null : RegistrationClosesAt)));
 }

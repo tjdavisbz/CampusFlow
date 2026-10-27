@@ -62,7 +62,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var profile = await GetCurrentProfileAsync();
         var context = await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId)
             ?? throw new UserFriendlyException("You are not eligible to select courses for that term.");
-        var policy = await GetCurrentPolicyAsync(externalTermId);
+        var policy = await GetCurrentPolicyAsync(externalTermId, profile);
         var offerings = await _lookup.GetAvailableOfferingsAsync(externalTermId);
         var sectionMappings = await GetSectionMappingsAsync();
         var registrations = await _lookup.GetRegistrationsAsync(profile.ExternalStudentId, externalTermId);
@@ -248,11 +248,12 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     {
         var profile = await GetCurrentProfileAsync();
         var configurations = await _termConfigurations.GetListAsync();
-        var openConfigurations = configurations.Where(x => x.IsOpen(Clock.Now)).ToArray();
+        var now = Clock.Now;
+        var openConfigurations = configurations.Where(x => x.IsOpenForStudent(now, profile.StudentId)).ToArray();
         if (openConfigurations.Length == 0) return [];
         var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
         contexts = contexts.Where(x => openConfigurations.Any(c =>
-            c.ExternalTermId == x.ExternalTermId && c.IsOpen(Clock.Now))).ToArray();
+            c.ExternalTermId == x.ExternalTermId)).ToArray();
         return contexts
             .Select(x => new CourseSelectionTermDto
             {
@@ -276,7 +277,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         using (var readUow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: false))
         {
             profile = await GetCurrentProfileAsync();
-            policy = await GetCurrentPolicyAsync(input.ExternalTermId);
+            policy = await GetCurrentPolicyAsync(input.ExternalTermId, profile);
             await readUow.CompleteAsync();
         }
         var existing = await FindOperationAsync(input.IdempotencyKey);
@@ -414,15 +415,15 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             ?? throw new UserFriendlyException("Your student profile could not be found.");
     }
 
-    private async Task<CourseSelectionPolicy> GetCurrentPolicyAsync(string externalTermId)
+    private async Task<CourseSelectionPolicy> GetCurrentPolicyAsync(string externalTermId, StudentProfile profile)
     {
         var now = Clock.Now;
         var termConfiguration = await _termConfigurations.FindAsync(x => x.ExternalTermId == externalTermId);
         if (termConfiguration is not null)
         {
-            if (!termConfiguration.IsOpen(now))
+            if (!termConfiguration.IsOpenForStudent(now, profile.StudentId))
                 throw new UserFriendlyException("Registration is not currently open for that term.");
-            return termConfiguration.CreatePolicy();
+            return termConfiguration.CreatePolicy(allowOutsideWindow: !termConfiguration.IsOpen(now));
         }
         throw new UserFriendlyException("Registration is not configured for that term.");
     }
