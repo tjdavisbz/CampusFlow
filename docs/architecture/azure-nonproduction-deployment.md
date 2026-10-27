@@ -1,6 +1,7 @@
 # Azure non-production operations
 
-Updated October 27, 2026 (America/Chicago). Application deployed; final launch checks are in progress.
+Updated October 27, 2026 (America/Chicago). Non-production is deployed and open at
+`https://my-np.nelson.edu`. Final staging run `40539547963` succeeded.
 The owner authorized completing the non-production site at `https://my-np.nelson.edu`
 and copying the production PostgreSQL application database **into non-production only**.
 
@@ -148,3 +149,51 @@ were present. A first restore attempt encountered an Azure platform extension an
 rolled back transactionally; the corrected refresh excludes those extensions.
 Private source and pre-refresh rollback dumps remain in the protected temporary
 `campusflow-prod-to-nonprod-ootr31s9` evidence folder; do not commit or share them.
+
+Post-refresh schema reconciliation: the staging-only `AppTexasCountryCodes` table
+remained after `pg_restore --clean`, while production migration history did not contain
+its migration. All five columns, the primary and unique indexes, and every seed row
+were verified against `20260915032000_AddTexasCountryCodes`; only its already-applied
+migration-history record was inserted in non-production. No table data was deleted
+or changed. The normal migrator then completed for host and Nelson tenant. Future
+refreshes should check staging-only objects before rerunning divergent migrations;
+the refresh tool does not perform broad target-table cleanup.
+
+## Launch completion, October 27
+
+- Final staging deployment: `40539547963`, commit
+  `cd44235abc86259b784f28edce859e383f2cdd3c`, successful. Development has no Azure
+  deployment and no change was promoted to `main` by this work.
+- Post-refresh `/health-status`: HTTP 200, Healthy. Maintenance was verified at HTTP
+  503 before opening; `MaintenanceMode__Enabled=false` is set only on non-production.
+- The public portal reaches Microsoft sign-in with the separate non-production client
+  and `https://my-np.nelson.edu/signin-oidc`. The owner approved first-use
+  Microsoft consent. Interactive sign-in completed under the Nelson account and loaded
+  the dashboard at `/?__tenant=nelson`; sign-out returned through the configured
+  non-production callback to `/Account/SignedOut`. No password was requested or copied into the repository.
+- Payments and document-tracking writes remain disabled in non-production. Both
+  Elements endpoints/credentials remain non-production after the database refresh.
+- Small-plan startup was CPU-bound (observed roughly 82–100% during rollout). Set
+  `WEBSITES_CONTAINER_START_TIME_LIMIT=600` and `WEBSITE_WARMUP_PATH=/health-status`;
+  container filesystem diagnostics are enabled. Cold starts can take several minutes.
+- Nine offline restore safety tests pass in addition to the 154 application tests.
+- Production database access for this refresh was read-only. No production restore,
+  production app-setting change, or production deployment was performed here.
+  Shared-server firewall additions were separately and explicitly approved.
+
+## Visible environment identification
+
+`App__EnvironmentLabel` identifies a non-production portal. Any non-empty value
+renders a persistent amber banner on all shared portal layouts, the signed-out page,
+and the maintenance page. The label is HTML-encoded, and the message states that the
+portal is for testing only. It is not dismissible and remains visible while scrolling.
+
+- Non-production Azure setting: `App__EnvironmentLabel=NON-PRODUCTION`.
+- Local development: `App:EnvironmentLabel=LOCAL DEVELOPMENT` in the tracked
+  `appsettings.Development.json`.
+- Production: leave the setting unset or empty (the tracked default). No banner is
+  rendered and no production setting needs changing when this code is promoted.
+- Other test/training portals can set their own descriptive label using the same key.
+
+This classification belongs in app settings, not in the application database, so a
+production-to-non-production database refresh cannot remove the warning.

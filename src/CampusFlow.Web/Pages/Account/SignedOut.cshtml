@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Signed out | CampusFlow</title>
-    <link rel="stylesheet" href="~/global-styles.css" />
+    <link rel="stylesheet" href="~/global-styles.css" asp-append-version="true" />
     <style>
         body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f5f4f7; color: #171326; font-family: Arial, sans-serif; }
         .signed-out-card { width: min(34rem, calc(100% - 3rem)); padding: 3rem; border: 1px solid #ded9e7; border-radius: 1.5rem; background: white; box-shadow: 0 1rem 3rem rgba(44, 25, 70, .09); text-align: center; }
@@ -27,5 +27,6 @@
     <p>Your CampusFlow and Microsoft sign-in sessions have been closed.</p>
     <a asp-page="/Account/MicrosoftLogin">Sign in again</a>
 </main>
+@await Component.InvokeAsync(typeof(CampusFlow.Web.Components.EnvironmentBanner.EnvironmentBannerViewComponent))
 </body>
 </html>
