@@ -167,9 +167,10 @@ the refresh tool does not perform broad target-table cleanup.
 - Post-refresh `/health-status`: HTTP 200, Healthy. Maintenance was verified at HTTP
   503 before opening; `MaintenanceMode__Enabled=false` is set only on non-production.
 - The public portal reaches Microsoft sign-in with the separate non-production client
-  and `https://my-np.nelson.edu/signin-oidc`. First use of the new app presents a normal
-  Microsoft consent prompt; the owner must approve it before the interactive login
-  test can complete. No password was requested or copied into the repository.
+  and `https://my-np.nelson.edu/signin-oidc`. The owner approved first-use
+  Microsoft consent. Interactive sign-in completed under the Nelson account and loaded
+  the dashboard at `/?__tenant=nelson`; sign-out returned through the configured
+  non-production callback to `/Account/SignedOut`. No password was requested or copied into the repository.
 - Payments and document-tracking writes remain disabled in non-production. Both
   Elements endpoints/credentials remain non-production after the database refresh.
 - Small-plan startup was CPU-bound (observed roughly 82–100% during rollout). Set
@@ -179,3 +180,20 @@ the refresh tool does not perform broad target-table cleanup.
 - Production database access for this refresh was read-only. No production restore,
   production app-setting change, or production deployment was performed here.
   Shared-server firewall additions were separately and explicitly approved.
+
+## Visible environment identification
+
+`App__EnvironmentLabel` identifies a non-production portal. Any non-empty value
+renders a persistent amber banner on all shared portal layouts, the signed-out page,
+and the maintenance page. The label is HTML-encoded, and the message states that the
+portal is for testing only. It is not dismissible and remains visible while scrolling.
+
+- Non-production Azure setting: `App__EnvironmentLabel=NON-PRODUCTION`.
+- Local development: `App:EnvironmentLabel=LOCAL DEVELOPMENT` in the tracked
+  `appsettings.Development.json`.
+- Production: leave the setting unset or empty (the tracked default). No banner is
+  rendered and no production setting needs changing when this code is promoted.
+- Other test/training portals can set their own descriptive label using the same key.
+
+This classification belongs in app settings, not in the application database, so a
+production-to-non-production database refresh cannot remove the warning.
