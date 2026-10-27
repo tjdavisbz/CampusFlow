@@ -27,7 +27,6 @@ public class CampusFlowMenus
     public const string Agreements = Prefix + ".Agreements";
     public const string RegistrationRules = Prefix + ".RegistrationRules";
     public const string AdvisorVisibility = Prefix + ".AdvisorVisibility";
-    public const string AccessManagement = Prefix + ".AccessManagement";
     public const string StudentBillingAdmin = Prefix + ".Admin.StudentBilling";
     public const string ResetIndividualBillApproval = StudentBillingAdmin + ".ResetIndividualBillApproval";
     public const string BusinessServicesAdmin = Prefix + ".Admin.BusinessServices";

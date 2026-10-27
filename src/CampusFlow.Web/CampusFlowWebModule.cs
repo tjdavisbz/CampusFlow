@@ -237,6 +237,7 @@ public class CampusFlowWebModule : AbpModule
                 bundle =>
                 {
                     bundle.AddFiles("/global-scripts.js");
+                    bundle.AddFiles("/staff-student-user-editor.js");
                     if (hostingEnvironment.IsDevelopment())
                     {
                         bundle.AddFiles("/dev-login-helper.js");
