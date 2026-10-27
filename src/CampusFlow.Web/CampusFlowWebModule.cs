@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,6 +13,8 @@ using CampusFlow.Localization;
 using CampusFlow.MultiTenancy;
 using CampusFlow.Permissions;
 using CampusFlow.Web.Menus;
+using CampusFlow.Web.Components.EnvironmentBanner;
+using Volo.Abp.Ui.LayoutHooks;
 using CampusFlow.Web.Administration;
 using CampusFlow.Web.HealthChecks;
 using CampusFlow.Web.BillApprovals;
@@ -184,6 +186,8 @@ public class CampusFlowWebModule : AbpModule
 
         ConfigureStudio(hostingEnvironment);
         ConfigureBundles(hostingEnvironment);
+        Configure<AbpLayoutHookOptions>(options =>
+            options.Add(LayoutHooks.Body.First, typeof(EnvironmentBannerViewComponent)));
         ConfigureUrls(configuration);
         ConfigureHealthChecks(context);
         ConfigureAuthentication(context);
