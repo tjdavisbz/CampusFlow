@@ -4,6 +4,8 @@ using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
+using CampusFlow.Web.Components.EnvironmentBanner;
 
 namespace CampusFlow.Web.Maintenance;
 
@@ -13,14 +15,17 @@ public sealed class MaintenanceModeMiddleware
         "CampusFlow is temporarily unavailable while scheduled maintenance is completed. Please check back soon.";
 
     private readonly RequestDelegate _next;
+    private readonly IConfiguration? _configuration;
     private readonly IOptionsMonitor<MaintenanceModeOptions> _options;
 
     public MaintenanceModeMiddleware(
         RequestDelegate next,
-        IOptionsMonitor<MaintenanceModeOptions> options)
+        IOptionsMonitor<MaintenanceModeOptions> options,
+        IConfiguration? configuration = null)
     {
         _next = next;
         _options = options;
+        _configuration = configuration;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -43,7 +48,7 @@ public sealed class MaintenanceModeMiddleware
         context.Response.Headers.RetryAfter = "300";
         context.Response.Headers.Append("X-Robots-Tag", "noindex, nofollow");
 
-        await context.Response.WriteAsync(BuildPage(description), context.RequestAborted);
+        await context.Response.WriteAsync(BuildPage(description, PortalEnvironmentBanner.Render(_configuration)), context.RequestAborted);
     }
 
     internal static bool IsAllowedDuringMaintenance(PathString path) =>
@@ -56,7 +61,7 @@ public sealed class MaintenanceModeMiddleware
         path.Value?.EndsWith(".js", StringComparison.OrdinalIgnoreCase) == true ||
         path.Value?.EndsWith(".map", StringComparison.OrdinalIgnoreCase) == true;
 
-    private static string BuildPage(string description)
+    private static string BuildPage(string description, string environmentBanner)
     {
         var encodedDescription = HtmlEncoder.Default.Encode(description)
             .Replace("\r\n", "<br>", StringComparison.Ordinal)
@@ -70,6 +75,7 @@ public sealed class MaintenanceModeMiddleware
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="robots" content="noindex,nofollow">
                 <title>CampusFlow maintenance | Nelson University</title>
+                <link rel="stylesheet" href="/global-styles.css">
                 <style>
                     :root { color-scheme: light; --purple: #502d7f; --dark-purple: #28163f; --lavender: #c5c0e0; }
                     * { box-sizing: border-box; }
@@ -96,6 +102,7 @@ public sealed class MaintenanceModeMiddleware
                         <p class="note">Thank you for your patience.</p>
                     </section>
                 </main>
+                {{environmentBanner}}
             </body>
             </html>
             """;
