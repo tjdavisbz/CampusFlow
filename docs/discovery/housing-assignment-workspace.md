@@ -31,8 +31,17 @@ charges. Until the schedule is saved, Apply fails closed.
 
 This remains a one-term test implementation. Future terms require reviewed fee/property mappings,
 and production promotion still needs an operation journal, broader canary testing, and an
-approved production billing policy. The setup-area copy-forward and per-dorm single/triple
-eligibility controls from the housing email are not implemented yet.
+approved production billing policy. The setup-area copy-forward now prepares a one-time
+CampusFlow draft and copies saved fee amounts together, after verifying that the destination
+is empty and both periods have approved billing rules; it never writes to Elements directly.
+It cannot yet be exercised because non-production has only one housing period. The per-dorm
+single/triple eligibility controls from the housing email are not implemented yet.
+
+The reported $0 batch row is Elements' automatic room-rent row, which is expected
+under the agreed $0 Elements rent setup. The separate CampusFlow batch contains the $2,500
+Bridges base charge and $2,125 intentional-single charge. Production currently has Spring 2027
+housing with existing assignments, so it is not a safe copy destination. This branch's assignment
+and billing writers are non-production-only and require a separate reviewed production rollout.
 
 ## Scope and implementation status
 

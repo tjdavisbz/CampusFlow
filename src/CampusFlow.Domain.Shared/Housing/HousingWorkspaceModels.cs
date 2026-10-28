@@ -68,3 +68,36 @@ public class ApplyHousingDraftInput
     public string RateRevision { get; set; } = "";
     public bool Confirmed { get; set; }
 }
+
+public class HousingTermCopyPreview
+{
+    public int SourcePeriodId { get; set; }
+    public int DestinationPeriodId { get; set; }
+    public string SourcePeriodName { get; set; } = "";
+    public string DestinationPeriodName { get; set; } = "";
+    public int StudentsToCopy { get; set; }
+    public int DestinationRooms { get; set; }
+    public int IntentionalSinglesToReview { get; set; }
+    public List<HousingTermCopyFeeAmount> FeesToCopy { get; set; } = [];
+    public string FeeRevision { get; set; } = "";
+    public string CopyRevision { get; set; } = "";
+    public string Warning { get; set; } = "";
+}
+
+public class HousingTermCopyFeeAmount
+{
+    public string Building { get; set; } = "";
+    public string RateChoice { get; set; } = "";
+    public decimal BaseAmount { get; set; }
+    public decimal SingleSurchargeAmount { get; set; }
+}
+
+public class CopyHousingTermInput
+{
+    public int SourcePeriodId { get; set; }
+    public int DestinationPeriodId { get; set; }
+    public int ExpectedStudents { get; set; }
+    public string ExpectedFeeRevision { get; set; } = "";
+    public string ExpectedCopyRevision { get; set; } = "";
+    public bool Confirmed { get; set; }
+}

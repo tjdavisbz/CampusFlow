@@ -1,0 +1,23 @@
+@page
+@model CampusFlow.Web.Pages.Admin.Housing.TermCopyModel
+@{ ViewData["Title"] = "Copy Housing Term"; }
+@section scripts { <script src="~/Pages/Admin/Housing/TermCopy.js" asp-append-version="true"></script> }
+<div id="housing-term-copy" class="container-fluid py-4">
+    @Html.AntiForgeryToken()
+    <header class="mb-4"><p class="text-uppercase text-muted fw-bold mb-1">Housing setup</p><h1>Copy assignments to a new term</h1>
+        <p>Start a new term's assignment draft and fee setup from a previous period. This does not change Elements or create charges.</p></header>
+    <div class="alert alert-warning">A destination can be copied only once and must have no assignments, CampusFlow draft, or saved fees. Its rooms and billing rules must already be set up and approved. Applied rate choices carry forward; any unknown choices require review. Review all copied amounts before applying the draft.</div>
+    <p><a href="~/Admin/Housing/Fees">← Housing Fee Setup</a></p>
+    <div id="housing-copy-message" role="status" aria-live="polite"></div>
+    <div class="card mb-4"><div class="card-body row g-3 align-items-end">
+        <div class="col-md-4"><label for="housing-copy-source" class="form-label">Copy from period</label><select id="housing-copy-source" class="form-select"><option value="">Choose source</option></select></div>
+        <div class="col-md-4"><label for="housing-copy-destination" class="form-label">Into new period</label><select id="housing-copy-destination" class="form-select"><option value="">Choose destination</option></select></div>
+        <div class="col-md-4"><button id="housing-copy-preview" type="button" class="btn btn-outline-primary" disabled>Preview copy</button></div>
+    </div></div>
+    <section id="housing-copy-review" class="card" hidden aria-labelledby="housing-copy-review-heading"><div class="card-body">
+        <h2 id="housing-copy-review-heading" class="h4">Review before copying</h2>
+        <p id="housing-copy-summary"></p><p id="housing-copy-warning" class="text-muted"></p>
+        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Building</th><th>Rate choice</th><th>Base charge</th><th>Intentional-single charge</th></tr></thead><tbody id="housing-copy-fees"></tbody></table></div>
+        <button id="housing-copy-apply" type="button" class="btn btn-primary">Copy assignments and fees</button>
+    </div></section>
+</div>
