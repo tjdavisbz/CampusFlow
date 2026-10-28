@@ -22,7 +22,8 @@ namespace CampusFlow.StudentInformationSystems;
 // This adapter is deliberately locked to Nelson's non-production Elements tenant.
 public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter, ITransientDependency
 {
-    private const string BatchComment = "CampusFlow Housing Charges (NON-PRODUCTION)";
+    private const string BatchComment = "Housing Charges";
+    private const string ElementsRentBatchComment = "Housing charges Rent and Security Deposit";
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
     private const string TokenCacheKey = "ThesisElements:NonProductionHousing:BillingToken";
     private static readonly HttpClient SharedClient = new();
@@ -51,9 +52,22 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         if (studentUid <= 0 || termCalendarId != 268 || housingDocumentIds.Count == 0 ||
             housingDocumentIds.Any(x => x <= 0))
             throw new InvalidOperationException("The housing billing scope is invalid.");
+        var batchId = ConfiguredBatchId();
         var documents = housingDocumentIds.Distinct().Order().ToArray();
         await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
         await connection.OpenAsync(cancellationToken);
+        await using (var master = new SqlCommand("""
+            SELECT COUNT(*) FROM dbo.BatchMaster
+            WHERE BatchMasterID = @BatchMasterId AND BatchName = 'HousingCharges'
+              AND Comment = @BatchComment AND Status = 'Open'
+              AND SourceModuleID = 2 AND TermBased = 1;
+            """, connection))
+        {
+            master.Parameters.Add("@BatchMasterId", SqlDbType.Int).Value = batchId;
+            master.Parameters.Add("@BatchComment", SqlDbType.VarChar, 100).Value = BatchComment;
+            if ((int)(await master.ExecuteScalarAsync(cancellationToken) ?? 0) != 1)
+                throw new InvalidOperationException("The configured Elements Housing Charges batch is not open or does not match the approved batch.");
+        }
         var parameterNames = documents.Select((_, index) => "@Doc" + index).ToArray();
         await using var command = new SqlCommand($"""
             SELECT (SELECT COUNT(*) FROM dbo.Billing b
@@ -61,15 +75,14 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
                       AND b.TransDOCID IN ({string.Join(",", parameterNames)})
                       AND (b.Debits <> 0 OR b.Credits <> 0))
                  + (SELECT COUNT(*) FROM dbo.BillingBatch b
-                    LEFT JOIN dbo.BatchMaster master ON master.BatchMasterID = b.BatchMasterID
                     WHERE b.OwnerUID = @StudentUid AND b.TermCalendarID = @TermId
                       AND b.TransDOCID IN ({string.Join(",", parameterNames)})
                       AND (b.Debits <> 0 OR b.Credits <> 0)
-                      AND (master.Comment IS NULL OR master.Comment <> @BatchComment));
+                      AND b.BatchMasterID <> @BatchMasterId);
             """, connection) { CommandTimeout = 60 };
         command.Parameters.Add("@StudentUid", SqlDbType.Int).Value = studentUid;
         command.Parameters.Add("@TermId", SqlDbType.Int).Value = termCalendarId;
-        command.Parameters.Add("@BatchComment", SqlDbType.VarChar, 100).Value = BatchComment;
+        command.Parameters.Add("@BatchMasterId", SqlDbType.Int).Value = batchId;
         for (var i = 0; i < documents.Length; i++)
             command.Parameters.Add(parameterNames[i], SqlDbType.Int).Value = documents[i];
         if ((int)(await command.ExecuteScalarAsync(cancellationToken) ?? -1) != 0)
@@ -84,25 +97,24 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         if (desired.Count > 2 || desired.Any(x => x.Amount <= 0 || x.TransactionDocumentId <= 0))
             throw new InvalidOperationException("The proposed housing charge lines are invalid.");
         var token = await GetTokenAsync(cancellationToken);
-        var batchId = await FindBatchAsync(token, cancellationToken);
-        if (batchId is null && desired.Count == 0) return;
-        if (batchId is null)
-        {
-            await CreateBatchAsync(token, cancellationToken);
-            batchId = await FindBatchAsync(token, cancellationToken)
-                ?? throw new InvalidOperationException("Elements created a housing batch but did not return it in the batch list.");
-        }
-        var existing = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
+        var batchId = ConfiguredBatchId();
+        var existing = await GetEntriesAsync(token, studentUid, batchId, cancellationToken);
         var references = new[] { Reference(termCalendarId, studentUid, "BASE"),
             Reference(termCalendarId, studentUid, "SINGLE") };
-        if (existing.Any(x => x.Reference.StartsWith("CFH-", StringComparison.OrdinalIgnoreCase) &&
+        var sameTerm = existing.Where(x => x.TermCalendarId == termCalendarId).ToList();
+        if (sameTerm.Any(x => x.Reference.StartsWith("CFH-", StringComparison.OrdinalIgnoreCase) &&
                               !references.Contains(x.Reference, StringComparer.OrdinalIgnoreCase)))
             throw new InvalidOperationException("An unrecognized CampusFlow housing charge was found in the batch.");
+        if (sameTerm.Any(x => references.Contains(x.Reference, StringComparer.OrdinalIgnoreCase) &&
+                              !housingDocumentIds.Contains(x.TransactionDocumentId)))
+            throw new InvalidOperationException("A CampusFlow housing reference points to an unexpected transaction document.");
+        var replaceable = sameTerm.Where(x => housingDocumentIds.Contains(x.TransactionDocumentId)).ToList();
+        if (references.Any(reference => replaceable.Count(x =>
+                string.Equals(x.Reference, reference, StringComparison.OrdinalIgnoreCase)) > 1))
+            throw new InvalidOperationException("Duplicate CampusFlow housing charge references require manual review.");
         for (var i = 0; i < references.Length; i++)
         {
-            var matches = existing.Where(x => string.Equals(x.Reference, references[i], StringComparison.OrdinalIgnoreCase)).ToList();
-            if (matches.Count > 1)
-                throw new InvalidOperationException("Duplicate CampusFlow housing charge references require manual review.");
+            var matches = replaceable.Where(x => string.Equals(x.Reference, references[i], StringComparison.OrdinalIgnoreCase)).ToList();
             var prior = matches.SingleOrDefault();
             var wanted = i < desired.Count ? desired[i] : null;
             if (prior is null && wanted is null) continue;
@@ -112,16 +124,22 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
             }
             else if (prior is null)
             {
-                await SaveEntryAsync(token, HttpMethod.Post, batchId.Value, 0, studentUid,
+                await SaveEntryAsync(token, HttpMethod.Post, batchId, 0, studentUid,
                     termCalendarId, references[i], wanted, cancellationToken);
             }
             else if (prior.TransactionDocumentId != wanted.TransactionDocumentId || prior.Amount != wanted.Amount)
             {
-                await SaveEntryAsync(token, HttpMethod.Put, batchId.Value, prior.Id, studentUid,
+                await SaveEntryAsync(token, HttpMethod.Put, batchId, prior.Id, studentUid,
                     termCalendarId, references[i], wanted, cancellationToken);
             }
         }
-        var confirmed = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
+        foreach (var entry in replaceable.Where(x => !references.Contains(x.Reference, StringComparer.OrdinalIgnoreCase)))
+            await DeleteEntryAsync(token, entry.Id, cancellationToken);
+        var confirmed = await GetEntriesAsync(token, studentUid, batchId, cancellationToken);
+        if (confirmed.Any(x => x.TermCalendarId == termCalendarId &&
+                               housingDocumentIds.Contains(x.TransactionDocumentId) &&
+                               !references.Contains(x.Reference, StringComparer.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("Elements still has an unexpected housing charge for this student and term.");
         for (var i = 0; i < references.Length; i++)
         {
             var matches = confirmed.Where(x => string.Equals(x.Reference, references[i], StringComparison.OrdinalIgnoreCase)).ToList();
@@ -131,9 +149,11 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
                 matches[0].TransactionDocumentId == desired[i].TransactionDocumentId) continue;
             throw new InvalidOperationException("Elements did not confirm the expected CampusFlow housing charges.");
         }
+        await RemoveElementsZeroRentAsync(token, studentUid, termCalendarId, cancellationToken);
     }
 
-    private async Task<int?> FindBatchAsync(string token, CancellationToken cancellationToken)
+    private async Task<int?> FindBatchByCommentAsync(string token, string comment,
+        CancellationToken cancellationToken)
     {
         using var request = Request(HttpMethod.Get, "/api/billing/cashier-entry/select-items", token);
         using var response = await _client.SendAsync(request, cancellationToken);
@@ -141,20 +161,31 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         if (root["data"]?["batchMasterList"] is not JsonArray batches)
             throw new InvalidOperationException("Elements returned an invalid housing batch list.");
         var matches = batches.OfType<JsonObject>()
-            .Where(x => string.Equals(x["comment"]?.GetValue<string>(), BatchComment, StringComparison.OrdinalIgnoreCase))
+            .Where(x => string.Equals(x["comment"]?.GetValue<string>(), comment, StringComparison.OrdinalIgnoreCase))
             .Select(x => x["batchMasterID"]?.GetValue<int>() ?? 0).Where(x => x > 0).Distinct().ToList();
-        if (matches.Count > 1) throw new InvalidOperationException("Multiple CampusFlow housing batches require manual review.");
+        if (matches.Count > 1) throw new InvalidOperationException("Multiple matching housing batches require manual review.");
         return matches.Count == 1 ? matches[0] : null;
     }
 
-    private async Task CreateBatchAsync(string token, CancellationToken cancellationToken)
+    private async Task RemoveElementsZeroRentAsync(string token, int studentUid, int termCalendarId,
+        CancellationToken cancellationToken)
     {
-        using var request = Request(HttpMethod.Post, "/api/billing/cashier-entry/batches/batch-master", token);
-        request.Content = JsonContent(new { campus = 0, comment = BatchComment, mod = 2, termBased = true });
-        using var response = await _client.SendAsync(request, cancellationToken);
-        var root = await ReadAsync(response, cancellationToken);
-        if (root["data"]?.GetValue<bool>() != true)
-            throw new InvalidOperationException("Elements did not create the CampusFlow housing batch.");
+        // Assigning a room in Elements creates a $0 rent entry. CampusFlow posts the real
+        // charge separately, so remove only the exact vendor-generated zero-dollar row.
+        var batchId = await FindBatchByCommentAsync(token, ElementsRentBatchComment, cancellationToken);
+        if (batchId is null) return;
+        var entries = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
+        var zeroRent = entries.Where(x => x.StudentUid == studentUid && x.TermCalendarId == termCalendarId &&
+                                          x.TransactionDocumentId == 137 && x.Amount == 0 &&
+                                          x.AccountsReceivableTypeId == 0 && string.IsNullOrEmpty(x.Reference) &&
+                                          string.Equals(x.Description, "Rent Per Person", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var entry in zeroRent)
+            await DeleteEntryAsync(token, entry.Id, cancellationToken);
+        if (zeroRent.Count == 0) return;
+        var remaining = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
+        if (zeroRent.Any(x => remaining.Any(y => y.Id == x.Id)))
+            throw new InvalidOperationException("Elements did not confirm removal of its zero-dollar rent entry.");
     }
 
     private async Task<List<BatchEntry>> GetEntriesAsync(string token, int studentUid, int batchId,
@@ -169,12 +200,20 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         if (root["data"]?["batchEntriesList"] is null) return [];
         if (root["data"]?["batchEntriesList"] is not JsonArray entries)
             throw new InvalidOperationException("Elements returned an invalid housing charge list.");
-        return entries.OfType<JsonObject>().Select(x => new BatchEntry(
+        var result = entries.OfType<JsonObject>().Select(x => new BatchEntry(
             x["billingBatchID"]?.GetValue<int>() ?? 0,
+            x["batchMasterID"]?.GetValue<int>() ?? 0,
             x["refNo"]?.GetValue<string>()?.Trim() ?? "",
             x["transDOCID"]?.GetValue<int>() ?? 0,
-            decimal.Parse(x["amount"]?.ToString() ?? "0", CultureInfo.InvariantCulture)))
+            decimal.Parse(x["amount"]?.ToString() ?? "0", CultureInfo.InvariantCulture),
+            x["studentUID"]?.GetValue<int>() ?? 0,
+            x["termCalendarID"]?.GetValue<int>() ?? 0,
+            x["arTypeID"]?.GetValue<int>() ?? 0,
+            x["description"]?.GetValue<string>()?.Trim() ?? ""))
             .ToList();
+        if (result.Any(x => x.Id <= 0 || x.BatchMasterId != batchId || x.StudentUid != studentUid))
+            throw new InvalidOperationException("Elements returned a housing charge outside the requested student or batch.");
+        return result;
     }
 
     private async Task SaveEntryAsync(string token, HttpMethod method, int batchId, int entryId,
@@ -202,13 +241,13 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
 
     private async Task DeleteEntryAsync(string token, int entryId, CancellationToken cancellationToken)
     {
-        if (entryId <= 0) throw new InvalidOperationException("The CampusFlow charge entry ID is invalid.");
+        if (entryId <= 0) throw new InvalidOperationException("The housing batch entry ID is invalid.");
         using var request = Request(HttpMethod.Delete,
             $"/api/billing/cashier-entry/batches/batch-entry/{entryId}", token);
         using var response = await _client.SendAsync(request, cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         if (root["data"]?.GetValue<bool>() != true)
-            throw new InvalidOperationException("Elements did not delete the CampusFlow housing charge.");
+            throw new InvalidOperationException("Elements did not delete the housing batch entry.");
     }
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
@@ -262,8 +301,16 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
     private string Setting(string name) => _configuration[ApiPath + name]
         ?? throw new InvalidOperationException($"Missing Elements API setting '{name}'.");
 
+    private int ConfiguredBatchId()
+    {
+        if (!int.TryParse(_configuration["Housing:ElementsBatchMasterId"], out var id) || id <= 0)
+            throw new InvalidOperationException("The CampusFlow housing batch ID is not configured.");
+        return id;
+    }
+
     private static string Reference(int termCalendarId, int studentUid, string component) =>
         $"CFH-{termCalendarId}-{studentUid}-{component}";
 
-    private sealed record BatchEntry(int Id, string Reference, int TransactionDocumentId, decimal Amount);
+    private sealed record BatchEntry(int Id, int BatchMasterId, string Reference, int TransactionDocumentId, decimal Amount,
+        int StudentUid, int TermCalendarId, int AccountsReceivableTypeId, string Description);
 }
