@@ -2,8 +2,9 @@
   Read-only Chapel follow-up export for Nelson Fall 2026 (TermCalendarID 268).
   Run in SSMS on the SQL Server that contains CAMs_Enterprise. The operational
   Chapel schedule, excuses, groups, and exclusion data are in CAMs_Enterprise.
-  ChapelBonusBank is in Nelson_ReportingAndIntegration. ChapelReleaseRequests
-  was not found in CAMs_Enterprise, so the script checks both databases.
+  The active bonus and request tables use SAGU_ names in CAMs_Enterprise.
+  Similar unprefixed tables also exist in Nelson_ReportingAndIntegration;
+  their presence does not establish that the legacy portals use them.
 
   Schedule, excuses, groups, and exclusion results were supplied on
   2026-10-27. The default skips them. Set @IncludeAlreadyReceived = 1 to
@@ -56,9 +57,19 @@ BEGIN
         PRINT 'No Chapel exclusion-list table found in CAMs_Enterprise.';
 END;
 
--- ChapelReleaseRequests is not present in CAMS on this server. Use dynamic SQL
--- so a missing optional table cannot abort the remaining bonus-bank exports.
-IF OBJECT_ID(N'dbo.ChapelReleaseRequests', N'U') IS NOT NULL
+-- The CAMS request tables use SAGU_ prefixes. Export those first. If a
+-- request table lacks TermCalendarID, report that instead of exporting rows
+-- from all terms. The unprefixed Integration table is only a fallback.
+IF OBJECT_ID(N'dbo.SAGU_ChapelReleaseRequests', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.SAGU_ChapelReleaseRequests', N'TermCalendarID') IS NOT NULL
+    EXEC sys.sp_executesql
+        N'SELECT N''CAMs_Enterprise.dbo.SAGU_ChapelReleaseRequests'' AS SourceTable, *
+          FROM dbo.SAGU_ChapelReleaseRequests
+          WHERE TermCalendarID = @TermCalendarID;',
+        N'@TermCalendarID int', @TermCalendarID = @TermCalendarID;
+ELSE IF OBJECT_ID(N'dbo.SAGU_ChapelReleaseRequests', N'U') IS NOT NULL
+    PRINT 'SAGU_ChapelReleaseRequests exists but has no TermCalendarID; review its schema before exporting.';
+ELSE IF OBJECT_ID(N'dbo.ChapelReleaseRequests', N'U') IS NOT NULL
     EXEC sys.sp_executesql
         N'SELECT N''CAMs_Enterprise.dbo.ChapelReleaseRequests'' AS SourceTable,
                  StudentUID, TermCalendarID, BeginDate, ExcuseType, Reason,
@@ -79,6 +90,18 @@ ELSE IF DB_ID(N'Nelson_ReportingAndIntegration') IS NOT NULL
         N'@TermCalendarID int', @TermCalendarID = @TermCalendarID;
 ELSE
     PRINT 'ChapelReleaseRequests was not visible in either database.';
+
+IF OBJECT_ID(N'dbo.SAGU_ChapelExcuseRequests', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.SAGU_ChapelExcuseRequests', N'TermCalendarID') IS NOT NULL
+    EXEC sys.sp_executesql
+        N'SELECT N''CAMs_Enterprise.dbo.SAGU_ChapelExcuseRequests'' AS SourceTable, *
+          FROM dbo.SAGU_ChapelExcuseRequests
+          WHERE TermCalendarID = @TermCalendarID;',
+        N'@TermCalendarID int', @TermCalendarID = @TermCalendarID;
+ELSE IF OBJECT_ID(N'dbo.SAGU_ChapelExcuseRequests', N'U') IS NOT NULL
+    PRINT 'SAGU_ChapelExcuseRequests exists but has no TermCalendarID; review its schema before exporting.';
+ELSE
+    PRINT 'No SAGU_ChapelExcuseRequests table found in CAMs_Enterprise.';
 
 -- The legacy staff portal writes SAGU_ChapelBonusBank in CAMS. Export it if
 -- present, and also export the separately supplied Nelson Integration table.
