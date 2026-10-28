@@ -29,7 +29,7 @@
                 </select><noscript><button type="submit">View term</button></noscript></form>
             </div>
             <div class="chapel-request-content">
-                <p>Submitting a request does not change your attendance. Chapel staff will review it separately. For a recurring release, contact chapel@nelson.edu.</p>
+                <p>Submitting a request does not change your attendance. Chapel staff will review it separately. For a recurring release, contact the Chapel office.</p>
                 @if (Model.IsImpersonating) { <div class="alert alert-info">Request submission is unavailable while viewing a student account in read-only mode.</div> }
                 else if (Model.TermId.HasValue)
                 {
