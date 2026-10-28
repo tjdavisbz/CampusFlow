@@ -1,0 +1,76 @@
+@page
+@model CampusFlow.Web.Pages.Admin.Chapel.AttendanceModel
+@using CampusFlow.Chapel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Chapel Attendance";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ChapelAdmin + ".Attendance";
+}
+
+<main class="container-fluid py-4">
+    <h1>Chapel attendance</h1>
+    <p>Find a chapel date, student, or group, then record a present, absent, or excused decision. Staff changes are retained separately from imported scans.</p>
+    @if (!string.IsNullOrWhiteSpace(Model.Message)) { <div class="alert alert-success" role="status">@Model.Message</div> }
+    @if (Model.IsUnavailable) { <div class="alert alert-warning" role="status">Attendance is temporarily unavailable.</div> }
+    else
+    {
+        <form method="get" class="row g-3 align-items-end mb-4">
+            <div class="col-md-2"><label class="form-label" for="termId">Term</label>
+                <select class="form-select" id="termId" name="termId" required>
+                    @foreach (var term in Model.Terms)
+                    {
+                        <option value="@term.ExternalTermId" selected="@(term.ExternalTermId == Model.TermId?.ToString())">@term.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2"><label class="form-label" for="date">Chapel date</label><input class="form-control" id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /></div>
+            <div class="col-md-3"><label class="form-label" for="student">Student ID or name</label><input class="form-control" id="student" name="student" value="@Model.Student" maxlength="100" /></div>
+            <div class="col-md-3"><label class="form-label" for="group">Group</label><select class="form-select" id="group" name="group"><option value="">All groups</option>
+                @foreach (var group in Model.Groups) { <option value="@group" selected="@(group == Model.Group)">@group</option> }
+            </select></div>
+            <div class="col-md-2"><button class="btn btn-primary" type="submit">Search</button></div>
+        </form>
+        @if (Model.Date.HasValue || !string.IsNullOrWhiteSpace(Model.Student) || !string.IsNullOrWhiteSpace(Model.Group))
+        {
+            <p>@Model.Rows.Count result(s)@(Model.Rows.Count == 500 ? " — showing first 500; narrow your search" : "")</p>
+            <div class="table-responsive"><table class="table table-striped align-middle">
+                <thead><tr><!th scope="col">Student</!th><!th scope="col">Chapel</!th><!th scope="col">Status and comment</!th><!th scope="col">Source</!th><!th scope="col">Action</!th></tr></thead>
+                <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    var formId = "chapel-" + row.Id.ToString("N");
+                    <tr>
+                        <td><strong>@row.StudentName</strong><br /><small>@row.StudentId</small></td>
+                        <td>@row.ChapelAtLocal.ToString("MMM d, yyyy h:mm tt")</td>
+                        <td><label class="visually-hidden" for="status-@formId">Status for @row.StudentName</label>
+                            <select class="form-select mb-2" id="status-@formId" name="status" form="@formId">
+                                @foreach (var value in Enum.GetValues<ChapelAttendanceStatus>())
+                                {
+                                    <option value="@value" selected="@(row.Status == value)">@value</option>
+                                }
+                            </select>
+                            <label class="visually-hidden" for="comment-@formId">Comment for @row.StudentName</label>
+                            <input class="form-control" id="comment-@formId" name="comment" form="@formId" value="@row.Comment" maxlength="4000" />
+                        </td>
+                        <td>@row.Source</td>
+                        <td><form id="@formId" method="post" asp-page-handler="Update">
+                            <input type="hidden" name="id" value="@row.Id" />
+                            <input type="hidden" name="revision" value="@row.Revision" />
+                            <input type="hidden" name="termId" value="@Model.TermId" />
+                            <input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" />
+                            <input type="hidden" name="student" value="@Model.Student" />
+                            <input type="hidden" name="group" value="@Model.Group" />
+                            <button class="btn btn-primary" type="submit">Save</button>
+                        </form></td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        }
+        else { <div class="alert alert-info">Choose a chapel date, student, or group to begin.</div> }
+    }
+</main>

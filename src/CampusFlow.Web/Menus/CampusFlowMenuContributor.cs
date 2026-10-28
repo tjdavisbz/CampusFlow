@@ -100,6 +100,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                     "~/Documents",
                     icon: "fa fa-file-lines",
                     order: 8));
+                student.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.ChapelAttendance,
+                    "Chapel Attendance",
+                    "~/ChapelAttendance",
+                    icon: "fa fa-clipboard-check",
+                    order: 10));
             }
             if (!currentStudentView.IsImpersonating &&
                 studentProfile?.Provider == CampusFlow.StudentInformationSystems.StudentInformationSystemProvider.ThesisElements &&
@@ -184,7 +190,8 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
-        if (!studentOnly && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu))
+        var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
+        if (!studentOnly && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -232,6 +239,9 @@ public class CampusFlowMenuContributor : IMenuContributor
             if (canManageHousing)
                 admin.AddItem(new ApplicationMenuItem("CampusFlow.HousingAdmin", "Housing", icon: "fa fa-building", order: 6)
                     .AddItem(new ApplicationMenuItem("CampusFlow.HousingAssignments", "Assignments", "~/Admin/Housing/Assignments", icon: "fa fa-bed")));
+            if (canManageChapel)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin, "Chapel", icon: "fa fa-church", order: 6)
+                    .AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin + ".Attendance", "Attendance", "~/Admin/Chapel/Attendance", icon: "fa fa-clipboard-check")));
             if (canManageAdvisorRouting)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.AdvisorVisibility, "Advisor Assignments",
                     "~/Admin/AdvisorVisibility", icon: "fa fa-people-arrows", order: 3));

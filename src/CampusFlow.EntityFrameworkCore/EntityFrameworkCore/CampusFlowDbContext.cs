@@ -21,6 +21,7 @@ using CampusFlow.Housing;
 using CampusFlow.Payments;
 using CampusFlow.Announcements;
 using CampusFlow.Bibliu;
+using CampusFlow.Chapel;
 
 namespace CampusFlow.EntityFrameworkCore;
 
@@ -53,6 +54,8 @@ public class CampusFlowDbContext :
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
     public DbSet<PortalAnnouncement> PortalAnnouncements { get; set; }
+    public DbSet<ChapelAttendanceRecord> ChapelAttendanceRecords { get; set; }
+    public DbSet<ChapelGroupMembership> ChapelGroupMemberships { get; set; }
 
     #region Entities from the modules
 
@@ -185,6 +188,29 @@ public class CampusFlowDbContext :
             b.Property(x => x.ContentHtml).IsRequired();
             b.Property(x => x.TermsJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.IsPublished, x.StartsAtUtc, x.EndsAtUtc });
+        });
+
+        builder.Entity<ChapelAttendanceRecord>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "ChapelAttendanceRecords", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.StudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StudentName).IsRequired().HasMaxLength(256);
+            b.Property(x => x.ChapelAtLocal).HasColumnType("timestamp without time zone");
+            b.Property(x => x.Comment).HasMaxLength(4000);
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.StudentUid, x.ChapelAtLocal }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.ChapelAtLocal });
+            b.HasIndex(x => new { x.TenantId, x.LegacyAttendanceId }).IsUnique()
+                .HasFilter("\"LegacyAttendanceId\" IS NOT NULL");
+        });
+
+        builder.Entity<ChapelGroupMembership>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "ChapelGroupMemberships", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.GroupName).IsRequired().HasMaxLength(100);
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.StudentUid, x.GroupName }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.GroupName });
         });
 
         builder.Entity<PaymentPlanPolicy>(b =>

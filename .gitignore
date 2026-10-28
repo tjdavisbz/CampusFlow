@@ -301,6 +301,7 @@ tempkey.jwk
 /eStudent/
 /Student_MRP/
 /Scheduler/
+/ChappelAttendance/
 
 # Administrative SQL reference archive (not part of the application).
 /John Old SQL/
@@ -308,6 +309,10 @@ tempkey.jwk
 # Local development utilities and generated previews.
 /tools/local/
 /output/
+
+# FERPA-sensitive chapel migration extracts (store outside Git).
+chapel-*-history-export.csv
+chapel-*-export.csv
 
 # macOS metadata
 .DS_Store

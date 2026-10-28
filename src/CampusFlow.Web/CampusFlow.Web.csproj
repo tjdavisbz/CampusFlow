@@ -14,12 +14,14 @@
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
     <MvcRazorExcludeRefAssembliesFromPublish>false</MvcRazorExcludeRefAssembliesFromPublish>
     <PreserveCompilationReferences>true</PreserveCompilationReferences>
+    <OpenIddictPfxPath Condition="'$(OpenIddictPfxPath)' == ''">openiddict.pfx</OpenIddictPfxPath>
   </PropertyGroup>
 
-  <ItemGroup Condition="Exists('./openiddict.pfx')">
+  <ItemGroup Condition="Exists('$(OpenIddictPfxPath)')">
     <None Remove="openiddict.pfx" />
-    <EmbeddedResource Include="openiddict.pfx">
+    <EmbeddedResource Include="$(OpenIddictPfxPath)" Link="openiddict.pfx" TargetPath="openiddict.pfx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </EmbeddedResource>
   </ItemGroup>
 
@@ -28,6 +30,8 @@
     <Content Remove="Logs\**" />
     <EmbeddedResource Remove="Logs\**" />
     <None Remove="Logs\**" />
+    <Content Remove="appsettings.secrets.json" />
+    <None Remove="appsettings.secrets.json" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,80 @@
+@page
+@model CampusFlow.Web.Pages.ChapelAttendanceModel
+@using CampusFlow.Chapel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Chapel Attendance";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ChapelAttendance;
+}
+
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl)) { <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" /> }
+    <abp-style src="/Pages/ChapelAttendance.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
+}
+
+<main class="chapel-page">
+    <header class="chapel-hero">
+        <span>Student life</span>
+        <h1>Chapel Attendance</h1>
+        <p>Review your attendance and any recorded excused absences by term.</p>
+    </header>
+
+    @if (Model.IsUnavailable)
+    {
+        <section class="chapel-message" role="status">
+            <i class="fa-regular fa-circle-exclamation" aria-hidden="true"></i>
+            <div><h2>Chapel attendance is temporarily unavailable</h2><p>Please try again later.</p></div>
+        </section>
+    }
+    else
+    {
+        <section class="chapel-panel" aria-labelledby="chapel-records-heading">
+            <div class="chapel-toolbar">
+                <div><span>Attendance record</span><h2 id="chapel-records-heading">Your chapel history</h2></div>
+                <form method="get" class="chapel-term-form">
+                    <label for="termId">Academic term</label>
+                    <select id="termId" name="termId" onchange="this.form.submit()">
+                        @foreach (var term in Model.Terms)
+                        {
+                            <option value="@term.ExternalTermId" selected="@(term.ExternalTermId == Model.TermId?.ToString())">@term.DisplayName</option>
+                        }
+                    </select>
+                    <noscript><button type="submit">View term</button></noscript>
+                </form>
+            </div>
+            @if (Model.Attendance.Count == 0)
+            {
+                <div class="chapel-empty"><h3>No attendance to display</h3><p>No chapel attendance records have been loaded for this term.</p></div>
+            }
+            else
+            {
+                <div class="chapel-summary" aria-label="Attendance totals">
+                    <div class="chapel-summary-item"><span>Present</span><strong>@Model.PresentCount</strong></div>
+                    <div class="chapel-summary-item"><span>Absent</span><strong>@Model.AbsentCount</strong></div>
+                    <div class="chapel-summary-item"><span>Excused</span><strong>@Model.ExcusedCount</strong></div>
+                </div>
+                <div class="chapel-history-heading"><div><span>Chapel sessions</span><h3>Attendance details</h3></div><p>Upcoming chapel dates are not shown.</p></div>
+                <div class="chapel-table-wrap">
+                    <table class="chapel-table">
+                        <thead><tr><!th scope="col">Date</!th><!th scope="col">Status</!th><!th scope="col">Comment</!th></tr></thead>
+                        <tbody>
+                        @foreach (var row in Model.Attendance)
+                        {
+                            <tr>
+                                <td data-label="Date"><div><strong>@row.ChapelAtLocal.ToString("MMM d, yyyy")</strong><span class="chapel-time">@row.ChapelAtLocal.ToString("h:mm tt")</span></div></td>
+                                <td data-label="Status"><span class="chapel-status @row.Status.ToString().ToLowerInvariant()">@row.Status</span></td>
+                                <td data-label="Comment">@(string.IsNullOrWhiteSpace(row.Comment) ? "—" : row.Comment)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+</main>

@@ -44,6 +44,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:Admin.BusinessServices"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.HousingAssignments,
             new Volo.Abp.Localization.FixedLocalizableString("Manage housing assignment drafts"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.ChapelAttendance,
+            new FixedLocalizableString("Manage chapel attendance"), MultiTenancySides.Tenant);
         businessServices.AddChild(CampusFlowPermissions.Admin.AddStudentMealPlan,
             L("Permission:Admin.BusinessServices.AddStudentMealPlan"), MultiTenancySides.Tenant);
     }
