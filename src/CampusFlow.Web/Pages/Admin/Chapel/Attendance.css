@@ -1,5 +1,10 @@
 .chapel-admin-filters { display: grid; grid-template-columns: 1fr 1fr 1.5fr 1fr auto; align-items: end; gap: 1rem; padding: 1.5rem; }
 .chapel-admin-filters > div { min-width: 0; }
+.chapel-admin-filters small { display: block; margin-top: .35rem; color: #667085; font-size: .75rem; }
+.chapel-admin-filters .chapel-scan-filter { grid-column: 1 / -2; align-self: center; }
+.chapel-admin-filters .chapel-scan-filter label { display: inline-flex; align-items: center; gap: .55rem; margin: 0; cursor: pointer; }
+.chapel-admin-filters .chapel-scan-filter input { width: auto; margin: 0; accent-color: var(--tenant-primary); }
+.chapel-admin-filters > button { grid-column: -2 / -1; }
 .chapel-admin-filters label, .chapel-admin-table label { display: block; margin-bottom: .4rem; color: #475467; font-size: .8rem; font-weight: 750; }
 .chapel-admin-filters input, .chapel-admin-filters select, .chapel-admin-table input, .chapel-admin-table select { width: 100%; min-width: 0; padding: .65rem .75rem; border: 1px solid #d6dbe5; border-radius: .6rem; color: var(--tenant-text); background: #fff; font: inherit; font-size: .88rem; }
 .chapel-admin-filters input:focus-visible, .chapel-admin-filters select:focus-visible, .chapel-admin-table input:focus-visible, .chapel-admin-table select:focus-visible, .chapel-admin-page button:focus-visible { outline: 2px solid var(--tenant-primary); outline-offset: 2px; }
@@ -15,15 +20,26 @@
 .chapel-admin-table label:not(:first-of-type) { margin-top: .7rem; }
 .chapel-admin-table button { width: 100%; }
 .chapel-admin-note { margin: 0; padding: 1rem 1.5rem; border-top: 1px solid #eef0f4; color: #667085; font-size: .8rem; }
+.chapel-session-list { display: grid; gap: .75rem; padding: 1rem 1.5rem 1.5rem; }
+.chapel-session-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid #e5e7eb; border-radius: .75rem; background: #faf9fd; }
+.chapel-session-card strong, .chapel-session-card span { display: block; }
+.chapel-session-card span { margin-top: .2rem; color: #667085; font-size: .85rem; }
+.chapel-session-card button { border: 0; border-radius: .6rem; padding: .7rem 1rem; color: #fff; background: var(--tenant-primary); font-weight: 750; }
+.chapel-session-card button:hover { background: var(--tenant-primary-dark); }
 
 @media (max-width: 1100px) {
     .chapel-admin-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .chapel-admin-filters button { justify-self: start; }
+    .chapel-admin-filters .chapel-scan-filter { grid-column: 1 / -1; }
+    .chapel-admin-filters > button { grid-column: 1 / -1; justify-self: start; }
 }
 
 @media (max-width: 720px) {
     .chapel-admin-filters { grid-template-columns: 1fr; padding: 1rem; }
+    .chapel-admin-filters .chapel-scan-filter, .chapel-admin-filters > button { grid-column: 1; }
     .chapel-admin-filters button { width: 100%; }
+    .chapel-session-list { padding: 1rem; }
+    .chapel-session-card { align-items: stretch; flex-direction: column; }
+    .chapel-session-card button { width: 100%; }
     .chapel-admin-table th:first-child, .chapel-admin-table td:first-child, .chapel-admin-table th:last-child, .chapel-admin-table td:last-child { padding-left: 1rem; padding-right: 1rem; }
     .chapel-admin-table td:nth-child(3) { min-width: 0; }
     .chapel-admin-table td::before { align-self: start; }

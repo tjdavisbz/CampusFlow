@@ -21,6 +21,7 @@
 <main class="chapel-page chapel-admin-page">
     <header class="chapel-hero"><span>Chapel administration</span><h1>Attendance</h1><p>Find a chapel session or student, then update the attendance record.</p></header>
     @if (!string.IsNullOrWhiteSpace(Model.Message)) { <div class="alert alert-success" role="status">@Model.Message</div> }
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage)) { <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div> }
     @if (Model.IsUnavailable) { <section class="chapel-message" role="status"><i class="fa-regular fa-circle-exclamation" aria-hidden="true"></i><div><h2>Attendance is temporarily unavailable</h2><p>Please try again later.</p></div></section> }
     else
     {
@@ -35,18 +36,44 @@
                     }
                 </select>
             </div>
-            <div><label for="date">Chapel date</label><input id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /></div>
-            <div><label for="student">Student ID or name</label><input id="student" name="student" value="@Model.Student" maxlength="100" placeholder="Search students" /></div>
+            <div><label for="date">Chapel date</label><input id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><small>Choose a date to see everyone for that day.</small></div>
+            <div><label for="student">Student ID or name</label><input id="student" name="student" value="@Model.Student" maxlength="100" placeholder="First and last name, or part of either" /><small>Middle names are optional; partial names work.</small></div>
             <div><label for="group">Group</label><select id="group" name="group"><option value="">All groups</option>
                 @foreach (var group in Model.Groups) { <option value="@group" selected="@(group == Model.Group)">@group</option> }
             </select></div>
+            <div class="chapel-scan-filter"><label for="showScanInOnly"><input id="showScanInOnly" name="showScanInOnly" type="checkbox" value="true" checked="@Model.ShowScanInOnly" /> Scan-in-only absences</label></div>
             <button type="submit">Search attendance</button>
         </form>
         </section>
         @if (Model.Date.HasValue || !string.IsNullOrWhiteSpace(Model.Student) || !string.IsNullOrWhiteSpace(Model.Group))
         {
+            @if (Model.SessionSummaries.Count > 0)
+            {
+                <section class="chapel-panel chapel-session-review" aria-labelledby="chapel-day-heading">
+                    <div class="chapel-toolbar"><div><span>Day review</span><h2 id="chapel-day-heading">@Model.Date?.ToString("MMMM d, yyyy")</h2></div></div>
+                    <p class="chapel-admin-note">Each chapel session is separate. The correction below credits only imported absences labeled “Scan In Only”; it does not change other absences, excuses, or staff decisions.</p>
+                    <div class="chapel-session-list">
+                    @foreach (var session in Model.SessionSummaries)
+                    {
+                        var confirmation = $"Credit all {session.ScanInOnly} scan-in-only absences for the {session.ChapelAtLocal:h:mm tt} chapel as Present? Use this only if scan-out was waived for this session. This cannot be undone as a group.";
+                        <div class="chapel-session-card">
+                            <div><strong>@session.ChapelAtLocal.ToString("h:mm tt") chapel</strong><span>@session.Total students · @session.Present present · @session.Absent absent · @session.Excused excused · @session.ScanInOnly scan-in-only</span></div>
+                            @if (session.ScanInOnly > 0)
+                            {
+                                <form method="post" asp-page-handler="CreditScanInOnly" data-confirmation="@confirmation" onsubmit="return confirm(this.dataset.confirmation);">
+                                    <input type="hidden" name="termId" value="@Model.TermId" />
+                                    <input type="hidden" name="sessionAtLocal" value="@session.ChapelAtLocal.ToString("yyyy-MM-ddTHH:mm:ss")" />
+                                    <input type="hidden" name="expectedCount" value="@session.ScanInOnly" />
+                                    <button type="submit">Credit @session.ScanInOnly scan-in-only records</button>
+                                </form>
+                            }
+                        </div>
+                    }
+                    </div>
+                </section>
+            }
             <section class="chapel-panel" aria-labelledby="chapel-results-heading">
-            <div class="chapel-toolbar"><div><span>Attendance records</span><h2 id="chapel-results-heading">Search results</h2></div><p class="chapel-admin-count">@Model.Rows.Count result(s)@(Model.Rows.Count == 500 ? " · Showing first 500; narrow your search" : "")</p></div>
+            <div class="chapel-toolbar"><div><span>Attendance records</span><h2 id="chapel-results-heading">@(Model.ShowScanInOnly && Model.Date.HasValue ? "Scan-in-only absences" : "Search results")</h2></div><p class="chapel-admin-count">@Model.Rows.Count result(s)@(Model.IsTruncated ? $" · Showing first {Model.ResultLimit}; narrow your search" : "")</p></div>
             @if (Model.Rows.Count == 0) { <div class="chapel-empty"><h3>No matching records</h3><p>Try another date, student, or group.</p></div> }
             else { <div class="chapel-table-wrap"><table class="chapel-table chapel-admin-table">
                 <thead><tr><!th scope="col">Student</!th><!th scope="col">Chapel</!th><!th scope="col">Status and comment</!th><!th scope="col">Source</!th><!th scope="col">Action</!th></tr></thead>
@@ -75,6 +102,7 @@
                             <input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" />
                             <input type="hidden" name="student" value="@Model.Student" />
                             <input type="hidden" name="group" value="@Model.Group" />
+                            <input type="hidden" name="showScanInOnly" value="@Model.ShowScanInOnly.ToString().ToLowerInvariant()" />
                             <button type="submit">Save change</button>
                         </form></td>
                     </tr>
