@@ -11,7 +11,8 @@
 }
 <main class="container-fluid py-4">
     <h1>Chapel excuse requests</h1>
-    <p>Student submissions appear here for staff review. A submission does not approve an excuse or alter attendance. Use <a asp-page="/Admin/Chapel/Attendance">Attendance</a> for any staff decision.</p>
+    <p>Review student submissions here. Approving a request marks matching absent or pending chapel sessions Excused; sessions already Present keep their credit. You can also open <a asp-page="/Admin/Chapel/Attendance">Attendance</a> to inspect the student's record.</p>
+    @if (!string.IsNullOrWhiteSpace(Model.Feedback)) { <div class="alert alert-success" role="status">@Model.Feedback</div> }
     @if (Model.IsUnavailable) { <div class="alert alert-warning" role="status">Requests are temporarily unavailable.</div> }
     else
     {
@@ -23,8 +24,23 @@
             <div class="col-md-2"><button class="btn btn-primary" type="submit">Search</button></div>
         </form>
         <p>@Model.Rows.Count request(s)@(Model.Rows.Count == 300 ? " — showing latest 300; narrow your search" : "")</p>
-        <div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><!th scope="col">Student</!th><!th scope="col">Requested dates</!th><!th scope="col">Category</!th><!th scope="col">Reason</!th><!th scope="col">Submitted</!th><!th scope="col">Attendance</!th></tr></thead><tbody>
-            @foreach (var row in Model.Rows) { <tr><td><strong>@row.StudentName</strong><br /><small>@row.StudentId</small></td><td>@row.StartDate.ToString("MMM d, yyyy") – @row.EndDate.ToString("MMM d, yyyy")</td><td>@(row.ExcuseType == "MedicalIssue" ? "Medical issue" : row.ExcuseType)</td><td style="white-space: pre-wrap">@row.Reason</td><td>@row.CreationTime.ToString("MMM d, yyyy")</td><td><a asp-page="/Admin/Chapel/Attendance" asp-route-termId="@row.TermCalendarId" asp-route-student="@row.StudentId">Open record</a></td></tr> }
+        <div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><!th scope="col">Student</!th><!th scope="col">Requested dates</!th><!th scope="col">Category</!th><!th scope="col">Reason</!th><!th scope="col">Submitted</!th><!th scope="col">Decision</!th><!th scope="col">Attendance</!th></tr></thead><tbody>
+            @foreach (var row in Model.Rows) { <tr><td><strong>@row.StudentName</strong><br /><small>@row.StudentId</small></td><td>@row.StartDate.ToString("MMM d, yyyy") – @row.EndDate.ToString("MMM d, yyyy")</td><td>@(row.ExcuseType == "MedicalIssue" ? "Medical issue" : row.ExcuseType)</td><td style="white-space: pre-wrap">@row.Reason</td><td>@row.CreationTime.ToString("MMM d, yyyy")</td><td>
+                @if (row.Status == CampusFlow.Chapel.ChapelExcuseRequestStatus.Approved)
+                {
+                    <strong>Approved</strong><br /><small>@row.ApprovedAt?.ToString("MMM d, yyyy") · @row.AttendanceRecordsExcused record(s) changed</small>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="Approve">
+                        <input type="hidden" name="requestId" value="@row.Id" />
+                        <input type="hidden" name="revision" value="@row.ConcurrencyStamp" />
+                        <input type="hidden" name="termId" value="@Model.TermId" />
+                        <input type="hidden" name="student" value="@Model.Student" />
+                        <button class="btn btn-primary btn-sm" type="submit">Approve &amp; excuse</button>
+                    </form>
+                }
+            </td><td><a asp-page="/Admin/Chapel/Attendance" asp-route-termId="@row.TermCalendarId" asp-route-student="@row.StudentId">Open record</a></td></tr> }
         </tbody></table></div>
     }
 </main>

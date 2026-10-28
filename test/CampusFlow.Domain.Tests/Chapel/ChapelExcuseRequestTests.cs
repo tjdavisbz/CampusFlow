@@ -39,4 +39,21 @@ public class ChapelExcuseRequestTests
         Should.Throw<ArgumentException>(() =>
             Create(new DateOnly(2026, 10, 27), new DateOnly(2026, 10, 27), reason: " "));
     }
+
+    [Fact]
+    public void Approval_records_reviewer_time_and_changed_attendance_count_once()
+    {
+        var request = Create(new DateOnly(2026, 10, 27), new DateOnly(2026, 10, 29));
+        var reviewer = Guid.NewGuid();
+        var approvedAt = new DateTime(2026, 10, 27, 20, 0, 0, DateTimeKind.Utc);
+
+        request.Status.ShouldBe(ChapelExcuseRequestStatus.Pending);
+        request.Approve(reviewer, approvedAt, 2);
+
+        request.Status.ShouldBe(ChapelExcuseRequestStatus.Approved);
+        request.ApprovedByUserId.ShouldBe(reviewer);
+        request.ApprovedAt.ShouldBe(approvedAt);
+        request.AttendanceRecordsExcused.ShouldBe(2);
+        Should.Throw<InvalidOperationException>(() => request.Approve(reviewer, approvedAt, 2));
+    }
 }

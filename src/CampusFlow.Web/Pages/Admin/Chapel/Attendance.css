@@ -1,0 +1,33 @@
+.chapel-admin-filters { display: grid; grid-template-columns: 1fr 1fr 1.5fr 1fr auto; align-items: end; gap: 1rem; padding: 1.5rem; }
+.chapel-admin-filters > div { min-width: 0; }
+.chapel-admin-filters label, .chapel-admin-table label { display: block; margin-bottom: .4rem; color: #475467; font-size: .8rem; font-weight: 750; }
+.chapel-admin-filters input, .chapel-admin-filters select, .chapel-admin-table input, .chapel-admin-table select { width: 100%; min-width: 0; padding: .65rem .75rem; border: 1px solid #d6dbe5; border-radius: .6rem; color: var(--tenant-text); background: #fff; font: inherit; font-size: .88rem; }
+.chapel-admin-filters input:focus-visible, .chapel-admin-filters select:focus-visible, .chapel-admin-table input:focus-visible, .chapel-admin-table select:focus-visible, .chapel-admin-page button:focus-visible { outline: 2px solid var(--tenant-primary); outline-offset: 2px; }
+.chapel-admin-filters button, .chapel-admin-table button { padding: .65rem 1rem; border: 0; border-radius: .6rem; color: #fff; background: var(--tenant-primary); font-weight: 750; white-space: nowrap; }
+.chapel-admin-filters button:hover, .chapel-admin-table button:hover { background: var(--tenant-primary-dark); }
+.chapel-admin-count { margin: 0; color: #667085; font-size: .85rem; }
+.chapel-admin-table th, .chapel-admin-table td { padding: .9rem 1rem; }
+.chapel-admin-table th:first-child, .chapel-admin-table td:first-child { padding-left: 1.5rem; }
+.chapel-admin-table th:last-child, .chapel-admin-table td:last-child { padding-right: 1.5rem; }
+.chapel-admin-table td { vertical-align: top; }
+.chapel-admin-table td:nth-child(3) { min-width: 13rem; }
+.chapel-admin-table .chapel-status { margin-bottom: .65rem; }
+.chapel-admin-table label:not(:first-of-type) { margin-top: .7rem; }
+.chapel-admin-table button { width: 100%; }
+.chapel-admin-note { margin: 0; padding: 1rem 1.5rem; border-top: 1px solid #eef0f4; color: #667085; font-size: .8rem; }
+
+@media (max-width: 1100px) {
+    .chapel-admin-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chapel-admin-filters button { justify-self: start; }
+}
+
+@media (max-width: 720px) {
+    .chapel-admin-filters { grid-template-columns: 1fr; padding: 1rem; }
+    .chapel-admin-filters button { width: 100%; }
+    .chapel-admin-table th:first-child, .chapel-admin-table td:first-child, .chapel-admin-table th:last-child, .chapel-admin-table td:last-child { padding-left: 1rem; padding-right: 1rem; }
+    .chapel-admin-table td:nth-child(3) { min-width: 0; }
+    .chapel-admin-table td::before { align-self: start; }
+    .chapel-admin-table td[data-label="Attendance decision"] > label, .chapel-admin-table td[data-label="Attendance decision"] > input, .chapel-admin-table td[data-label="Attendance decision"] > select { grid-column: 2; }
+    .chapel-admin-table td[data-label="Attendance decision"] > .chapel-status { grid-column: 2; justify-self: start; }
+    .chapel-admin-note { padding: 1rem; }
+}

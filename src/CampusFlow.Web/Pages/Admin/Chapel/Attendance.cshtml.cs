@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CampusFlow.Branding;
 using CampusFlow.Chapel;
 using CampusFlow.Permissions;
 using CampusFlow.StudentInformationSystems;
@@ -16,6 +17,7 @@ namespace CampusFlow.Web.Pages.Admin.Chapel;
 public class AttendanceModel(
     ChapelAttendanceAppService attendance,
     IEnumerable<IStudentInformationSystemTermLookup> termLookups,
+    ITenantThemeProvider themeProvider,
     ILogger<AttendanceModel> logger) : CampusFlowPageModel
 {
     [BindProperty(SupportsGet = true)] public int? TermId { get; set; }
@@ -25,12 +27,16 @@ public class AttendanceModel(
     public IReadOnlyList<StudentInformationSystemTerm> Terms { get; private set; } = [];
     public IReadOnlyList<string> Groups { get; private set; } = [];
     public IReadOnlyList<ChapelAttendanceRow> Rows { get; private set; } = [];
+    public TenantTheme Theme { get; private set; } = new(
+        "CampusFlow", "#274690", "#172554", "#667eea", "#A1A8AE", "#F7F8FA", "#172033",
+        null, null, "system-ui, sans-serif", "system-ui, sans-serif", null);
     public bool IsUnavailable { get; private set; }
     public string? Message { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
         if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        Theme = themeProvider.Get(CurrentTenant.Name);
         try
         {
             var terms = termLookups.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);

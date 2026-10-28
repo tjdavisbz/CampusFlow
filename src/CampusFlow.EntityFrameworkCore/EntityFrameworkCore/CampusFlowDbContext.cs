@@ -222,8 +222,10 @@ public class CampusFlowDbContext :
             b.Property(x => x.StudentName).IsRequired().HasMaxLength(256);
             b.Property(x => x.ExcuseType).IsRequired().HasMaxLength(32);
             b.Property(x => x.Reason).IsRequired().HasMaxLength(2000);
+            b.Property(x => x.Status).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.StudentUid, x.CreationTime });
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.CreationTime });
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.Status, x.CreationTime });
         });
 
         builder.Entity<PaymentPlanPolicy>(b =>

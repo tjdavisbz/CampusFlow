@@ -18,6 +18,7 @@ namespace CampusFlow.Web.Pages.Admin.Chapel;
 public class ExcuseRequestsModel(
     IEnumerable<IStudentInformationSystemTermLookup> termLookups,
     IRepository<ChapelExcuseRequest, Guid> requests,
+    ChapelExcuseReviewAppService review,
     ILogger<ExcuseRequestsModel> logger) : CampusFlowPageModel
 {
     [BindProperty(SupportsGet = true)] public int? TermId { get; set; }
@@ -25,10 +26,12 @@ public class ExcuseRequestsModel(
     public IReadOnlyList<StudentInformationSystemTerm> Terms { get; private set; } = [];
     public IReadOnlyList<ChapelExcuseRequest> Rows { get; private set; } = [];
     public bool IsUnavailable { get; private set; }
+    public string? Feedback { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
         if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        Feedback = TempData["ChapelReviewMessage"] as string;
         try
         {
             var lookup = termLookups.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
@@ -54,5 +57,16 @@ public class ExcuseRequestsModel(
             IsUnavailable = true;
         }
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostApproveAsync(Guid requestId, string revision,
+        int? termId, string? student)
+    {
+        if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        var result = await review.ApproveAsync(requestId, revision);
+        TempData["ChapelReviewMessage"] = result.NewlyExcusedSessions == 0
+            ? "Request approved. Matching sessions were already marked Present or Excused; no attendance was changed."
+            : $"Request approved. {result.NewlyExcusedSessions} chapel attendance record(s) marked Excused.";
+        return RedirectToPage(new { termId, student });
     }
 }

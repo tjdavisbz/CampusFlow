@@ -11,66 +11,79 @@
     PageLayout.Content.MenuItemName = CampusFlowMenus.ChapelAdmin + ".Attendance";
 }
 
-<main class="container-fluid py-4">
-    <h1>Chapel attendance</h1>
-    <p>Find a chapel date, student, or group, then record a present, absent, or excused decision. Staff changes are retained separately from imported scans.</p>
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl)) { <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" /> }
+    <abp-style src="/Pages/ChapelAttendance.css" />
+    <abp-style src="/Pages/Admin/Chapel/Attendance.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
+}
+
+<main class="chapel-page chapel-admin-page">
+    <header class="chapel-hero"><span>Chapel administration</span><h1>Attendance</h1><p>Find a chapel session or student, then update the attendance record.</p></header>
     @if (!string.IsNullOrWhiteSpace(Model.Message)) { <div class="alert alert-success" role="status">@Model.Message</div> }
-    @if (Model.IsUnavailable) { <div class="alert alert-warning" role="status">Attendance is temporarily unavailable.</div> }
+    @if (Model.IsUnavailable) { <section class="chapel-message" role="status"><i class="fa-regular fa-circle-exclamation" aria-hidden="true"></i><div><h2>Attendance is temporarily unavailable</h2><p>Please try again later.</p></div></section> }
     else
     {
-        <form method="get" class="row g-3 align-items-end mb-4">
-            <div class="col-md-2"><label class="form-label" for="termId">Term</label>
-                <select class="form-select" id="termId" name="termId" required>
+        <section class="chapel-panel" aria-labelledby="chapel-search-heading">
+        <div class="chapel-toolbar"><div><span>Find records</span><h2 id="chapel-search-heading">Search attendance</h2></div></div>
+        <form method="get" class="chapel-admin-filters">
+            <div><label for="termId">Academic term</label>
+                <select id="termId" name="termId" required>
                     @foreach (var term in Model.Terms)
                     {
                         <option value="@term.ExternalTermId" selected="@(term.ExternalTermId == Model.TermId?.ToString())">@term.DisplayName</option>
                     }
                 </select>
             </div>
-            <div class="col-md-2"><label class="form-label" for="date">Chapel date</label><input class="form-control" id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /></div>
-            <div class="col-md-3"><label class="form-label" for="student">Student ID or name</label><input class="form-control" id="student" name="student" value="@Model.Student" maxlength="100" /></div>
-            <div class="col-md-3"><label class="form-label" for="group">Group</label><select class="form-select" id="group" name="group"><option value="">All groups</option>
+            <div><label for="date">Chapel date</label><input id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /></div>
+            <div><label for="student">Student ID or name</label><input id="student" name="student" value="@Model.Student" maxlength="100" placeholder="Search students" /></div>
+            <div><label for="group">Group</label><select id="group" name="group"><option value="">All groups</option>
                 @foreach (var group in Model.Groups) { <option value="@group" selected="@(group == Model.Group)">@group</option> }
             </select></div>
-            <div class="col-md-2"><button class="btn btn-primary" type="submit">Search</button></div>
+            <button type="submit">Search attendance</button>
         </form>
+        </section>
         @if (Model.Date.HasValue || !string.IsNullOrWhiteSpace(Model.Student) || !string.IsNullOrWhiteSpace(Model.Group))
         {
-            <p>@Model.Rows.Count result(s)@(Model.Rows.Count == 500 ? " — showing first 500; narrow your search" : "")</p>
-            <div class="table-responsive"><table class="table table-striped align-middle">
+            <section class="chapel-panel" aria-labelledby="chapel-results-heading">
+            <div class="chapel-toolbar"><div><span>Attendance records</span><h2 id="chapel-results-heading">Search results</h2></div><p class="chapel-admin-count">@Model.Rows.Count result(s)@(Model.Rows.Count == 500 ? " · Showing first 500; narrow your search" : "")</p></div>
+            @if (Model.Rows.Count == 0) { <div class="chapel-empty"><h3>No matching records</h3><p>Try another date, student, or group.</p></div> }
+            else { <div class="chapel-table-wrap"><table class="chapel-table chapel-admin-table">
                 <thead><tr><!th scope="col">Student</!th><!th scope="col">Chapel</!th><!th scope="col">Status and comment</!th><!th scope="col">Source</!th><!th scope="col">Action</!th></tr></thead>
                 <tbody>
                 @foreach (var row in Model.Rows)
                 {
                     var formId = "chapel-" + row.Id.ToString("N");
                     <tr>
-                        <td><strong>@row.StudentName</strong><br /><small>@row.StudentId</small></td>
-                        <td>@row.ChapelAtLocal.ToString("MMM d, yyyy h:mm tt")</td>
-                        <td><label class="visually-hidden" for="status-@formId">Status for @row.StudentName</label>
-                            <select class="form-select mb-2" id="status-@formId" name="status" form="@formId">
+                        <td data-label="Student"><strong>@row.StudentName</strong><span class="chapel-time">@row.StudentId</span></td>
+                        <td data-label="Chapel session">@row.ChapelAtLocal.ToString("MMM d, yyyy h:mm tt")</td>
+                        <td data-label="Attendance decision"><span class="chapel-status @row.Status.ToString().ToLowerInvariant()">@row.Status</span><label for="status-@formId">Change status</label>
+                            <select id="status-@formId" name="status" form="@formId">
                                 @foreach (var value in Enum.GetValues<ChapelAttendanceStatus>())
                                 {
                                     <option value="@value" selected="@(row.Status == value)">@value</option>
                                 }
                             </select>
-                            <label class="visually-hidden" for="comment-@formId">Comment for @row.StudentName</label>
-                            <input class="form-control" id="comment-@formId" name="comment" form="@formId" value="@row.Comment" maxlength="4000" />
+                            <label for="comment-@formId">Comment</label>
+                            <input id="comment-@formId" name="comment" form="@formId" value="@row.Comment" maxlength="4000" placeholder="Optional note" />
                         </td>
-                        <td>@row.Source</td>
-                        <td><form id="@formId" method="post" asp-page-handler="Update">
+                        <td data-label="Source">@row.Source</td>
+                        <td data-label="Action"><form id="@formId" method="post" asp-page-handler="Update">
                             <input type="hidden" name="id" value="@row.Id" />
                             <input type="hidden" name="revision" value="@row.Revision" />
                             <input type="hidden" name="termId" value="@Model.TermId" />
                             <input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" />
                             <input type="hidden" name="student" value="@Model.Student" />
                             <input type="hidden" name="group" value="@Model.Group" />
-                            <button class="btn btn-primary" type="submit">Save</button>
+                            <button type="submit">Save change</button>
                         </form></td>
                     </tr>
                 }
                 </tbody>
-            </table></div>
+            </table></div> }
+            <p class="chapel-admin-note">Staff changes are retained separately from imported scans.</p>
+            </section>
         }
-        else { <div class="alert alert-info">Choose a chapel date, student, or group to begin.</div> }
+        else { <section class="chapel-panel chapel-empty" role="status"><h2>Ready to search</h2><p>Choose a chapel date, student, or group above to see attendance records.</p></section> }
     }
 </main>

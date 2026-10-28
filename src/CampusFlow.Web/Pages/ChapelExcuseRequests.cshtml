@@ -29,7 +29,7 @@
                 </select><noscript><button type="submit">View term</button></noscript></form>
             </div>
             <div class="chapel-request-content">
-                <p>Submitting a request does not change your attendance. Chapel staff will review it separately. For a recurring release, contact the Chapel office.</p>
+                <p>Submitting a request does not change your attendance. Chapel staff will review it separately. For a request longer than three days or a recurring release, contact the Chapel office at <a href="mailto:chapel@nelson.edu">chapel@nelson.edu</a>.</p>
                 @if (Model.IsImpersonating) { <div class="alert alert-info">Request submission is unavailable while viewing a student account in read-only mode.</div> }
                 else if (Model.TermId.HasValue)
                 {
@@ -47,8 +47,8 @@
         <section class="chapel-panel" aria-labelledby="chapel-previous-heading">
             <div class="chapel-toolbar"><div><span>History</span><h2 id="chapel-previous-heading">Your submitted requests</h2></div></div>
             @if (Model.PreviousRequests.Count == 0) { <div class="chapel-empty"><p>No excuse requests are on file for this term.</p></div> }
-            else { <div class="chapel-table-wrap"><table class="chapel-table"><thead><tr><!th scope="col">Dates</!th><!th scope="col">Category</!th><!th scope="col">Details</!th><!th scope="col">Submitted</!th></tr></thead><tbody>
-                @foreach (var request in Model.PreviousRequests) { <tr><td data-label="Dates">@request.StartDate.ToString("MMM d, yyyy") – @request.EndDate.ToString("MMM d, yyyy")</td><td data-label="Category">@(request.ExcuseType == "MedicalIssue" ? "Medical issue" : request.ExcuseType)</td><td data-label="Details">@(string.IsNullOrWhiteSpace(request.Reason) ? "—" : request.Reason)</td><td data-label="Submitted">@request.CreationTime.ToString("MMM d, yyyy")</td></tr> }
+            else { <div class="chapel-table-wrap"><table class="chapel-table"><thead><tr><!th scope="col">Dates</!th><!th scope="col">Category</!th><!th scope="col">Details</!th><!th scope="col">Submitted</!th><!th scope="col">Decision</!th></tr></thead><tbody>
+                @foreach (var request in Model.PreviousRequests) { <tr><td data-label="Dates">@request.StartDate.ToString("MMM d, yyyy") – @request.EndDate.ToString("MMM d, yyyy")</td><td data-label="Category">@(request.ExcuseType == "MedicalIssue" ? "Medical issue" : request.ExcuseType)</td><td data-label="Details">@(string.IsNullOrWhiteSpace(request.Reason) ? "—" : request.Reason)</td><td data-label="Submitted">@request.CreationTime.ToString("MMM d, yyyy")</td><td data-label="Decision">@(request.Status == CampusFlow.Chapel.ChapelExcuseRequestStatus.Approved ? "Approved" : "Pending review")</td></tr> }
             </tbody></table></div> }
         </section>
     }

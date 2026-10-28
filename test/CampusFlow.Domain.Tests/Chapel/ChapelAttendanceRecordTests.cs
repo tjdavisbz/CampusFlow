@@ -85,4 +85,39 @@ public class ChapelAttendanceRecordTests
         record.ExtraProperties["LegacyExcused"].ShouldBe(false);
         record.ExtraProperties["LegacyFlagConflict"].ShouldBe(true);
     }
+
+    [Fact]
+    public void Approved_request_excuses_absence_and_preserves_previous_decision_metadata()
+    {
+        var record = new ChapelAttendanceRecord(Guid.NewGuid(), Guid.NewGuid(), 268, 42,
+            "20000000042", "Test Student", new DateTime(2026, 10, 27, 10, 0, 0),
+            ChapelAttendanceStatus.Absent, "Late", 123);
+        var requestId = Guid.NewGuid();
+
+        record.ExcuseForApprovedRequest(requestId).ShouldBeTrue();
+
+        record.Status.ShouldBe(ChapelAttendanceStatus.Excused);
+        record.Source.ShouldBe(ChapelAttendanceSource.Staff);
+        record.Comment.ShouldBe("Approved chapel excuse request");
+        record.ExtraProperties["ApprovedChapelExcuseRequestId"].ShouldBe(requestId.ToString());
+        record.ExtraProperties["PreExcuseRequestStatus"].ShouldBe("Absent");
+        record.ExtraProperties["PreExcuseRequestComment"].ShouldBe("Late");
+        record.LegacyAttendanceId.ShouldBe(123);
+    }
+
+    [Theory]
+    [InlineData(ChapelAttendanceStatus.Present)]
+    [InlineData(ChapelAttendanceStatus.Excused)]
+    public void Approved_request_preserves_present_or_already_excused_sessions(ChapelAttendanceStatus status)
+    {
+        var record = new ChapelAttendanceRecord(Guid.NewGuid(), Guid.NewGuid(), 268, 42,
+            "20000000042", "Test Student", new DateTime(2026, 10, 27, 10, 0, 0),
+            status, "Existing decision", 123);
+
+        record.ExcuseForApprovedRequest(Guid.NewGuid()).ShouldBeFalse();
+
+        record.Status.ShouldBe(status);
+        record.Comment.ShouldBe("Existing decision");
+        record.Source.ShouldBe(ChapelAttendanceSource.LegacyImport);
+    }
 }

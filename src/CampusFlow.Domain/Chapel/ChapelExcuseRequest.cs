@@ -4,7 +4,9 @@ using Volo.Abp.MultiTenancy;
 
 namespace CampusFlow.Chapel;
 
-/// <summary>A student's request, not an approved excuse or an attendance decision.</summary>
+public enum ChapelExcuseRequestStatus { Pending, Approved }
+
+/// <summary>A student's request and its staff approval decision.</summary>
 public class ChapelExcuseRequest : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
     public Guid? TenantId { get; private set; }
@@ -16,6 +18,10 @@ public class ChapelExcuseRequest : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public DateOnly EndDate { get; private set; }
     public string ExcuseType { get; private set; } = "";
     public string Reason { get; private set; } = "";
+    public ChapelExcuseRequestStatus Status { get; private set; } = ChapelExcuseRequestStatus.Pending;
+    public Guid? ApprovedByUserId { get; private set; }
+    public DateTime? ApprovedAt { get; private set; }
+    public int AttendanceRecordsExcused { get; private set; }
 
     protected ChapelExcuseRequest() { }
 
@@ -45,5 +51,19 @@ public class ChapelExcuseRequest : FullAuditedAggregateRoot<Guid>, IMultiTenant
         EndDate = endDate;
         ExcuseType = excuseType;
         Reason = reason.Trim();
+    }
+
+    public void Approve(Guid staffUserId, DateTime approvedAt, int attendanceRecordsExcused)
+    {
+        if (Status != ChapelExcuseRequestStatus.Pending)
+            throw new InvalidOperationException("This excuse request has already been approved.");
+        if (staffUserId == Guid.Empty) throw new ArgumentException("A staff user is required.", nameof(staffUserId));
+        if (attendanceRecordsExcused < 0)
+            throw new ArgumentOutOfRangeException(nameof(attendanceRecordsExcused));
+
+        Status = ChapelExcuseRequestStatus.Approved;
+        ApprovedByUserId = staffUserId;
+        ApprovedAt = approvedAt;
+        AttendanceRecordsExcused = attendanceRecordsExcused;
     }
 }

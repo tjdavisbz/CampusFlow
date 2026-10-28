@@ -101,4 +101,18 @@ public class ChapelAttendanceRecord : FullAuditedAggregateRoot<Guid>, IMultiTena
         Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
         Source = ChapelAttendanceSource.Staff;
     }
+
+    /// <summary>Present sessions retain their earned credit; an already excused session is unchanged.</summary>
+    public bool ExcuseForApprovedRequest(Guid requestId)
+    {
+        if (requestId == Guid.Empty) throw new ArgumentException("A request is required.", nameof(requestId));
+        if (Status is ChapelAttendanceStatus.Present or ChapelAttendanceStatus.Excused) return false;
+
+        ExtraProperties["PreExcuseRequestStatus"] = Status.ToString();
+        ExtraProperties["PreExcuseRequestSource"] = Source.ToString();
+        ExtraProperties["PreExcuseRequestComment"] = Comment;
+        ExtraProperties["ApprovedChapelExcuseRequestId"] = requestId.ToString();
+        SetByStaff(ChapelAttendanceStatus.Excused, "Approved chapel excuse request");
+        return true;
+    }
 }

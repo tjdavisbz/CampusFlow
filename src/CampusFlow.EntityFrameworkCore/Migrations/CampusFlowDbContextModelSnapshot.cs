@@ -922,6 +922,15 @@ namespace CampusFlow.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttendanceRecordsExcused")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -980,6 +989,9 @@ namespace CampusFlow.Migrations
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<string>("StudentId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1003,6 +1015,8 @@ namespace CampusFlow.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "TermCalendarId", "CreationTime");
+
+                    b.HasIndex("TenantId", "TermCalendarId", "Status", "CreationTime");
 
                     b.HasIndex("TenantId", "TermCalendarId", "StudentUid", "CreationTime");
 
