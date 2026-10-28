@@ -57,6 +57,7 @@ public class CampusFlowDbContext :
     public DbSet<ChapelAttendanceRecord> ChapelAttendanceRecords { get; set; }
     public DbSet<ChapelGroupMembership> ChapelGroupMemberships { get; set; }
     public DbSet<ChapelExcuseRequest> ChapelExcuseRequests { get; set; }
+    public DbSet<ChapelFeedFile> ChapelFeedFiles { get; set; }
 
     #region Entities from the modules
 
@@ -226,6 +227,18 @@ public class CampusFlowDbContext :
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.StudentUid, x.CreationTime });
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.CreationTime });
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.Status, x.CreationTime });
+        });
+
+        builder.Entity<ChapelFeedFile>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "ChapelFeedFiles", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.FileName).IsRequired().HasMaxLength(160);
+            b.Property(x => x.Sha256).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Content).IsRequired();
+            b.Property(x => x.ScanCount).IsRequired();
+            b.Property(x => x.ReceivedAtUtc).HasColumnType("timestamp with time zone");
+            b.HasIndex(x => new { x.TenantId, x.Sha256 }).IsUnique();
         });
 
         builder.Entity<PaymentPlanPolicy>(b =>

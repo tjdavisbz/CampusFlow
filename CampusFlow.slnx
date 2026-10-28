@@ -1,7 +1,7 @@
 <Solution>
-    <Configurations>
-        <Platform Name="Any CPU" />
-    </Configurations>
+    <Folder Name="/maintenance/">
+        <Project Path="maintenance/ChapelCbordFeed/ChapelCbordFeed.csproj" />
+    </Folder>
     <Folder Name="/src/">
         <Project Path="src/CampusFlow.Domain/CampusFlow.Domain.csproj" />
         <Project Path="src/CampusFlow.Application/CampusFlow.Application.csproj" />

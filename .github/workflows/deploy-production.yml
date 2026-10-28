@@ -71,6 +71,17 @@ jobs:
           --no-restore
           --output "${{ env.PUBLISH_DIRECTORY }}"
 
+      - name: Publish scheduled Chapel SFTP archive job
+        run: |
+          dotnet publish maintenance/ChapelCbordFeed/ChapelCbordFeed.csproj \
+            --configuration Release --no-restore \
+            --output "${{ runner.temp }}/chapel-cbord-feed"
+          job_dir="${{ env.PUBLISH_DIRECTORY }}/app_data/jobs/triggered/chapel-cbord"
+          mkdir -p "$job_dir"
+          cp -R "${{ runner.temp }}/chapel-cbord-feed/." "$job_dir/"
+          cp maintenance/ChapelCbordFeed/run.sh maintenance/ChapelCbordFeed/settings.job "$job_dir/"
+          chmod 755 "$job_dir/run.sh"
+
       - name: Sign in to Azure
         uses: azure/login@v2
         with:
