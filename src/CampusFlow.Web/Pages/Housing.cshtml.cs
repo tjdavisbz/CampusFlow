@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using CampusFlow.Branding;
 using CampusFlow.BillApprovals;
 using CampusFlow.Housing;
+using CampusFlow.StudentInformationSystems;
+using CampusFlow.Students;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -20,21 +22,27 @@ public class HousingModel : CampusFlowPageModel
     private readonly IRepository<BillApprovalTermConfiguration, Guid> _billApprovalTermConfigurations;
     private readonly IClock _clock;
     private readonly ILogger<HousingModel> _logger;
+    private readonly IElementsHousingReader _housingReader;
+    private readonly ICurrentStudentView _currentStudentView;
 
     public HousingModel(ITenantThemeProvider themeProvider, IMealPlanAppService mealPlans,
         IRepository<BillApprovalTermConfiguration, Guid> billApprovalTermConfigurations,
-        IClock clock, ILogger<HousingModel> logger)
+        IClock clock, ILogger<HousingModel> logger, IElementsHousingReader housingReader,
+        ICurrentStudentView currentStudentView)
     {
         _themeProvider = themeProvider;
         _mealPlans = mealPlans;
         _billApprovalTermConfigurations = billApprovalTermConfigurations;
         _clock = clock;
         _logger = logger;
+        _housingReader = housingReader;
+        _currentStudentView = currentStudentView;
     }
 
     [BindProperty] public SaveMealPlanSelectionInput Input { get; set; } = new();
     [BindProperty(SupportsGet = true)] public bool Saved { get; set; }
     public MealPlanSelectionDto? Selection { get; private set; }
+    public StudentHousingAssignment? CurrentAssignment { get; private set; }
     public bool IsUnavailable { get; private set; }
     public TenantTheme Theme { get; private set; } = new("CampusFlow", "#274690", "#172554", "#667eea",
         "#A1A8AE", "#F7F8FA", "#172033", null, null, "system-ui, sans-serif", "system-ui, sans-serif", null);
@@ -42,6 +50,17 @@ public class HousingModel : CampusFlowPageModel
     public async Task OnGetAsync()
     {
         Theme = _themeProvider.Get(CurrentTenant.Name);
+        try
+        {
+            var student = await _currentStudentView.GetProfileAsync();
+            if (student?.Provider == StudentInformationSystemProvider.ThesisElements &&
+                int.TryParse(student.ExternalStudentId, out var studentUid))
+                CurrentAssignment = await _housingReader.GetStudentAssignmentAsync(studentUid);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Unable to load the student's current housing assignment.");
+        }
         try
         {
             if (!await IsEnabledAsync())

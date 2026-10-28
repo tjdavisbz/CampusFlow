@@ -10,6 +10,7 @@
         el('period').disabled = busy;
         el('refresh').disabled = busy || !el('period').value;
         ['save','preview'].forEach(x => el(x).disabled = busy || !state);
+        if (el('apply')) el('apply').disabled = busy || !state;
         el('clear').disabled = busy || !state || !selected.size;
         el('rows').querySelectorAll('input,select,button').forEach(x => x.disabled = busy);
         updateSelectionUi();
@@ -99,8 +100,16 @@
                     const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-sm btn-outline-primary'; button.textContent = 'Assign student';
                     button.onclick = () => { selectedRoom = room; el('search-results').replaceChildren(); el('students').showModal(); el('search').focus(); }; student.append(button);
                 } else student.textContent = 'No available beds';
-                const single = cell(row), rate = cell(row), notes = cell(row);
+                const assignment = cell(row), single = cell(row), rate = cell(row), notes = cell(row);
                 if (!occupant) continue;
+                const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-sm btn-outline-danger'; remove.textContent = 'Remove';
+                remove.setAttribute('aria-label', 'Remove ' + occupant.name + ' from ' + room.building + ' ' + room.name);
+                remove.onclick = () => {
+                    if (!confirm(`Remove ${occupant.name} from ${room.building} / ${room.name} in this draft? Elements will not change until you apply the draft.`)) return;
+                    room.occupants = room.occupants.filter(o => o.studentUid !== occupant.studentUid);
+                    selected.delete(occupant.studentUid); changed(); render();
+                };
+                assignment.append(remove);
                 single.append(input('checkbox', 'Intentional single for ' + occupant.name, occupant.intentionalSingle, v => { occupant.intentionalSingle = v; changed(); }));
                 const choice = document.createElement('select'); choice.className = 'form-select'; choice.setAttribute('aria-label', 'Rate for ' + occupant.name);
                 rates.forEach(x => choice.add(new Option(x,x)));
@@ -117,7 +126,7 @@
         catch (e) { el('period').value = loadedPeriod; throw e; }
     });
     el('refresh').onclick = () => run(async () => {
-        if (!confirm('Replace this period’s saved draft and unsaved edits with Elements assignments? Draft-only rate choices and notes will also be cleared. This does not change Elements.')) return;
+        if (!confirm('Refresh from Elements will replace this CampusFlow draft. Any changes not applied—including saved draft assignments, rate choices, notes, and unsaved edits—will be lost. Rate choices and intentional-single flags from the last successful Apply will be kept. This action will not change Elements. Continue?')) return;
         state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.');
     });
     async function save() { state = await request('Save', state); dirty = false; render(); message('Draft saved in CampusFlow. Elements is unchanged.'); }
@@ -129,8 +138,20 @@
         (changes.length ? changes : [{action:'No assignment changes',detail:'The saved assignments and capacities match the last refresh.'}]).forEach(c => { const li = document.createElement('li'); li.textContent = `${c.action}: ${c.detail}`; list.append(li); });
         el('changes').hidden = false; el('changes').scrollIntoView({behavior:'smooth'});
     });
+    if (el('apply')) el('apply').onclick = () => run(async () => {
+        if (dirty) await save();
+        const changes = await request('Preview', undefined, {periodId:state.periodId});
+        const actionable = changes.filter(x => ['Assign','Move','Remove','Rate review'].includes(x.action));
+        if (!actionable.length) { message('There are no assignment or rate changes to apply to Elements.'); return; }
+        const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
+        const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
+        if (!confirm(`Apply ${actionable.length} assignment/rate change(s) to NON-PRODUCTION Elements?\n\n${listed}${more}\n\nElements room rent stays at $0. CampusFlow will post the proposed charges in a separate billing batch. Continue?`)) return;
+        state = await request('Apply', {periodId:state.periodId, revision:state.revision, confirmed:true});
+        dirty = false; selected.clear(); render();
+        message('Room assignments and CampusFlow housing charges were applied to non-production Elements and verified.');
+    });
     el('clear').onclick = () => {
-        if (!selected.size || !confirm(`Clear ${selected.size} selected assignments from the draft? Students remain assigned in Elements until sync is implemented and run.`)) return;
+        if (!selected.size || !confirm(`Clear ${selected.size} selected assignments from the draft? Students remain assigned in Elements until you apply the draft.`)) return;
         state.rooms.forEach(r => r.occupants = r.occupants.filter(o => !selected.has(o.studentUid))); selected.clear(); changed(); render();
     };
     el('filter').oninput = render;
@@ -156,14 +177,24 @@
     };
     el('close-search').onclick = () => el('students').close();
     el('search-form').onsubmit = event => { event.preventDefault(); run(async () => {
-        const students = await request('Students', undefined, {query:el('search').value}); const results = el('search-results'); results.replaceChildren();
+        const students = await request('Students', undefined, {query:el('search').value, periodId:state.periodId}); const results = el('search-results'); results.replaceChildren();
         if (!students.length) results.textContent = 'No matching students.';
-        students.forEach(s => { const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline-primary'; button.textContent = `${s.name} · ${s.studentId}`;
+        students.forEach(s => { const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-outline-primary housing-student-result';
+            button.textContent = `${s.name} · ${s.studentId}\nMiddle name: ${s.middleName || '—'} · Applicant status: ${s.applicantStatus || '—'} · Campus: ${s.campus || '—'}\nElements assignment this period: ${s.currentRoom}`;
             button.onclick = () => {
-                const uid = Number(s.externalStudentId);
-                if (state.rooms.some(r => r.occupants.some(o => o.studentUid === uid))) { results.textContent = 'This student is already assigned. Clear the existing assignment before moving them.'; return; }
+                const uid = Number(s.studentUid);
+                const previousRoom = state.rooms.find(r => r.occupants.some(o => o.studentUid === uid));
+                if (previousRoom === selectedRoom) { results.textContent = 'This student is already assigned to this room.'; return; }
+                if (!previousRoom && s.currentRoom !== 'Not assigned') {
+                    results.textContent = 'This student has an Elements assignment missing from the draft. Refresh from Elements before moving them.';
+                    return;
+                }
                 if (selectedRoom.occupants.length >= selectedRoom.capacity) { results.textContent = 'This room is full. Increase capacity first.'; return; }
-                selectedRoom.occupants.push({studentUid:uid,name:s.name,intentionalSingle:false,rate:'Standard',notes:''}); changed(); el('students').close(); render();
+                if (previousRoom && !confirm(`Move ${s.name} from ${previousRoom.building} / ${previousRoom.name} to ${selectedRoom.building} / ${selectedRoom.name} in this draft? Elements will not change until you apply the draft.`)) return;
+                const existing = previousRoom?.occupants.find(o => o.studentUid === uid);
+                if (previousRoom) previousRoom.occupants = previousRoom.occupants.filter(o => o.studentUid !== uid);
+                selectedRoom.occupants.push(existing ?? {studentUid:uid,name:s.name,intentionalSingle:false,rate:'Standard',notes:''});
+                changed(); el('students').close(); render();
             }; results.append(button); });
     }); };
     window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });

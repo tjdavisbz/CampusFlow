@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CampusFlow.Permissions;
 using CampusFlow.StudentInformationSystems;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Configuration;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
 
@@ -16,11 +17,17 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
 {
     private readonly IRepository<HousingAssignmentDraft, Guid> _drafts;
     private readonly IElementsHousingReader _elements;
+    private readonly IElementsHousingAssignmentWriter _writer;
+    private readonly IElementsHousingBillingWriter _billingWriter;
+    private readonly IConfiguration _configuration;
     private readonly IStudentInformationSystemStudentLookup _students;
     public HousingWorkspaceAppService(IRepository<HousingAssignmentDraft, Guid> drafts, IElementsHousingReader elements,
+        IElementsHousingAssignmentWriter writer, IElementsHousingBillingWriter billingWriter,
+        IConfiguration configuration,
         IEnumerable<IStudentInformationSystemStudentLookup> students)
     {
-        _drafts = drafts; _elements = elements;
+        _drafts = drafts; _elements = elements; _writer = writer; _billingWriter = billingWriter;
+        _configuration = configuration;
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
     }
     private Guid Tenant() => CurrentTenant.Id ?? throw new UserFriendlyException("Select a university before managing housing.");
@@ -45,6 +52,22 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         else if (!string.IsNullOrEmpty(revision)) throw new UserFriendlyException("This draft no longer exists. Reload the page.");
         var rooms = await _elements.GetRoomsAsync(periodId);
         Validate(rooms, rooms);
+        if (draft is not null)
+        {
+            // Rate choices and intentional-single flags are CampusFlow billing metadata,
+            // not Elements room fields. Preserve only values from the last successful
+            // Apply; discard any newer, unapplied draft edits during Refresh.
+            var applied = Read(draft.BaselineJson)
+                .SelectMany(room => room.Occupants.Select(occupant => (room.Id, occupant)))
+                .ToDictionary(x => (x.Id, x.occupant.StudentUid));
+            foreach (var room in rooms)
+                foreach (var occupant in room.Occupants)
+                    if (applied.TryGetValue((room.Id, occupant.StudentUid), out var previous))
+                    {
+                        occupant.Rate = previous.occupant.Rate;
+                        occupant.IntentionalSingle = previous.occupant.IntentionalSingle;
+                    }
+        }
         var json = JsonSerializer.Serialize(rooms);
         if (draft is null)
         {
@@ -84,14 +107,147 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
     public async Task<List<HousingWorkspaceChange>> PreviewAsync(int periodId)
     {
         var draft = await Find(periodId) ?? throw new UserFriendlyException("Refresh from Elements first.");
-        return Validate(Read(draft.BaselineJson), Read(draft.RoomsJson));
+        var before = Read(draft.BaselineJson);
+        var after = Read(draft.RoomsJson);
+        var changes = Validate(before, after);
+        if (!string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION",
+                StringComparison.OrdinalIgnoreCase)) return changes;
+        var pricing = await _elements.GetPricingAsync(periodId);
+        var oldAssignments = before.SelectMany(room => room.Occupants.Select(o => (room, o)))
+            .ToDictionary(x => x.o.StudentUid);
+        var newAssignments = after.SelectMany(room => room.Occupants.Select(o => (room, o)))
+            .ToDictionary(x => x.o.StudentUid);
+        foreach (var (studentId, proposed) in newAssignments)
+        {
+            if (oldAssignments.TryGetValue(studentId, out var old) && old.room.Id == proposed.room.Id &&
+                old.o.Rate == proposed.o.Rate && old.o.IntentionalSingle == proposed.o.IntentionalSingle) continue;
+            IReadOnlyList<HousingChargeLine> lines;
+            try
+            {
+                lines = HousingChargeCalculator.Quote(pricing.TermCalendarId, proposed.room.Building,
+                    proposed.o.Rate, proposed.o.IntentionalSingle, pricing.Fees,
+                    pricing.SingleTransactionDocumentId, pricing.SingleAccountsReceivableTypeId);
+            }
+            catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
+            foreach (var line in lines)
+                changes.Add(new HousingWorkspaceChange { Action = "Proposed charge",
+                    Detail = $"{proposed.o.Name}: {line.Description} — {line.Amount:C2} (document {line.TransactionDocumentId})" });
+        }
+        foreach (var (studentId, old) in oldAssignments)
+            if (!newAssignments.ContainsKey(studentId))
+                changes.Add(new HousingWorkspaceChange { Action = "Proposed charge removal",
+                    Detail = $"{old.o.Name}: CampusFlow-managed housing batch charges would be removed; existing manual or posted charges will not be changed." });
+        return changes;
     }
-    public async Task<List<AdminMealPlanStudentDto>> SearchStudentsAsync(string query)
+    public async Task<HousingWorkspaceState> ApplyAssignmentsAsync(ApplyHousingDraftInput input)
+    {
+        if (!input.Confirmed) throw new UserFriendlyException("Review and confirm the Elements changes before applying them.");
+        _writer.EnsureNonProductionWriteEnabled();
+        var draft = await Find(input.PeriodId) ?? throw new UserFriendlyException("Refresh from Elements first.");
+        CheckRevision(draft, input.Revision);
+        var before = Read(draft.BaselineJson);
+        var after = Read(draft.RoomsJson);
+        Validate(before, after);
+
+        // The vendor's assignment endpoint has no capacity or note fields. Pricing is posted
+        // separately to the CampusFlow-owned billing batch, not to Elements' $0 room rent.
+        if (before.Any(room => after.Single(x => x.Id == room.Id).Capacity != room.Capacity) ||
+            after.SelectMany(x => x.Occupants).Any(x => !string.IsNullOrWhiteSpace(x.Notes)))
+            throw new UserFriendlyException("This draft includes capacity or note changes that the Elements room-assignment API cannot apply. Save them as a CampusFlow draft, then resolve those changes before applying assignments and charges.");
+
+        var oldAssignments = before.SelectMany(room => room.Occupants.Select(o => (room, o)))
+            .ToDictionary(x => x.o.StudentUid);
+        var newAssignments = after.SelectMany(room => room.Occupants.Select(o => (room, o)))
+            .ToDictionary(x => x.o.StudentUid);
+        var roomChangedIds = oldAssignments.Keys.Union(newAssignments.Keys)
+            .Where(id => !oldAssignments.TryGetValue(id, out var old) ||
+                         !newAssignments.TryGetValue(id, out var desired) || old.room.Id != desired.room.Id)
+            .Order().ToList();
+        var changedIds = oldAssignments.Keys.Union(newAssignments.Keys)
+            .Where(id => roomChangedIds.Contains(id) ||
+                         oldAssignments[id].o.Rate != newAssignments[id].o.Rate ||
+                         oldAssignments[id].o.IntentionalSingle != newAssignments[id].o.IntentionalSingle)
+            .Order().ToList();
+        if (changedIds.Count == 0) return Map(draft);
+
+        var pricing = await _elements.GetPricingAsync(input.PeriodId);
+        var documents = new[] { 137, 1471, 1765, pricing.SingleTransactionDocumentId };
+        var proposedCharges = new Dictionary<int, IReadOnlyList<HousingChargeLine>>();
+        foreach (var id in changedIds)
+        {
+            if (newAssignments.TryGetValue(id, out var proposed))
+            {
+                try
+                {
+                    proposedCharges[id] = HousingChargeCalculator.Quote(pricing.TermCalendarId,
+                        proposed.room.Building, proposed.o.Rate, proposed.o.IntentionalSingle,
+                        pricing.Fees, pricing.SingleTransactionDocumentId,
+                        pricing.SingleAccountsReceivableTypeId);
+                }
+                catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
+            }
+            else proposedCharges[id] = [];
+            await _billingWriter.VerifyCanReconcileAsync(id, pricing.TermCalendarId, documents);
+        }
+
+        var current = await _elements.GetRoomsAsync(input.PeriodId);
+        if (!SameAssignments(before, current))
+            throw new UserFriendlyException("Elements assignments or room capacities changed since this draft was refreshed. Review and refresh before applying changes.");
+
+        // The replica is only a first check. Confirm every affected student through the live API.
+        foreach (var id in roomChangedIds)
+        {
+            var actual = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
+            if (!oldAssignments.TryGetValue(id, out var old))
+            {
+                if (actual is not null)
+                    throw new UserFriendlyException("A student has a new Elements assignment. Refresh the draft before applying changes.");
+            }
+            else if (actual is null || !SameRoom(actual.Value, old.room))
+                throw new UserFriendlyException("A student's Elements room differs from the saved baseline. Refresh the draft before applying changes.");
+        }
+
+        var completed = 0;
+        try
+        {
+            foreach (var id in roomChangedIds.Where(oldAssignments.ContainsKey))
+            {
+                var oldRoom = oldAssignments[id].room;
+                await _writer.DeallocateAsync(id, input.PeriodId, oldRoom.Id);
+                completed++;
+                if (await _writer.GetAssignedRoomAsync(id, input.PeriodId) is not null)
+                    throw new InvalidOperationException("Elements did not confirm removal of a room assignment.");
+            }
+            foreach (var id in roomChangedIds.Where(newAssignments.ContainsKey))
+            {
+                var newRoom = newAssignments[id].room;
+                await _writer.AssignAsync(id, input.PeriodId, newRoom.Id);
+                completed++;
+                var confirmed = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
+                if (confirmed is null || !SameRoom(confirmed.Value, newRoom))
+                    throw new InvalidOperationException("Elements did not confirm the new room assignment.");
+            }
+            foreach (var id in changedIds)
+            {
+                await _billingWriter.ReconcileAsync(id, pricing.TermCalendarId,
+                    proposedCharges[id], documents);
+                completed++;
+            }
+        }
+        catch (Exception) when (completed > 0)
+        {
+            throw new UserFriendlyException("Elements may have applied some room or billing changes, but the operation did not finish. Review the live assignments and CampusFlow housing batch before retrying; do not blindly reapply this draft.");
+        }
+
+        draft.Refresh(JsonSerializer.Serialize(after), Clock.Now);
+        await _drafts.UpdateAsync(draft, autoSave: true);
+        return Map(draft);
+    }
+    public async Task<List<HousingStudentOption>> SearchStudentsAsync(string query, int periodId)
     {
         Tenant();
         if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2) return [];
-        return (await _students.SearchAsync(query.Trim())).Select(x => new AdminMealPlanStudentDto
-        { ExternalStudentId = x.ExternalStudentId, StudentId = x.StudentId, Name = $"{x.FirstName} {x.LastName}" }).ToList();
+        return await _elements.SearchStudentsAsync(query.Trim(), periodId);
     }
     private static void CheckRevision(HousingAssignmentDraft draft, string? revision)
     {
@@ -103,6 +259,17 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
     }
     private static List<HousingWorkspaceRoom> Read(string json) => JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(json)!;
+    private static bool SameRoom((string Building, string Room) actual, HousingWorkspaceRoom expected) =>
+        string.Equals(actual.Building.Trim(), expected.Building.Trim(), StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(actual.Room.Trim(), expected.Name.Trim(), StringComparison.OrdinalIgnoreCase);
+    private static bool SameAssignments(List<HousingWorkspaceRoom> before, List<HousingWorkspaceRoom> current) =>
+        before.Count == current.Count && before.All(room =>
+        {
+            var found = current.SingleOrDefault(x => x.Id == room.Id);
+            return found is not null && found.Capacity == room.Capacity &&
+                   room.Occupants.Select(x => x.StudentUid).Order()
+                       .SequenceEqual(found.Occupants.Select(x => x.StudentUid).Order());
+        });
     private static HousingWorkspaceState Map(HousingAssignmentDraft x) => new()
     { Id = x.Id, PeriodId = x.PeriodId, Revision = x.ConcurrencyStamp, RefreshedAt = x.RefreshedAt, Rooms = Read(x.RoomsJson) };
 }

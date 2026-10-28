@@ -24,9 +24,27 @@
         @if (Model.Selection is not null) { <div class="housing-student"><strong>@Model.Selection.StudentName</strong><span>ID @Model.Selection.StudentId</span></div> }
     </header>
 
+    <section class="housing-current" aria-labelledby="housing-current-title">
+        <div class="section-heading"><span>My housing</span><h2 id="housing-current-title">Current room assignment</h2></div>
+        @if (Model.CurrentAssignment is null)
+        {
+            <p>No room assignment is available for your student record yet.</p>
+        }
+        else
+        {
+            <p><strong>@Model.CurrentAssignment.PeriodName</strong></p>
+            <div class="housing-current-grid">
+                <div><span>Residence</span><strong>@Model.CurrentAssignment.Building</strong></div>
+                <div><span>Room</span><strong>@Model.CurrentAssignment.Room</strong></div>
+                <div><span>Roommate@(Model.CurrentAssignment.Roommates.Count == 1 ? "" : "s")</span>
+                    <strong>@(Model.CurrentAssignment.Roommates.Count == 0 ? "None currently assigned" : string.Join(", ", Model.CurrentAssignment.Roommates))</strong></div>
+            </div>
+        }
+    </section>
+
     @if (Model.IsUnavailable || Model.Selection is null)
     {
-        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Housing selection is temporarily unavailable</h2><p>Please try again shortly.</p></div></section>
+        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Housing selection is currently unavailable</h2><p>Your room assignment above is still available when one has been recorded.</p></div></section>
     }
     else
     {
