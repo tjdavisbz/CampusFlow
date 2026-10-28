@@ -1,11 +1,13 @@
 /*
   Read-only Chapel follow-up export for Nelson Fall 2026 (TermCalendarID 268).
   Run in SSMS on the SQL Server that contains CAMs_Enterprise. The operational
-  Chapel tables are in CAMs_Enterprise, except the supplied ChapelBonusBank
-  table, which is in Nelson_ReportingAndIntegration.
+  Chapel schedule, excuses, groups, and exclusion data are in CAMs_Enterprise.
+  ChapelBonusBank is in Nelson_ReportingAndIntegration. ChapelReleaseRequests
+  was not found in CAMs_Enterprise, so the script checks both databases.
 
-  The schedule and excuses results were already supplied on 2026-10-27. The
-  default below skips them. Set @IncludeAlreadyReceived = 1 to repeat them.
+  Schedule, excuses, groups, and exclusion results were supplied on
+  2026-10-27. The default skips them. Set @IncludeAlreadyReceived = 1 to
+  repeat them.
   Save each remaining result set separately, with its column headers, and
   transfer securely: the results contain student identifiers and comments.
   Do not commit data exports. This script makes NO data changes or backups.
@@ -35,30 +37,48 @@ BEGIN
     ORDER BY StudentUID, ChapelExcusesID;
 END;
 
--- The legacy group table has no term column, so export all memberships.
-SELECT N'CAMs_Enterprise.dbo.ChapelGroups' AS SourceTable, *
-FROM dbo.ChapelGroups
-ORDER BY StudentUID, ChapelGroupsID;
+IF @IncludeAlreadyReceived = 1
+BEGIN
+    -- Neither legacy table has a term column, so export every row.
+    SELECT N'CAMs_Enterprise.dbo.ChapelGroups' AS SourceTable, *
+    FROM dbo.ChapelGroups
+    ORDER BY StudentUID, ChapelGroupsID;
 
--- The exclusion list has no term column. It may include students deliberately
--- omitted from Fall attendance, so do not filter it by ChapelAttendance.
-IF OBJECT_ID(N'dbo.Chapel_ExclusionList', N'U') IS NOT NULL
-    EXEC (N'SELECT N''CAMs_Enterprise.dbo.Chapel_ExclusionList'' AS SourceTable,
-                   StudentUID
-            FROM dbo.Chapel_ExclusionList ORDER BY StudentUID;');
-ELSE IF OBJECT_ID(N'dbo.SAGU_Chapel_ExclusionList', N'U') IS NOT NULL
-    EXEC (N'SELECT N''CAMs_Enterprise.dbo.SAGU_Chapel_ExclusionList'' AS SourceTable,
-                   StudentUID
-            FROM dbo.SAGU_Chapel_ExclusionList ORDER BY StudentUID;');
+    IF OBJECT_ID(N'dbo.Chapel_ExclusionList', N'U') IS NOT NULL
+        EXEC (N'SELECT N''CAMs_Enterprise.dbo.Chapel_ExclusionList'' AS SourceTable,
+                       StudentUID
+                FROM dbo.Chapel_ExclusionList ORDER BY StudentUID;');
+    ELSE IF OBJECT_ID(N'dbo.SAGU_Chapel_ExclusionList', N'U') IS NOT NULL
+        EXEC (N'SELECT N''CAMs_Enterprise.dbo.SAGU_Chapel_ExclusionList'' AS SourceTable,
+                       StudentUID
+                FROM dbo.SAGU_Chapel_ExclusionList ORDER BY StudentUID;');
+    ELSE
+        PRINT 'No Chapel exclusion-list table found in CAMs_Enterprise.';
+END;
+
+-- ChapelReleaseRequests is not present in CAMS on this server. Use dynamic SQL
+-- so a missing optional table cannot abort the remaining bonus-bank exports.
+IF OBJECT_ID(N'dbo.ChapelReleaseRequests', N'U') IS NOT NULL
+    EXEC sys.sp_executesql
+        N'SELECT N''CAMs_Enterprise.dbo.ChapelReleaseRequests'' AS SourceTable,
+                 StudentUID, TermCalendarID, BeginDate, ExcuseType, Reason,
+                 Mon, Tue, Wed, Thu, Fri, EmployerName, EmployerPhone, EmployerEmail
+          FROM dbo.ChapelReleaseRequests
+          WHERE TermCalendarID = @TermCalendarID
+          ORDER BY StudentUID, BeginDate;',
+        N'@TermCalendarID int', @TermCalendarID = @TermCalendarID;
+ELSE IF DB_ID(N'Nelson_ReportingAndIntegration') IS NOT NULL
+    AND OBJECT_ID(N'Nelson_ReportingAndIntegration.dbo.ChapelReleaseRequests', N'U') IS NOT NULL
+    EXEC sys.sp_executesql
+        N'SELECT N''Nelson_ReportingAndIntegration.dbo.ChapelReleaseRequests'' AS SourceTable,
+                 StudentUID, TermCalendarID, BeginDate, ExcuseType, Reason,
+                 Mon, Tue, Wed, Thu, Fri, EmployerName, EmployerPhone, EmployerEmail
+          FROM Nelson_ReportingAndIntegration.dbo.ChapelReleaseRequests
+          WHERE TermCalendarID = @TermCalendarID
+          ORDER BY StudentUID, BeginDate;',
+        N'@TermCalendarID int', @TermCalendarID = @TermCalendarID;
 ELSE
-    PRINT 'No Chapel exclusion-list table found in CAMs_Enterprise.';
-
-SELECT N'CAMs_Enterprise.dbo.ChapelReleaseRequests' AS SourceTable,
-       StudentUID, TermCalendarID, BeginDate, ExcuseType, Reason,
-       Mon, Tue, Wed, Thu, Fri, EmployerName, EmployerPhone, EmployerEmail
-FROM dbo.ChapelReleaseRequests
-WHERE TermCalendarID = @TermCalendarID
-ORDER BY StudentUID, BeginDate;
+    PRINT 'ChapelReleaseRequests was not visible in either database.';
 
 -- The legacy staff portal writes SAGU_ChapelBonusBank in CAMS. Export it if
 -- present, and also export the separately supplied Nelson Integration table.
