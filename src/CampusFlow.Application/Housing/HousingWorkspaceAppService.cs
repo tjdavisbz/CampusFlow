@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CampusFlow.Permissions;
@@ -9,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Uow;
 
 namespace CampusFlow.Housing;
 
@@ -22,14 +25,16 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
     private readonly IElementsHousingBillingWriter _billingWriter;
     private readonly IConfiguration _configuration;
     private readonly IStudentInformationSystemStudentLookup _students;
+    private readonly IUnitOfWorkManager _unitOfWorkManager;
     public HousingWorkspaceAppService(IRepository<HousingAssignmentDraft, Guid> drafts,
         IRepository<HousingRateSchedule, Guid> rateSchedules, IElementsHousingReader elements,
         IElementsHousingAssignmentWriter writer, IElementsHousingBillingWriter billingWriter,
-        IConfiguration configuration,
+        IConfiguration configuration, IUnitOfWorkManager unitOfWorkManager,
         IEnumerable<IStudentInformationSystemStudentLookup> students)
     {
         _drafts = drafts; _rateSchedules = rateSchedules; _elements = elements; _writer = writer; _billingWriter = billingWriter;
         _configuration = configuration;
+        _unitOfWorkManager = unitOfWorkManager;
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
     }
     private Guid Tenant() => CurrentTenant.Id ?? throw new UserFriendlyException("Select a university before managing housing.");
@@ -270,6 +275,92 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         Tenant();
         if (string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2) return [];
         return await _elements.SearchStudentsAsync(query.Trim(), periodId);
+    }
+    public async Task<HousingTermCopyPreview> PreviewTermCopyAsync(int sourcePeriodId, int destinationPeriodId)
+    {
+        var (preview, _, _, _, _) = await PrepareTermCopyAsync(sourcePeriodId, destinationPeriodId);
+        return preview;
+    }
+
+    [UnitOfWork(IsDisabled = true)]
+    public async Task<HousingWorkspaceState> CopyTermDraftAsync(CopyHousingTermInput input)
+    {
+        if (!input.Confirmed) throw new UserFriendlyException("Confirm the reviewed term copy before creating the draft.");
+        using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+        var (preview, destination, copied, sourceRates, destinationTermId) =
+            await PrepareTermCopyAsync(input.SourcePeriodId, input.DestinationPeriodId);
+        if (input.ExpectedStudents != preview.StudentsToCopy ||
+            input.ExpectedFeeRevision != preview.FeeRevision ||
+            input.ExpectedCopyRevision != preview.CopyRevision)
+            throw new UserFriendlyException("The source assignments or fee amounts changed. Preview the term copy again.");
+        var draft = new HousingAssignmentDraft(GuidGenerator.Create(), Tenant(), input.DestinationPeriodId,
+            JsonSerializer.Serialize(destination), Clock.Now);
+        draft.Save(JsonSerializer.Serialize(copied));
+        await _drafts.InsertAsync(draft, autoSave: true);
+        await _rateSchedules.InsertAsync(new HousingRateSchedule(GuidGenerator.Create(), Tenant(),
+            input.DestinationPeriodId, destinationTermId, sourceRates.RatesJson), autoSave: true);
+        await uow.CompleteAsync();
+        return Map(draft);
+    }
+
+    private async Task<(HousingTermCopyPreview Preview, List<HousingWorkspaceRoom> Destination,
+        List<HousingWorkspaceRoom> Copied, HousingRateSchedule SourceRates, int DestinationTermId)>
+        PrepareTermCopyAsync(int sourcePeriodId, int destinationPeriodId)
+    {
+        Tenant();
+        if (sourcePeriodId <= 0 || destinationPeriodId <= 0 || sourcePeriodId == destinationPeriodId)
+            throw new UserFriendlyException("Choose two different housing periods.");
+        var periods = await _elements.GetPeriodsAsync();
+        var sourcePeriod = periods.SingleOrDefault(x => x.Id == sourcePeriodId);
+        var destinationPeriod = periods.SingleOrDefault(x => x.Id == destinationPeriodId);
+        if (sourcePeriod is null || destinationPeriod is null)
+            throw new UserFriendlyException("One of the housing periods is no longer available.");
+        if (await Find(destinationPeriodId) is not null)
+            throw new UserFriendlyException("The destination already has a CampusFlow draft. A term can be copied only once; review the existing draft instead.");
+        var sourceRates = await _rateSchedules.FindAsync(x => x.TenantId == CurrentTenant.Id && x.PeriodId == sourcePeriodId)
+            ?? throw new UserFriendlyException("Save the source term's fee amounts before copying it.");
+        if (await _rateSchedules.FindAsync(x => x.TenantId == CurrentTenant.Id && x.PeriodId == destinationPeriodId) is not null)
+            throw new UserFriendlyException("The destination already has fee amounts. Review them instead of copying over them.");
+        HousingPricingContext sourcePricing, destinationPricing;
+        try
+        {
+            sourcePricing = await _elements.GetPricingAsync(sourcePeriodId);
+            destinationPricing = await _elements.GetPricingAsync(destinationPeriodId);
+        }
+        catch (InvalidOperationException exception) { throw new UserFriendlyException(exception.Message); }
+        if (sourceRates.TermCalendarId != sourcePricing.TermCalendarId)
+            throw new UserFriendlyException("The source fee amounts are for a different term.");
+        var sourceAmounts = JsonSerializer.Deserialize<List<HousingRateAmount>>(sourceRates.RatesJson) ?? [];
+        IReadOnlyList<HousingRateDefinition> destinationDefinitions;
+        try { destinationDefinitions = HousingChargeCalculator.GetRateDefinitions(destinationPricing.TermCalendarId); }
+        catch (ArgumentException exception) { throw new UserFriendlyException(exception.Message); }
+        var sourceKeys = sourceAmounts.Select(x => (x.Building, x.RateChoice)).ToHashSet();
+        var destinationKeys = destinationDefinitions.Select(x => (x.Building, x.RateChoice)).ToHashSet();
+        if (sourceKeys.Count != sourceAmounts.Count || !sourceKeys.SetEquals(destinationKeys) ||
+            sourceAmounts.Any(x => x.BaseAmount <= 0 || x.SingleSurchargeAmount <= 0))
+            throw new UserFriendlyException("The destination term has different fee choices. Review its rate setup before copying.");
+        var source = await _elements.GetRoomsAsync(sourcePeriodId);
+        var destination = await _elements.GetRoomsAsync(destinationPeriodId);
+        var sourceDraft = await Find(sourcePeriodId);
+        List<HousingWorkspaceRoom> copied;
+        try { copied = HousingTermCopyPlanner.Copy(source, destination,
+                sourceDraft is null ? null : Read(sourceDraft.BaselineJson)); }
+        catch (ArgumentException exception) { throw new UserFriendlyException(exception.Message); }
+        var preview = new HousingTermCopyPreview
+        {
+            SourcePeriodId = sourcePeriodId, DestinationPeriodId = destinationPeriodId,
+            SourcePeriodName = sourcePeriod.Name, DestinationPeriodName = destinationPeriod.Name,
+            StudentsToCopy = copied.Sum(room => room.Occupants.Count), DestinationRooms = destination.Count,
+            IntentionalSinglesToReview = copied.Sum(room => room.Occupants.Count(x => x.IntentionalSingle)),
+            FeesToCopy = sourceAmounts.Select(x => new HousingTermCopyFeeAmount { Building = x.Building,
+                RateChoice = x.RateChoice, BaseAmount = x.BaseAmount,
+                SingleSurchargeAmount = x.SingleSurchargeAmount }).ToList(),
+            FeeRevision = sourceRates.ConcurrencyStamp,
+            CopyRevision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                JsonSerializer.Serialize(copied)))),
+            Warning = "This creates an assignment draft and copies fee amounts in CampusFlow only. It does not change Elements. Applied rate and intentional-single choices carry forward; unknown choices require review. Review all copied fees before applying charges."
+        };
+        return (preview, destination, copied, sourceRates, destinationPricing.TermCalendarId);
     }
     private static void CheckRevision(HousingAssignmentDraft draft, string? revision)
     {
