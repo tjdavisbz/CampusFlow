@@ -74,6 +74,9 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
             IStudentInformationSystemFinancialAidDecisionService,
             ThesisElementsFinancialAidDecisionService>();
         context.Services.AddTransient<
+            IStudentInformationSystemAwardCodeMaintenance,
+            ThesisElementsAwardCodeMaintenance>();
+        context.Services.AddTransient<
             IStudentInformationSystemPaymentPlanLookup,
             ThesisElementsPaymentPlanLookup>();
         context.Services.AddTransient<

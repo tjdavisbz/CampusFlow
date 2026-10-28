@@ -33,4 +33,6 @@ public class CampusFlowMenus
     public const string ResetIndividualBillApproval = StudentBillingAdmin + ".ResetIndividualBillApproval";
     public const string BusinessServicesAdmin = Prefix + ".Admin.BusinessServices";
     public const string AddStudentMealPlan = BusinessServicesAdmin + ".AddStudentMealPlan";
+    public const string FinancialAidAdmin = Prefix + ".Admin.FinancialAid";
+    public const string ReconcileAwardCodes = FinancialAidAdmin + ".ReconcileAwardCodes";
 }
