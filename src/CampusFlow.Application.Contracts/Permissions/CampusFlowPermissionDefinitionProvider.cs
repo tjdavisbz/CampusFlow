@@ -48,6 +48,10 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             new FixedLocalizableString("Manage chapel attendance"), MultiTenancySides.Tenant);
         businessServices.AddChild(CampusFlowPermissions.Admin.AddStudentMealPlan,
             L("Permission:Admin.BusinessServices.AddStudentMealPlan"), MultiTenancySides.Tenant);
+        var financialAid = admin.AddChild(CampusFlowPermissions.Admin.FinancialAid,
+            new FixedLocalizableString("Access Financial Aid administration"), MultiTenancySides.Tenant);
+        financialAid.AddChild(CampusFlowPermissions.Admin.ReconcileAwardCodes,
+            new FixedLocalizableString("Reconcile financial award codes"), MultiTenancySides.Tenant);
     }
 
     private static LocalizableString L(string name)
