@@ -79,7 +79,7 @@ public sealed class ThesisElementsAwardCodeMaintenance : IStudentInformationSyst
             JOIN dbo.Student s ON s.StudentUID = f.StudentUID
             WHERE tc.TextTerm = @Term
               AND (ISNULL(f.Code1ID, -1) <> ISNULL(fr.Code1ID, -1)
-                   OR ISNULL(f.ShowOnBillingStatement, 0) <> ISNULL(fr.ShowOnBillStatement, 0))
+                   OR COALESCE(f.ShowOnBillingStatement, '') <> COALESCE(fr.ShowOnBillStatement, ''))
             ORDER BY f.FinancialAwardID
             """;
         await using var connection = new SqlConnection(GetConnectionString());
@@ -95,8 +95,8 @@ public sealed class ThesisElementsAwardCodeMaintenance : IStudentInformationSyst
                 reader.IsDBNull(5) ? "Award" : reader.GetString(5).Trim(),
                 reader.IsDBNull(6) ? null : reader.GetInt32(6),
                 reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                !reader.IsDBNull(8) && Convert.ToBoolean(reader.GetValue(8)),
-                !reader.IsDBNull(9) && Convert.ToBoolean(reader.GetValue(9))));
+                !reader.IsDBNull(8) && IsYes(reader.GetValue(8)),
+                !reader.IsDBNull(9) && IsYes(reader.GetValue(9))));
         return rows;
     }
 
@@ -130,7 +130,8 @@ public sealed class ThesisElementsAwardCodeMaintenance : IStudentInformationSyst
         foreach (var field in AwardFields)
             if (award.TryGetPropertyValue(field, out var value)) body[field] = value?.DeepClone();
         body["code1Id"] = expected.ReferenceCodeId;
-        body["showOnBillingStatement"] = expected.ReferenceShowOnBill;
+        // Elements represents this SQL Yes/No field as the strings "Yes" and "No".
+        body["showOnBillingStatement"] = ToElementsYesNo(expected.ReferenceShowOnBill);
         using var put = CreateRequest(HttpMethod.Put,
             $"api/financial-aid/maintenance/awards/financial-awards/{expected.AwardId}", token);
         put.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
@@ -147,8 +148,17 @@ public sealed class ThesisElementsAwardCodeMaintenance : IStudentInformationSyst
     {
         if (node is null) return false;
         var value = node.AsValue();
-        return value.TryGetValue<bool>(out var flag) ? flag : value.GetValue<int>() != 0;
+        if (value.TryGetValue<bool>(out var flag)) return flag;
+        if (value.TryGetValue<int>(out var number)) return number != 0;
+        return IsYes(value.GetValue<string>());
     }
+
+    internal static string ToElementsYesNo(bool value) => value ? "Yes" : "No";
+
+    internal static bool IsYes(object value) =>
+        string.Equals(Convert.ToString(value)?.Trim(), "Yes", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Convert.ToString(value)?.Trim(), "True", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Convert.ToString(value)?.Trim(), "1", StringComparison.OrdinalIgnoreCase);
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
