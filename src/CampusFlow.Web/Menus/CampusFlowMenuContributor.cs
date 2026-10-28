@@ -188,10 +188,11 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageAdvisorRouting = await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ManageRouting);
         var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
+        var canReconcileAwardCodes = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ReconcileAwardCodes);
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
         var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
-        if (!studentOnly && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
+        if (!studentOnly && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canReconcileAwardCodes || canManageHousing || canManageBibliu || canManageChapel))
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -231,6 +232,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                     icon: "fa fa-utensils", order: 1));
                 admin.AddItem(businessServices);
             }
+            if (canReconcileAwardCodes)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.FinancialAidAdmin,
+                    "Financial Aid", icon: "fa fa-graduation-cap", order: 6)
+                    .AddItem(new ApplicationMenuItem(CampusFlowMenus.ReconcileAwardCodes,
+                        "Reconcile Award Codes", "~/Admin/FinancialAid/ReconcileAwardCodes",
+                        icon: "fa fa-list-check", order: 1)));
             if (canManageRegistration)
             {
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",

@@ -1,0 +1,49 @@
+@page "/Admin/FinancialAid/ReconcileAwardCodes"
+@model CampusFlow.Web.Pages.Admin.FinancialAid.ReconcileAwardCodesModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Reconcile Award Codes";
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ReconcileAwardCodes;
+}
+@section styles {
+    <link rel="stylesheet" href="~/Pages/Admin/FinancialAid/ReconcileAwardCodes.css" asp-append-version="true" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
+}
+<main class="award-shell">
+    <header class="award-hero"><span>Financial Aid · Update Routines</span><h1>Reconcile award codes</h1><p>Review awards whose code or billing-statement setting differs from the award reference. Changes are applied through Elements.</p></header>
+    <section class="award-card">
+        <h2>Choose a term</h2>
+        <form method="get" class="award-filter"><label for="term">Academic term</label><select id="term" asp-for="Term" required><option value="">Choose a term</option>@foreach(var term in Model.Terms){<option value="@term">@term</option>}</select><button type="submit">Preview differences</button></form>
+    </section>
+    @if (!string.IsNullOrWhiteSpace(Model.Term))
+    {
+        <section class="award-card">
+            <h2>Preview for @Model.Term</h2>
+            @if (Model.Awards.Count == 0)
+            {
+                <p>No mismatched awards were found for this term.</p>
+            }
+            else
+            {
+                <p>@Model.VisibleAwards.Count award(s) in this batch. @if(Model.HasMore){<text>More awards remain; preview again after this batch.</text>}</p>
+                <div class="award-table-wrap"><table><thead><tr><th>Student</th><th>Award</th><th>Code</th><th>Reference code</th><th>Show on bill</th><th>Reference setting</th></tr></thead><tbody>
+                @foreach(var award in Model.VisibleAwards){<tr><td>@award.StudentName<br /><small>@award.StudentId</small></td><td>@award.Description<br /><small>ID @award.AwardId</small></td><td>@(award.CurrentCodeId?.ToString() ?? "Blank")</td><td>@(award.ReferenceCodeId?.ToString() ?? "Blank")</td><td>@(award.CurrentShowOnBill ? "Yes" : "No")</td><td>@(award.ReferenceShowOnBill ? "Yes" : "No")</td></tr>}
+                </tbody></table></div>
+                @if (!Model.CanApply)
+                {
+                    <p class="award-notice">Updates are disabled for this portal until its Elements API destination is verified.</p>
+                }
+                else
+                {
+                <form method="post" asp-page-handler="Apply" class="award-confirm">
+                    <input asp-for="Input.Term" type="hidden" value="@Model.Term" /><input asp-for="Input.PreviewAwardIds" type="hidden" value="@Model.PreviewIds" />
+                    <label><input asp-for="Input.Confirmed" /> I reviewed this batch and intend to copy the reference code and billing-statement setting to these awards.</label>
+                    <span asp-validation-for="Input.Confirmed"></span><button type="submit">Update @Model.VisibleAwards.Count award(s)</button>
+                </form>
+                }
+            }
+        </section>
+    }
+</main>
