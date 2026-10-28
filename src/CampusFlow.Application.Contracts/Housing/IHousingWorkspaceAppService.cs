@@ -11,6 +11,7 @@ public interface IHousingWorkspaceAppService : IApplicationService
     Task<HousingWorkspaceState> RefreshAsync(int periodId, string? revision);
     Task<HousingWorkspaceState> SaveAsync(HousingWorkspaceState input);
     Task<List<HousingWorkspaceChange>> PreviewAsync(int periodId);
+    Task<string> GetRateRevisionAsync(int periodId);
     Task<HousingWorkspaceState> ApplyAssignmentsAsync(ApplyHousingDraftInput input);
     Task<List<HousingStudentOption>> SearchStudentsAsync(string query, int periodId);
 }

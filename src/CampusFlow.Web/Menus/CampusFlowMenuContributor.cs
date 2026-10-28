@@ -244,7 +244,8 @@ public class CampusFlowMenuContributor : IMenuContributor
             }
             if (canManageHousing)
                 admin.AddItem(new ApplicationMenuItem("CampusFlow.HousingAdmin", "Housing", icon: "fa fa-building", order: 6)
-                    .AddItem(new ApplicationMenuItem("CampusFlow.HousingAssignments", "Assignments", "~/Admin/Housing/Assignments", icon: "fa fa-bed")));
+                    .AddItem(new ApplicationMenuItem("CampusFlow.HousingAssignments", "Assignments", "~/Admin/Housing/Assignments", icon: "fa fa-bed"))
+                    .AddItem(new ApplicationMenuItem("CampusFlow.HousingRates", "Fee Setup", "~/Admin/Housing/Fees", icon: "fa fa-dollar-sign")));
             if (canManageChapel)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin, "Chapel", icon: "fa fa-church", order: 6)
                     .AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin + ".Attendance", "Attendance", "~/Admin/Chapel/Attendance", icon: "fa fa-clipboard-check"))

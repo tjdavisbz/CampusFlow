@@ -1,0 +1,23 @@
+@page
+@model CampusFlow.Web.Pages.Admin.Housing.FeesModel
+@{ ViewData["Title"] = "Housing Fee Setup"; }
+@section styles { <link rel="stylesheet" href="~/Pages/Admin/Housing/Fees.css" asp-append-version="true" /> }
+@section scripts { <script src="~/Pages/Admin/Housing/Fees.js" asp-append-version="true"></script> }
+<div id="housing-fees" data-can-edit="@(Model.CanEdit ? "true" : "false")">
+    @Html.AntiForgeryToken()
+    <header><p class="fee-eyebrow">HOUSING</p><h1>Fee setup</h1>
+        <p>Set the charge for each dorm and approved room-rate choice for a housing term. These amounts live in CampusFlow; Elements room rent remains $0.</p></header>
+    <div class="alert alert-info">Amounts suggested from the existing Elements fee table are not active until you review and save them here. The intentional-single amount is an additional, separate charge. Existing Elements charges are not repriced when these settings change.</div>
+    <p><a href="~/Admin/Housing/Assignments">← Back to housing assignments</a></p>
+    <div id="fee-message" role="status" aria-live="polite"></div>
+    <div class="fee-toolbar">
+        <label>Housing period <select id="fee-period" class="form-select"><option value="">Choose a period</option></select></label>
+        @if (Model.CanEdit) { <button id="fee-save" class="btn btn-primary" type="button" disabled>Save fee amounts</button> }
+    </div>
+    <p id="fee-status"></p>
+    <div class="fee-table-wrap"><table class="table table-striped">
+        <thead><tr><!th scope="col">Dorm</!th><!th scope="col">Rate choice</!th><!th scope="col">Base housing charge</!th><!th scope="col">Additional intentional-single charge</!th></tr></thead>
+        <tbody id="fee-rows"></tbody>
+    </table></div>
+    <p class="fee-note">Only rate choices already mapped to an approved Elements transaction document are shown. Standard rates are available for every listed dorm; AIC and Savell triple options appear only where their existing transaction documents are mapped.</p>
+</div>

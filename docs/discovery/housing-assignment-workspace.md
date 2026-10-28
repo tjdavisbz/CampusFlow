@@ -21,7 +21,15 @@ confirmation. It refuses existing non-CampusFlow housing charges and does not al
 ledger entries. Multi-student operations are not transactional; on a partial failure, staff
 must review live Elements state and the dedicated batch before retrying.
 
-This is a one-term test implementation. Future terms require reviewed fee/property mappings,
+The follow-up adds Admin → Housing → Fee Setup on this branch: a tenant/period/term-scoped
+CampusFlow rate schedule with one base and one additional intentional-single amount per
+approved dorm/rate choice. The first load suggests amounts from Elements' existing fee table,
+but those suggestions are not active until explicitly reviewed and saved. Elements still
+supplies transaction-document and receivable metadata; its fee amounts no longer determine
+new CampusFlow housing charges. Changing a saved schedule does not reprice already-posted
+charges. Until the schedule is saved, Apply fails closed.
+
+This remains a one-term test implementation. Future terms require reviewed fee/property mappings,
 and production promotion still needs an operation journal, broader canary testing, and an
 approved production billing policy. The setup-area copy-forward and per-dorm single/triple
 eligibility controls from the housing email are not implemented yet.

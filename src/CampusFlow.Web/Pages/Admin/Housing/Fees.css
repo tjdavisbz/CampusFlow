@@ -1,0 +1,13 @@
+#housing-fees { max-width: 1180px; margin: 0 auto; padding: 1.5rem; }
+#housing-fees header { margin-bottom: 1.25rem; }
+#housing-fees h1 { font-size: 2rem; margin: .25rem 0 .5rem; }
+#housing-fees .fee-eyebrow { color: #67418b; font-weight: 700; letter-spacing: .12em; margin: 0; }
+#housing-fees .fee-toolbar { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; margin: 1.5rem 0 1rem; }
+#housing-fees .fee-toolbar label { min-width: 18rem; }
+#housing-fees .fee-table-wrap { overflow-x: auto; background: white; border: 1px solid #e4deed; border-radius: 12px; }
+#housing-fees table { margin: 0; }
+#housing-fees th, #housing-fees td { vertical-align: middle; padding: .75rem; }
+#housing-fees td input { min-width: 9rem; max-width: 12rem; }
+#housing-fees .fee-note { color: #5c5862; margin-top: 1rem; }
+#fee-message { margin: .75rem 0; }
+#fee-message[data-error="true"] { color: #b42318; font-weight: 600; }

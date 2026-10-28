@@ -10,6 +10,9 @@ public sealed record HousingChargeLine(string Description, int TransactionDocume
     int AccountsReceivableTypeId = 0);
 public sealed record HousingPricingContext(int TermCalendarId, IReadOnlyCollection<HousingTermFee> Fees,
     int SingleTransactionDocumentId, int SingleAccountsReceivableTypeId = 0);
+public sealed record HousingRateAmount(string Building, string RateChoice, decimal BaseAmount,
+    decimal SingleSurchargeAmount);
+public sealed record HousingRateDefinition(string Building, string RateChoice, string FeeName);
 
 // The legacy Fall 2026 fee labels identify the charge for each Elements property.
 // Future terms must have their own reviewed mapping; never reuse this one implicitly.
@@ -29,49 +32,64 @@ public static class HousingChargeCalculator
             ["Theodore Gannon Dormitory"] = "Gannon"
         };
 
-    public static IReadOnlyList<HousingChargeLine> Quote(int termCalendarId, string building,
-        string rateChoice, bool intentionalSingle, IReadOnlyCollection<HousingTermFee> feeSchedule,
-        int singleTransactionDocumentId, int singleAccountsReceivableTypeId = 0)
+    public static IReadOnlyList<HousingRateDefinition> GetRateDefinitions(int termCalendarId)
     {
         if (termCalendarId != 268)
             throw new ArgumentException("Housing charge rules have not been reviewed for this term.");
+        var definitions = Fall2026Fees.Select(x => new HousingRateDefinition(x.Key, "Standard", x.Value)).ToList();
+        definitions.Add(new("Alta M. Washburn Building", "AIC Triple Room", "AIC Triple Room"));
+        definitions.Add(new("Theodore Gannon Dormitory", "AIC Triple Room", "AIC Triple Room"));
+        definitions.Add(new("Savell Hall", "Savell Triple Occupancy", "Savell Triple Occupancy"));
+        return definitions;
+    }
+
+    public static IReadOnlyList<HousingRateAmount> SuggestRates(HousingPricingContext pricing)
+    {
+        return GetRateDefinitions(pricing.TermCalendarId).Select(definition =>
+        {
+            var matches = pricing.Fees.Where(x => string.Equals(x.Name.Trim(), definition.FeeName,
+                StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count != 1 || matches[0].TransactionDocumentId <= 0)
+                throw new ArgumentException($"A unique transaction document for {definition.FeeName} is required in Elements to set up housing rates.");
+            var basis = definition.Building is "Alta M. Washburn Building" or "Theodore Gannon Dormitory"
+                ? matches[0].Amount - 1800m : matches[0].Amount;
+            return new HousingRateAmount(definition.Building, definition.RateChoice, matches[0].Amount,
+                basis > 0 ? decimal.Round(basis * 0.85m, 2, MidpointRounding.AwayFromZero) : 0m);
+        }).ToList();
+    }
+
+    public static IReadOnlyList<HousingChargeLine> Quote(int termCalendarId, string building,
+        string rateChoice, bool intentionalSingle, IReadOnlyCollection<HousingTermFee> feeMetadata,
+        IReadOnlyCollection<HousingRateAmount> configuredRates,
+        int singleTransactionDocumentId, int singleAccountsReceivableTypeId = 0)
+    {
         if (singleTransactionDocumentId <= 0)
             throw new ArgumentException("The Single transaction document is not configured.");
-        if (!Fall2026Fees.TryGetValue(building.Trim(), out var feeName))
-            throw new ArgumentException($"No Fall 2026 housing fee is mapped for {building}.");
-        if (rateChoice is "AIC Triple Room")
-        {
-            if (building is not ("Alta M. Washburn Building" or "Theodore Gannon Dormitory"))
-                throw new ArgumentException("AIC Triple Room is valid only for AIC housing.");
-            feeName = "AIC Triple Room";
-        }
-        else if (rateChoice is "Savell Triple Occupancy")
-        {
-            if (!building.Equals("Savell Hall", StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Savell Triple Occupancy is valid only for Savell Hall.");
-            feeName = "Savell Triple Occupancy";
-        }
-        else if (rateChoice is not "Standard")
-            throw new ArgumentException("Choose a reviewed housing rate before applying charges.");
-
-        var matches = feeSchedule.Where(x =>
-            string.Equals(x.Name.Trim(), feeName, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (matches.Count != 1 || matches[0].TransactionDocumentId <= 0 || matches[0].Amount <= 0)
-            throw new ArgumentException($"A unique positive Fall 2026 fee named {feeName} is required in Elements.");
+        var definition = GetRateDefinitions(termCalendarId).SingleOrDefault(x =>
+            string.Equals(x.Building, building.Trim(), StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(x.RateChoice, rateChoice, StringComparison.Ordinal));
+        if (definition is null)
+            throw new ArgumentException($"The {rateChoice} rate is not approved for {building}.");
+        var rates = configuredRates.Where(x => x.Building == definition.Building &&
+            x.RateChoice == definition.RateChoice).ToList();
+        if (rates.Count != 1 || rates[0].BaseAmount <= 0 || rates[0].SingleSurchargeAmount < 0)
+            throw new ArgumentException($"Save a positive CampusFlow {rateChoice} rate for {building} before applying charges.");
+        var matches = feeMetadata.Where(x => string.Equals(x.Name.Trim(), definition.FeeName,
+            StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count != 1 || matches[0].TransactionDocumentId <= 0)
+            throw new ArgumentException($"A unique transaction document for {definition.FeeName} is required in Elements.");
         var baseFee = matches[0];
         var charges = new List<HousingChargeLine>
         {
-            new($"Housing — {building} ({feeName})", baseFee.TransactionDocumentId,
-                baseFee.Amount, baseFee.AccountsReceivableTypeId)
+            new($"Housing — {building} ({definition.FeeName})", baseFee.TransactionDocumentId,
+                rates[0].BaseAmount, baseFee.AccountsReceivableTypeId)
         };
         if (intentionalSingle)
         {
-            var surchargeBase = building is "Alta M. Washburn Building" or "Theodore Gannon Dormitory"
-                ? baseFee.Amount - 1800m : baseFee.Amount;
-            if (surchargeBase <= 0)
-                throw new ArgumentException("The intentional-single surcharge basis is not positive.");
-            var surcharge = decimal.Round(surchargeBase * 0.85m, 2, MidpointRounding.AwayFromZero);
-            charges.Add(new("Intentional single room", singleTransactionDocumentId, surcharge,
+            if (rates[0].SingleSurchargeAmount <= 0)
+                throw new ArgumentException($"Save a positive CampusFlow intentional-single surcharge for {building} before applying it.");
+            charges.Add(new("Intentional single room", singleTransactionDocumentId,
+                rates[0].SingleSurchargeAmount,
                 singleAccountsReceivableTypeId));
         }
         return charges;
