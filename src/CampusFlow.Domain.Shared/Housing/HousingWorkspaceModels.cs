@@ -65,5 +65,6 @@ public class ApplyHousingDraftInput
 {
     public int PeriodId { get; set; }
     public string Revision { get; set; } = "";
+    public string RateRevision { get; set; } = "";
     public bool Confirmed { get; set; }
 }

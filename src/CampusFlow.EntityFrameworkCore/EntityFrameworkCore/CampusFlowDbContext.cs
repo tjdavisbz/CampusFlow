@@ -52,6 +52,7 @@ public class CampusFlowDbContext :
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
+    public DbSet<HousingRateSchedule> HousingRateSchedules { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
     public DbSet<PortalAnnouncement> PortalAnnouncements { get; set; }
     public DbSet<ChapelAttendanceRecord> ChapelAttendanceRecords { get; set; }
@@ -419,6 +420,14 @@ public class CampusFlowDbContext :
             b.ConfigureByConvention();
             b.Property(x => x.BaselineJson).IsRequired();
             b.Property(x => x.RoomsJson).IsRequired();
+            b.HasIndex(x => new { x.TenantId, x.PeriodId }).IsUnique().HasFilter("\"IsDeleted\" = false");
+        });
+
+        builder.Entity<HousingRateSchedule>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "HousingRateSchedules", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.RatesJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.PeriodId }).IsUnique().HasFilter("\"IsDeleted\" = false");
         });
 

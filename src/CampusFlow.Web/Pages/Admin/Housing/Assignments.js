@@ -140,13 +140,17 @@
     });
     if (el('apply')) el('apply').onclick = () => run(async () => {
         if (dirty) await save();
+        const rateRevision = await request('RateRevision', undefined, {periodId:state.periodId});
         const changes = await request('Preview', undefined, {periodId:state.periodId});
+        if (rateRevision !== await request('RateRevision', undefined, {periodId:state.periodId}))
+            throw new Error('Housing fee amounts changed during the preview. Review again before applying.');
         const actionable = changes.filter(x => ['Assign','Move','Remove','Rate review'].includes(x.action));
         if (!actionable.length) { message('There are no assignment or rate changes to apply to Elements.'); return; }
         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
         if (!confirm(`Apply ${actionable.length} assignment/rate change(s) to NON-PRODUCTION Elements?\n\n${listed}${more}\n\nElements room rent stays at $0. CampusFlow will post the proposed charges in a separate billing batch. Continue?`)) return;
-        state = await request('Apply', {periodId:state.periodId, revision:state.revision, confirmed:true});
+        state = await request('Apply', {periodId:state.periodId, revision:state.revision,
+            rateRevision, confirmed:true});
         dirty = false; selected.clear(); render();
         message('Room assignments and CampusFlow housing charges were applied to non-production Elements and verified.');
     });

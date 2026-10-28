@@ -16,17 +16,19 @@ namespace CampusFlow.Housing;
 public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspaceAppService
 {
     private readonly IRepository<HousingAssignmentDraft, Guid> _drafts;
+    private readonly IRepository<HousingRateSchedule, Guid> _rateSchedules;
     private readonly IElementsHousingReader _elements;
     private readonly IElementsHousingAssignmentWriter _writer;
     private readonly IElementsHousingBillingWriter _billingWriter;
     private readonly IConfiguration _configuration;
     private readonly IStudentInformationSystemStudentLookup _students;
-    public HousingWorkspaceAppService(IRepository<HousingAssignmentDraft, Guid> drafts, IElementsHousingReader elements,
+    public HousingWorkspaceAppService(IRepository<HousingAssignmentDraft, Guid> drafts,
+        IRepository<HousingRateSchedule, Guid> rateSchedules, IElementsHousingReader elements,
         IElementsHousingAssignmentWriter writer, IElementsHousingBillingWriter billingWriter,
         IConfiguration configuration,
         IEnumerable<IStudentInformationSystemStudentLookup> students)
     {
-        _drafts = drafts; _elements = elements; _writer = writer; _billingWriter = billingWriter;
+        _drafts = drafts; _rateSchedules = rateSchedules; _elements = elements; _writer = writer; _billingWriter = billingWriter;
         _configuration = configuration;
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
     }
@@ -35,6 +37,21 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
     {
         var tenant = Tenant();
         return await _drafts.FindAsync(x => x.TenantId == tenant && x.PeriodId == periodId);
+    }
+    private async Task<(List<HousingRateAmount> Rates, string Revision)> SavedRatesAsync(int periodId, int termCalendarId)
+    {
+        var tenant = Tenant();
+        var schedule = await _rateSchedules.FindAsync(x => x.TenantId == tenant && x.PeriodId == periodId);
+        if (schedule is null || schedule.TermCalendarId != termCalendarId)
+            throw new UserFriendlyException("Save the housing fee amounts in Admin → Housing → Fee Setup before applying charges.");
+        var rates = JsonSerializer.Deserialize<List<HousingRateAmount>>(schedule.RatesJson)
+            ?? throw new UserFriendlyException("The saved housing fee amounts could not be read.");
+        return (rates, schedule.ConcurrencyStamp);
+    }
+    public async Task<string> GetRateRevisionAsync(int periodId)
+    {
+        var pricing = await _elements.GetPricingAsync(periodId);
+        return (await SavedRatesAsync(periodId, pricing.TermCalendarId)).Revision;
     }
     public async Task<List<HousingPeriodOption>> GetPeriodsAsync() { Tenant(); return await _elements.GetPeriodsAsync(); }
     public async Task<HousingWorkspaceState?> GetAsync(int periodId)
@@ -113,6 +130,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         if (!string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION",
                 StringComparison.OrdinalIgnoreCase)) return changes;
         var pricing = await _elements.GetPricingAsync(periodId);
+        var configuredRates = (await SavedRatesAsync(periodId, pricing.TermCalendarId)).Rates;
         var oldAssignments = before.SelectMany(room => room.Occupants.Select(o => (room, o)))
             .ToDictionary(x => x.o.StudentUid);
         var newAssignments = after.SelectMany(room => room.Occupants.Select(o => (room, o)))
@@ -125,7 +143,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
             try
             {
                 lines = HousingChargeCalculator.Quote(pricing.TermCalendarId, proposed.room.Building,
-                    proposed.o.Rate, proposed.o.IntentionalSingle, pricing.Fees,
+                    proposed.o.Rate, proposed.o.IntentionalSingle, pricing.Fees, configuredRates,
                     pricing.SingleTransactionDocumentId, pricing.SingleAccountsReceivableTypeId);
             }
             catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
@@ -171,6 +189,10 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         if (changedIds.Count == 0) return Map(draft);
 
         var pricing = await _elements.GetPricingAsync(input.PeriodId);
+        var savedRates = await SavedRatesAsync(input.PeriodId, pricing.TermCalendarId);
+        if (savedRates.Revision != input.RateRevision)
+            throw new UserFriendlyException("Housing fee amounts changed since the preview. Review charges again before applying.");
+        var configuredRates = savedRates.Rates;
         var documents = new[] { 137, 1471, 1765, pricing.SingleTransactionDocumentId };
         var proposedCharges = new Dictionary<int, IReadOnlyList<HousingChargeLine>>();
         foreach (var id in changedIds)
@@ -181,7 +203,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
                 {
                     proposedCharges[id] = HousingChargeCalculator.Quote(pricing.TermCalendarId,
                         proposed.room.Building, proposed.o.Rate, proposed.o.IntentionalSingle,
-                        pricing.Fees, pricing.SingleTransactionDocumentId,
+                        pricing.Fees, configuredRates, pricing.SingleTransactionDocumentId,
                         pricing.SingleAccountsReceivableTypeId);
                 }
                 catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
