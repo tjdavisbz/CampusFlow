@@ -1,0 +1,30 @@
+@page
+@model CampusFlow.Web.Pages.Admin.Chapel.ExcuseRequestsModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Chapel Excuse Requests";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ChapelAdmin + ".ExcuseRequests";
+}
+<main class="container-fluid py-4">
+    <h1>Chapel excuse requests</h1>
+    <p>Student submissions appear here for staff review. A submission does not approve an excuse or alter attendance. Use <a asp-page="/Admin/Chapel/Attendance">Attendance</a> for any staff decision.</p>
+    @if (Model.IsUnavailable) { <div class="alert alert-warning" role="status">Requests are temporarily unavailable.</div> }
+    else
+    {
+        <form method="get" class="row g-3 align-items-end mb-4">
+            <div class="col-md-3"><label class="form-label" for="termId">Term</label><select class="form-select" id="termId" name="termId">
+                @foreach (var term in Model.Terms) { <option value="@term.ExternalTermId" selected="@(term.ExternalTermId == Model.TermId?.ToString())">@term.DisplayName</option> }
+            </select></div>
+            <div class="col-md-4"><label class="form-label" for="student">Student ID or name</label><input class="form-control" id="student" name="student" value="@Model.Student" maxlength="100" /></div>
+            <div class="col-md-2"><button class="btn btn-primary" type="submit">Search</button></div>
+        </form>
+        <p>@Model.Rows.Count request(s)@(Model.Rows.Count == 300 ? " — showing latest 300; narrow your search" : "")</p>
+        <div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><!th scope="col">Student</!th><!th scope="col">Requested dates</!th><!th scope="col">Category</!th><!th scope="col">Reason</!th><!th scope="col">Submitted</!th><!th scope="col">Attendance</!th></tr></thead><tbody>
+            @foreach (var row in Model.Rows) { <tr><td><strong>@row.StudentName</strong><br /><small>@row.StudentId</small></td><td>@row.StartDate.ToString("MMM d, yyyy") – @row.EndDate.ToString("MMM d, yyyy")</td><td>@(row.ExcuseType == "MedicalIssue" ? "Medical issue" : row.ExcuseType)</td><td style="white-space: pre-wrap">@row.Reason</td><td>@row.CreationTime.ToString("MMM d, yyyy")</td><td><a asp-page="/Admin/Chapel/Attendance" asp-route-termId="@row.TermCalendarId" asp-route-student="@row.StudentId">Open record</a></td></tr> }
+        </tbody></table></div>
+    }
+</main>

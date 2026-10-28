@@ -56,6 +56,7 @@ public class CampusFlowDbContext :
     public DbSet<PortalAnnouncement> PortalAnnouncements { get; set; }
     public DbSet<ChapelAttendanceRecord> ChapelAttendanceRecords { get; set; }
     public DbSet<ChapelGroupMembership> ChapelGroupMemberships { get; set; }
+    public DbSet<ChapelExcuseRequest> ChapelExcuseRequests { get; set; }
 
     #region Entities from the modules
 
@@ -211,6 +212,18 @@ public class CampusFlowDbContext :
             b.Property(x => x.GroupName).IsRequired().HasMaxLength(100);
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.StudentUid, x.GroupName }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.GroupName });
+        });
+
+        builder.Entity<ChapelExcuseRequest>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "ChapelExcuseRequests", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.StudentId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.StudentName).IsRequired().HasMaxLength(256);
+            b.Property(x => x.ExcuseType).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Reason).IsRequired().HasMaxLength(2000);
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.StudentUid, x.CreationTime });
+            b.HasIndex(x => new { x.TenantId, x.TermCalendarId, x.CreationTime });
         });
 
         builder.Entity<PaymentPlanPolicy>(b =>

@@ -23,6 +23,7 @@
         <h1>Chapel Attendance</h1>
         <p>Review your attendance and any recorded excused absences by term.</p>
     </header>
+    <p><a asp-page="/ChapelExcuseRequests" asp-route-termId="@Model.TermId">Request a chapel excuse →</a></p>
 
     @if (Model.IsUnavailable)
     {

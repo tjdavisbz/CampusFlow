@@ -1,0 +1,55 @@
+@page
+@model CampusFlow.Web.Pages.ChapelExcuseRequestsModel
+@using CampusFlow.Web.Menus
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = "Chapel Excuse Requests";
+    PageLayout.Content.BreadCrumb.ShowCurrent = false;
+    PageLayout.Content.ShowToolbar = false;
+    PageLayout.Content.MenuItemName = CampusFlowMenus.ChapelAttendance;
+}
+@section styles {
+    @if (!string.IsNullOrWhiteSpace(Model.Theme.FontStylesheetUrl)) { <link rel="stylesheet" href="@Model.Theme.FontStylesheetUrl" /> }
+    <abp-style src="/Pages/ChapelAttendance.css" />
+    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
+}
+<main class="chapel-page">
+    <header class="chapel-hero"><span>Student life</span><h1>Chapel excuse requests</h1><p>Request a one- to three-day excuse and review requests you have submitted.</p></header>
+    <p><a asp-page="/ChapelAttendance" asp-route-termId="@Model.TermId">← Back to chapel attendance</a></p>
+    @if (!string.IsNullOrWhiteSpace(Model.Feedback)) { <div class="alert alert-success" role="status">@Model.Feedback</div> }
+    @if (!string.IsNullOrWhiteSpace(Model.Error)) { <div class="alert alert-danger" role="alert">@Model.Error</div> }
+    @if (Model.IsUnavailable) { <div class="alert alert-warning" role="status">Excuse requests are temporarily unavailable.</div> }
+    else
+    {
+        <section class="chapel-panel" aria-labelledby="chapel-request-heading">
+            <div class="chapel-toolbar"><div><span>Requests</span><h2 id="chapel-request-heading">Submit a chapel excuse request</h2></div>
+                <form method="get" class="chapel-term-form"><label for="termId">Academic term</label><select id="termId" name="termId" onchange="this.form.submit()">
+                    @foreach (var term in Model.Terms) { <option value="@term.ExternalTermId" selected="@(term.ExternalTermId == Model.TermId?.ToString())">@term.DisplayName</option> }
+                </select><noscript><button type="submit">View term</button></noscript></form>
+            </div>
+            <div class="chapel-request-content">
+                <p>Submitting a request does not change your attendance. Chapel staff will review it separately. For a recurring release, contact chapel@nelson.edu.</p>
+                @if (Model.IsImpersonating) { <div class="alert alert-info">Request submission is unavailable while viewing a student account in read-only mode.</div> }
+                else if (Model.TermId.HasValue)
+                {
+                    <form method="post" class="row g-3">
+                        <input type="hidden" name="termId" value="@Model.TermId" />
+                        <div class="col-md-4"><label class="form-label" for="excuseType">Reason category</label><select class="form-select" id="excuseType" asp-for="ExcuseType" required><option value="">Choose one</option><option value="Work">Work</option><option value="MedicalIssue">Medical issue</option><option value="Other">Other</option></select></div>
+                        <div class="col-md-4"><label class="form-label" for="startDate">Start date</label><input class="form-control" id="startDate" asp-for="StartDate" type="date" required /></div>
+                        <div class="col-md-4"><label class="form-label" for="endDate">End date</label><input class="form-control" id="endDate" asp-for="EndDate" type="date" required /></div>
+                        <div class="col-12"><label class="form-label" for="reason">Details for chapel staff</label><textarea class="form-control" id="reason" asp-for="Reason" rows="4" maxlength="2000" required></textarea></div>
+                        <div class="col-12"><button class="btn btn-primary" type="submit">Submit request</button></div>
+                    </form>
+                }
+            </div>
+        </section>
+        <section class="chapel-panel" aria-labelledby="chapel-previous-heading">
+            <div class="chapel-toolbar"><div><span>History</span><h2 id="chapel-previous-heading">Your submitted requests</h2></div></div>
+            @if (Model.PreviousRequests.Count == 0) { <div class="chapel-empty"><p>No excuse requests are on file for this term.</p></div> }
+            else { <div class="chapel-table-wrap"><table class="chapel-table"><thead><tr><!th scope="col">Dates</!th><!th scope="col">Category</!th><!th scope="col">Details</!th><!th scope="col">Submitted</!th></tr></thead><tbody>
+                @foreach (var request in Model.PreviousRequests) { <tr><td data-label="Dates">@request.StartDate.ToString("MMM d, yyyy") – @request.EndDate.ToString("MMM d, yyyy")</td><td data-label="Category">@(request.ExcuseType == "MedicalIssue" ? "Medical issue" : request.ExcuseType)</td><td data-label="Details">@(string.IsNullOrWhiteSpace(request.Reason) ? "—" : request.Reason)</td><td data-label="Submitted">@request.CreationTime.ToString("MMM d, yyyy")</td></tr> }
+            </tbody></table></div> }
+        </section>
+    }
+</main>

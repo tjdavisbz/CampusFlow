@@ -50,6 +50,8 @@
 .chapel-message i { color: var(--tenant-primary); font-size: 1.35rem; }
 .chapel-message h2 { margin: 0 0 .2rem; font-size: 1rem; }
 .chapel-message p { margin: 0; color: #667085; }
+.chapel-request-content { padding: 1.25rem 1.5rem 1.5rem; }
+.chapel-request-content > p { color: #475467; }
 
 @media (max-width: 720px) {
     .chapel-hero { padding: 1.5rem; }
