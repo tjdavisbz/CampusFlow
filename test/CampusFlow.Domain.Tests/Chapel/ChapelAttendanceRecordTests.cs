@@ -120,4 +120,40 @@ public class ChapelAttendanceRecordTests
         record.Comment.ShouldBe("Existing decision");
         record.Source.ShouldBe(ChapelAttendanceSource.LegacyImport);
     }
+
+    [Theory]
+    [InlineData(ChapelAttendanceSource.LegacyImport)]
+    [InlineData(ChapelAttendanceSource.CbordImport)]
+    public void Scan_out_waiver_credits_only_imported_scan_in_only_absences(ChapelAttendanceSource source)
+    {
+        var record = new ChapelAttendanceRecord(Guid.NewGuid(), Guid.NewGuid(), 268, 42,
+            "20000000042", "Test Student", new DateTime(2026, 10, 28, 10, 15, 0),
+            ChapelAttendanceStatus.Absent, "Scan In Only", 123);
+        if (source == ChapelAttendanceSource.CbordImport)
+        {
+            var scheduled = ChapelAttendanceRecord.CreateScheduled(Guid.NewGuid(), Guid.NewGuid(), 268, 42,
+                "20000000042", "Test Student", new DateTime(2026, 10, 28, 10, 15, 0));
+            scheduled.ApplyCbordDecision(ChapelAttendanceStatus.Absent, "Scan In Only");
+            record = scheduled;
+        }
+
+        record.CreditScanInOnlyWithoutScanOut(new DateTime(2026, 10, 28, 19, 0, 0, DateTimeKind.Utc));
+
+        record.Status.ShouldBe(ChapelAttendanceStatus.Present);
+        record.Source.ShouldBe(ChapelAttendanceSource.Staff);
+        record.Comment.ShouldBe("Scan-out waived for this chapel");
+        record.ExtraProperties["PreScanOutWaiverSource"].ShouldBe(source.ToString());
+        record.ExtraProperties["PreScanOutWaiverComment"].ShouldBe("Scan In Only");
+    }
+
+    [Theory]
+    [InlineData(ChapelAttendanceStatus.Absent, ChapelAttendanceSource.CbordImport, "Late")]
+    [InlineData(ChapelAttendanceStatus.Present, ChapelAttendanceSource.CbordImport, "Scan In Only")]
+    [InlineData(ChapelAttendanceStatus.Absent, ChapelAttendanceSource.Staff, "Scan In Only")]
+    [InlineData(ChapelAttendanceStatus.Excused, ChapelAttendanceSource.LegacyImport, "Scan In Only")]
+    public void Scan_out_waiver_rejects_other_decisions(ChapelAttendanceStatus status,
+        ChapelAttendanceSource source, string comment)
+    {
+        ChapelScanOutWaiverPolicy.IsEligible(status, source, comment).ShouldBeFalse();
+    }
 }

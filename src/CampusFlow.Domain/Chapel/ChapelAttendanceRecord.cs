@@ -8,6 +8,14 @@ public enum ChapelAttendanceStatus { Pending, Present, Absent, Excused }
 public enum ChapelAttendanceSource { LegacyImport, CbordImport, Staff, Scheduled }
 public enum ChapelImportDecisionResult { Applied, AlreadyApplied, RequiresReview }
 
+public static class ChapelScanOutWaiverPolicy
+{
+    public static bool IsEligible(ChapelAttendanceStatus status, ChapelAttendanceSource source, string? comment) =>
+        status == ChapelAttendanceStatus.Absent &&
+        (source is ChapelAttendanceSource.CbordImport or ChapelAttendanceSource.LegacyImport) &&
+        string.Equals(comment?.Trim(), "Scan In Only", StringComparison.OrdinalIgnoreCase);
+}
+
 public class ChapelAttendanceRecord : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
     public Guid? TenantId { get; private set; }
@@ -100,6 +108,21 @@ public class ChapelAttendanceRecord : FullAuditedAggregateRoot<Guid>, IMultiTena
         Status = status;
         Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
         Source = ChapelAttendanceSource.Staff;
+    }
+
+    /// <summary>Credits a verified scan-in when staff waive scan-out for the whole chapel session.</summary>
+    public void CreditScanInOnlyWithoutScanOut(DateTime reviewedAtUtc)
+    {
+        if (!ChapelScanOutWaiverPolicy.IsEligible(Status, Source, Comment))
+            throw new InvalidOperationException("Only imported scan-in-only absences can receive this credit.");
+        if (reviewedAtUtc.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("Review time must be UTC.", nameof(reviewedAtUtc));
+
+        ExtraProperties["PreScanOutWaiverStatus"] = Status.ToString();
+        ExtraProperties["PreScanOutWaiverSource"] = Source.ToString();
+        ExtraProperties["PreScanOutWaiverComment"] = Comment;
+        ExtraProperties["ScanOutWaiverAtUtc"] = reviewedAtUtc.ToString("O");
+        SetByStaff(ChapelAttendanceStatus.Present, "Scan-out waived for this chapel");
     }
 
     /// <summary>Present sessions retain their earned credit; an already excused session is unchanged.</summary>
