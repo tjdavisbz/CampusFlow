@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using CampusFlow.Web.StudentInformationSystems;
 
 namespace CampusFlow.Web;
 
@@ -21,6 +22,7 @@ public class Program
         {
             Log.Information("Starting web host.");
             var builder = WebApplication.CreateBuilder(args);
+            NonProductionElementsGuard.Validate(builder.Environment.EnvironmentName, builder.Configuration);
             builder.Host
                 .AddAppSettingsSecretsJson()
                 .UseAutofac()
