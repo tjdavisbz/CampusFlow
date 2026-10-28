@@ -2,6 +2,30 @@
 
 Feature branch: `codex/housing-assignment-workspace`.
 
+## Non-production update — 2026-10-28
+
+The initial discovery below is historical. The current work is on `codex/housing-nonprod`.
+Nelson's non-production Elements tenant now has the Fall 2026 period initialized with nine
+properties and 536 rooms, all with $0 Elements room rent. CampusFlow calculates the term's
+base housing charge from the assigned building and reviewed fee choice, and creates a separate
+intentional-single charge using the current 85% rule (with the AIC $1,800 adjustment). The
+charges go into a dedicated CampusFlow-owned, non-production Elements billing batch. Neither
+room rent nor any production Elements data is changed by this workflow.
+
+A synthetic non-production student was assigned to a Bridges room, given separate $2,500 base
+and $2,125 intentional-single charges, and then had both charges and the assignment removed;
+the live Elements API confirmed each result. The writer is fail-closed to the exact Nelson
+non-production API, tenant, gateway, and replica, and the portal has an additional startup
+environment check. The Apply action requires an explicit feature flag, change review, and
+confirmation. It refuses existing non-CampusFlow housing charges and does not alter posted
+ledger entries. Multi-student operations are not transactional; on a partial failure, staff
+must review live Elements state and the dedicated batch before retrying.
+
+This is a one-term test implementation. Future terms require reviewed fee/property mappings,
+and production promotion still needs an operation journal, broader canary testing, and an
+approved production billing policy. The setup-area copy-forward and per-dorm single/triple
+eligibility controls from the housing email are not implemented yet.
+
 ## Scope and implementation status
 
 First increment: Admin → Housing → Assignments; tenant-scoped saved draft per housing period;

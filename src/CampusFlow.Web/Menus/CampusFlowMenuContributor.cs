@@ -95,6 +95,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                     "nelson", StringComparison.OrdinalIgnoreCase))
             {
                 student.AddItem(new ApplicationMenuItem(
+                    CampusFlowMenus.Housing,
+                    "My Housing",
+                    "~/Housing",
+                    icon: "fa fa-bed",
+                    order: 5));
+                student.AddItem(new ApplicationMenuItem(
                     CampusFlowMenus.Documents,
                     "My Documents",
                     "~/Documents",
