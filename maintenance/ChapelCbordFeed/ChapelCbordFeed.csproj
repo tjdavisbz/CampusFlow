@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/CampusFlow.Application/Chapel/ChapelScanCsvReader.cs" Link="ChapelScanCsvReader.cs" />
+    <Compile Include="../../src/CampusFlow.Application/Chapel/ChapelScanMatcher.cs" Link="ChapelScanMatcher.cs" />
+    <Content Include="fall-2026-schedule.tsv" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Npgsql" Version="10.0.0" />
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>

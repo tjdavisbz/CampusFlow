@@ -71,7 +71,7 @@ jobs:
           --no-restore
           --output "${{ env.PUBLISH_DIRECTORY }}"
 
-      - name: Publish scheduled Chapel SFTP archive job
+      - name: Publish scheduled Chapel SFTP attendance job
         run: |
           dotnet publish maintenance/ChapelCbordFeed/ChapelCbordFeed.csproj \
             --configuration Release --no-restore \

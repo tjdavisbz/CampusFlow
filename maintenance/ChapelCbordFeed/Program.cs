@@ -23,8 +23,90 @@ if (args.Length == 2 && args[0] == "--preview-file")
 }
 var force = args.Length == 1 && args[0] == "--manual";
 var probe = args.Length == 1 && args[0] == "--probe";
-if (args.Length > 0 && !force && !probe)
-    throw new ArgumentException("Only --manual, --probe, or --preview-file is supported.");
+var status = args.Length == 1 && args[0] == "--status";
+var previewArchived = args.Length == 1 && args[0] == "--preview-archived";
+if (args.Length > 0 && !force && !probe && !status && !previewArchived)
+    throw new ArgumentException("Only --manual, --probe, --status, --preview-archived, or --preview-file is supported.");
+
+if (status)
+{
+    var connectionString = Environment.GetEnvironmentVariable("POSTGRESQLCONNSTR_Default") ??
+                           Environment.GetEnvironmentVariable("ConnectionStrings__Default");
+    if (string.IsNullOrWhiteSpace(connectionString))
+        throw new InvalidOperationException("The default PostgreSQL connection is not configured.");
+    var expectedStatusDatabase = Environment.GetEnvironmentVariable("ChapelFeed__ExpectedDatabase");
+    var expectedStatusHost = Environment.GetEnvironmentVariable("ChapelFeed__ExpectedHost");
+    if (string.IsNullOrWhiteSpace(expectedStatusDatabase) || string.IsNullOrWhiteSpace(expectedStatusHost) ||
+        !string.Equals(new NpgsqlConnectionStringBuilder(connectionString).Host, expectedStatusHost,
+            StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("The expected PostgreSQL host/database must be configured explicitly.");
+
+    await using var statusDb = new NpgsqlConnection(connectionString);
+    await statusDb.OpenAsync();
+    await using (var target = new NpgsqlCommand("SELECT current_database()", statusDb))
+    {
+        if ((string?)await target.ExecuteScalarAsync() != expectedStatusDatabase)
+            throw new InvalidOperationException("The destination database is not the configured Chapel feed database.");
+    }
+    await using var summary = new NpgsqlCommand("""
+        SELECT (SELECT COUNT(*) FROM "AppChapelFeedFiles") AS file_count,
+               (SELECT MAX("ReceivedAtUtc") FROM "AppChapelFeedFiles") AS last_received,
+               (SELECT COUNT(*) FROM "AppChapelAttendanceRecords" WHERE "TermCalendarId" = 268) AS attendance_count,
+               (SELECT COUNT(*) FROM "AppChapelAttendanceRecords" WHERE "TermCalendarId" = 268 AND "Source" = 0) AS legacy_count,
+               (SELECT COUNT(*) FROM "AppChapelAttendanceRecords" WHERE "TermCalendarId" = 268 AND "Source" = 1) AS cbord_count,
+               (SELECT COUNT(*) FROM "AppChapelAttendanceRecords" WHERE "TermCalendarId" = 268 AND "Source" = 2) AS staff_count,
+               (SELECT COUNT(*) FROM "AppChapelAttendanceRecords" WHERE "TermCalendarId" = 268 AND "Source" = 3) AS scheduled_count
+        """, statusDb);
+    await using var rows = await summary.ExecuteReaderAsync();
+    await rows.ReadAsync();
+    Console.WriteLine($"CHAPEL STATUS: archived files={rows.GetInt64(0)}, last received={(rows.IsDBNull(1) ? "none" : rows.GetDateTime(1).ToString("O"))}, Fall 2026 attendance={rows.GetInt64(2)} (legacy={rows.GetInt64(3)}, CBORD={rows.GetInt64(4)}, staff={rows.GetInt64(5)}, scheduled={rows.GetInt64(6)}). No attendance changed.");
+    await rows.CloseAsync();
+    await using var files = new NpgsqlCommand("SELECT \"Sha256\", \"Content\" FROM \"AppChapelFeedFiles\" ORDER BY \"ReceivedAtUtc\"", statusDb);
+    await using var fileRows = await files.ExecuteReaderAsync();
+    while (await fileRows.ReadAsync())
+    {
+        using var reader = new StreamReader(new MemoryStream(fileRows.GetFieldValue<byte[]>(1)),
+            new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true);
+        var scans = ChapelScanCsvReader.ReadRows(reader).ToArray();
+        Console.WriteLine($"ARCHIVE {fileRows.GetString(0)[..12]}: scans={scans.Length}, dates={scans.Min(x => x.ScannedAtLocal):yyyy-MM-dd} to {scans.Max(x => x.ScannedAtLocal):yyyy-MM-dd}, distinct days={scans.Select(x => x.ScannedAtLocal.Date).Distinct().Count()}");
+    }
+    return;
+}
+
+if (previewArchived)
+{
+    var connectionString = Environment.GetEnvironmentVariable("POSTGRESQLCONNSTR_Default") ??
+                           Environment.GetEnvironmentVariable("ConnectionStrings__Default");
+    var expectedPreviewDatabase = Environment.GetEnvironmentVariable("ChapelFeed__ExpectedDatabase");
+    var expectedPreviewHost = Environment.GetEnvironmentVariable("ChapelFeed__ExpectedHost");
+    if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(expectedPreviewDatabase) ||
+        string.IsNullOrWhiteSpace(expectedPreviewHost) ||
+        !string.Equals(new NpgsqlConnectionStringBuilder(connectionString).Host, expectedPreviewHost,
+            StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("The expected PostgreSQL host/database must be configured explicitly.");
+    await using var previewDb = new NpgsqlConnection(connectionString);
+    await previewDb.OpenAsync();
+    await using (var target = new NpgsqlCommand("SELECT current_database()", previewDb))
+    {
+        if ((string?)await target.ExecuteScalarAsync() != expectedPreviewDatabase)
+            throw new InvalidOperationException("The destination database is not the configured Chapel feed database.");
+    }
+    Guid previewTenant;
+    await using (var tenant = new NpgsqlCommand("SELECT \"Id\" FROM \"AbpTenants\" WHERE \"NormalizedName\" = 'NELSON' AND NOT \"IsDeleted\"", previewDb))
+        previewTenant = await tenant.ExecuteScalarAsync() is Guid id ? id :
+            throw new InvalidOperationException("The Nelson tenant is not present.");
+    await using var archive = new NpgsqlCommand("SELECT \"Sha256\", \"Content\" FROM \"AppChapelFeedFiles\" WHERE \"TenantId\" = @tenant ORDER BY \"ReceivedAtUtc\" DESC LIMIT 1", previewDb);
+    archive.Parameters.AddWithValue("tenant", previewTenant);
+    await using var archived = await archive.ExecuteReaderAsync();
+    if (!await archived.ReadAsync()) throw new InvalidOperationException("There is no archived CBORD file to preview.");
+    var previewHash = archived.GetString(0);
+    var previewContent = archived.GetFieldValue<byte[]>(1);
+    await archived.CloseAsync();
+    await ChapelAttendanceProcessor.RunAsync(previewDb, previewTenant, previewHash, previewContent,
+        nowCentral.DateTime, new DateOnly(2026, 10, 28), apply: false);
+    Console.WriteLine("PREVIEW ONLY: attendance was not changed.");
+    return;
+}
 
 // Two UTC trigger times cover both sides of the daylight-saving transition. Only
 // the trigger that is 1:30 p.m. Chicago time is allowed to fetch a file.
@@ -140,13 +222,32 @@ try
     var inserted = await insert.ExecuteNonQueryAsync();
     await transaction.CommitAsync();
     Console.WriteLine(inserted == 1
-        ? $"ARCHIVED CBORD file: SHA-256 {sha256}, {scanCount} scans. Remote file was retained. Attendance was not changed."
-        : $"ALREADY ARCHIVED: SHA-256 {sha256}. Remote file was retained. Attendance was not changed.");
+        ? $"ARCHIVED CBORD file: SHA-256 {sha256}, {scanCount} scans. Remote file was retained."
+        : $"ALREADY ARCHIVED: SHA-256 {sha256}. Remote file was retained.");
 }
 catch
 {
     await transaction.RollbackAsync();
     throw;
+}
+
+if (Environment.GetEnvironmentVariable("ChapelFeed__ApplyAttendance") == "true")
+{
+    if (expectedHost != "psql-campusflow-prod-001.postgres.database.azure.com" ||
+        expectedDatabase != "postgres" ||
+        !string.Equals(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"),
+            "app-campusflow-prod-001", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("Automatic Chapel attendance writes are permitted only on the production App Service and database.");
+    if (!DateOnly.TryParseExact(Environment.GetEnvironmentVariable("ChapelFeed__ApplyFromLocal"),
+            "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var firstDate) ||
+        firstDate < new DateOnly(2026, 10, 29))
+        throw new InvalidOperationException("ChapelFeed__ApplyFromLocal must be 2026-10-29 or later.");
+    Guid tenantId;
+    await using (var tenant = new NpgsqlCommand("SELECT \"Id\" FROM \"AbpTenants\" WHERE \"NormalizedName\" = 'NELSON' AND NOT \"IsDeleted\"", db))
+        tenantId = await tenant.ExecuteScalarAsync() is Guid id ? id :
+            throw new InvalidOperationException("The Nelson tenant is not present.");
+    await ChapelAttendanceProcessor.RunAsync(db, tenantId, sha256, content, nowCentral.DateTime,
+        firstDate, apply: true);
 }
 
 static (string Sha256, int ScanCount) ValidateFile(byte[] content, DateTime nowCentral)
