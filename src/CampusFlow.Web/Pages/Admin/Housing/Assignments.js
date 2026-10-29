@@ -6,11 +6,24 @@
     const selected = new Set();
     const rates = ['Unreviewed','Standard','AIC Triple Room','Savell Triple Occupancy'];
     function message(text, error = false) { el('message').textContent = text; el('message').dataset.error = error; }
+    function overCapacityRooms() { return state ? state.rooms.filter(room => room.occupants.length > room.capacity) : []; }
+    function capacityWarning() {
+        const rooms = overCapacityRooms(), warning = el('capacity-warning'), list = el('capacity-list');
+        warning.hidden = !rooms.length;
+        list.replaceChildren();
+        if (!rooms.length) return;
+        el('capacity-title').textContent = `${rooms.length} room${rooms.length === 1 ? '' : 's'} over capacity — Apply to Elements is blocked`;
+        rooms.forEach(room => {
+            const item = document.createElement('li');
+            item.textContent = `${room.building} / ${room.name}: ${room.occupants.length} assigned, capacity ${room.capacity}`;
+            list.append(item);
+        });
+    }
     function controls() {
         el('period').disabled = busy;
         el('refresh').disabled = busy || !el('period').value;
         ['save','preview'].forEach(x => el(x).disabled = busy || !state);
-        if (el('apply')) el('apply').disabled = busy || !state;
+        if (el('apply')) el('apply').disabled = busy || !state || overCapacityRooms().length > 0;
         el('clear').disabled = busy || !state || !selected.size;
         el('rows').querySelectorAll('input,select,button').forEach(x => x.disabled = busy);
         updateSelectionUi();
@@ -28,6 +41,7 @@
     async function run(action) { if (busy) return; busy = true; controls(); try { await action(); } catch (e) { message(e.message, true); } finally { busy = false; controls(); } }
     function changed() { dirty = true; el('changes').hidden = true; summary(); }
     function summary() {
+        capacityWarning();
         if (!state) { el('summary').textContent = 'No saved draft. Refresh to load rooms and assignments from Elements.'; return; }
         const assigned = state.rooms.reduce((n,r) => n + r.occupants.length, 0);
         const beds = state.rooms.reduce((n,r) => n + r.capacity, 0);
@@ -83,9 +97,15 @@
                 const occupant = room.occupants[slot];
                 if (!matchesFilter(room, occupant, filter)) continue;
                 const row = document.createElement('tr'); rows.append(row);
+                if (room.occupants.length > room.capacity) row.classList.add('housing-over-capacity');
                 const select = cell(row);
                 if (occupant) select.append(input('checkbox', 'Select ' + occupant.name, selected.has(occupant.studentUid), checked => { checked ? selected.add(occupant.studentUid) : selected.delete(occupant.studentUid); updateSelectionUi(); }));
-                cell(row, `${room.building} / ${room.name}`);
+                const roomCell = cell(row, `${room.building} / ${room.name}`);
+                if (slot === 0 && room.occupants.length > room.capacity) {
+                    const label = document.createElement('span'); label.className = 'housing-capacity-label';
+                    label.textContent = `${room.occupants.length} assigned / ${room.capacity} allowed`;
+                    roomCell.append(label);
+                }
                 const capacity = cell(row);
                 if (slot === 0) {
                     const count = input('number', `Capacity for ${room.building} ${room.name}`, room.capacity, value => {

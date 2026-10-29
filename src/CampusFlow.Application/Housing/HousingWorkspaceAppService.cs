@@ -73,7 +73,9 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         if (draft is not null) CheckRevision(draft, revision);
         else if (!string.IsNullOrEmpty(revision)) throw new UserFriendlyException("This draft no longer exists. Reload the page.");
         var rooms = await _elements.GetRoomsAsync(periodId);
-        Validate(rooms, rooms);
+        // Elements may already contain over-capacity rooms. Import the real snapshot so
+        // staff can see and resolve them; only Apply enforces capacity compliance.
+        Validate(rooms, rooms, requireCapacityCompliance: false);
         if (draft is not null)
         {
             // Rate choices and intentional-single flags are CampusFlow billing metadata,
@@ -105,7 +107,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         if (draft.Id != input.Id) throw new UserFriendlyException("Reload the current draft.");
         CheckRevision(draft, input.Revision);
         var baseline = Read(draft.BaselineJson);
-        Validate(baseline, input.Rooms);
+        Validate(baseline, input.Rooms, requireCapacityCompliance: false);
         var known = Read(draft.RoomsJson).SelectMany(x => x.Occupants).ToDictionary(x => x.StudentUid, x => x.Name);
         foreach (var room in input.Rooms)
         {
@@ -131,7 +133,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         var draft = await Find(periodId) ?? throw new UserFriendlyException("Refresh from Elements first.");
         var before = Read(draft.BaselineJson);
         var after = Read(draft.RoomsJson);
-        var changes = Validate(before, after);
+        var changes = Validate(before, after, requireCapacityCompliance: false);
         if (!_configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
             !_configuration.GetValue<bool>("Housing:EnableProductionWrites")) return changes;
         var pricing = await _elements.GetPricingAsync(periodId);
@@ -366,9 +368,10 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
     {
         if (draft.ConcurrencyStamp != revision) throw new UserFriendlyException("Another user changed this draft. Reload before continuing.");
     }
-    private static List<HousingWorkspaceChange> Validate(List<HousingWorkspaceRoom> before, List<HousingWorkspaceRoom> after)
+    private static List<HousingWorkspaceChange> Validate(List<HousingWorkspaceRoom> before, List<HousingWorkspaceRoom> after,
+        bool requireCapacityCompliance = true)
     {
-        try { return HousingWorkspacePlanner.Compare(before, after); }
+        try { return HousingWorkspacePlanner.Compare(before, after, requireCapacityCompliance); }
         catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
     }
     private static List<HousingWorkspaceRoom> Read(string json) => JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(json)!;

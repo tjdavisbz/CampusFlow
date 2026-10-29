@@ -18,6 +18,11 @@
 .housing-grid td:nth-child(4) { min-width:200px; }
 #housing-message { padding:.5rem 0; }
 #housing-message[data-error=true] { color:#a00; }
+.housing-capacity-warning { padding:1rem; border:1px solid #e5a64c; border-radius:.75rem; background:#fff4df; color:#573a12; margin:1rem 0; }
+.housing-capacity-warning p { margin:.4rem 0; }
+.housing-capacity-warning ul { margin:0; padding-left:1.5rem; }
+.housing-over-capacity { background:#fff3e5; }
+.housing-over-capacity .housing-capacity-label { display:block; color:#9a3500; font-weight:600; font-size:.85rem; }
 #housing-students { width:min(650px,95vw); border:1px solid #ddd; border-radius:1rem; padding:1.5rem; }
 #housing-students::backdrop { background:#0006; }
 #housing-search-results button { display:block; width:100%; text-align:left; margin:.5rem 0; }

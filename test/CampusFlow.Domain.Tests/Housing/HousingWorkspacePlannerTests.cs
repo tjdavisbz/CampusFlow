@@ -31,6 +31,18 @@ public class HousingWorkspacePlannerTests
     public void Over_capacity_is_rejected()
         => Should.Throw<ArgumentException>(() => HousingWorkspacePlanner.Compare([Room(1)], [Room(1, 1, 2, 3)]));
     [Fact]
+    public void Existing_over_capacity_snapshot_can_be_reviewed_before_apply()
+    {
+        var imported = Room(1, 1, 2, 3);
+        HousingWorkspacePlanner.Compare([imported], [Room(1, 1, 2, 3)], requireCapacityCompliance: false)
+            .ShouldBeEmpty();
+        HousingWorkspacePlanner.Compare([imported], [Room(1, 1, 2)], requireCapacityCompliance: true)
+            .Count.ShouldBe(1);
+        var exception = Should.Throw<ArgumentException>(() => HousingWorkspacePlanner.Compare(
+            [imported], [Room(1, 1, 2, 3)], requireCapacityCompliance: true));
+        exception.Message.ShouldContain("Hall / Room 1 has 3 students but capacity is 2");
+    }
+    [Fact]
     public void Vacancy_does_not_create_a_single_room_surcharge()
     {
         var result = HousingWorkspacePlanner.Compare([Room(1, 1, 2)], [Room(1, 1)]);
