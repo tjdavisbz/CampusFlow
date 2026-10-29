@@ -13,8 +13,14 @@ namespace CampusFlow.Web.Pages.Admin.Housing;
 public class FeesModel(IHousingWorkspaceAppService workspace, IHousingRateSetupAppService setup,
     IConfiguration configuration) : CampusFlowPageModel
 {
-    public bool CanEdit => configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
-        string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase);
+    public string EnvironmentName =>
+        string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase)
+            ? "NON-PRODUCTION" : "PRODUCTION";
+    public bool CanEdit =>
+        (configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
+         string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase)) ||
+        (configuration.GetValue<bool>("Housing:EnableProductionWrites") &&
+         string.IsNullOrWhiteSpace(configuration["App:EnvironmentLabel"]));
 
     public void OnGet() { }
     public async Task<JsonResult> OnGetPeriodsAsync() => new(await workspace.GetPeriodsAsync());

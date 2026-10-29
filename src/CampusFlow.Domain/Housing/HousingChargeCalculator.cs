@@ -14,11 +14,11 @@ public sealed record HousingRateAmount(string Building, string RateChoice, decim
     decimal SingleSurchargeAmount);
 public sealed record HousingRateDefinition(string Building, string RateChoice, string FeeName);
 
-// The legacy Fall 2026 fee labels identify the charge for each Elements property.
-// Future terms must have their own reviewed mapping; never reuse this one implicitly.
+// These fee labels and transaction documents were verified for Fall 2026 and Spring 2027.
+// Future terms require their own reviewed mapping; never reuse this one implicitly.
 public static class HousingChargeCalculator
 {
-    private static readonly IReadOnlyDictionary<string, string> Fall2026Fees =
+    private static readonly IReadOnlyDictionary<string, string> ApprovedFees =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Alta M. Washburn Building"] = "Washburn",
@@ -34,9 +34,9 @@ public static class HousingChargeCalculator
 
     public static IReadOnlyList<HousingRateDefinition> GetRateDefinitions(int termCalendarId)
     {
-        if (termCalendarId != 268)
+        if (termCalendarId is not (268 or 269))
             throw new ArgumentException("Housing charge rules have not been reviewed for this term.");
-        var definitions = Fall2026Fees.Select(x => new HousingRateDefinition(x.Key, "Standard", x.Value)).ToList();
+        var definitions = ApprovedFees.Select(x => new HousingRateDefinition(x.Key, "Standard", x.Value)).ToList();
         definitions.Add(new("Alta M. Washburn Building", "AIC Triple Room", "AIC Triple Room"));
         definitions.Add(new("Theodore Gannon Dormitory", "AIC Triple Room", "AIC Triple Room"));
         definitions.Add(new("Savell Hall", "Savell Triple Occupancy", "Savell Triple Occupancy"));

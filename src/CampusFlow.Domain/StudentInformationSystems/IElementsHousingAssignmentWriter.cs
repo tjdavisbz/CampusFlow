@@ -5,7 +5,7 @@ namespace CampusFlow.StudentInformationSystems;
 
 public interface IElementsHousingAssignmentWriter
 {
-    void EnsureNonProductionWriteEnabled();
+    void EnsureWriteEnabled();
     Task<(string Building, string Room)?> GetAssignedRoomAsync(int studentUid, int periodId,
         CancellationToken cancellationToken = default);
     Task DeallocateAsync(int studentUid, int periodId, int periodRoomId,

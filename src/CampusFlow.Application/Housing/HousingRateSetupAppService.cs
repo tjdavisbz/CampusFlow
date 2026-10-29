@@ -66,9 +66,11 @@ public class HousingRateSetupAppService : CampusFlowAppService, IHousingRateSetu
 
     public async Task<HousingRateScheduleDto> SaveAsync(HousingRateScheduleDto input)
     {
-        if (!_configuration.GetValue<bool>("Housing:EnableNonProductionWrites") ||
-            !string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase))
-            throw new UserFriendlyException("Housing rate editing is enabled only in the non-production portal.");
+        if (!((_configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
+               string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase)) ||
+              (_configuration.GetValue<bool>("Housing:EnableProductionWrites") &&
+               string.IsNullOrWhiteSpace(_configuration["App:EnvironmentLabel"]))))
+            throw new UserFriendlyException("Housing rate editing is not enabled for this portal.");
         if (input.Rates is null) throw new UserFriendlyException("Enter housing rates before saving.");
         var current = await GetAsync(input.PeriodId);
         if (input.TermCalendarId != current.TermCalendarId || input.Revision != current.Revision)

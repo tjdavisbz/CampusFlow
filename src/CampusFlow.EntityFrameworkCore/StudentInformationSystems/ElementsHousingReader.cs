@@ -96,6 +96,11 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
     public async Task<HousingPricingContext> GetPricingAsync(int periodId,
         CancellationToken cancellationToken = default)
     {
+        var nonProduction = string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION",
+            StringComparison.OrdinalIgnoreCase);
+        var termId = periodId switch { 1 => 268, 2 when !nonProduction => 269, _ => 0 };
+        if (termId == 0)
+            throw new InvalidOperationException("This housing period has not been approved for CampusFlow billing.");
         await using var connection = Connection();
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand("""
@@ -103,17 +108,9 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
             FROM StudentLife.HousingPeriods
             WHERE HousingPeriodID = @PeriodId AND IsDeleted = 0;
 
-            SELECT COUNT(*) AS Properties,
-                   SUM(CASE WHEN rent.HousingPeriodRentID IS NOT NULL
-                                 AND rent.Rent = 'Room Setup' AND rent.TransDocID = 137
-                                 AND rent.TransactionCategoryID = 7
-                                 AND rent.PaymentFrequencyID = 1 THEN 1 ELSE 0 END) AS ZeroRentConfigured,
-                   SUM(CASE WHEN room.HousingPeriodRoomID IS NOT NULL
-                                 AND (room.PerPersonRate <> 0 OR room.RoomRate <> 0) THEN 1 ELSE 0 END) AS NonzeroRooms
+            SELECT COUNT(DISTINCT property.HousingPeriodPropertyID) AS Properties,
+                   COUNT(DISTINCT room.HousingPeriodRoomID) AS Rooms
             FROM StudentLife.HousingPeriodProperties property
-            LEFT JOIN StudentLife.HousingPeriodRents rent
-              ON rent.HousingPeriodPropertyID = property.HousingPeriodPropertyID
-             AND rent.HousingPeriodID = property.HousingPeriodID AND rent.IsDeleted = 0
             LEFT JOIN StudentLife.HousingPeriodRooms room
               ON room.HousingPeriodPropertyID = property.HousingPeriodPropertyID
              AND room.HousingPeriodID = property.HousingPeriodID AND room.IsDeleted = 0
@@ -122,22 +119,33 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
             SELECT fee.FeeName, fee.TransDocID, CAST(fee.Amount AS decimal(12,2)), doc.ARTypeID
             FROM dbo.Housing_Fees fee
             JOIN dbo.Transdoc doc ON doc.TransDocID = fee.TransDocID AND doc.TransType = 'DEBIT'
-            WHERE fee.TermCalendarID = 268;
+            WHERE fee.TermCalendarID = @TermId;
 
             SELECT TransDocID, ARTypeID FROM dbo.Transdoc
             WHERE TransDoc = 'Single' AND TransType = 'DEBIT' AND ActiveFlag = 1;
             """, connection) { CommandTimeout = 60 };
         command.Parameters.Add("@PeriodId", SqlDbType.Int).Value = periodId;
+        command.Parameters.Add("@TermId", SqlDbType.Int).Value = termId;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken) || periodId != 1 ||
-            !string.Equals(reader.GetString(0), "Fall 2026 Prod", StringComparison.OrdinalIgnoreCase) ||
-            reader.GetDateTime(1).Date != new DateTime(2026, 8, 24) ||
-            reader.GetDateTime(2).Date != new DateTime(2026, 12, 11))
+        var expectedName = (periodId, nonProduction) switch
+        {
+            (1, true) => "Fall 2026 Prod",
+            (1, false) => "Fall 2026",
+            (2, false) => "Spring 2027",
+            _ => ""
+        };
+        var expectedStart = periodId == 1 ? new DateTime(2026, 8, 24) : new DateTime(2027, 1, 11);
+        var expectedEnd = periodId == 1 ? new DateTime(2026, 12, 11) : new DateTime(2027, 4, 30);
+        if (!await reader.ReadAsync(cancellationToken) ||
+            !string.Equals(reader.GetString(0), expectedName, StringComparison.OrdinalIgnoreCase) ||
+            reader.GetDateTime(1).Date != expectedStart || reader.GetDateTime(2).Date != expectedEnd)
             throw new InvalidOperationException("The housing period has not been approved for CampusFlow billing.");
         await reader.NextResultAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken) || reader.GetInt32(0) != 536 ||
-            reader.GetInt32(1) != 536 || reader.GetInt32(2) != 0)
-            throw new InvalidOperationException("Elements housing rent must be configured at $0 for every room before CampusFlow calculates charges.");
+        var expectedProperties = nonProduction ? 9 : 10;
+        var expectedRooms = nonProduction ? 536 : periodId == 1 ? 540 : 512;
+        if (!await reader.ReadAsync(cancellationToken) || reader.GetInt32(0) != expectedProperties ||
+            reader.GetInt32(1) != expectedRooms)
+            throw new InvalidOperationException("The Elements housing properties or rooms changed. Review the period before applying charges.");
         await reader.NextResultAsync(cancellationToken);
         var fees = new List<HousingTermFee>();
         while (await reader.ReadAsync(cancellationToken))
@@ -149,7 +157,7 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         var singleAccountsReceivableTypeId = reader.GetInt32(1);
         if (await reader.ReadAsync(cancellationToken))
             throw new InvalidOperationException("The Single housing charge transaction document is ambiguous.");
-        return new HousingPricingContext(268, fees, singleDocumentId, singleAccountsReceivableTypeId);
+        return new HousingPricingContext(termId, fees, singleDocumentId, singleAccountsReceivableTypeId);
     }
 
     public async Task<List<HousingStudentOption>> SearchStudentsAsync(string query, int periodId,

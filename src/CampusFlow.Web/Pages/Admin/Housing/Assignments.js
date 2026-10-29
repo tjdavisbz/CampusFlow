@@ -148,11 +148,11 @@
         if (!actionable.length) { message('There are no assignment or rate changes to apply to Elements.'); return; }
         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
-        if (!confirm(`Apply ${actionable.length} assignment/rate change(s) to NON-PRODUCTION Elements?\n\n${listed}${more}\n\nElements room rent stays at $0. CampusFlow will post the proposed charges in a separate billing batch. Continue?`)) return;
+        if (!confirm(`Apply ${actionable.length} assignment/rate change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
         state = await request('Apply', {periodId:state.periodId, revision:state.revision,
             rateRevision, confirmed:true});
         dirty = false; selected.clear(); render();
-        message('Room assignments and CampusFlow housing charges were applied to non-production Elements and verified.');
+        message(`Room assignments and CampusFlow housing charges were applied to ${root.dataset.environment} Elements and verified.`);
     });
     el('clear').onclick = () => {
         if (!selected.size || !confirm(`Clear ${selected.size} selected assignments from the draft? Students remain assigned in Elements until you apply the draft.`)) return;

@@ -18,14 +18,14 @@ using Volo.Abp.DependencyInjection;
 
 namespace CampusFlow.StudentInformationSystems;
 
-// All money in this batch is calculated by CampusFlow. Elements' housing rent remains $0.
-// This adapter is deliberately locked to Nelson's non-production Elements tenant.
+// CampusFlow replaces only the affected student's unposted housing batch entries.
+// Existing room-rate setup and posted ledger transactions are never changed here.
 public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter, ITransientDependency
 {
     private const string BatchComment = "Housing Charges";
     private const string ElementsRentBatchComment = "Housing charges Rent and Security Deposit";
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
-    private const string TokenCacheKey = "ThesisElements:NonProductionHousing:BillingToken";
+    private const string TokenCacheKey = "ThesisElements:Housing:BillingToken";
     private static readonly HttpClient SharedClient = new();
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
@@ -48,8 +48,8 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
     public async Task VerifyCanReconcileAsync(int studentUid, int termCalendarId,
         IReadOnlyCollection<int> housingDocumentIds, CancellationToken cancellationToken = default)
     {
-        _assignmentWriter.EnsureNonProductionWriteEnabled();
-        if (studentUid <= 0 || termCalendarId != 268 || housingDocumentIds.Count == 0 ||
+        _assignmentWriter.EnsureWriteEnabled();
+        if (studentUid <= 0 || termCalendarId is not (268 or 269) || housingDocumentIds.Count == 0 ||
             housingDocumentIds.Any(x => x <= 0))
             throw new InvalidOperationException("The housing billing scope is invalid.");
         var batchId = ConfiguredBatchId();
@@ -75,14 +75,24 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
                       AND b.TransDOCID IN ({string.Join(",", parameterNames)})
                       AND (b.Debits <> 0 OR b.Credits <> 0))
                  + (SELECT COUNT(*) FROM dbo.BillingBatch b
+                    LEFT JOIN dbo.BatchMaster m ON m.BatchMasterID = b.BatchMasterID
                     WHERE b.OwnerUID = @StudentUid AND b.TermCalendarID = @TermId
                       AND b.TransDOCID IN ({string.Join(",", parameterNames)})
                       AND (b.Debits <> 0 OR b.Credits <> 0)
-                      AND b.BatchMasterID <> @BatchMasterId);
+                      AND b.BatchMasterID <> @BatchMasterId
+                      AND NOT (m.Comment = @ElementsRentBatchComment
+                               AND COALESCE(b.Credits, 0) = 0
+                               AND NULLIF(LTRIM(RTRIM(b.RefNo)), '') IS NULL
+                               AND b.Description = 'Rent Per Person' AND b.ARTypeID = 0))
+                 + (SELECT COUNT(*) FROM dbo.BillingBatch b
+                    WHERE b.OwnerUID = @StudentUid AND b.TermCalendarID = @TermId
+                      AND b.TransDOCID IN ({string.Join(",", parameterNames)})
+                      AND b.BatchMasterID = @BatchMasterId AND COALESCE(b.Credits, 0) <> 0);
             """, connection) { CommandTimeout = 60 };
         command.Parameters.Add("@StudentUid", SqlDbType.Int).Value = studentUid;
         command.Parameters.Add("@TermId", SqlDbType.Int).Value = termCalendarId;
         command.Parameters.Add("@BatchMasterId", SqlDbType.Int).Value = batchId;
+        command.Parameters.Add("@ElementsRentBatchComment", SqlDbType.VarChar, 100).Value = ElementsRentBatchComment;
         for (var i = 0; i < documents.Length; i++)
             command.Parameters.Add(parameterNames[i], SqlDbType.Int).Value = documents[i];
         if ((int)(await command.ExecuteScalarAsync(cancellationToken) ?? -1) != 0)
@@ -102,6 +112,8 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         var references = new[] { Reference(termCalendarId, studentUid, "BASE"),
             Reference(termCalendarId, studentUid, "SINGLE") };
         var sameTerm = existing.Where(x => x.TermCalendarId == termCalendarId).ToList();
+        if (sameTerm.Any(x => housingDocumentIds.Contains(x.TransactionDocumentId) && x.Amount < 0))
+            throw new InvalidOperationException("A housing credit was found in the batch. Review it before replacing this student's charges.");
         if (sameTerm.Any(x => x.Reference.StartsWith("CFH-", StringComparison.OrdinalIgnoreCase) &&
                               !references.Contains(x.Reference, StringComparer.OrdinalIgnoreCase)))
             throw new InvalidOperationException("An unrecognized CampusFlow housing charge was found in the batch.");
@@ -149,7 +161,8 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
                 matches[0].TransactionDocumentId == desired[i].TransactionDocumentId) continue;
             throw new InvalidOperationException("Elements did not confirm the expected CampusFlow housing charges.");
         }
-        await RemoveElementsZeroRentAsync(token, studentUid, termCalendarId, cancellationToken);
+        await RemoveElementsGeneratedRentAsync(token, studentUid, termCalendarId,
+            housingDocumentIds, cancellationToken);
     }
 
     private async Task<int?> FindBatchByCommentAsync(string token, string comment,
@@ -164,28 +177,44 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
             .Where(x => string.Equals(x["comment"]?.GetValue<string>(), comment, StringComparison.OrdinalIgnoreCase))
             .Select(x => x["batchMasterID"]?.GetValue<int>() ?? 0).Where(x => x > 0).Distinct().ToList();
         if (matches.Count > 1) throw new InvalidOperationException("Multiple matching housing batches require manual review.");
-        return matches.Count == 1 ? matches[0] : null;
+        if (matches.Count == 1) return matches[0];
+        // The cashier selector can omit an open batch that is still accessible by ID.
+        // The replica is used only to identify that batch; its entries are read live above.
+        await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand("""
+            SELECT BatchMasterID FROM dbo.BatchMaster
+            WHERE Comment = @Comment AND Status = 'Open' AND SourceModuleID = 2;
+            """, connection);
+        command.Parameters.Add("@Comment", SqlDbType.VarChar, 100).Value = comment;
+        var replicaMatches = new List<int>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) replicaMatches.Add(reader.GetInt32(0));
+        if (replicaMatches.Count > 1)
+            throw new InvalidOperationException("Multiple matching Elements rent batches require manual review.");
+        return replicaMatches.Count == 1 ? replicaMatches[0] : null;
     }
 
-    private async Task RemoveElementsZeroRentAsync(string token, int studentUid, int termCalendarId,
-        CancellationToken cancellationToken)
+    private async Task RemoveElementsGeneratedRentAsync(string token, int studentUid, int termCalendarId,
+        IReadOnlyCollection<int> housingDocumentIds, CancellationToken cancellationToken)
     {
-        // Assigning a room in Elements creates a $0 rent entry. CampusFlow posts the real
-        // charge separately, so remove only the exact vendor-generated zero-dollar row.
+        // Assignment can create a rent entry at $0 or at the configured room rate.
+        // Remove only the exact vendor-generated entry for this student and term.
         var batchId = await FindBatchByCommentAsync(token, ElementsRentBatchComment, cancellationToken);
         if (batchId is null) return;
         var entries = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
-        var zeroRent = entries.Where(x => x.StudentUid == studentUid && x.TermCalendarId == termCalendarId &&
-                                          x.TransactionDocumentId == 137 && x.Amount == 0 &&
+        var generatedRent = entries.Where(x => x.StudentUid == studentUid && x.TermCalendarId == termCalendarId &&
+                                          housingDocumentIds.Contains(x.TransactionDocumentId) &&
+                                          x.Amount >= 0 &&
                                           x.AccountsReceivableTypeId == 0 && string.IsNullOrEmpty(x.Reference) &&
                                           string.Equals(x.Description, "Rent Per Person", StringComparison.OrdinalIgnoreCase))
             .ToList();
-        foreach (var entry in zeroRent)
+        foreach (var entry in generatedRent)
             await DeleteEntryAsync(token, entry.Id, cancellationToken);
-        if (zeroRent.Count == 0) return;
+        if (generatedRent.Count == 0) return;
         var remaining = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
-        if (zeroRent.Any(x => remaining.Any(y => y.Id == x.Id)))
-            throw new InvalidOperationException("Elements did not confirm removal of its zero-dollar rent entry.");
+        if (generatedRent.Any(x => remaining.Any(y => y.Id == x.Id)))
+            throw new InvalidOperationException("Elements did not confirm removal of its generated rent entry.");
     }
 
     private async Task<List<BatchEntry>> GetEntriesAsync(string token, int studentUid, int batchId,
@@ -252,7 +281,7 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
-        _assignmentWriter.EnsureNonProductionWriteEnabled();
+        _assignmentWriter.EnsureWriteEnabled();
         if (_cache.TryGetValue(TokenCacheKey, out string? cached) && !string.IsNullOrWhiteSpace(cached)) return cached;
         using var request = new HttpRequestMessage(HttpMethod.Get,
             $"{Setting("BaseUrl").TrimEnd('/')}/api/Login/Authenticate");
@@ -261,18 +290,18 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
         using var response = await _client.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("Non-production Elements billing authentication failed.");
+            throw new InvalidOperationException("Elements housing billing authentication failed.");
         var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         var token = root?["data"]?["token"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Non-production Elements did not return a billing token.");
+            throw new InvalidOperationException("Elements did not return a housing billing token.");
         _cache.Set(TokenCacheKey, token, TimeSpan.FromMinutes(10));
         return token;
     }
 
     private HttpRequestMessage Request(HttpMethod method, string route, string token)
     {
-        _assignmentWriter.EnsureNonProductionWriteEnabled();
+        _assignmentWriter.EnsureWriteEnabled();
         var tenantHost = Setting("TenantHost");
         var request = new HttpRequestMessage(method, $"{Setting("RegistrationBaseUrl").TrimEnd('/')}{route}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -294,7 +323,7 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         try { root = JsonNode.Parse(body) as JsonObject; }
         catch (JsonException) { root = null; }
         if (!response.IsSuccessStatusCode || root?["isSuccess"]?.GetValue<bool>() != true)
-            throw new InvalidOperationException($"Non-production Elements rejected the housing billing request (HTTP {(int)response.StatusCode}).");
+            throw new InvalidOperationException($"Elements rejected the housing billing request (HTTP {(int)response.StatusCode}).");
         return root;
     }
 

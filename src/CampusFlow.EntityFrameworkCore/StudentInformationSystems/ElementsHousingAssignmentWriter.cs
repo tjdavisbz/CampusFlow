@@ -15,11 +15,11 @@ using Volo.Abp.DependencyInjection;
 
 namespace CampusFlow.StudentInformationSystems;
 
-// Room-assignment writes are intentionally limited to Nelson's non-production Elements tenant.
+// Room-assignment writes require an explicit flag and the exact matching Elements environment.
 public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignmentWriter, ITransientDependency
 {
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
-    private const string TokenCacheKey = "ThesisElements:NonProductionHousing:IntegrationToken";
+    private const string TokenCacheKey = "ThesisElements:Housing:IntegrationToken";
     private static readonly HttpClient SharedHttpClient = new();
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
@@ -35,27 +35,36 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
         _client = client;
     }
 
-    public void EnsureNonProductionWriteEnabled()
+    public void EnsureWriteEnabled()
     {
-        if (!_configuration.GetValue<bool>("Housing:EnableNonProductionWrites") ||
-            !string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase) ||
-            !MatchesHost(Setting("BaseUrl"), "app-elm-nonprod-usc-integrationapi.azurewebsites.net") ||
-            !MatchesHost(Setting("RegistrationBaseUrl"), "np-usc-gateway.thesiscloud.com") ||
-            !string.Equals(Setting("TenantHost"), "el-np-nel.thesiscloud.com", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Housing writes are enabled only for the verified Nelson non-production Elements tenant.");
+        var nonProduction = string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase);
+        var production = string.IsNullOrWhiteSpace(_configuration["App:EnvironmentLabel"]);
+        if (!((nonProduction && _configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
+                !_configuration.GetValue<bool>("Housing:EnableProductionWrites") &&
+                MatchesHost(Setting("BaseUrl"), "app-elm-nonprod-usc-integrationapi.azurewebsites.net") &&
+                MatchesHost(Setting("RegistrationBaseUrl"), "np-usc-gateway.thesiscloud.com") &&
+                string.Equals(Setting("TenantHost"), "el-np-nel.thesiscloud.com", StringComparison.OrdinalIgnoreCase)) ||
+              (production && _configuration.GetValue<bool>("Housing:EnableProductionWrites") &&
+                !_configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
+                MatchesHost(Setting("BaseUrl"), "app-elm-prod-usc-integrationapi.azurewebsites.net") &&
+                MatchesHost(Setting("RegistrationBaseUrl"), "el-usc-gateway.thesiscloud.com") &&
+                string.Equals(Setting("TenantHost"), "el-nel.thesiscloud.com", StringComparison.OrdinalIgnoreCase))))
+            throw new InvalidOperationException("Housing writes require an explicitly enabled and verified Nelson Elements environment.");
         var connectionString = _configuration.GetConnectionString("ThesisElementsReadOnly");
         if (string.IsNullOrWhiteSpace(connectionString))
-            throw new InvalidOperationException("The non-production Elements replica is not configured.");
+            throw new InvalidOperationException("The Elements read-only replica is not configured.");
         var replica = new SqlConnectionStringBuilder(connectionString);
-        if (!MatchesReplicaHost(replica.DataSource) ||
-            !string.Equals(replica.InitialCatalog, "EL-NP-NEL-DB", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Housing writes require the Nelson non-production Elements replica.");
+        if (!MatchesReplicaHost(replica.DataSource, nonProduction
+                ? "sql-elm-nonprod-usc-replica.database.windows.net"
+                : "sql-elm-prod-usc-replica.database.windows.net") ||
+            !string.Equals(replica.InitialCatalog, nonProduction ? "EL-NP-NEL-DB" : "EL-NEL-DB", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Housing writes require the matching Nelson Elements replica.");
     }
 
     public async Task<(string Building, string Room)?> GetAssignedRoomAsync(int studentUid, int periodId,
         CancellationToken cancellationToken = default)
     {
-        EnsureNonProductionWriteEnabled();
+        EnsureWriteEnabled();
         var token = await GetTokenAsync(cancellationToken);
         using var request = Request(HttpMethod.Get,
             $"/api/student-life/housing/assign-room/get-assigned-rooms/{studentUid}", token);
@@ -86,7 +95,7 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
     private async Task ChangeAsync(string action, int studentUid, int periodId, int periodRoomId,
         CancellationToken cancellationToken)
     {
-        EnsureNonProductionWriteEnabled();
+        EnsureWriteEnabled();
         if (studentUid <= 0 || periodId <= 0 || periodRoomId <= 0)
             throw new ArgumentOutOfRangeException(nameof(studentUid), "A valid student, period, and room are required.");
         var token = await GetTokenAsync(cancellationToken);
@@ -103,7 +112,7 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
-        EnsureNonProductionWriteEnabled();
+        EnsureWriteEnabled();
         if (_cache.TryGetValue(TokenCacheKey, out string? cached) && !string.IsNullOrWhiteSpace(cached)) return cached;
         using var request = new HttpRequestMessage(HttpMethod.Get,
             $"{Setting("BaseUrl").TrimEnd('/')}/api/Login/Authenticate");
@@ -112,11 +121,11 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
         using var response = await _client.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("Non-production Elements authentication failed.");
+            throw new InvalidOperationException("Elements housing authentication failed.");
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         var token = JsonNode.Parse(body)?["data"]?["token"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Non-production Elements did not return an authentication token.");
+            throw new InvalidOperationException("Elements did not return a housing authentication token.");
         _cache.Set(TokenCacheKey, token, TimeSpan.FromMinutes(10));
         return token;
     }
@@ -141,7 +150,7 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
         try { root = JsonNode.Parse(body) as JsonObject; }
         catch (JsonException) { root = null; }
         if (!response.IsSuccessStatusCode || root?["isSuccess"]?.GetValue<bool>() != true)
-            throw new InvalidOperationException($"Non-production Elements rejected the housing request (HTTP {(int)response.StatusCode}).");
+            throw new InvalidOperationException($"Elements rejected the housing request (HTTP {(int)response.StatusCode}).");
         return root;
     }
 
@@ -153,9 +162,9 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
         uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.AbsolutePath == "/" &&
         string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase);
 
-    private static bool MatchesReplicaHost(string value) =>
-        string.Equals(value, "sql-elm-nonprod-usc-replica.database.windows.net", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(value, "tcp:sql-elm-nonprod-usc-replica.database.windows.net,1433", StringComparison.OrdinalIgnoreCase);
+    private static bool MatchesReplicaHost(string value, string host) =>
+        string.Equals(value, host, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, $"tcp:{host},1433", StringComparison.OrdinalIgnoreCase);
 
     private static int ReadInt(JsonObject value, string key) => value[key]?.GetValue<int>() ?? 0;
     private static string ReadString(JsonObject value, string key) => value[key]?.GetValue<string>()?.Trim() ?? "";

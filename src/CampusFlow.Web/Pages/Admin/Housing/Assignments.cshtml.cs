@@ -12,9 +12,14 @@ namespace CampusFlow.Web.Pages.Admin.Housing;
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfiguration configuration) : CampusFlowPageModel
 {
+    public string EnvironmentName =>
+        string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase)
+            ? "NON-PRODUCTION" : "PRODUCTION";
     public bool CanApplyToElements =>
-        configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
-        string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase);
+        (configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
+         string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase)) ||
+        (configuration.GetValue<bool>("Housing:EnableProductionWrites") &&
+         string.IsNullOrWhiteSpace(configuration["App:EnvironmentLabel"]));
     public void OnGet() { }
     public async Task<JsonResult> OnGetPeriodsAsync() => new(await workspace.GetPeriodsAsync());
     public async Task<JsonResult> OnGetDraftAsync(int periodId) => new(await workspace.GetAsync(periodId));

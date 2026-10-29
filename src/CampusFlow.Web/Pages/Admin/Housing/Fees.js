@@ -62,7 +62,7 @@
         if (!state || state.rates.some(rate => !Number.isFinite(rate.baseAmount) || rate.baseAmount <= 0 ||
             !Number.isFinite(rate.singleSurchargeAmount) || rate.singleSurchargeAmount <= 0))
             throw new Error('Enter positive base and single-room amounts for every listed rate.');
-        if (!confirm(`Save ${state.rates.length} CampusFlow housing rates for ${state.periodName}? These prices will be used for future non-production assignment applies, but existing posted charges will not be changed.`)) return;
+        if (!confirm(`Save ${state.rates.length} CampusFlow housing rates for ${state.periodName} in ${root.dataset.environment}? These prices will be used for future assignment applies, but existing posted charges will not be changed.`)) return;
         state = await request('Save', state); dirty = false; render(); message('Housing fee amounts saved in CampusFlow. Elements was not changed.');
     });
     window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });

@@ -35,6 +35,15 @@ public class HousingChargeCalculatorTests
     }
 
     [Fact]
+    public void Spring_2027_Uses_The_Approved_CampusFlow_Rate()
+    {
+        var lines = HousingChargeCalculator.Quote(269, "Bridges Hall", "Standard", false, Fees, Rates, 243);
+        Assert.Single(lines);
+        Assert.Equal(2500m, lines[0].Amount);
+        Assert.Equal(137, lines[0].TransactionDocumentId);
+    }
+
+    [Fact]
     public void Intentional_Single_Is_Separate_Charge()
     {
         var lines = HousingChargeCalculator.Quote(268, "Bridges Hall", "Standard", true, Fees, Rates, 243);
@@ -61,7 +70,7 @@ public class HousingChargeCalculatorTests
     }
 
     [Theory]
-    [InlineData(269, "Bridges Hall", "Standard")]
+    [InlineData(270, "Bridges Hall", "Standard")]
     [InlineData(268, "Bridges Hall", "AIC Triple Room")]
     [InlineData(268, "Savell Hall", "Unreviewed")]
     public void Unreviewed_Term_Or_Mapping_Is_Rejected(int term, string building, string rate) =>

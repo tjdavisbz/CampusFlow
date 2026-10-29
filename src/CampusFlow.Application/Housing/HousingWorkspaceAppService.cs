@@ -132,8 +132,8 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         var before = Read(draft.BaselineJson);
         var after = Read(draft.RoomsJson);
         var changes = Validate(before, after);
-        if (!string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION",
-                StringComparison.OrdinalIgnoreCase)) return changes;
+        if (!_configuration.GetValue<bool>("Housing:EnableNonProductionWrites") &&
+            !_configuration.GetValue<bool>("Housing:EnableProductionWrites")) return changes;
         var pricing = await _elements.GetPricingAsync(periodId);
         var configuredRates = (await SavedRatesAsync(periodId, pricing.TermCalendarId)).Rates;
         var oldAssignments = before.SelectMany(room => room.Occupants.Select(o => (room, o)))
@@ -165,7 +165,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
     public async Task<HousingWorkspaceState> ApplyAssignmentsAsync(ApplyHousingDraftInput input)
     {
         if (!input.Confirmed) throw new UserFriendlyException("Review and confirm the Elements changes before applying them.");
-        _writer.EnsureNonProductionWriteEnabled();
+        _writer.EnsureWriteEnabled();
         var draft = await Find(input.PeriodId) ?? throw new UserFriendlyException("Refresh from Elements first.");
         CheckRevision(draft, input.Revision);
         var before = Read(draft.BaselineJson);
@@ -198,7 +198,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         if (savedRates.Revision != input.RateRevision)
             throw new UserFriendlyException("Housing fee amounts changed since the preview. Review charges again before applying.");
         var configuredRates = savedRates.Rates;
-        var documents = new[] { 137, 1471, 1765, pricing.SingleTransactionDocumentId };
+        var documents = new[] { 137, 1471, 1765, 1776, pricing.SingleTransactionDocumentId };
         var proposedCharges = new Dictionary<int, IReadOnlyList<HousingChargeLine>>();
         foreach (var id in changedIds)
         {

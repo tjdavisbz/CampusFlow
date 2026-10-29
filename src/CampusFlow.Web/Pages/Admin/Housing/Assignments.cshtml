@@ -3,13 +3,13 @@
 @{ ViewData["Title"] = "Housing Assignments"; }
 @section styles { <link rel="stylesheet" href="~/Pages/Admin/Housing/Assignments.css" asp-append-version="true" /> }
 @section scripts { <script src="~/Pages/Admin/Housing/Assignments.js" asp-append-version="true"></script> }
-<div id="housing-workspace">
+<div id="housing-workspace" data-environment="@Model.EnvironmentName">
     @Html.AntiForgeryToken()
     <header><p class="housing-eyebrow">HOUSING</p><h1>Housing assignments</h1>
         <p>Plan room assignments together. Save changes here before reviewing what needs to change in Elements.</p></header>
     @if (Model.CanApplyToElements)
     {
-        <div class="alert alert-warning">Non-production only: applying a draft writes room assignments to Elements and separate CampusFlow-calculated housing charges to an Elements billing batch. Elements room rent stays at $0. Capacity and notes are not sent by this action; the portal stops if those fields changed.</div>
+        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Capacity and notes are not sent; the portal stops if those fields changed.</div>
     }
     else
     {
@@ -23,7 +23,7 @@
         <button id="housing-preview" class="btn btn-outline-primary" type="button" disabled>Review changes</button>
         @if (Model.CanApplyToElements)
         {
-            <button id="housing-apply" class="btn btn-danger" type="button" disabled>Apply assignments and charges to Elements (non-production)</button>
+            <button id="housing-apply" class="btn btn-danger" type="button" disabled>Apply assignments and charges to Elements</button>
         }
     </div>
     <p id="housing-summary"></p>
