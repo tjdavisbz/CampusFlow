@@ -76,6 +76,27 @@
             <div class="credit-total"><span>Scheduled credits</span><strong>@Model.Selection.SelectedCredits.ToString("0.##")</strong><small>of @Model.Selection.MaximumAllowedCredits.ToString("0.##") allowed</small></div>
         </section>
 
+        <section class="graduation-intent" aria-labelledby="graduation-intent-heading">
+            <div class="section-heading"><div><span>Graduation planning</span><h2 id="graduation-intent-heading">Do you intend to graduate in @Model.Selection.TermName?</h2></div></div>
+            <p>This records your intent for this term. It is not a graduation application and does not add a fee.</p>
+            @if (Model.IsReadOnlyStudentView)
+            {
+                <strong>Saved answer: @(Model.Selection.IntendsToGraduate is true ? "Yes" : Model.Selection.IntendsToGraduate is false ? "No" : "Not answered")</strong>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="SaveGraduationIntent" class="graduation-intent-form">
+                    <input type="hidden" name="ExternalTermId" value="@Model.Selection.ExternalTermId" />
+                    <div class="graduation-intent-options" role="radiogroup" aria-label="Intend to graduate this term">
+                        <label><input type="radio" name="IntendsToGraduate" value="true" checked="@(Model.Selection.IntendsToGraduate is true)" required /> Yes</label>
+                        <label><input type="radio" name="IntendsToGraduate" value="false" checked="@(Model.Selection.IntendsToGraduate is false)" required /> No</label>
+                    </div>
+                    <button type="submit">Save answer</button>
+                    <span>Currently saved: @(Model.Selection.IntendsToGraduate is true ? "Yes" : Model.Selection.IntendsToGraduate is false ? "No" : "Not answered")</span>
+                </form>
+            }
+        </section>
+
         <section class="selected-courses" aria-labelledby="selected-heading">
             <div class="section-heading"><div><span>Your schedule</span><h2 id="selected-heading">Selected courses</h2></div></div>
             @if (Model.Selection.Registrations.Count == 0)

@@ -1887,6 +1887,78 @@ namespace CampusFlow.Migrations
                     b.ToTable("AppRegistrationTermConfigurations", (string)null);
                 });
 
+            modelBuilder.Entity("CampusFlow.CourseSelections.StudentGraduationIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExternalTermId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IntendsToGraduate")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<Guid>("StudentProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentProfileId");
+
+                    b.HasIndex("TenantId", "StudentProfileId", "ExternalTermId")
+                        .IsUnique();
+
+                    b.ToTable("AppStudentGraduationIntents", (string)null);
+                });
+
             modelBuilder.Entity("CampusFlow.Housing.HousingAssignmentDraft", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4551,6 +4623,15 @@ namespace CampusFlow.Migrations
                 });
 
             modelBuilder.Entity("CampusFlow.CourseSelections.CourseSelectionOperation", b =>
+                {
+                    b.HasOne("CampusFlow.Students.StudentProfile", null)
+                        .WithMany()
+                        .HasForeignKey("StudentProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CampusFlow.CourseSelections.StudentGraduationIntent", b =>
                 {
                     b.HasOne("CampusFlow.Students.StudentProfile", null)
                         .WithMany()

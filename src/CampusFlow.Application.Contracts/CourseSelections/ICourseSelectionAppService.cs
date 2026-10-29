@@ -10,4 +10,5 @@ public interface ICourseSelectionAppService : IApplicationService
     Task<List<CourseSelectionTermDto>> GetEligibleTermsAsync();
     Task<AddCourseSelectionResultDto> AddAsync(AddCourseSelectionInput input);
     Task RemoveAsync(RemoveCourseSelectionInput input);
+    Task SaveGraduationIntentAsync(SaveGraduationIntentInput input);
 }

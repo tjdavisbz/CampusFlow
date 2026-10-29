@@ -45,6 +45,7 @@ public sealed class CourseSelectionDto
     public decimal MaximumAllowedCredits { get; set; }
     public decimal SelectedCredits { get; set; }
     public bool DegreeAuditAvailable { get; set; }
+    public bool? IntendsToGraduate { get; set; }
     public List<CourseSelectionOfferingDto> Offerings { get; set; } = [];
     public List<CourseSelectionRegistrationDto> Registrations { get; set; } = [];
 }
@@ -76,4 +77,10 @@ public sealed class RemoveCourseSelectionInput
     public string ExternalOfferingId { get; set; } = null!;
     public string ExternalRegistrationId { get; set; } = null!;
     public string IdempotencyKey { get; set; } = null!;
+}
+
+public sealed class SaveGraduationIntentInput
+{
+    public string ExternalTermId { get; set; } = null!;
+    public bool? IntendsToGraduate { get; set; }
 }

@@ -71,6 +71,9 @@ public class CourseSelectionModel : CampusFlowPageModel
     [BindProperty]
     public string ExternalRegistrationId { get; set; } = string.Empty;
 
+    [BindProperty]
+    public bool? IntendsToGraduate { get; set; }
+
     [TempData]
     public string? SuccessMessage { get; set; }
 
@@ -150,6 +153,28 @@ public class CourseSelectionModel : CampusFlowPageModel
             _logger.LogWarning(exception, "Unable to remove course registration {RegistrationId} for the current student.",
                 ExternalRegistrationId);
             ErrorTitle = "Course not removed";
+            ErrorMessage = exception.Message;
+            await LoadAsync(ExternalTermId);
+            return Page();
+        }
+    }
+
+    public async Task<IActionResult> OnPostSaveGraduationIntentAsync()
+    {
+        try
+        {
+            await _courseSelection.SaveGraduationIntentAsync(new SaveGraduationIntentInput
+            {
+                ExternalTermId = ExternalTermId,
+                IntendsToGraduate = IntendsToGraduate
+            });
+            SuccessMessage = "Your graduation intent was saved for this term.";
+            return RedirectToPage(new { term = ExternalTermId });
+        }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogWarning(exception, "Unable to save graduation intent for the current student.");
+            ErrorTitle = "Graduation intent not saved";
             ErrorMessage = exception.Message;
             await LoadAsync(ExternalTermId);
             return Page();

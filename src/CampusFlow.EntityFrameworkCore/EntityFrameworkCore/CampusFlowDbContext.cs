@@ -48,6 +48,7 @@ public class CampusFlowDbContext :
     public DbSet<CourseReview> CourseReviews { get; set; }
     public DbSet<CourseReviewSubmission> CourseReviewSubmissions { get; set; }
     public DbSet<CourseSelectionOperation> CourseSelectionOperations { get; set; }
+    public DbSet<StudentGraduationIntent> StudentGraduationIntents { get; set; }
     public DbSet<CourseSectionAttendanceTypeMapping> CourseSectionAttendanceTypeMappings { get; set; }
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
@@ -412,6 +413,15 @@ public class CampusFlowDbContext :
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Status, x.LastAttemptAt });
+        });
+
+        builder.Entity<StudentGraduationIntent>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "StudentGraduationIntents", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
+            b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.ExternalTermId }).IsUnique();
         });
 
         builder.Entity<HousingAssignmentDraft>(b =>

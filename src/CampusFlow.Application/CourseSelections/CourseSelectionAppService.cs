@@ -22,6 +22,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     private readonly IRepository<AdvisorAssignment, Guid> _advisorAssignments;
     private readonly IRepository<CourseReview, Guid> _reviews;
     private readonly IRepository<CourseSelectionOperation, Guid> _operations;
+    private readonly IRepository<StudentGraduationIntent, Guid> _graduationIntents;
     private readonly IRepository<CourseSectionAttendanceTypeMapping, Guid> _sectionMappings;
     private readonly IStudentInformationSystemCourseSelectionLookup _lookup;
     private readonly IStudentInformationSystemCourseRegistrationService _registration;
@@ -36,6 +37,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         IRepository<AdvisorAssignment, Guid> advisorAssignments,
         IRepository<CourseReview, Guid> reviews,
         IRepository<CourseSelectionOperation, Guid> operations,
+        IRepository<StudentGraduationIntent, Guid> graduationIntents,
         IRepository<CourseSectionAttendanceTypeMapping, Guid> sectionMappings,
         IStudentInformationSystemCourseSelectionLookup lookup,
         IStudentInformationSystemCourseRegistrationService registration,
@@ -49,6 +51,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         _advisorAssignments = advisorAssignments;
         _reviews = reviews;
         _operations = operations;
+        _graduationIntents = graduationIntents;
         _sectionMappings = sectionMappings;
         _lookup = lookup;
         _registration = registration;
@@ -71,6 +74,8 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var reviews = await AsyncExecuter.ToListAsync(reviewQuery.Where(x =>
             x.StudentProfileId == profile.Id && x.ExternalTermId == externalTermId));
         var degreeRequirements = await GetOutstandingDegreeRequirementsAsync(profile);
+        var graduationIntent = await _graduationIntents.FindAsync(x =>
+            x.StudentProfileId == profile.Id && x.ExternalTermId == externalTermId);
 
         return new CourseSelectionDto
         {
@@ -80,13 +85,14 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             MaximumAllowedCredits = context.MaximumAllowedCredits,
             SelectedCredits = registrations.Sum(x => x.Credits),
             DegreeAuditAvailable = degreeRequirements is not null,
+            IntendsToGraduate = graduationIntent?.IntendsToGraduate,
             Offerings = offerings.Select(x =>
             {
                 var previousAttempt = FindPreviousAttempt(x, courseAttempts);
                 return new CourseSelectionOfferingDto
                 {
                 ExternalOfferingId = x.ExternalOfferingId,
-                CourseCode = x.CourseCode,
+                CourseCode = CourseSelectionCourseCode.Format(x.Department, x.CourseCode, x.CourseType),
                 Section = x.Section,
                 CourseName = x.CourseName,
                 Credits = x.Credits,
@@ -111,7 +117,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             {
                 ExternalRegistrationId = x.ExternalRegistrationId,
                 ExternalOfferingId = x.ExternalOfferingId,
-                CourseCode = x.CourseCode,
+                CourseCode = CourseSelectionCourseCode.Format(x.Department, x.CourseCode, x.CourseType),
                 Section = x.Section,
                 CourseName = x.CourseName,
                 Credits = x.Credits,
@@ -260,6 +266,33 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 ExternalTermId = x.ExternalTermId,
                 TermName = x.TermName
             }).ToList();
+    }
+
+    public async Task SaveGraduationIntentAsync(SaveGraduationIntentInput input)
+    {
+        if (_currentStudentView.IsImpersonating)
+            throw new Volo.Abp.Authorization.AbpAuthorizationException("Student impersonation is read-only.");
+        if (string.IsNullOrWhiteSpace(input.ExternalTermId) || input.IntendsToGraduate is null)
+            throw new UserFriendlyException("Please choose Yes or No before saving.");
+
+        var profile = await GetCurrentProfileAsync();
+        await GetCurrentPolicyAsync(input.ExternalTermId, profile);
+        if (await _lookup.GetContextAsync(profile.ExternalStudentId, input.ExternalTermId) is null)
+            throw new UserFriendlyException("You are not eligible to select courses for that term.");
+
+        var intent = await _graduationIntents.FindAsync(x =>
+            x.StudentProfileId == profile.Id && x.ExternalTermId == input.ExternalTermId);
+        if (intent is null)
+        {
+            intent = new StudentGraduationIntent(GuidGenerator.Create(), CurrentTenant.Id,
+                profile.Id, input.ExternalTermId, input.IntendsToGraduate.Value);
+            await _graduationIntents.InsertAsync(intent, autoSave: true);
+        }
+        else
+        {
+            intent.Update(input.IntendsToGraduate.Value);
+            await _graduationIntents.UpdateAsync(intent, autoSave: true);
+        }
     }
 
     [UnitOfWork(IsDisabled = true)]

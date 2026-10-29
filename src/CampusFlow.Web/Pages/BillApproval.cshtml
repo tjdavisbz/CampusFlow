@@ -55,6 +55,10 @@
                 {
                     <p>Your agreement is complete. Your downloadable copy is being prepared.</p>
                 }
+                @if (Model.BookstoreUrl is not null)
+                {
+                    <p><a href="@Model.BookstoreUrl" target="_blank" rel="noopener noreferrer">Get your course materials now <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></p>
+                }
             </section>
         }
         else

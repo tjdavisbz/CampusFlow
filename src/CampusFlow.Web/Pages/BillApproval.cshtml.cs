@@ -14,6 +14,7 @@ using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
 using CampusFlow.Web.BillApprovals;
 using CampusFlow.Web.Payments;
+using CampusFlow.Web.Bookstores;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -123,6 +124,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public bool IsUnavailable { get; private set; }
     public IReadOnlyList<BillApprovalTermConfiguration> AvailableTerms { get; private set; } = [];
     public IReadOnlyList<StudentCourseScheduleItem> Courses { get; private set; } = [];
+    public string? BookstoreUrl { get; private set; }
     public IReadOnlyList<StudentBillingTransaction> Charges { get; private set; } = [];
     public IReadOnlyList<StudentFinancialAidAward> Aid { get; private set; } = [];
     public StudentPaymentPlan? PaymentPlan { get; private set; }
@@ -224,6 +226,7 @@ public class BillApprovalModel : CampusFlowPageModel
                 .OrderBy(x => x.Department).ThenBy(x => x.CourseNumber).ToArray();
             var courseTerm = Courses.FirstOrDefault();
             TermName = courseTerm?.TermName ?? termConfiguration?.TermName ?? currentTerm?.DisplayName ?? "Current term";
+            BookstoreUrl = CampusStoreLinks.ForCourses(_configuration, CurrentTenant.Name, TermName, Courses);
             ExternalTermId = courseTerm?.ExternalTermId;
             ExternalTermId ??= termConfiguration?.ExternalTermId;
 

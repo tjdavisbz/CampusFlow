@@ -23,6 +23,7 @@ using CampusFlow.Web.BillApprovals;
 using CampusFlow.CourseSelections;
 using CampusFlow.Housing;
 using CampusFlow.Announcements;
+using CampusFlow.Web.Bookstores;
 
 namespace CampusFlow.Web.Pages;
 
@@ -321,7 +322,8 @@ public class IndexModel : CampusFlowPageModel
                 journey.SelectedCourseCount = scheduledCourses.Length;
                 journey.SelectedCredits = scheduledCourses.Sum(x => x.Credits);
                 journey.HasSelectedCourses = scheduledCourses.Length > 0;
-                journey.BookstoreUrl = BuildBookstoreUrl(term, scheduledCourses);
+                journey.BookstoreUrl = CampusStoreLinks.ForCourses(
+                    _configuration, CurrentTenant.Name, term.DisplayName, scheduledCourses);
             }
             var eligibleTerms = await _courseSelection.GetEligibleTermsAsync();
             journey.CourseSelectionEnabled = eligibleTerms.Any(x => x.ExternalTermId == term.ExternalTermId);
@@ -376,30 +378,6 @@ public class IndexModel : CampusFlowPageModel
         journey.Term = term;
         journey.BuildSteps();
         return journey;
-    }
-
-    private string? BuildBookstoreUrl(StudentInformationSystemTerm term,
-        IReadOnlyCollection<StudentCourseScheduleItem> courses)
-    {
-        var tenantKey = CurrentTenant.Name ?? "Default";
-        var section = _configuration.GetSection($"CampusStores:{tenantKey}");
-        var baseUrl = section["CourseSelectionUrl"];
-        var storeId = section["StoreId"];
-        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(storeId)) return null;
-
-        var offeringIds = courses.Select(x => x.ExternalCourseOfferingId)
-            .Where(x => long.TryParse(x, out _))
-            .Select(x => x.PadLeft(15, '0'))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        if (offeringIds.Length == 0) return null;
-
-        var displayParts = term.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var bookstoreTerm = displayParts.Length > 1 && displayParts[^1].Length >= 2
-            ? $"{string.Join(' ', displayParts[..^1])} {displayParts[^1][^2..]}"
-            : term.DisplayName;
-        return $"{baseUrl}?src=2&type=2&stoid={Uri.EscapeDataString(storeId)}" +
-               $"&trm={Uri.EscapeDataString(bookstoreTerm)}&cid={string.Join(',', offeringIds)}";
     }
 
     public sealed class RegistrationJourneyViewModel
