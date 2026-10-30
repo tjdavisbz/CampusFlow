@@ -17,7 +17,7 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
     private const string TokenCacheKey = "ThesisElements:FinancialAid:ApiToken";
     private static readonly string[] RequestProperties =
     [
-        "financialStatusId", "studentUid", "termCalendarId", "transDate", "transTypeId",
+        "financialStatusId", "studentUid", "termCalendarId", "distributionDate", "transTypeId",
         "transStatusId", "amount", "estimatedAmount", "description", "referenceNo",
         "creditStatusId", "code1Id", "code2Id", "showOnBillingStatement", "dateCheckSigned",
         "requiredCredits", "studentAccepted", "transId", "lock", "campusId",
@@ -78,15 +78,7 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
             throw new InvalidOperationException("This award already has a recorded decision.");
         }
 
-        var body = new JsonObject();
-        foreach (var propertyName in RequestProperties)
-        {
-            if (award.TryGetPropertyValue(propertyName, out var value))
-            {
-                body[propertyName] = value?.DeepClone();
-            }
-        }
-        body["studentAccepted"] = (int)decision;
+        var body = BuildDecisionBody(award, decision);
 
         using var request = CreateRequest(HttpMethod.Put,
             $"api/financial-aid/maintenance/awards/financial-awards/{awardId}", token);
@@ -98,6 +90,30 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
         {
             throw new InvalidOperationException("Elements did not accept the financial aid decision.");
         }
+    }
+
+    internal static JsonObject BuildDecisionBody(JsonObject award, StudentFinancialAidDecision decision)
+    {
+        if (award["amount"] is not JsonValue amountValue ||
+            !amountValue.TryGetValue<decimal>(out var amount) || amount == 0m)
+        {
+            throw new InvalidOperationException("A zero-dollar award cannot be accepted or declined in the portal.");
+        }
+        if (!award.ContainsKey("distributionDate"))
+        {
+            throw new InvalidOperationException("Elements did not return the award distribution date; the decision was not sent.");
+        }
+
+        var body = new JsonObject();
+        foreach (var propertyName in RequestProperties)
+        {
+            if (award.TryGetPropertyValue(propertyName, out var value))
+            {
+                body[propertyName] = value?.DeepClone();
+            }
+        }
+        body["studentAccepted"] = (int)decision;
+        return body;
     }
 
     private async Task<JsonObject> GetStudentAwardAsync(int studentUid, int awardId, string token,

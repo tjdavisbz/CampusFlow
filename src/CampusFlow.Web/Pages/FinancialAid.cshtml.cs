@@ -92,6 +92,7 @@ public class FinancialAidModel : CampusFlowPageModel
             CurrentTermName = currentTerm?.DisplayName;
 
             var awards = await lookup.GetAwardsAsync(profile.ExternalStudentId, HttpContext.RequestAborted);
+            awards = StudentVisibleAwards(awards);
             var decisionService = _decisionServices.SingleOrDefault(x => x.Provider == profile.Provider);
             if (decisionService is not null)
             {
@@ -134,6 +135,10 @@ public class FinancialAidModel : CampusFlowPageModel
 
     public static string FormatCurrency(decimal amount) =>
         CampusFlow.Web.Formatting.UsdCurrency.Format(amount);
+
+    internal static IReadOnlyList<StudentFinancialAidAward> StudentVisibleAwards(
+        IEnumerable<StudentFinancialAidAward> awards) =>
+        awards.Where(award => award.Amount != 0m).ToArray();
 
     public async Task<Microsoft.AspNetCore.Mvc.IActionResult> OnPostDecisionAsync(
         string awardId,
