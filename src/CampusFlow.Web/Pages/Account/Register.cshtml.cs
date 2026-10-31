@@ -15,6 +15,7 @@ using Volo.Abp.Identity;
 using Volo.Abp.Security.Claims;
 using CampusFlow.Students;
 using CampusFlow.Permissions;
+using CampusFlow.Web.Portals;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Guids;
 using Volo.Abp.PermissionManagement;
@@ -28,6 +29,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly IGuidGenerator _guidGenerator;
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
+    private readonly FacultyPortalReader _facultyPortalReader;
     private readonly IdentityRoleManager _roleManager;
     private readonly IPermissionManager _permissionManager;
     private readonly IConfiguration _configuration;
@@ -41,6 +43,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         IRepository<StudentProfile, Guid> studentProfileRepository,
         IGuidGenerator guidGenerator,
         IStudentInformationSystemAdvisorLookup advisorLookup,
+        FacultyPortalReader facultyPortalReader,
         IdentityRoleManager roleManager,
         IPermissionManager permissionManager,
         IConfiguration configuration)
@@ -54,6 +57,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         _studentProfileRepository = studentProfileRepository;
         _guidGenerator = guidGenerator;
         _advisorLookup = advisorLookup;
+        _facultyPortalReader = facultyPortalReader;
         _roleManager = roleManager;
         _permissionManager = permissionManager;
         _configuration = configuration;
@@ -87,7 +91,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
             return Page();
         }
 
-        StudentLookupResult result;
+        StudentLookupResult? result = null;
         try
         {
             result = await lookup.FindByEmailAsync(email, HttpContext.RequestAborted);
@@ -95,10 +99,9 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         catch (Exception exception)
         {
             Logger.LogError(exception, "Student lookup failed during Microsoft account linking.");
-            return Page();
         }
 
-        if (result.Status == StudentLookupStatus.Matched && result.Student is not null)
+        if (result?.Status == StudentLookupStatus.Matched && result.Student is not null)
         {
             await RegisterExternalUserAsync(externalLogin, result.Student.Email, result.Student.Email);
 
@@ -122,7 +125,7 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
             return await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash);
         }
 
-        AdvisorLookupResult? advisor;
+        AdvisorLookupResult? advisor = null;
         try
         {
             advisor = await _advisorLookup.FindAsync(email, HttpContext.RequestAborted);
@@ -130,15 +133,37 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         catch (Exception exception)
         {
             Logger.LogError(exception, "Advisor lookup failed during Microsoft account linking.");
-            return Page();
         }
 
         if (advisor is null)
         {
-            Logger.LogWarning(
-                "Microsoft account matched neither an eligible student nor an active Elements user. Student status: {Status}",
-                result.Status);
-            return Page();
+            // Faculty portal membership is independent of CAMSUser. In particular,
+            // a disabled or absent staff login must not prevent a faculty member
+            // with a matching active faculty address from signing in.
+            FacultyIdentity? faculty;
+            try
+            {
+                faculty = await _facultyPortalReader.FindFacultyAsync(email, HttpContext.RequestAborted);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Faculty lookup failed during Microsoft account linking.");
+                return Page();
+            }
+
+            if (faculty is null)
+            {
+                Logger.LogWarning(
+                    "Microsoft account matched neither an eligible student, active Elements user, nor faculty portal record. Student status: {Status}",
+                    result?.Status.ToString() ?? "Unavailable");
+                return Page();
+            }
+
+            await RegisterExternalUserAsync(externalLogin, email, email);
+            return !string.IsNullOrWhiteSpace(ReturnUrl) &&
+                   ReturnUrl.StartsWith("/Faculty", StringComparison.OrdinalIgnoreCase)
+                ? await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash)
+                : RedirectToPage("/Faculty/Index");
         }
 
         await RegisterExternalUserAsync(externalLogin, advisor.UserName, email);

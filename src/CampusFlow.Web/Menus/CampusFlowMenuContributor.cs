@@ -32,10 +32,13 @@ public class CampusFlowMenuContributor : IMenuContributor
         var currentStudentView = context.ServiceProvider.GetRequiredService<ICurrentStudentView>();
         var facultyReader = context.ServiceProvider.GetRequiredService<FacultyPortalReader>();
         var advisingReader = context.ServiceProvider.GetRequiredService<FacultyAdvisingReader>();
+        var accountAccess = context.ServiceProvider.GetRequiredService<StudentOnlyAccountAccess>();
         var studentProfile = await currentStudentView.GetProfileAsync();
         var hasStudentProfile = studentProfile is not null;
         var studentOnly = hasStudentProfile && !currentStudentView.IsImpersonating &&
-            await context.ServiceProvider.GetRequiredService<StudentOnlyAccountAccess>().IsStudentOnlyAsync();
+            await accountAccess.IsStudentOnlyAsync();
+        var staffAccess = currentUser.IsAuthenticated && !studentOnly &&
+            await accountAccess.HasStaffAccessAsync();
 
         if (hasStudentProfile)
         {
@@ -128,7 +131,7 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(student);
         }
 
-        if (!studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.Default))
+        if (staffAccess && await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.Default))
         {
             var advisor = new ApplicationMenuItem(
                 CampusFlowMenus.Advisor,
@@ -197,7 +200,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
         var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
-        if (!studentOnly && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
+        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -262,12 +265,12 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(admin);
         }
         //Administration
-        var administration = context.Menu.GetAdministration();
-        if (studentOnly)
+        if (!staffAccess)
         {
-            context.Menu.TryRemoveMenuItem(administration.Name);
+            context.Menu.TryRemoveMenuItem("Abp.Application.Main.Administration");
             return;
         }
+        var administration = context.Menu.GetAdministration();
         administration.Order = 4;
         //Administration->Identity
         administration.SetSubItemOrder(IdentityMenuNames.GroupName, 1);

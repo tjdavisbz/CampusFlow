@@ -40,7 +40,7 @@ public sealed class ConfiguredAdministratorMiddleware
 
             if (!string.IsNullOrWhiteSpace(email) &&
                 administratorEmails.Contains(email, StringComparer.OrdinalIgnoreCase) &&
-                !await accountAccess.IsStudentOnlyAsync())
+                await accountAccess.HasStaffAccessAsync())
             {
                 var user = await userManager.FindByEmailAsync(email);
                 var role = await roleManager.FindByNameAsync(AdministratorRoleName);

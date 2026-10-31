@@ -40,6 +40,7 @@ public class IndexModel : CampusFlowPageModel
     private readonly IAdvisorPortalAppService _advisorPortal;
     private readonly IPermissionChecker _permissionChecker;
     private readonly StudentOnlyAccountAccess _studentOnlyAccountAccess;
+    private readonly FacultyPortalReader _facultyReader;
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
     private readonly IdentityUserManager _userManager;
     private readonly ICourseSelectionAppService _courseSelection;
@@ -64,6 +65,7 @@ public class IndexModel : CampusFlowPageModel
         IAdvisorPortalAppService advisorPortal,
         IPermissionChecker permissionChecker,
         StudentOnlyAccountAccess studentOnlyAccountAccess,
+        FacultyPortalReader facultyReader,
         IStudentInformationSystemAdvisorLookup advisorLookup,
         IdentityUserManager userManager,
         ICourseSelectionAppService courseSelection,
@@ -87,6 +89,7 @@ public class IndexModel : CampusFlowPageModel
         _advisorPortal = advisorPortal;
         _permissionChecker = permissionChecker;
         _studentOnlyAccountAccess = studentOnlyAccountAccess;
+        _facultyReader = facultyReader;
         _advisorLookup = advisorLookup;
         _userManager = userManager;
         _courseSelection = courseSelection;
@@ -119,7 +122,7 @@ public class IndexModel : CampusFlowPageModel
     public IReadOnlyList<PortalAnnouncement> VisibleAnnouncements { get; private set; } = [];
     public IReadOnlyList<DashboardTermOption> AnnouncementTerms { get; private set; } = [];
 
-    public async Task OnGetAsync([FromQuery] string? term = null)
+    public async Task<IActionResult> OnGetAsync([FromQuery] string? term = null)
     {
         TenantName = CurrentTenant.Name;
         Theme = _tenantThemeProvider.Get(TenantName);
@@ -127,11 +130,11 @@ public class IndexModel : CampusFlowPageModel
 
         if (CurrentUser.Id is null)
         {
-            return;
+            return Page();
         }
 
         HasAdvisorAccess = !_currentStudentView.IsImpersonating &&
-            !await _studentOnlyAccountAccess.IsStudentOnlyAsync() && await _permissionChecker.IsGrantedAsync(
+            await _studentOnlyAccountAccess.HasStaffAccessAsync() && await _permissionChecker.IsGrantedAsync(
             CampusFlowPermissions.AdvisorPortal.Default);
 
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
@@ -283,6 +286,21 @@ public class IndexModel : CampusFlowPageModel
             AdvisorStudentCount = queue.Count;
             AdvisorCourseCount = queue.Sum(x => x.PendingCourseCount);
         }
+        if (!HasStudentAccess && !HasAdvisorAccess && !_currentStudentView.IsImpersonating &&
+            !string.IsNullOrWhiteSpace(CurrentUser.Email))
+        {
+            try
+            {
+                if (await _facultyReader.FindFacultyAsync(CurrentUser.Email, HttpContext.RequestAborted) is not null)
+                    return RedirectToPage("/Faculty/Index");
+            }
+            catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                _logger.LogWarning(exception, "Unable to resolve the faculty portal landing page.");
+            }
+        }
+
+        return Page();
     }
 
     private async Task<RegistrationJourneyViewModel> BuildRegistrationJourneyAsync(

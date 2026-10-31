@@ -23,6 +23,31 @@ public sealed class StudentOnlyAccountAccess(
     ILogger<StudentOnlyAccountAccess> logger) : ITransientDependency
 {
     private const string CacheKey = "CampusFlow.StudentOnlyAccount";
+    private const string StaffCacheKey = "CampusFlow.StaffAccount";
+
+    public async Task<bool> HasStaffAccessAsync()
+    {
+        if (!currentUser.IsAuthenticated || string.IsNullOrWhiteSpace(currentUser.Email) ||
+            IsNelsonStudentMailbox(currentUser.Email)) return false;
+
+        var context = httpContextAccessor.HttpContext;
+        if (context?.Items.TryGetValue(StaffCacheKey, out var cached) == true && cached is bool result)
+            return result;
+
+        var hasStaffAccess = false;
+        try
+        {
+            hasStaffAccess = await facultyReader.HasActiveStaffIdentityAsync(
+                currentUser.Email, context?.RequestAborted ?? default);
+        }
+        catch (Exception exception) when (context?.RequestAborted.IsCancellationRequested != true)
+        {
+            logger.LogWarning(exception, "Unable to verify staff portal access; denying access.");
+        }
+
+        if (context is not null) context.Items[StaffCacheKey] = hasStaffAccess;
+        return hasStaffAccess;
+    }
 
     public async Task<bool> IsStudentOnlyAsync()
     {

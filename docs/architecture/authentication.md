@@ -24,6 +24,13 @@ Admin and Advisor portals will use separate record-matching policies when their 
 Advisor identity and assignment requirements are recorded in
 [`registration-and-advisor-review.md`](registration-and-advisor-review.md).
 
+Faculty portal eligibility comes from a unique `FacultyPortal` record matched through
+an active faculty email address. It does not require an enabled `CAMSUser` record.
+Staff/admin and advisor portal eligibility is checked separately against an enabled
+`CAMSUser` with the sign-in email; role and permission checks still apply. A person
+with both records can use both areas, while faculty-only registration grants no
+staff, advisor, or administrator role.
+
 ## Student information system boundary
 
 Authentication code does not query a vendor database directly. It uses

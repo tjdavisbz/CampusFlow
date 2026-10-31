@@ -34,4 +34,20 @@ public class StudentOnlyPortalMiddlewareTests
     {
         StudentOnlyPortalMiddleware.IsPrivilegedPath(new PathString(path)).ShouldBe(expected);
     }
+
+    [Theory]
+    [InlineData("/Admin/ImpersonateFaculty", true)]
+    [InlineData("/Advisor", true)]
+    [InlineData("/Identity/Users", true)]
+    [InlineData("/api/app/housing-workspace", true)]
+    [InlineData("/api/permission-management/permissions", true)]
+    [InlineData("/Faculty", false)]
+    [InlineData("/Faculty/students", false)]
+    [InlineData("/Faculty/email", false)]
+    [InlineData("/api/app/course-selection", false)]
+    [InlineData("/", false)]
+    public void Only_Staff_Accounts_Can_Reach_Non_Faculty_Privileged_Routes(string path, bool expected)
+    {
+        StudentOnlyPortalMiddleware.IsStaffOnlyPath(new PathString(path)).ShouldBe(expected);
+    }
 }

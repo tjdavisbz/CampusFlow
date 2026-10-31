@@ -9,11 +9,12 @@ public sealed class StudentOnlyPortalMiddleware(RequestDelegate next)
     {
         if (context.User.Identity?.IsAuthenticated == true &&
             IsPrivilegedPath(context.Request.Path) &&
-            await accountAccess.IsStudentOnlyAsync())
+            ((IsStaffOnlyPath(context.Request.Path) && !await accountAccess.HasStaffAccessAsync()) ||
+             await accountAccess.IsStudentOnlyAsync()))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "text/plain; charset=utf-8";
-            await context.Response.WriteAsync("This account has access to the student portal only.");
+            await context.Response.WriteAsync("This account does not have access to this portal area.");
             return;
         }
 
@@ -37,4 +38,7 @@ public sealed class StudentOnlyPortalMiddleware(RequestDelegate next)
         (path.StartsWithSegments("/api/app") &&
          !path.StartsWithSegments("/api/app/course-selection") &&
          !path.StartsWithSegments("/api/app/meal-plan"));
+
+    public static bool IsStaffOnlyPath(PathString path) =>
+        IsPrivilegedPath(path) && !path.StartsWithSegments("/Faculty");
 }
