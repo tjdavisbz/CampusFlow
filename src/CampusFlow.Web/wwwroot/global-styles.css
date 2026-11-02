@@ -117,6 +117,21 @@ body .lpx-sidebar-container .lpx-sidebar-header {
 .lpx-sidebar .lpx-brand-text,
 .lpx-sidebar .lpx-brand > span { display: none !important; }
 
+/* The mobile theme positions this title over its account and menu buttons.
+   The logo already contains the university name, so leave the controls clear. */
+@media (max-width: 767px) {
+    body .lpx-mobile-navbar .lpx-brand-name { display: none !important; }
+    body .lpx-mobile-navbar-container { --lpx-brand: var(--tenant-accent, #c5c0e0); }
+
+    /* LeptonX fixes the footer above the mobile browser controls, which covers
+       the page while scrolling. Keep it after the page content instead. */
+    body .lpx-footbar-container {
+        position: static;
+        width: 100%;
+        box-shadow: none;
+    }
+}
+
 #desktop-sidebar > .outer-menu-item > .lpx-menu-item-link { color: #fff !important; }
 #desktop-sidebar > .outer-menu-item > .lpx-menu-item-link .lpx-menu-item-icon { color: var(--tenant-accent, #c5c0e0) !important; }
 #desktop-sidebar > .outer-menu-item > .lpx-menu-item-link:hover:not(.selected) { background-color: color-mix(in srgb, white, transparent 86%) !important; }
