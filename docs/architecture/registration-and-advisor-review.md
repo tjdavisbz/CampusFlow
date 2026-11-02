@@ -74,7 +74,8 @@ CampusFlow does not depend on the legacy `SAGU_SectionAttendanceTypes` table at 
 - Attendance-type-to-advisor assignment must become tenant-admin configuration rather than
   Nelson-specific conditional code.
 - An advisor may see only students assigned to them under the configured attendance-type
-  rules, unless a future explicit administrative permission grants broader access.
+  rules. The Advisor Assignments screen also has a Global row for users who may review
+  every attendance type; advisor access does not depend on a separate security role.
 
 ## CampusFlow persistence requirements
 
@@ -106,12 +107,11 @@ history, not a single mutable field that loses earlier conversation context.
 
 ## Email boundary
 
-Submission is intended to email the student from the advisor's address and include the
-course decisions/comments and overall comment. CampusFlow does not yet have an outbound
-email service, so email implementation is deferred until Nelson configures Microsoft Graph,
-an approved SMTP relay, or another provider. Review persistence and Elements changes must
-not be rolled back merely because email delivery is unavailable or fails. Email delivery
-should have its own pending/completed/failed status and retry path.
+Submission emails the student from the advisor's linked Microsoft mailbox using delegated
+Mail.Send. The advisor previews approved, rejected, and still-pending results before saving;
+the advisor's overall notes appear below the course results. Review persistence and Elements
+changes are not rolled back if Microsoft does not accept the email. Each submission records
+email status and supports a retry from the same advisor account.
 
 ## Implementation boundary for Registration
 

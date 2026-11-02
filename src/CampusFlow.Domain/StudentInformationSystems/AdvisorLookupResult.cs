@@ -6,5 +6,4 @@ public sealed record AdvisorLookupResult(
     string Email,
     string FirstName,
     string LastName,
-    string DisplayName,
-    bool CanViewAll);
+    string DisplayName);

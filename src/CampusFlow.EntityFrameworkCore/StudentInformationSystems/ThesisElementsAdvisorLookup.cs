@@ -73,13 +73,9 @@ public sealed class ThesisElementsAdvisorLookup : IStudentInformationSystemAdvis
         if (await reader.ReadAsync(cancellationToken))
             throw new InvalidOperationException("The Microsoft account matched more than one active Elements user.");
 
-        var globalReviewers = _configuration
-            .GetSection("AdvisorPortal:LegacyGlobalReviewerUsernames")
-            .Get<string[]>() ?? [];
         return new AdvisorLookupResult(id, userName,
             string.IsNullOrWhiteSpace(elementsEmail) ? normalizedEmail : elementsEmail,
-            firstName, lastName, displayName,
-            globalReviewers.Contains(userName, StringComparer.OrdinalIgnoreCase));
+            firstName, lastName, displayName);
     }
 
     public async Task<IReadOnlyList<AdvisorLookupResult>> SearchAsync(
@@ -115,7 +111,7 @@ public sealed class ThesisElementsAdvisorLookup : IStudentInformationSystemAdvis
             results.Add(new AdvisorLookupResult(reader.GetInt32(0).ToString(), userName, email,
                 reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
                 reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                reader.IsDBNull(5) ? userName : reader.GetString(5), false));
+                reader.IsDBNull(5) ? userName : reader.GetString(5)));
         }
         return results;
     }

@@ -12,7 +12,7 @@ using Volo.Abp.Domain.Repositories;
 
 namespace CampusFlow.Web.Pages.Advisor;
 
-[Authorize(CampusFlowPermissions.AdvisorPortal.Default)]
+[Authorize]
 public class IndexModel : CampusFlowPageModel
 {
     private readonly IAdvisorPortalAppService _advisorPortal;
@@ -34,8 +34,9 @@ public class IndexModel : CampusFlowPageModel
     public IReadOnlyList<AdvisorTermOption> Terms { get; private set; } = [];
     public AdvisorTermOption? SelectedTerm { get; private set; }
 
-    public async Task OnGetAsync([FromQuery] string? term = null)
+    public async Task<IActionResult> OnGetAsync([FromQuery] string? term = null)
     {
+        if (!await _advisorPortal.HasAccessAsync()) return Forbid();
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         var configurations = (await _termConfigurations.GetListAsync())
             .Where(x => x.IsStudentSelectable).OrderByDescending(x => x.TermCode).ToArray();
@@ -47,6 +48,7 @@ public class IndexModel : CampusFlowPageModel
         Students = SelectedTerm is null
             ? []
             : await _advisorPortal.GetQueueAsync(SelectedTerm.ExternalTermId);
+        return Page();
     }
 
     public sealed record AdvisorTermOption(string ExternalTermId, string DisplayName);

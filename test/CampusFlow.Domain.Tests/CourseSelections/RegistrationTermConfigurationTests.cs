@@ -75,6 +75,26 @@ public class RegistrationTermConfigurationTests
     }
 
     [Fact]
+    public void Group_window_requires_both_college_level_and_attendance_type()
+    {
+        var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);
+        term.ConfigureGroupWindows(false, [new CourseSelectionGroupWindow(
+            ["Freshman", "Sophomore"], ["Residential Undergraduate", "Distance Education"],
+            new DateTime(2026, 2, 1), new DateTime(2026, 2, 15))]);
+        var inside = new DateTime(2026, 2, 10);
+
+        term.IsOpen(inside).ShouldBeFalse();
+        term.IsOpenForStudent(inside, "20000041293", "Freshman", "Residential Undergraduate").ShouldBeTrue();
+        term.IsOpenForStudent(inside, "20000041293", "sophomore", "distance education").ShouldBeTrue();
+        term.IsOpenForStudent(inside, "20000041293", "Junior", "Residential Undergraduate").ShouldBeFalse();
+        term.IsOpenForStudent(inside, "20000041293", "Freshman", "Graduate").ShouldBeFalse();
+        term.IsOpenForStudent(new DateTime(2026, 2, 16), "20000041293", "Freshman",
+            "Residential Undergraduate").ShouldBeFalse();
+        term.IsOpenForStudent(new DateTime(2026, 4, 10), "20000041293", "Junior", "Graduate")
+            .ShouldBeFalse();
+    }
+
+    [Fact]
     public void Dashboard_default_must_also_be_student_selectable()
     {
         var term = Create(new DateTime(2026, 3, 1), new DateTime(2026, 5, 31), true);

@@ -14,7 +14,7 @@
   <div class="section-heading"><span>Course selection calendar</span><h2>Configured terms</h2><p>Students can switch between every enabled term whose course-selection window is currently open.</p></div>
   @if(Model.Configurations.Count==0){<div class="empty-result"><strong>No terms configured yet</strong><span>Configure a term below before students can begin Course Selection.</span></div>}
   else {<div class="config-table"><div class="config-table-head"><span>Term</span><span>Course-selection window</span><span>Status</span><span>Actions</span></div>
-   @foreach(var item in Model.Configurations){var open=item.IsOpen(DateTime.Now);var studentCount=item.GetStudentAccessIds().Count;<div class="config-table-row"><div><strong>@item.TermName</strong></div><div><span>@item.RegistrationOpensAt.ToString("MMM d, yyyy h:mm tt")</span><small>through @item.RegistrationClosesAt.ToString("MMM d, yyyy h:mm tt")</small></div><div><span class="status-pill @(open?"active":"")">@(open?"Open":item.IsEnabled?"Scheduled / closed":"Disabled")</span>@if(studentCount>0){<small>@studentCount student-specific access @(studentCount==1?"entry":"entries")</small>}</div><div class="row-actions"><a asp-route-edit="@item.Id" asp-fragment="term-editor">Edit</a><a asp-route-copyFrom="@item.Id" asp-fragment="term-editor"><i class="fa-regular fa-copy"></i> Copy forward</a></div></div>}
+   @foreach(var item in Model.Configurations){var open=item.IsOpen(DateTime.Now);var studentCount=item.GetStudentAccessIds().Count;var groupCount=item.GetGroupWindows().Count;<div class="config-table-row"><div><strong>@item.TermName</strong></div><div><span>@item.RegistrationOpensAt.ToString("MMM d, yyyy h:mm tt")</span><small>through @item.RegistrationClosesAt.ToString("MMM d, yyyy h:mm tt")</small></div><div><span class="status-pill @(open?"active":"")">@(open?"Open":item.IsEnabled?"Scheduled / group access":"Disabled")</span>@if(studentCount>0){<small>@studentCount student-specific access @(studentCount==1?"entry":"entries")</small>}@if(groupCount>0){<small>@groupCount group @(groupCount==1?"window":"windows")</small>}</div><div class="row-actions"><a asp-route-edit="@item.Id" asp-fragment="term-editor">Edit</a><a asp-route-copyFrom="@item.Id" asp-fragment="term-editor"><i class="fa-regular fa-copy"></i> Copy forward</a></div></div>}
   </div>}
  </section>
  <form method="post" asp-page-handler="Save" class="config-card term-editor" id="term-editor">
@@ -50,7 +50,30 @@
    <label>Course selection opens<input asp-for="Input.RegistrationOpensAt" type="datetime-local" /></label>
    <label>Course selection closes<input asp-for="Input.RegistrationClosesAt" type="datetime-local" /><span asp-validation-for="Input.RegistrationClosesAt"></span></label>
   </div>
-  <div class="toggle-grid"><label><input asp-for="Input.IsEnabled" /><span><strong>Enabled</strong>Allow this term to open during its window.</span></label><label><input asp-for="Input.RequireAdvisorReview" /><span><strong>Advisor review</strong>Send new selections to the advisor queue.</span></label><label><input asp-for="Input.EnforceSectionCapacity" /><span><strong>Section capacity</strong>Prevent selection of full sections.</span></label></div>
+  <div class="toggle-grid"><label><input asp-for="Input.IsEnabled" /><span><strong>Enabled</strong>Allow access to this term.</span></label><label><input asp-for="Input.AllowAllStudentsDuringWindow" /><span><strong>All eligible students during the main window</strong>Turn off when only selected groups or Student IDs should have access.</span></label><label><input asp-for="Input.RequireAdvisorReview" /><span><strong>Advisor review</strong>Send new selections to the advisor queue.</span></label><label><input asp-for="Input.EnforceSectionCapacity" /><span><strong>Section capacity</strong>Prevent selection of full sections.</span></label></div>
+  <div class="mapping-editor">
+   <div class="mapping-heading"><div><strong>Group access windows</strong><small>For each window, select one or more college levels and attendance types. A student must match one value in both lists.</small></div><button type="button" id="addGroupWindow"><i class="fa-solid fa-plus"></i> Add group window</button></div>
+   <div id="groupWindowRows">
+    @for(var i=0;i<Model.Input.GroupWindows.Count;i++)
+    {
+     <div class="group-window-row" data-group-window>
+      <label>Opens<input asp-for="Input.GroupWindows[i].OpensAt" type="datetime-local" /></label>
+      <label>Closes<input asp-for="Input.GroupWindows[i].ClosesAt" type="datetime-local" /></label>
+      <label>College levels<select asp-for="Input.GroupWindows[i].CollegeLevels" multiple size="5">@foreach(var value in Model.CollegeLevels){<option value="@value">@value</option>}</select></label>
+      <label>Attendance types<select asp-for="Input.GroupWindows[i].AttendanceTypes" multiple size="5">@foreach(var value in Model.StudentAttendanceTypes){<option value="@value">@value</option>}</select></label>
+      <button type="button" class="remove-group-window" aria-label="Remove group window"><i class="fa-solid fa-xmark"></i> Remove</button>
+     </div>
+    }
+   </div>
+   <span asp-validation-for="Input.GroupWindows"></span>
+   <template id="groupWindowTemplate"><div class="group-window-row" data-group-window>
+    <label>Opens<input name="Input.GroupWindows[__index__].OpensAt" type="datetime-local" required /></label>
+    <label>Closes<input name="Input.GroupWindows[__index__].ClosesAt" type="datetime-local" required /></label>
+    <label>College levels<select name="Input.GroupWindows[__index__].CollegeLevels" multiple size="5" required>@foreach(var value in Model.CollegeLevels){<option value="@value">@value</option>}</select></label>
+    <label>Attendance types<select name="Input.GroupWindows[__index__].AttendanceTypes" multiple size="5" required>@foreach(var value in Model.StudentAttendanceTypes){<option value="@value">@value</option>}</select></label>
+    <button type="button" class="remove-group-window" aria-label="Remove group window"><i class="fa-solid fa-xmark"></i> Remove</button>
+   </div></template>
+  </div>
   <div class="student-access-editor">
    <label class="block-field" asp-for="Input.StudentIdsText"><span>Open for specific students</span><small>Enter Student IDs, one per line (or separated by commas). These students can select courses for this term outside the general date window. The term must remain Enabled, and all normal course and student eligibility rules still apply. Clearing the list removes this access.</small><textarea asp-for="Input.StudentIdsText" rows="5" placeholder="20000041293"></textarea><span asp-validation-for="Input.StudentIdsText"></span></label>
   </div>
@@ -68,6 +91,11 @@ document.addEventListener('DOMContentLoaded',()=>{
  function wire(){rows.querySelectorAll('.remove-mapping').forEach(b=>b.onclick=()=>{b.closest('.mapping-row').remove();reindex()})}
  add.onclick=()=>{const opts='<option value="">Choose…</option>'+types.map(x=>`<option value="${x}">${x}</option>`).join('');rows.insertAdjacentHTML('beforeend',`<div class="mapping-row"><select>${opts}</select><i class="fa-solid fa-arrow-right"></i><select>${opts}</select><button type="button" class="remove-mapping"><i class="fa-solid fa-xmark"></i></button></div>`);reindex();wire()};
  form.addEventListener('submit',reindex);wire();reindex();
+ const groupRows=document.getElementById('groupWindowRows'),groupTemplate=document.getElementById('groupWindowTemplate');
+ const reindexGroups=()=>{[...groupRows.children].forEach((row,i)=>row.querySelectorAll('[name]').forEach(field=>{field.name=field.name.replace(/Input\.GroupWindows\[(?:\d+|__index__)\]/,`Input.GroupWindows[${i}]`)}))};
+ groupRows.addEventListener('click',event=>{const remove=event.target.closest('.remove-group-window');if(remove){remove.closest('[data-group-window]').remove();reindexGroups()}});
+ document.getElementById('addGroupWindow').addEventListener('click',()=>{groupRows.appendChild(groupTemplate.content.cloneNode(true));reindexGroups()});
+ form.addEventListener('submit',reindexGroups);
  document.querySelectorAll('[data-term-picker]').forEach(picker=>{const trigger=picker.querySelector('.term-picker-trigger'),menu=picker.querySelector('.term-picker-menu'),value=picker.querySelector('[data-term-value]'),label=picker.querySelector('[data-term-label]');
   const close=()=>{menu.hidden=true;trigger.setAttribute('aria-expanded','false')};
   trigger.addEventListener('click',()=>{const opening=menu.hidden;menu.hidden=!opening;trigger.setAttribute('aria-expanded',opening?'true':'false')});

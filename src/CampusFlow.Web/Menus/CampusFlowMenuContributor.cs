@@ -15,6 +15,7 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using CampusFlow.Web.Portals;
+using CampusFlow.AdvisorPortal;
 namespace CampusFlow.Web.Menus;
 public class CampusFlowMenuContributor : IMenuContributor
 {
@@ -131,7 +132,8 @@ public class CampusFlowMenuContributor : IMenuContributor
             context.Menu.AddItem(student);
         }
 
-        if (staffAccess && await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.Default))
+        if (staffAccess && await context.ServiceProvider
+                .GetRequiredService<IAdvisorPortalAppService>().HasAccessAsync())
         {
             var advisor = new ApplicationMenuItem(
                 CampusFlowMenus.Advisor,
@@ -194,7 +196,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
-        var canManageAdvisorRouting = await context.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ManageRouting);
+        var canManageAdvisorRouting = canManageRegistration;
         var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);

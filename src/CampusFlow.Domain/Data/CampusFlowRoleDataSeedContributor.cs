@@ -48,9 +48,7 @@ public class CampusFlowRoleDataSeedContributor : IDataSeedContributor, ITransien
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.HousingAssignments);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Registration Manager",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.Admin.GlobalConfiguration,
-            CampusFlowPermissions.Admin.RegistrationRules,
-            CampusFlowPermissions.AdvisorPortal.Default, CampusFlowPermissions.AdvisorPortal.ManageRouting);
-        await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Advisor", CampusFlowPermissions.AdvisorPortal.Default);
+            CampusFlowPermissions.Admin.RegistrationRules);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Student Support",
             CampusFlowPermissions.Admin.Default, CampusFlowPermissions.StudentImpersonation.Default);
         await EnsureRoleAsync(context.TenantId.Value, "CampusFlow Access Administrator",

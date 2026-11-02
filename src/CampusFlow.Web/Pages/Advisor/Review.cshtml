@@ -22,9 +22,60 @@
         <div class="queue-count"><strong>@Model.Review.Courses.Count</strong><span>pending courses</span></div>
     </header>
 
+    @if (!string.IsNullOrWhiteSpace(Model.EmailNotice))
+    {
+        <section class="advisor-card" role="status"><p>@Model.EmailNotice</p></section>
+    }
+    @if (!Model.MailConnected)
+    {
+        <section class="advisor-card">
+            <h2>Connect your Microsoft mailbox</h2>
+            <p>This review email is sent from your Nelson mailbox. Connect it once before saving and sending a review.</p>
+            <form method="post" asp-page-handler="Connect">
+                <input name="Input.StudentProfileId" type="hidden" value="@Model.Input.StudentProfileId" />
+                <input name="Input.ExternalTermId" type="hidden" value="@(Model.FailedEmailSubmissionId.HasValue?Model.Review.ExternalTermId:Model.Input.ExternalTermId)" />
+                @if (Model.FailedEmailSubmissionId.HasValue) { <input name="submissionId" type="hidden" value="@Model.FailedEmailSubmissionId" /> }
+                <button type="submit" class="advisor-primary">Connect Microsoft Mail.Send</button>
+            </form>
+        </section>
+    }
+
+    @if (Model.FailedEmailSubmissionId.HasValue)
+    {
+        <section class="advisor-card">
+            <div class="card-heading"><div><span>Email not confirmed</span><h2>@Model.EmailSubject</h2></div></div>
+            <div class="advisor-email-preview">@Html.Raw(Model.EmailPreviewHtml)</div>
+            <form method="post" asp-page-handler="RetryEmail">
+                <input type="hidden" name="submissionId" value="@Model.FailedEmailSubmissionId" />
+                <button type="submit" class="advisor-primary" disabled="@(!Model.MailConnected)">Retry email</button>
+            </form>
+        </section>
+    }
+    else
+    {
+
     <form method="post" id="advisorReviewForm">
         <input asp-for="Input.StudentProfileId" type="hidden" />
         <input asp-for="Input.ExternalTermId" type="hidden" />
+        <section class="advisor-card">
+            <div class="card-heading"><div><span>Current schedule</span><h2>Courses already on the student's schedule</h2></div><p>Approved and directly added courses are shown here for context. They are not part of this review.</p></div>
+            @if (Model.Review.ExistingCourses.Count == 0)
+            {
+                <p>No other courses are currently on this student's schedule.</p>
+            }
+            else
+            {
+                <div class="review-list">
+                    @foreach (var course in Model.Review.ExistingCourses)
+                    {
+                        <article class="review-course">
+                            <div class="course-heading"><div><span>@course.CourseCode-@course.Section</span><h3>@course.CourseName</h3></div><strong>@course.Credits.ToString("0.##") credits</strong></div>
+                            <div class="course-meta"><span><i class="fa-solid fa-check"></i> On schedule · @course.Status</span></div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
         <section class="advisor-card">
             <div class="card-heading"><div><span>Selected schedule</span><h2>Review each course</h2></div><p>You may decide some courses now and leave the others pending.</p></div>
             <div class="review-list">
@@ -47,7 +98,7 @@
                         }
                         <fieldset class="decision-control">
                             <legend>Decision</legend>
-                            <label><input asp-for="Input.Courses[i].Decision" type="radio" value="" checked /> Decide later</label>
+                            <label><input asp-for="Input.Courses[i].Decision" type="radio" value="" /> Decide later</label>
                             <label class="approve"><input asp-for="Input.Courses[i].Decision" type="radio" value="Approve" /> Approve</label>
                             <label class="reject"><input asp-for="Input.Courses[i].Decision" type="radio" value="Reject" /> Reject</label>
                         </fieldset>
@@ -57,11 +108,20 @@
             </div>
         </section>
         <section class="advisor-card overall-card">
-            <div><span>Overall comment</span><h2>Message to the student</h2><p>This will be saved with this review submission. Email delivery will be added later.</p></div>
+            <div><span>Advisor notes</span><h2>Message to the student</h2><p>These notes appear at the bottom of the email, after the course results.</p></div>
             <textarea asp-for="Input.OverallComment" rows="4" maxlength="4000" placeholder="Add an overall note about the student's schedule"></textarea>
         </section>
-        <div class="submit-bar"><a asp-page="/Advisor/Index">Cancel</a><button type="submit"><i class="fa-solid fa-check"></i> Submit review</button></div>
+        <div asp-validation-summary="All" class="advisor-errors" role="alert"></div>
+        @if (Model.PreviewReady)
+        {
+            <section class="advisor-card">
+                <div class="card-heading"><div><span>Email preview</span><h2>@Model.EmailSubject</h2></div><p>This is the proposed message. Saving will use the actual results recorded in Elements and CampusFlow.</p></div>
+                <div class="advisor-email-preview">@Html.Raw(Model.EmailPreviewHtml)</div>
+            </section>
+        }
+        <div class="submit-bar"><a asp-page="/Advisor/Index">Cancel</a><button type="submit" asp-page-handler="Preview"><i class="fa-regular fa-eye"></i> Preview email</button>@if (Model.PreviewReady && Model.MailConnected){<button type="submit" asp-page-handler="Submit" data-action="submit-review"><i class="fa-solid fa-check"></i> Save review and email student</button>}</div>
     </form>
+    }
 </main>
 
 <div class="advisor-processing" id="advisorProcessing" hidden><div><span></span><h2>Recording your review</h2><p>Please wait while course decisions are completed.</p></div></div>
@@ -82,15 +142,14 @@
             const processing = document.getElementById('advisorProcessing');
             let confirmed = false;
             form?.addEventListener('submit', event => {
+                if (event.submitter?.dataset.action !== 'submit-review') return;
                 if (confirmed) {
                     processing.hidden = false;
-                    form.querySelector('button[type="submit"]').disabled = true;
                     return;
                 }
-            const rejected = [...document.querySelectorAll('input[type="radio"][value="Reject"]:checked')];
+                const rejected = [...document.querySelectorAll('input[type="radio"][value="Reject"]:checked')];
                 if (!rejected.length) {
                     processing.hidden = false;
-                    form.querySelector('button[type="submit"]').disabled = true;
                     return;
                 }
                 event.preventDefault();
@@ -106,7 +165,7 @@
                 confirmed = true;
                 confirmation.hidden = true;
                 document.body.classList.remove('modal-open');
-                form.requestSubmit();
+                form.requestSubmit(form.querySelector('[data-action="submit-review"]'));
             });
         })();
     </script>

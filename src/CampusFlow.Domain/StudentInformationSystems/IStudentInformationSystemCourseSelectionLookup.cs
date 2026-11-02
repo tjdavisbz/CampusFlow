@@ -8,6 +8,9 @@ public interface IStudentInformationSystemCourseSelectionLookup
 {
     StudentInformationSystemProvider Provider { get; }
 
+    Task<CourseSelectionGroupOptions> GetStudentGroupOptionsAsync(
+        CancellationToken cancellationToken = default);
+
     Task<CourseSelectionContext?> GetContextAsync(
         string externalStudentId,
         string externalTermId,

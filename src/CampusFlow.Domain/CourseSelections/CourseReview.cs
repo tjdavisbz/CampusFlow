@@ -25,6 +25,8 @@ public class CourseReview : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public int RemovalAttemptCount { get; private set; }
     public DateTime? LastRemovalAttemptAt { get; private set; }
     public string? LastRemovalError { get; private set; }
+    public bool CanStudentRemove => Status == CourseReviewStatus.Pending && NeedsReview &&
+                                    RemovalStatus == ExternalCourseRemovalStatus.NotRequired;
 
     protected CourseReview() { }
 

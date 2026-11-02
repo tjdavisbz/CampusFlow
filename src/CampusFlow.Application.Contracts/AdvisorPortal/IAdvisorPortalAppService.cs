@@ -7,7 +7,10 @@ namespace CampusFlow.AdvisorPortal;
 
 public interface IAdvisorPortalAppService : IApplicationService
 {
+    Task<bool> HasAccessAsync();
     Task<List<AdvisorQueueItemDto>> GetQueueAsync(string? externalTermId = null);
     Task<AdvisorStudentReviewDto> GetStudentReviewAsync(Guid studentProfileId, string externalTermId);
-    Task SubmitAsync(SubmitAdvisorReviewInput input);
+    Task<AdvisorReviewEmailDto> PreviewEmailAsync(SubmitAdvisorReviewInput input);
+    Task<Guid> SubmitAsync(SubmitAdvisorReviewInput input);
+    Task<AdvisorReviewEmailDto> GetSubmissionEmailAsync(Guid submissionId);
 }

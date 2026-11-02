@@ -22,6 +22,8 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
     public bool IsDashboardDefault { get; private set; }
     public string AttendanceTypeMappingsJson { get; private set; } = "[]";
     public string StudentAccessIdsJson { get; private set; } = "[]";
+    public bool AllowAllStudentsDuringWindow { get; private set; } = true;
+    public string GroupWindowsJson { get; private set; } = "[]";
 
     protected RegistrationTermConfiguration() { }
 
@@ -49,10 +51,45 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
         AttendanceTypeMappingsJson = mappingsJson;
     }
 
-    public bool IsOpen(DateTime at) => IsEnabled && RegistrationOpensAt <= at && RegistrationClosesAt >= at;
+    public bool IsOpen(DateTime at) => IsEnabled && AllowAllStudentsDuringWindow &&
+        RegistrationOpensAt <= at && RegistrationClosesAt >= at;
 
-    public bool IsOpenForStudent(DateTime at, string studentId) =>
-        IsEnabled && (IsOpen(at) || GetStudentAccessIds().Contains(studentId?.Trim(), StringComparer.Ordinal));
+    public bool IsOpenForStudent(DateTime at, string studentId, string? collegeLevel = null,
+        string? attendanceType = null) => IsEnabled &&
+        (IsOpen(at) || GetStudentAccessIds().Contains(studentId?.Trim(), StringComparer.Ordinal) ||
+         GetGroupWindows().Any(window => window.OpensAt <= at && window.ClosesAt >= at &&
+             window.CollegeLevels.Contains(collegeLevel?.Trim(), StringComparer.OrdinalIgnoreCase) &&
+             window.AttendanceTypes.Contains(attendanceType?.Trim(), StringComparer.OrdinalIgnoreCase)));
+
+    public IReadOnlyList<CourseSelectionGroupWindow> GetGroupWindows()
+    {
+        try { return JsonSerializer.Deserialize<CourseSelectionGroupWindow[]>(GroupWindowsJson) ?? []; }
+        catch (JsonException) { return []; }
+    }
+
+    public void ConfigureGroupWindows(bool allowAllStudentsDuringWindow,
+        IEnumerable<CourseSelectionGroupWindow> groupWindows)
+    {
+        ArgumentNullException.ThrowIfNull(groupWindows);
+        var windows = groupWindows.Select(x => new CourseSelectionGroupWindow(
+            NormalizeValues(x.CollegeLevels), NormalizeValues(x.AttendanceTypes), x.OpensAt, x.ClosesAt)).ToArray();
+        if (windows.Length > 50 || windows.Any(x => x.CollegeLevels.Count == 0 ||
+            x.AttendanceTypes.Count == 0 || x.ClosesAt <= x.OpensAt))
+            throw new ArgumentException("Each group window needs college levels, attendance types, and a valid time range.",
+                nameof(groupWindows));
+        AllowAllStudentsDuringWindow = allowAllStudentsDuringWindow;
+        GroupWindowsJson = JsonSerializer.Serialize(windows);
+    }
+
+    private static string[] NormalizeValues(IReadOnlyList<string> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        var normalized = values.Select(x => x?.Trim() ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (normalized.Length > 30 || normalized.Any(x => x.Length is < 1 or > 100))
+            throw new ArgumentException("A group window contains an invalid college level or attendance type.");
+        return normalized;
+    }
 
     public IReadOnlyList<string> GetStudentAccessIds()
     {

@@ -9,7 +9,7 @@
  <header class="admin-config-hero"><div><span>Admin portal</span><h1>Advisor assignments</h1><p>Choose which advisors can work with each student group.</p></div><i class="fa-solid fa-people-arrows"></i></header>
  <form method="post" asp-page-handler="Save" class="config-card advisor-routing-card">
   <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-  <div class="section-heading"><span>Student routing</span><h2>Attendance-type assignments</h2><p>Search for an active Elements advisor by name, username, or university email. Each group can have as many advisors as it needs.</p></div>
+  <div class="section-heading"><span>Advisor access</span><h2>Global and attendance-type assignments</h2><p>Search for an active Elements user by name, username, or university email. The Global row grants access to every student's review queue; other rows grant access only to that attendance type.</p></div>
   @if(Model.Rows.Count==0){<div class="empty-result"><strong>No attendance types are available</strong><span>Attendance types appear here after Course Selection section mappings are loaded.</span></div>}
   else
   {
@@ -19,7 +19,7 @@
     <section class="advisor-group" data-advisor-group>
      <input asp-for="Rows[i].AttendanceType" type="hidden" />
      <input asp-for="Rows[i].AdvisorEmailsJson" type="hidden" data-advisor-values />
-     <div class="advisor-group-title"><strong>@Model.Rows[i].AttendanceType</strong><span data-advisor-count>@Model.Rows[i].Advisors.Count advisor@(Model.Rows[i].Advisors.Count==1 ? "" : "s") assigned</span></div>
+     <div class="advisor-group-title"><strong>@(Model.Rows[i].AttendanceType==CampusFlow.CourseSelections.AdvisorAssignment.GlobalAttendanceType?"Global Advisor":Model.Rows[i].AttendanceType)</strong><span data-advisor-count>@Model.Rows[i].Advisors.Count advisor@(Model.Rows[i].Advisors.Count==1 ? "" : "s") assigned</span></div>
      <div class="advisor-chips" data-advisor-chips>
       @foreach(var advisor in Model.Rows[i].Advisors){<span class="advisor-chip" data-email="@advisor.Email"><span><strong>@advisor.Name</strong><small>@advisor.Email</small></span><button type="button" aria-label="Remove @advisor.Name"><i class="fa-solid fa-xmark"></i></button></span>}
      </div>
@@ -29,7 +29,7 @@
    }
    </div>
   }
-  <div class="routing-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Advisors who can see every student</strong><p>Global visibility is intentionally separate from attendance routing. Assign the “View all advisor students” permission through <a href="/Identity/Users">Users &amp; Roles</a>.</p></div></div>
+  <div class="routing-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Access is controlled here</strong><p>Advisors no longer need a separate advisor role or permission. Use the Global row for access to every student.</p></div></div>
   @if(Model.Rows.Count>0){<button class="primary-action" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save advisor assignments</button>}
  </form>
 </main>

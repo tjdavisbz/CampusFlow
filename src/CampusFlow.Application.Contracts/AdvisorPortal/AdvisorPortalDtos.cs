@@ -37,6 +37,16 @@ public sealed class AdvisorStudentReviewDto
     public string StudentEmail { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
     public List<AdvisorCourseReviewDto> Courses { get; set; } = [];
+    public List<AdvisorScheduledCourseDto> ExistingCourses { get; set; } = [];
+}
+
+public sealed class AdvisorScheduledCourseDto
+{
+    public string CourseCode { get; set; } = null!;
+    public string Section { get; set; } = null!;
+    public string CourseName { get; set; } = null!;
+    public decimal Credits { get; set; }
+    public string Status { get; set; } = null!;
 }
 
 public sealed class AdvisorCourseDecisionInput
@@ -52,4 +62,25 @@ public sealed class SubmitAdvisorReviewInput
     public string ExternalTermId { get; set; } = null!;
     public string? OverallComment { get; set; }
     public List<AdvisorCourseDecisionInput> Courses { get; set; } = [];
+}
+
+public sealed class AdvisorReviewEmailDto
+{
+    public Guid? SubmissionId { get; set; }
+    public string EmailStatus { get; set; } = "Pending";
+    public string StudentName { get; set; } = null!;
+    public string StudentEmail { get; set; } = null!;
+    public string ExternalTermId { get; set; } = null!;
+    public string TermName { get; set; } = null!;
+    public string? OverallComment { get; set; }
+    public List<AdvisorEmailCourseDto> Courses { get; set; } = [];
+}
+
+public sealed class AdvisorEmailCourseDto
+{
+    public string CourseCode { get; set; } = null!;
+    public string Section { get; set; } = null!;
+    public string CourseName { get; set; } = null!;
+    public string Status { get; set; } = null!;
+    public string? AdvisorComment { get; set; }
 }

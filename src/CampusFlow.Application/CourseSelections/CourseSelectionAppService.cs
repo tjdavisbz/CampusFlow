@@ -65,7 +65,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var profile = await GetCurrentProfileAsync();
         var context = await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId)
             ?? throw new UserFriendlyException("You are not eligible to select courses for that term.");
-        var policy = await GetCurrentPolicyAsync(externalTermId, profile);
+        var policy = await GetCurrentPolicyAsync(externalTermId, profile, context);
         var offerings = await _lookup.GetAvailableOfferingsAsync(externalTermId);
         var sectionMappings = await GetSectionMappingsAsync();
         var registrations = await _lookup.GetRegistrationsAsync(profile.ExternalStudentId, externalTermId);
@@ -122,7 +122,9 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 CourseName = x.CourseName,
                 Credits = x.Credits,
                 Status = x.RegistrationStatus,
-                CanRemove = string.Equals(x.RegistrationStatus, "Unofficial", StringComparison.OrdinalIgnoreCase),
+                CanRemove = string.Equals(x.RegistrationStatus, "Unofficial", StringComparison.OrdinalIgnoreCase) &&
+                    reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId &&
+                                     r.CanStudentRemove),
                 NeedsReview = reviews.Any(r =>
                     r.ExternalCourseRegistrationId == x.ExternalRegistrationId && r.NeedsReview)
             }).ToList()
@@ -255,11 +257,9 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var profile = await GetCurrentProfileAsync();
         var configurations = await _termConfigurations.GetListAsync();
         var now = Clock.Now;
-        var openConfigurations = configurations.Where(x => x.IsOpenForStudent(now, profile.StudentId)).ToArray();
-        if (openConfigurations.Length == 0) return [];
         var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
-        contexts = contexts.Where(x => openConfigurations.Any(c =>
-            c.ExternalTermId == x.ExternalTermId)).ToArray();
+        contexts = contexts.Where(x => configurations.Any(c => c.ExternalTermId == x.ExternalTermId &&
+            c.IsOpenForStudent(now, profile.StudentId, x.CollegeLevel, x.AttendanceType))).ToArray();
         return contexts
             .Select(x => new CourseSelectionTermDto
             {
@@ -276,9 +276,10 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             throw new UserFriendlyException("Please choose Yes or No before saving.");
 
         var profile = await GetCurrentProfileAsync();
-        await GetCurrentPolicyAsync(input.ExternalTermId, profile);
-        if (await _lookup.GetContextAsync(profile.ExternalStudentId, input.ExternalTermId) is null)
+        var context = await _lookup.GetContextAsync(profile.ExternalStudentId, input.ExternalTermId);
+        if (context is null)
             throw new UserFriendlyException("You are not eligible to select courses for that term.");
+        await GetCurrentPolicyAsync(input.ExternalTermId, profile, context);
 
         var intent = await _graduationIntents.FindAsync(x =>
             x.StudentProfileId == profile.Id && x.ExternalTermId == input.ExternalTermId);
@@ -404,12 +405,13 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         using (var reviewUow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true))
         {
             review = await _reviews.FindAsync(x => x.StudentProfileId == profile.Id &&
+                x.ExternalTermId == input.ExternalTermId &&
+                x.ExternalCourseOfferingId == input.ExternalOfferingId &&
                 x.ExternalCourseRegistrationId == input.ExternalRegistrationId);
-            if (review is not null)
-            {
-                review.BeginStudentRemoval(Clock.Now);
-                await _reviews.UpdateAsync(review, autoSave: true);
-            }
+            if (review is null || !review.CanStudentRemove)
+                throw new UserFriendlyException("Only courses awaiting advisor review can be removed through Course Selection.");
+            review.BeginStudentRemoval(Clock.Now);
+            await _reviews.UpdateAsync(review, autoSave: true);
             await reviewUow.CompleteAsync();
         }
 
@@ -448,13 +450,16 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             ?? throw new UserFriendlyException("Your student profile could not be found.");
     }
 
-    private async Task<CourseSelectionPolicy> GetCurrentPolicyAsync(string externalTermId, StudentProfile profile)
+    private async Task<CourseSelectionPolicy> GetCurrentPolicyAsync(string externalTermId, StudentProfile profile,
+        CourseSelectionContext? context = null)
     {
         var now = Clock.Now;
         var termConfiguration = await _termConfigurations.FindAsync(x => x.ExternalTermId == externalTermId);
         if (termConfiguration is not null)
         {
-            if (!termConfiguration.IsOpenForStudent(now, profile.StudentId))
+            context ??= await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId);
+            if (context is null || !termConfiguration.IsOpenForStudent(now, profile.StudentId,
+                context.CollegeLevel, context.AttendanceType))
                 throw new UserFriendlyException("Registration is not currently open for that term.");
             return termConfiguration.CreatePolicy(allowOutsideWindow: !termConfiguration.IsOpen(now));
         }

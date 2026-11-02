@@ -44,6 +44,31 @@ public class FacultyGraphMailSenderTests
     }
 
     [Fact]
+    public async Task Advisor_Review_Sends_Html_Directly_To_Student()
+    {
+        string? requestBody = null;
+        var handler = new StubHandler(async request =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.Accepted);
+        });
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(Arg.Any<string>()).Returns(new HttpClient(handler));
+        var sender = new FacultyGraphMailSender(factory, Substitute.For<ILogger<FacultyGraphMailSender>>());
+
+        var result = await sender.SendAsync("test-token", "advisor@nelson.edu", "Review", "<p>Approved</p>",
+            ["student@my.nelson.edu"], CancellationToken.None, html: true, directToRecipients: true);
+
+        result.Accepted.ShouldBeTrue();
+        using var json = JsonDocument.Parse(requestBody!);
+        var message = json.RootElement.GetProperty("message");
+        message.GetProperty("toRecipients")[0].GetProperty("emailAddress").GetProperty("address")
+            .GetString().ShouldBe("student@my.nelson.edu");
+        message.GetProperty("bccRecipients").GetArrayLength().ShouldBe(0);
+        message.GetProperty("body").GetProperty("contentType").GetString().ShouldBe("HTML");
+    }
+
+    [Fact]
     public async Task Does_Not_Call_Graph_For_Too_Many_Recipients()
     {
         var factory = Substitute.For<IHttpClientFactory>();

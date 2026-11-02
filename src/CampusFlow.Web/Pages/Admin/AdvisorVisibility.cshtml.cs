@@ -15,7 +15,7 @@ using Volo.Abp.Guids;
 
 namespace CampusFlow.Web.Pages.Admin;
 
-[Authorize(CampusFlowPermissions.AdvisorPortal.ManageRouting)]
+[Authorize(CampusFlowPermissions.Admin.RegistrationRules)]
 public class AdvisorVisibilityModel : CampusFlowPageModel
 {
     private readonly IRepository<AdvisorAssignment, Guid> _assignments;
@@ -111,8 +111,11 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
         var active = await _assignments.GetListAsync(x => x.IsActive);
         var types = (await _termConfigurations.GetListAsync())
             .SelectMany(x => ReadStudentAttendanceTypes(x.AttendanceTypeMappingsJson))
-            .Concat(active.Select(x => x.AttendanceType)).Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x).ToArray();
+            .Concat(active.Select(x => x.AttendanceType))
+            .Append(AdvisorAssignment.GlobalAttendanceType)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x == AdvisorAssignment.GlobalAttendanceType ? 0 : 1)
+            .ThenBy(x => x).ToArray();
         Rows = types.Select(type =>
         {
             var advisors = active.Where(x => string.Equals(x.AttendanceType, type,

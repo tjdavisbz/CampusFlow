@@ -6,6 +6,7 @@ namespace CampusFlow.CourseSelections;
 
 public class AdvisorAssignment : FullAuditedAggregateRoot<Guid>, IMultiTenant
 {
+    public const string GlobalAttendanceType = "Global";
     public Guid? TenantId { get; private set; }
     public string AttendanceType { get; private set; } = null!;
     public string ExternalAdvisorId { get; private set; } = null!;

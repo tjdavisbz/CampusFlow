@@ -36,4 +36,13 @@ public class CourseReviewSubmission : FullAuditedAggregateRoot<Guid>, IMultiTena
         SubmittedAt = submittedAt;
         EmailStatus = emailStatus;
     }
+
+    public void RecordEmailResult(DateTime attemptedAt, bool accepted, string? error)
+    {
+        if (EmailStatus == ReviewEmailStatus.Sent) return;
+        EmailAttemptCount++;
+        LastEmailAttemptAt = attemptedAt;
+        LastEmailError = accepted ? null : error;
+        EmailStatus = accepted ? ReviewEmailStatus.Sent : ReviewEmailStatus.Failed;
+    }
 }

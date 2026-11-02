@@ -20,6 +20,32 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
 
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
 
+    public async Task<CourseSelectionGroupOptions> GetStudentGroupOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT DISTINCT LTRIM(RTRIM(DisplayText)) AS Value, 'CollegeLevel' AS Kind
+            FROM dbo.CAMS_RegCollegeLevelRef_View
+            WHERE NULLIF(LTRIM(RTRIM(DisplayText)), '') IS NOT NULL
+            UNION ALL
+            SELECT DISTINCT LTRIM(RTRIM(DisplayText)) AS Value, 'AttendanceType' AS Kind
+            FROM dbo.Glossary_ATTENDENCE_TYPE
+            WHERE NULLIF(LTRIM(RTRIM(DisplayText)), '') IS NOT NULL
+            ORDER BY Kind, Value
+            """;
+        var levels = new List<string>();
+        var types = new List<string>();
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (reader.GetString(1) == "CollegeLevel") levels.Add(reader.GetString(0));
+            else types.Add(reader.GetString(0));
+        }
+        return new CourseSelectionGroupOptions(levels, types);
+    }
+
     public async Task<CourseSelectionContext?> GetContextAsync(
         string externalStudentId, string externalTermId, CancellationToken cancellationToken = default)
     {
@@ -30,7 +56,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
                 status.TermCalendarID,
                 status.TextTerm,
                 student.AttendanceType,
-                status.MaxAllowedHours
+                status.MaxAllowedHours,
+                status.CollegeLevel
             FROM [dbo].[CAMS_StudentStatus_View] status
             INNER JOIN [dbo].[CAMS_Student_View] student
                 ON student.StudentUID = status.StudentUID
@@ -49,7 +76,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
             reader.GetInt32(1).ToString(),
             reader.GetString(2).Trim(),
             reader.GetString(3).Trim(),
-            Convert.ToDecimal(reader.GetValue(4)));
+            Convert.ToDecimal(reader.GetValue(4)),
+            reader.IsDBNull(5) ? string.Empty : Convert.ToString(reader.GetValue(5))!.Trim());
     }
 
     public async Task<IReadOnlyList<CourseSelectionContext>> GetEligibleContextsAsync(
@@ -65,7 +93,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
                 term.TextTerm,
                 student.AttendanceType,
                 status.MaxAllowedHours,
-                term.TermStartDate
+                term.TermStartDate,
+                status.CollegeLevel
             FROM [dbo].[CAMS_StudentStatus_View] status
             INNER JOIN [dbo].[TermCalendar] term
                 ON term.TermCalendarID = status.TermCalendarID
@@ -86,7 +115,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
         {
             results.Add(new CourseSelectionContext(Provider, reader.GetInt32(0).ToString(),
                 reader.GetInt32(1).ToString(), reader.GetString(2).Trim(), reader.GetString(3).Trim(),
-                Convert.ToDecimal(reader.GetValue(4))));
+                Convert.ToDecimal(reader.GetValue(4)),
+                reader.IsDBNull(6) ? string.Empty : Convert.ToString(reader.GetValue(6))!.Trim()));
         }
         return results;
     }

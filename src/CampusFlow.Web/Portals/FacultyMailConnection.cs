@@ -155,7 +155,8 @@ public sealed class FacultyGraphMailSender(IHttpClientFactory httpClientFactory,
     ILogger<FacultyGraphMailSender> logger) : ITransientDependency
 {
     public async Task<FacultyMailSendResult> SendAsync(string accessToken, string senderEmail,
-        string subject, string body, IReadOnlyList<string> recipients, CancellationToken cancellationToken)
+        string subject, string body, IReadOnlyList<string> recipients, CancellationToken cancellationToken,
+        bool html = false, bool directToRecipients = false)
     {
         if (recipients.Count is < 1 or > 100) return new(false, "Choose between 1 and 100 students.");
         if (!MailAddress.TryCreate(senderEmail, out var senderAddress) ||
@@ -169,9 +170,11 @@ public sealed class FacultyGraphMailSender(IHttpClientFactory httpClientFactory,
             message = new
             {
                 subject,
-                body = new { contentType = "Text", content = body },
-                toRecipients = new[] { new { emailAddress = new { address = senderAddress.Address } } },
-                bccRecipients = recipients.Select(x => new { emailAddress = new { address = x } }).ToArray()
+                body = new { contentType = html ? "HTML" : "Text", content = body },
+                toRecipients = (directToRecipients ? recipients : [senderAddress.Address])
+                    .Select(x => new { emailAddress = new { address = x } }).ToArray(),
+                bccRecipients = directToRecipients ? [] : recipients
+                    .Select(x => new { emailAddress = new { address = x } }).ToArray()
             },
             saveToSentItems = true
         });

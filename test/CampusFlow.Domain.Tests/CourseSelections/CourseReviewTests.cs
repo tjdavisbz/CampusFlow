@@ -15,6 +15,7 @@ public class CourseReviewTests
         review.Status.ShouldBe(CourseReviewStatus.Pending);
         review.NeedsReview.ShouldBeTrue();
         review.RemovalStatus.ShouldBe(ExternalCourseRemovalStatus.NotRequired);
+        review.CanStudentRemove.ShouldBeTrue();
     }
 
     [Fact]
@@ -30,6 +31,7 @@ public class CourseReviewTests
         review.RemovalStatus.ShouldBe(ExternalCourseRemovalStatus.NotRequired);
         review.AdvisorComment.ShouldBe("Looks good");
         review.DecidedByUserId.ShouldBe(advisorUserId);
+        review.CanStudentRemove.ShouldBeFalse();
     }
 
     [Fact]
@@ -62,6 +64,7 @@ public class CourseReviewTests
         review.Status.ShouldBe(CourseReviewStatus.Failed);
         review.NeedsReview.ShouldBeTrue();
         review.RemovalStatus.ShouldBe(ExternalCourseRemovalStatus.Failed);
+        review.CanStudentRemove.ShouldBeFalse();
         review.RemovalAttemptCount.ShouldBe(1);
         review.LastRemovalError.ShouldBe("Elements unavailable");
     }
@@ -75,6 +78,7 @@ public class CourseReviewTests
         review.BeginStudentRemoval(attemptedAt);
 
         review.RemovalStatus.ShouldBe(ExternalCourseRemovalStatus.Pending);
+        review.CanStudentRemove.ShouldBeFalse();
         review.RemovalAttemptCount.ShouldBe(1);
         review.LastRemovalAttemptAt.ShouldBe(attemptedAt);
 
@@ -92,6 +96,12 @@ public class CourseReviewTests
         review.ReassignAdvisor("77", "newadvisor@nelson.edu");
         review.ExternalAdvisorId.ShouldBe("77");
         review.AdvisorEmail.ShouldBe("newadvisor@nelson.edu");
+    }
+
+    [Fact]
+    public void Course_without_required_advisor_review_cannot_be_removed_by_student()
+    {
+        CreateReview(needsReview: false).CanStudentRemove.ShouldBeFalse();
     }
 
     [Fact]

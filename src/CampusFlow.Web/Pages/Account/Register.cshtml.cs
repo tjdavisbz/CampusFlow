@@ -14,11 +14,9 @@ using Volo.Abp.Account.Web;
 using Volo.Abp.Identity;
 using Volo.Abp.Security.Claims;
 using CampusFlow.Students;
-using CampusFlow.Permissions;
 using CampusFlow.Web.Portals;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Guids;
-using Volo.Abp.PermissionManagement;
 using Volo.Abp;
 
 namespace CampusFlow.Web.Pages.Account;
@@ -31,7 +29,6 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
     private readonly IStudentInformationSystemAdvisorLookup _advisorLookup;
     private readonly FacultyPortalReader _facultyPortalReader;
     private readonly IdentityRoleManager _roleManager;
-    private readonly IPermissionManager _permissionManager;
     private readonly IConfiguration _configuration;
 
     public RegisterModel(
@@ -45,7 +42,6 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         IStudentInformationSystemAdvisorLookup advisorLookup,
         FacultyPortalReader facultyPortalReader,
         IdentityRoleManager roleManager,
-        IPermissionManager permissionManager,
         IConfiguration configuration)
         : base(
             accountAppService,
@@ -59,7 +55,6 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         _advisorLookup = advisorLookup;
         _facultyPortalReader = facultyPortalReader;
         _roleManager = roleManager;
-        _permissionManager = permissionManager;
         _configuration = configuration;
     }
 
@@ -174,20 +169,6 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         EnsureIdentitySucceeded(await UserManager.UpdateAsync(user));
         await EnsureConfiguredFullAdministratorAsync(user, email);
 
-        const string advisorRoleName = "advisor";
-        await EnsureRoleAsync(user, advisorRoleName);
-        await _permissionManager.SetForRoleAsync(
-            advisorRoleName, CampusFlowPermissions.AdvisorPortal.Default, true);
-        if (advisor.CanViewAll)
-        {
-            const string globalReviewerRoleName = "advisor-global-reviewer";
-            await EnsureRoleAsync(user, globalReviewerRoleName);
-            await _permissionManager.SetForRoleAsync(
-                globalReviewerRoleName, CampusFlowPermissions.AdvisorPortal.Default, true);
-            await _permissionManager.SetForRoleAsync(
-                globalReviewerRoleName, CampusFlowPermissions.AdvisorPortal.ViewAll, true);
-        }
-
         return await RedirectSafelyAsync(ReturnUrl, ReturnUrlHash);
     }
 
@@ -208,21 +189,6 @@ public class RegisterModel : Volo.Abp.Account.Web.Pages.Account.RegisterModel
         if (!await UserManager.IsInRoleAsync(user, administratorRoleName))
         {
             EnsureIdentitySucceeded(await UserManager.AddToRoleAsync(user, administratorRoleName));
-        }
-    }
-
-    private async Task EnsureRoleAsync(IdentityUser user, string roleName)
-    {
-        var role = await _roleManager.FindByNameAsync(roleName);
-        if (role is null)
-        {
-            role = new IdentityRole(_guidGenerator.Create(), roleName, CurrentTenant.Id);
-            EnsureIdentitySucceeded(await _roleManager.CreateAsync(role));
-        }
-
-        if (!await UserManager.IsInRoleAsync(user, roleName))
-        {
-            EnsureIdentitySucceeded(await UserManager.AddToRoleAsync(user, roleName));
         }
     }
 

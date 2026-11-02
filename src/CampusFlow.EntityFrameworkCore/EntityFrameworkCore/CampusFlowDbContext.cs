@@ -341,6 +341,7 @@ public class CampusFlowDbContext :
             b.Property(x => x.TermName).IsRequired().HasMaxLength(160);
             b.Property(x => x.AttendanceTypeMappingsJson).IsRequired();
             b.Property(x => x.StudentAccessIdsJson).IsRequired();
+            b.Property(x => x.GroupWindowsJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.ExternalTermId }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.IsEnabled, x.RegistrationOpensAt, x.RegistrationClosesAt });
         });

@@ -22,17 +22,20 @@ public class RegistrationRulesModel : CampusFlowPageModel
     private readonly IRepository<RegistrationTermConfiguration, Guid> _configurations;
     private readonly IRepository<CourseSectionAttendanceTypeMapping, Guid> _sectionMappings;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
+    private readonly IStudentInformationSystemCourseSelectionLookup _courseLookup;
     private readonly IGuidGenerator _guidGenerator;
     private readonly ITenantThemeProvider _tenantThemeProvider;
 
     public RegistrationRulesModel(IRepository<RegistrationTermConfiguration, Guid> configurations,
         IRepository<CourseSectionAttendanceTypeMapping, Guid> sectionMappings,
-        IEnumerable<IStudentInformationSystemTermLookup> termLookups, IGuidGenerator guidGenerator,
+        IEnumerable<IStudentInformationSystemTermLookup> termLookups,
+        IStudentInformationSystemCourseSelectionLookup courseLookup, IGuidGenerator guidGenerator,
         ITenantThemeProvider tenantThemeProvider)
     {
         _configurations = configurations;
         _sectionMappings = sectionMappings;
         _termLookups = termLookups.ToArray();
+        _courseLookup = courseLookup;
         _guidGenerator = guidGenerator;
         _tenantThemeProvider = tenantThemeProvider;
     }
@@ -41,6 +44,8 @@ public class RegistrationRulesModel : CampusFlowPageModel
     public IReadOnlyList<RegistrationTermConfiguration> Configurations { get; private set; } = [];
     public IReadOnlyList<SelectListItem> Terms { get; private set; } = [];
     public IReadOnlyList<string> AttendanceTypes { get; private set; } = [];
+    public IReadOnlyList<string> CollegeLevels { get; private set; } = [];
+    public IReadOnlyList<string> StudentAttendanceTypes { get; private set; } = [];
     public TenantTheme Theme { get; private set; } = null!;
 
     public async Task OnGetAsync(Guid? edit = null, Guid? copyFrom = null)
@@ -55,6 +60,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
             Input.Id = null;
             Input.ExternalTermId = string.Empty;
             Input.StudentIdsText = string.Empty;
+            Input.GroupWindows = [];
         }
     }
 
@@ -70,6 +76,17 @@ public class RegistrationRulesModel : CampusFlowPageModel
         if (term is null) ModelState.AddModelError("Input.ExternalTermId", "Choose a term from Elements.");
         if (Input.RegistrationClosesAt <= Input.RegistrationOpensAt)
             ModelState.AddModelError("Input.RegistrationClosesAt", "Closing must be after opening.");
+        if (Input.GroupWindows.Count > 50)
+            ModelState.AddModelError("Input.GroupWindows", "Enter no more than 50 group windows.");
+        foreach (var window in Input.GroupWindows)
+        {
+            if (window.OpensAt >= window.ClosesAt || window.CollegeLevels.Count == 0 ||
+                window.AttendanceTypes.Count == 0 ||
+                window.CollegeLevels.Except(CollegeLevels, StringComparer.OrdinalIgnoreCase).Any() ||
+                window.AttendanceTypes.Except(StudentAttendanceTypes, StringComparer.OrdinalIgnoreCase).Any())
+                ModelState.AddModelError("Input.GroupWindows",
+                    "Each group window needs valid dates and at least one listed college level and attendance type.");
+        }
         Input.Mappings = Input.Mappings.Where(x => !string.IsNullOrWhiteSpace(x.StudentAttendanceType) ||
             !string.IsNullOrWhiteSpace(x.CourseAttendanceType)).ToList();
         if (Input.Mappings.Any(x => string.IsNullOrWhiteSpace(x.StudentAttendanceType) ||
@@ -89,6 +106,8 @@ public class RegistrationRulesModel : CampusFlowPageModel
             existing.Update(Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
                 Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
             existing.ConfigureStudentAccess(studentIds);
+            existing.ConfigureGroupWindows(Input.AllowAllStudentsDuringWindow,
+                Input.GroupWindows.Select(x => x.ToWindow()));
             await _configurations.UpdateAsync(existing, autoSave: true);
             Alerts.Success($"{existing.TermName} registration was updated.");
         }
@@ -99,6 +118,8 @@ public class RegistrationRulesModel : CampusFlowPageModel
                 Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
                 Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
             configuration.ConfigureStudentAccess(studentIds);
+            configuration.ConfigureGroupWindows(Input.AllowAllStudentsDuringWindow,
+                Input.GroupWindows.Select(x => x.ToWindow()));
             await _configurations.InsertAsync(configuration, autoSave: true);
             Alerts.Success($"{selected.DisplayName} registration was configured.");
         }
@@ -114,6 +135,9 @@ public class RegistrationRulesModel : CampusFlowPageModel
         Terms = terms.Select(x => new SelectListItem(x.DisplayName, x.ExternalTermId)).ToArray();
         AttendanceTypes = (await _sectionMappings.GetListAsync()).Select(x => x.AttendanceType)
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToArray();
+        var groups = await _courseLookup.GetStudentGroupOptionsAsync(HttpContext.RequestAborted);
+        CollegeLevels = groups.CollegeLevels;
+        StudentAttendanceTypes = groups.AttendanceTypes;
     }
 
     private static InputModel Map(RegistrationTermConfiguration source)
@@ -123,7 +147,13 @@ public class RegistrationRulesModel : CampusFlowPageModel
             RegistrationOpensAt = source.RegistrationOpensAt, RegistrationClosesAt = source.RegistrationClosesAt,
             IsEnabled = source.IsEnabled, RequireAdvisorReview = source.RequireAdvisorReview,
             EnforceSectionCapacity = source.EnforceSectionCapacity,
+            AllowAllStudentsDuringWindow = source.AllowAllStudentsDuringWindow,
             StudentIdsText = string.Join(Environment.NewLine, source.GetStudentAccessIds()),
+            GroupWindows = source.GetGroupWindows().Select(x => new GroupWindowInput
+            {
+                CollegeLevels = x.CollegeLevels.ToList(), AttendanceTypes = x.AttendanceTypes.ToList(),
+                OpensAt = x.OpensAt, ClosesAt = x.ClosesAt
+            }).ToList(),
             Mappings = mappings.Select(x => new MappingInput { StudentAttendanceType = x.StudentAttendanceType,
                 CourseAttendanceType = x.CourseAttendanceType }).ToList() };
     }
@@ -141,8 +171,19 @@ public class RegistrationRulesModel : CampusFlowPageModel
         public bool IsEnabled { get; set; } = true;
         public bool RequireAdvisorReview { get; set; } = true;
         public bool EnforceSectionCapacity { get; set; } = true;
+        public bool AllowAllStudentsDuringWindow { get; set; } = true;
         public string StudentIdsText { get; set; } = string.Empty;
+        public List<GroupWindowInput> GroupWindows { get; set; } = [];
         public List<MappingInput> Mappings { get; set; } = [];
+    }
+    public class GroupWindowInput
+    {
+        public List<string> CollegeLevels { get; set; } = [];
+        public List<string> AttendanceTypes { get; set; } = [];
+        public DateTime OpensAt { get; set; } = DateTime.Today;
+        public DateTime ClosesAt { get; set; } = DateTime.Today.AddMonths(3);
+
+        public CourseSelectionGroupWindow ToWindow() => new(CollegeLevels, AttendanceTypes, OpensAt, ClosesAt);
     }
     public class MappingInput
     {

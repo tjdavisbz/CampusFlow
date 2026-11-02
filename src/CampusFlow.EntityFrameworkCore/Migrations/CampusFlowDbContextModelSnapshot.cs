@@ -1830,6 +1830,13 @@ namespace CampusFlow.Migrations
                     b.Property<bool>("IsDashboardDefault")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("AllowAllStudentsDuringWindow")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("GroupWindowsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

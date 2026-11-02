@@ -4,19 +4,17 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CampusFlow.CourseSelections;
-using CampusFlow.Permissions;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
 using Microsoft.AspNetCore.Authorization;
 using Volo.Abp;
 using Volo.Abp.Authorization;
-using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
 
 namespace CampusFlow.AdvisorPortal;
 
-[Authorize(CampusFlowPermissions.AdvisorPortal.Default)]
+[Authorize]
 public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppService
 {
     private readonly IRepository<CourseReview, Guid> _reviews;
@@ -24,6 +22,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     private readonly IRepository<StudentProfile, Guid> _profiles;
     private readonly IRepository<AdvisorAssignment, Guid> _advisorAssignments;
     private readonly IStudentInformationSystemCourseRegistrationService _registration;
+    private readonly IStudentInformationSystemCourseSelectionLookup _courseLookup;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
     public AdvisorPortalAppService(
@@ -32,6 +31,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         IRepository<StudentProfile, Guid> profiles,
         IRepository<AdvisorAssignment, Guid> advisorAssignments,
         IStudentInformationSystemCourseRegistrationService registration,
+        IStudentInformationSystemCourseSelectionLookup courseLookup,
         IUnitOfWorkManager unitOfWorkManager)
     {
         _reviews = reviews;
@@ -39,11 +39,14 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         _profiles = profiles;
         _advisorAssignments = advisorAssignments;
         _registration = registration;
+        _courseLookup = courseLookup;
         _unitOfWorkManager = unitOfWorkManager;
     }
 
     public async Task<List<AdvisorQueueItemDto>> GetQueueAsync(string? externalTermId = null)
     {
+        if (!await HasAccessAsync())
+            throw new AbpAuthorizationException("This account has no active advisor assignment.");
         var pending = await GetVisiblePendingReviewsAsync();
         if (!string.IsNullOrWhiteSpace(externalTermId))
             pending = pending.Where(x => x.ExternalTermId == externalTermId).ToList();
@@ -74,6 +77,12 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             .ToList();
     }
 
+    public async Task<bool> HasAccessAsync()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentUser.Email)) return false;
+        return (await GetActiveAssignmentsAsync(CurrentUser.Email)).Count > 0;
+    }
+
     public async Task<AdvisorStudentReviewDto> GetStudentReviewAsync(
         Guid studentProfileId, string externalTermId)
     {
@@ -83,6 +92,11 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             x.StudentProfileId == studentProfileId && x.ExternalTermId == externalTermId && x.NeedsReview));
         await EnsureVisibleAsync(reviews);
 
+        var registrations = await _courseLookup.GetRegistrationsAsync(profile.ExternalStudentId, externalTermId);
+        var pendingIds = reviews.Select(x => x.ExternalCourseRegistrationId).ToHashSet(StringComparer.Ordinal);
+        var activeCourses = registrations.Where(x => x.EffectiveWithdrawDate is null &&
+            !pendingIds.Contains(x.ExternalRegistrationId));
+
         return new AdvisorStudentReviewDto
         {
             StudentProfileId = profile.Id,
@@ -91,12 +105,33 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             StudentId = profile.StudentId,
             StudentEmail = profile.Email,
             AttendanceType = reviews.Select(x => x.AttendanceType).FirstOrDefault() ?? string.Empty,
+            ExistingCourses = activeCourses.Select(x => new AdvisorScheduledCourseDto
+            {
+                CourseCode = CourseSelectionCourseCode.Format(x.Department, x.CourseCode, x.CourseType),
+                Section = x.Section,
+                CourseName = x.CourseName,
+                Credits = x.Credits,
+                Status = x.RegistrationStatus
+            }).ToList(),
             Courses = reviews.OrderBy(x => x.CreationTime).Select(MapCourse).ToList()
         };
     }
 
     [UnitOfWork(IsDisabled = true)]
-    public async Task SubmitAsync(SubmitAdvisorReviewInput input)
+    public async Task<AdvisorReviewEmailDto> PreviewEmailAsync(SubmitAdvisorReviewInput input)
+    {
+        if (!await HasAccessAsync()) throw new AbpAuthorizationException("No active advisor assignment.");
+        var profile = await _profiles.GetAsync(input.StudentProfileId);
+        var query = await _reviews.GetQueryableAsync();
+        var reviews = await AsyncExecuter.ToListAsync(query.Where(x =>
+            x.StudentProfileId == input.StudentProfileId && x.ExternalTermId == input.ExternalTermId));
+        await EnsureVisibleAsync(reviews.Where(x => x.NeedsReview).ToArray());
+        ValidateSubmittedDecisions(input, reviews.Where(x => x.NeedsReview).ToArray());
+        return await BuildEmailAsync(profile, input.ExternalTermId, reviews,
+            input.OverallComment, input.Courses);
+    }
+
+    public async Task<Guid> SubmitAsync(SubmitAdvisorReviewInput input)
     {
         if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(CurrentUser.Email))
             throw new UserFriendlyException("Your advisor identity could not be resolved.");
@@ -115,9 +150,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         }
 
         var byId = reviews.ToDictionary(x => x.Id);
-        var decisions = input.Courses
-            .Where(x => byId.ContainsKey(x.ReviewId))
-            .ToList();
+        ValidateSubmittedDecisions(input, reviews);
+        var decisions = input.Courses.ToList();
 
         foreach (var decision in decisions)
         {
@@ -151,11 +185,88 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             Comment = NormalizeComment(x.Comment)
         }));
         using var submissionUow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
-        await _submissions.InsertAsync(new CourseReviewSubmission(
+        var submission = new CourseReviewSubmission(
             GuidGenerator.Create(), CurrentTenant.Id, input.StudentProfileId, input.ExternalTermId,
             CurrentUser.Id.Value, CurrentUser.Email, NormalizeComment(input.OverallComment), snapshot,
-            Clock.Now, ReviewEmailStatus.NotConfigured), autoSave: true);
+            Clock.Now, ReviewEmailStatus.Pending);
+        await _submissions.InsertAsync(submission, autoSave: true);
         await submissionUow.CompleteAsync();
+        return submission.Id;
+    }
+
+    public async Task<AdvisorReviewEmailDto> GetSubmissionEmailAsync(Guid submissionId)
+    {
+        var submission = await _submissions.GetAsync(submissionId);
+        if (CurrentUser.Id != submission.SubmittedByUserId || !await HasAccessAsync())
+            throw new AbpAuthorizationException("This review message is not available to this account.");
+        var profile = await _profiles.GetAsync(submission.StudentProfileId);
+        var query = await _reviews.GetQueryableAsync();
+        var reviews = await AsyncExecuter.ToListAsync(query.Where(x =>
+            x.StudentProfileId == submission.StudentProfileId &&
+            x.ExternalTermId == submission.ExternalTermId));
+        if (reviews.Count == 0) throw new UserFriendlyException("No course reviews were found for this message.");
+        await EnsureAssignedToStudentAsync(reviews);
+        var email = await BuildEmailAsync(profile, submission.ExternalTermId, reviews,
+            submission.OverallComment, []);
+        email.SubmissionId = submissionId;
+        email.EmailStatus = submission.EmailStatus.ToString();
+        return email;
+    }
+
+    private static void ValidateSubmittedDecisions(SubmitAdvisorReviewInput input,
+        IReadOnlyCollection<CourseReview> pending)
+    {
+        if (input.Courses.Count != pending.Count ||
+            input.Courses.Select(x => x.ReviewId).Distinct().Count() != pending.Count ||
+            input.Courses.Any(x => pending.All(r => r.Id != x.ReviewId)))
+            throw new UserFriendlyException("The pending course list changed. Reload and review it again.");
+        if (input.Courses.Any(x => !string.IsNullOrWhiteSpace(x.Decision) &&
+            !x.Decision.Equals("Approve", StringComparison.OrdinalIgnoreCase) &&
+            !x.Decision.Equals("Reject", StringComparison.OrdinalIgnoreCase)))
+            throw new UserFriendlyException("A course decision must be Approve, Reject, or left undecided.");
+    }
+
+    private async Task<AdvisorReviewEmailDto> BuildEmailAsync(StudentProfile profile,
+        string externalTermId, IReadOnlyCollection<CourseReview> reviews, string? overallComment,
+        IReadOnlyCollection<AdvisorCourseDecisionInput> proposed)
+    {
+        var decisions = proposed.ToDictionary(x => x.ReviewId);
+        var context = await _courseLookup.GetContextAsync(profile.ExternalStudentId, externalTermId);
+        return new AdvisorReviewEmailDto
+        {
+            StudentName = profile.DisplayName,
+            StudentEmail = profile.Email,
+            ExternalTermId = externalTermId,
+            TermName = context?.TermName ?? externalTermId,
+            OverallComment = NormalizeComment(overallComment),
+            Courses = reviews.Where(x => x.Status != CourseReviewStatus.RemovedByStudent)
+                .OrderBy(x => x.CreationTime).Select(review =>
+            {
+                var course = MapCourse(review);
+                decisions.TryGetValue(review.Id, out var proposedDecision);
+                var proposedStatus = proposedDecision?.Decision?.Trim();
+                return new AdvisorEmailCourseDto
+                {
+                    CourseCode = course.CourseCode,
+                    Section = course.Section,
+                    CourseName = course.CourseName,
+                    Status = proposedStatus?.Equals("Approve", StringComparison.OrdinalIgnoreCase) == true
+                        ? "Approved" : proposedStatus?.Equals("Reject", StringComparison.OrdinalIgnoreCase) == true
+                        ? "Rejected" : review.Status == CourseReviewStatus.Approved ? "Approved"
+                        : review.Status == CourseReviewStatus.Rejected ? "Rejected" : "Still pending",
+                    AdvisorComment = NormalizeComment(proposedDecision?.Comment) ?? review.AdvisorComment
+                };
+            }).ToList()
+        };
+    }
+
+    private async Task EnsureAssignedToStudentAsync(IReadOnlyCollection<CourseReview> reviews)
+    {
+        var assignments = await GetActiveAssignmentsAsync(CurrentUser.Email);
+        if (assignments.Any(x => x.AttendanceType == AdvisorAssignment.GlobalAttendanceType)) return;
+        var types = assignments.Select(x => x.AttendanceType).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (reviews.Any(x => !types.Contains(x.AttendanceType)))
+            throw new AbpAuthorizationException("This student is not assigned to the current advisor.");
     }
 
     private async Task RejectAsync(CourseReview review, string? comment)
@@ -205,12 +316,10 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     {
         var query = await _reviews.GetQueryableAsync();
         var pending = await AsyncExecuter.ToListAsync(query.Where(x => x.NeedsReview));
-        if (await AuthorizationService.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ViewAll))
+        var assignments = await GetActiveAssignmentsAsync(CurrentUser.Email);
+        if (assignments.Any(x => x.AttendanceType == AdvisorAssignment.GlobalAttendanceType))
             return pending;
-
-        var email = CurrentUser.Email?.Trim();
-        if (string.IsNullOrWhiteSpace(email)) return [];
-        var attendanceTypes = await GetAssignedAttendanceTypesAsync(email);
+        var attendanceTypes = assignments.Select(x => x.AttendanceType).ToHashSet(StringComparer.OrdinalIgnoreCase);
         return pending.Where(x => attendanceTypes.Contains(x.AttendanceType)).ToList();
     }
 
@@ -218,23 +327,17 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     {
         if (reviews.Count == 0)
             throw new UserFriendlyException("There are no pending courses for this student and term.");
-        if (await AuthorizationService.IsGrantedAsync(CampusFlowPermissions.AdvisorPortal.ViewAll)) return;
-
-        var email = CurrentUser.Email?.Trim();
-        if (string.IsNullOrWhiteSpace(email))
-            throw new AbpAuthorizationException("This student is not assigned to the current advisor.");
-        var attendanceTypes = await GetAssignedAttendanceTypesAsync(email);
-        if (reviews.Any(x => !attendanceTypes.Contains(x.AttendanceType)))
-            throw new AbpAuthorizationException("This student is not assigned to the current advisor.");
+        await EnsureAssignedToStudentAsync(reviews);
     }
 
-    private async Task<HashSet<string>> GetAssignedAttendanceTypesAsync(string email)
+    private async Task<List<AdvisorAssignment>> GetActiveAssignmentsAsync(string? email)
     {
+        if (string.IsNullOrWhiteSpace(email)) return [];
         var now = Clock.Now;
         var assignments = await _advisorAssignments.GetListAsync(x => x.IsActive &&
             x.EffectiveFrom <= now && (x.EffectiveTo == null || x.EffectiveTo > now));
-        return assignments.Where(x => string.Equals(x.AdvisorEmail, email, StringComparison.OrdinalIgnoreCase))
-            .Select(x => x.AttendanceType).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return assignments.Where(x => string.Equals(x.AdvisorEmail, email.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     private static AdvisorCourseReviewDto MapCourse(CourseReview review)
@@ -247,7 +350,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         {
             ReviewId = review.Id,
             CourseCode = course is null ? review.ExternalCourseOfferingId :
-                $"{course.Department}{course.CourseCode}",
+                CourseSelectionCourseCode.Format(course.Department, course.CourseCode, course.CourseType),
             Section = course?.Section ?? string.Empty,
             CourseName = course?.CourseName ?? "Course details unavailable",
             Credits = course?.Credits ?? 0,

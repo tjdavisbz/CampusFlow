@@ -6,4 +6,5 @@ public sealed record CourseSelectionContext(
     string ExternalTermId,
     string TermName,
     string AttendanceType,
-    decimal MaximumAllowedCredits);
+    decimal MaximumAllowedCredits,
+    string CollegeLevel = "");

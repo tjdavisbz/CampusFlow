@@ -134,8 +134,8 @@ public class IndexModel : CampusFlowPageModel
         }
 
         HasAdvisorAccess = !_currentStudentView.IsImpersonating &&
-            await _studentOnlyAccountAccess.HasStaffAccessAsync() && await _permissionChecker.IsGrantedAsync(
-            CampusFlowPermissions.AdvisorPortal.Default);
+            await _studentOnlyAccountAccess.HasStaffAccessAsync() &&
+            await _advisorPortal.HasAccessAsync();
 
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (!_currentStudentView.IsImpersonating && !string.IsNullOrWhiteSpace(CurrentUser.Email))
