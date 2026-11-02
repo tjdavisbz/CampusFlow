@@ -70,8 +70,9 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
     {
         if (string.IsNullOrWhiteSpace(email)) return null;
         const string sql = """
-            SELECT DISTINCT TOP (2) fp.FacultyID,
-                LTRIM(RTRIM(CONCAT(f.FirstName, ' ', f.LastName)))
+            SELECT DISTINCT fp.FacultyID,
+                LTRIM(RTRIM(CONCAT(f.FirstName, ' ', f.LastName))),
+                fp.PortalAlias
             FROM dbo.FacultyPortal fp
             INNER JOIN dbo.Faculty f ON f.FacultyID = fp.FacultyID
             WHERE EXISTS (
@@ -87,11 +88,31 @@ public sealed class FacultyPortalReader(IConfiguration configuration) : ITransie
         await using var connection = await OpenAsync(cancellationToken);
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@Email", SqlDbType.VarChar, 256).Value = email.Trim();
+        var matches = new List<(FacultyIdentity Identity, string? PortalAlias)>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken)) return null;
-        var result = new FacultyIdentity(reader.GetInt32(0), reader.GetString(1));
-        if (await reader.ReadAsync(cancellationToken)) return null;
-        return result;
+        while (await reader.ReadAsync(cancellationToken))
+            matches.Add((new FacultyIdentity(reader.GetInt32(0), reader.GetString(1)),
+                reader.IsDBNull(2) ? null : reader.GetString(2)));
+        return SelectFacultyIdentity(email, matches);
+    }
+
+    internal static FacultyIdentity? SelectFacultyIdentity(string email,
+        IReadOnlyList<(FacultyIdentity Identity, string? PortalAlias)> matches)
+    {
+        var distinctFaculty = matches.Select(match => match.Identity)
+            .DistinctBy(identity => identity.FacultyId).ToList();
+        if (distinctFaculty.Count == 1) return distinctFaculty[0];
+        if (distinctFaculty.Count == 0) return null;
+
+        var atIndex = email.IndexOf('@');
+        if (atIndex <= 0) return null;
+        var emailUsername = email[..atIndex].Trim();
+        var aliasMatches = matches
+            .Where(match => string.Equals(match.PortalAlias?.Trim(), emailUsername,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(match => match.Identity)
+            .DistinctBy(identity => identity.FacultyId).ToList();
+        return aliasMatches.Count == 1 ? aliasMatches[0] : null;
     }
 
     public async Task<FacultyIdentity?> FindByIdAsync(int facultyId, CancellationToken cancellationToken)
