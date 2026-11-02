@@ -26,20 +26,6 @@
     {
         <section class="advisor-card" role="status"><p>@Model.EmailNotice</p></section>
     }
-    @if (!Model.MailConnected)
-    {
-        <section class="advisor-card">
-            <h2>Connect your Microsoft mailbox</h2>
-            <p>This review email is sent from your Nelson mailbox. Connect it once before saving and sending a review.</p>
-            <form method="post" asp-page-handler="Connect">
-                <input name="Input.StudentProfileId" type="hidden" value="@Model.Input.StudentProfileId" />
-                <input name="Input.ExternalTermId" type="hidden" value="@(Model.FailedEmailSubmissionId.HasValue?Model.Review.ExternalTermId:Model.Input.ExternalTermId)" />
-                @if (Model.FailedEmailSubmissionId.HasValue) { <input name="submissionId" type="hidden" value="@Model.FailedEmailSubmissionId" /> }
-                <button type="submit" class="advisor-primary">Connect Microsoft Mail.Send</button>
-            </form>
-        </section>
-    }
-
     @if (Model.FailedEmailSubmissionId.HasValue)
     {
         <section class="advisor-card">
@@ -47,7 +33,7 @@
             <div class="advisor-email-preview">@Html.Raw(Model.EmailPreviewHtml)</div>
             <form method="post" asp-page-handler="RetryEmail">
                 <input type="hidden" name="submissionId" value="@Model.FailedEmailSubmissionId" />
-                <button type="submit" class="advisor-primary" disabled="@(!Model.MailConnected)">Retry email</button>
+                <button type="submit" class="advisor-primary">Retry email</button>
             </form>
         </section>
     }
@@ -111,6 +97,10 @@
             <div><span>Advisor notes</span><h2>Message to the student</h2><p>These notes appear at the bottom of the email, after the course results.</p></div>
             <textarea asp-for="Input.OverallComment" rows="4" maxlength="4000" placeholder="Add an overall note about the student's schedule"></textarea>
         </section>
+        @if (!Model.MailConnected)
+        {
+            <p class="advisor-mail-hint">Previewing may ask you to approve sending mail from your Nelson Microsoft account. Your review will be kept while you approve it.</p>
+        }
         <div asp-validation-summary="All" class="advisor-errors" role="alert"></div>
         @if (Model.PreviewReady)
         {

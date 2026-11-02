@@ -30,6 +30,7 @@ public class ReviewModel : CampusFlowPageModel
     private readonly IAdvisorPortalAppService _advisorPortal;
     private readonly ITenantThemeProvider _tenantThemeProvider;
     private readonly FacultyMailConnection _mailConnection;
+    private readonly AdvisorReviewMailDraftStore _mailDrafts;
     private readonly FacultyGraphMailSender _mailSender;
     private readonly IdentityUserManager _userManager;
     private readonly SignInManager<CampusFlowIdentityUser> _signInManager;
@@ -37,13 +38,15 @@ public class ReviewModel : CampusFlowPageModel
     private readonly ILogger<ReviewModel> _logger;
 
     public ReviewModel(IAdvisorPortalAppService advisorPortal, ITenantThemeProvider tenantThemeProvider,
-        FacultyMailConnection mailConnection, FacultyGraphMailSender mailSender,
+        FacultyMailConnection mailConnection, AdvisorReviewMailDraftStore mailDrafts,
+        FacultyGraphMailSender mailSender,
         IdentityUserManager userManager, SignInManager<CampusFlowIdentityUser> signInManager,
         IRepository<CourseReviewSubmission, Guid> submissions, ILogger<ReviewModel> logger)
     {
         _advisorPortal = advisorPortal;
         _tenantThemeProvider = tenantThemeProvider;
         _mailConnection = mailConnection;
+        _mailDrafts = mailDrafts;
         _mailSender = mailSender;
         _userManager = userManager;
         _signInManager = signInManager;
@@ -85,11 +88,23 @@ public class ReviewModel : CampusFlowPageModel
             ModelState.AddModelError(string.Empty, "The student's email address is not available for delivery.");
             return Page();
         }
+        if (!MailConnected)
+        {
+            if (CurrentUser.Id is not Guid userId) return Forbid();
+            var draftId = await _mailDrafts.SaveAsync(userId, CurrentTenant.Id, Input,
+                HttpContext.RequestAborted);
+            return BeginMailAuthorization(draftId: draftId);
+        }
+        ShowPreview(email);
+        return Page();
+    }
+
+    private void ShowPreview(AdvisorReviewEmailDto email)
+    {
         EmailSubject = AdvisorReviewEmailTemplate.Subject(email);
         EmailPreviewHtml = AdvisorReviewEmailTemplate.Render(email);
         PreviewReady = true;
         TempData[PreviewKey] = Fingerprint();
-        return Page();
     }
 
     public async Task<IActionResult> OnPostSubmitAsync()
@@ -107,7 +122,8 @@ public class ReviewModel : CampusFlowPageModel
         var access = await GetMailAccessAsync();
         if (access is null)
         {
-            ModelState.AddModelError(string.Empty, "Connect your Microsoft mailbox before saving and emailing this review.");
+            ModelState.AddModelError(string.Empty,
+                "Microsoft mail authorization expired. Select Preview email again to reconnect before saving.");
             return Page();
         }
         var preview = await _advisorPortal.PreviewEmailAsync(Input);
@@ -136,18 +152,18 @@ public class ReviewModel : CampusFlowPageModel
         var access = await GetMailAccessAsync();
         if (access is null)
         {
-            await ShowRetryAsync(submissionId, email,
-                "Connect your Microsoft mailbox before retrying this message.");
-            return Page();
+            Input.ExternalTermId = email.ExternalTermId;
+            return BeginMailAuthorization(submissionId: submissionId);
         }
         return await DeliverAsync(submissionId, email, access);
     }
 
-    public async Task<IActionResult> OnPostConnectAsync(Guid? submissionId = null)
+    private IActionResult BeginMailAuthorization(Guid? draftId = null, Guid? submissionId = null)
     {
-        if (!await _advisorPortal.HasAccessAsync() || CurrentUser.Id is not Guid userId) return Forbid();
+        if (CurrentUser.Id is not Guid userId) return Forbid();
         var callback = Url.Page("/Advisor/Review", "Connected",
-            new { studentProfileId = Input.StudentProfileId, term = Input.ExternalTermId, submissionId });
+            new { studentProfileId = Input.StudentProfileId, term = Input.ExternalTermId,
+                draftId, submissionId });
         var baseline = _signInManager.ConfigureExternalAuthenticationProperties(Provider, callback, userId.ToString());
         var properties = new OpenIdConnectChallengeProperties(baseline.Items, baseline.Parameters)
         {
@@ -158,9 +174,13 @@ public class ReviewModel : CampusFlowPageModel
         return Challenge(properties, Provider);
     }
 
-    public async Task<IActionResult> OnGetConnectedAsync(Guid studentProfileId, string term, Guid? submissionId)
+    public async Task<IActionResult> OnGetConnectedAsync(Guid studentProfileId, string term,
+        Guid? draftId, Guid? submissionId)
     {
         if (!await _advisorPortal.HasAccessAsync() || CurrentUser.Id is not Guid userId) return Forbid();
+        var draft = draftId.HasValue
+            ? await _mailDrafts.TakeAsync(draftId.Value, userId, CurrentTenant.Id, HttpContext.RequestAborted)
+            : null;
         var external = await _signInManager.GetExternalLoginInfoAsync(userId.ToString());
         var ticket = await HttpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
         await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
@@ -176,14 +196,54 @@ public class ReviewModel : CampusFlowPageModel
             string.IsNullOrWhiteSpace(accessToken) || string.IsNullOrWhiteSpace(refreshToken) ||
             !MailAddress.TryCreate(senderEmail, out _) ||
             !DateTimeOffset.TryParse(expiresText, out var expiresAt))
+            return await MailAuthorizationFailedAsync(draft, submissionId, studentProfileId, term,
+                "Microsoft mail authorization did not complete. Select Preview email to try again.");
+        try
         {
-            SuccessMessage = "Microsoft mail authorization did not complete. Try connecting again.";
-            return submissionId.HasValue
-                ? RedirectToPage("/Advisor/Review", "EmailRetry", new { id = submissionId.Value })
-                : RedirectToPage(new { studentProfileId, term });
+            await _mailConnection.ConnectAsync(userId, linkedKey, senderEmail!, accessToken,
+                refreshToken, expiresAt);
         }
-        await _mailConnection.ConnectAsync(userId, linkedKey, senderEmail!, accessToken,
-            refreshToken, expiresAt);
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Could not save Microsoft mail authorization for advisor {UserId}.", userId);
+            return await MailAuthorizationFailedAsync(draft, submissionId, studentProfileId, term,
+                "Microsoft mail authorization could not be saved. Select Preview email to try again or contact Nelson IT.");
+        }
+        if (draftId.HasValue)
+        {
+            if (draft is null)
+            {
+                SuccessMessage = "The review preview expired during Microsoft authorization. Please enter your decisions again.";
+                return RedirectToPage(new { studentProfileId, term });
+            }
+            Input = draft;
+            await LoadAsync(draft.StudentProfileId, draft.ExternalTermId, populateInput: false);
+            var email = await _advisorPortal.PreviewEmailAsync(Input);
+            if (!MailAddress.TryCreate(email.StudentEmail, out _))
+            {
+                ModelState.AddModelError(string.Empty,
+                    "The student's email address is not available for delivery.");
+                return Page();
+            }
+            ShowPreview(email);
+            return Page();
+        }
+        return submissionId.HasValue
+            ? RedirectToPage("/Advisor/Review", "EmailRetry", new { id = submissionId.Value })
+            : RedirectToPage(new { studentProfileId, term });
+    }
+
+    private async Task<IActionResult> MailAuthorizationFailedAsync(SubmitAdvisorReviewInput? draft,
+        Guid? submissionId, Guid studentProfileId, string term, string message)
+    {
+        if (draft is not null)
+        {
+            Input = draft;
+            await LoadAsync(draft.StudentProfileId, draft.ExternalTermId, populateInput: false);
+            EmailNotice = message;
+            return Page();
+        }
+        SuccessMessage = message;
         return submissionId.HasValue
             ? RedirectToPage("/Advisor/Review", "EmailRetry", new { id = submissionId.Value })
             : RedirectToPage(new { studentProfileId, term });
