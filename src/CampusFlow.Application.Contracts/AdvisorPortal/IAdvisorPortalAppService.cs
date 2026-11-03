@@ -12,5 +12,6 @@ public interface IAdvisorPortalAppService : IApplicationService
     Task<AdvisorStudentReviewDto> GetStudentReviewAsync(Guid studentProfileId, string externalTermId);
     Task<AdvisorReviewEmailDto> PreviewEmailAsync(SubmitAdvisorReviewInput input);
     Task<Guid> SubmitAsync(SubmitAdvisorReviewInput input);
+    Task EnsureStudentNoteAsync(Guid submissionId);
     Task<AdvisorReviewEmailDto> GetSubmissionEmailAsync(Guid submissionId);
 }

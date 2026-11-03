@@ -29,11 +29,11 @@
     @if (Model.FailedEmailSubmissionId.HasValue)
     {
         <section class="advisor-card">
-            <div class="card-heading"><div><span>Email not confirmed</span><h2>@Model.EmailSubject</h2></div></div>
+            <div class="card-heading"><div><span>Delivery not complete</span><h2>@Model.EmailSubject</h2></div></div>
             <div class="advisor-email-preview">@Html.Raw(Model.EmailPreviewHtml)</div>
             <form method="post" asp-page-handler="RetryEmail">
                 <input type="hidden" name="submissionId" value="@Model.FailedEmailSubmissionId" />
-                <button type="submit" class="advisor-primary">Retry email</button>
+                <button type="submit" class="advisor-primary">Retry delivery</button>
             </form>
         </section>
     }
@@ -94,7 +94,7 @@
             </div>
         </section>
         <section class="advisor-card overall-card">
-            <div><span>Advisor notes</span><h2>Message to the student</h2><p>These notes appear at the bottom of the email, after the course results.</p></div>
+            <div><span>Advisor notes</span><h2>Message to the student</h2><p>This message appears at the bottom of the email and is saved to Student Notes as Scheduler Comments for this term.</p></div>
             <textarea asp-for="Input.OverallComment" rows="4" maxlength="4000" placeholder="Add an overall note about the student's schedule"></textarea>
         </section>
         @if (!Model.MailConnected)

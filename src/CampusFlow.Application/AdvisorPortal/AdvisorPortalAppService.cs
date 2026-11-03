@@ -23,6 +23,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     private readonly IRepository<AdvisorAssignment, Guid> _advisorAssignments;
     private readonly IStudentInformationSystemCourseRegistrationService _registration;
     private readonly IStudentInformationSystemCourseSelectionLookup _courseLookup;
+    private readonly IStudentInformationSystemStudentNotesService _studentNotes;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
     public AdvisorPortalAppService(
@@ -32,6 +33,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         IRepository<AdvisorAssignment, Guid> advisorAssignments,
         IStudentInformationSystemCourseRegistrationService registration,
         IStudentInformationSystemCourseSelectionLookup courseLookup,
+        IStudentInformationSystemStudentNotesService studentNotes,
         IUnitOfWorkManager unitOfWorkManager)
     {
         _reviews = reviews;
@@ -40,6 +42,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         _advisorAssignments = advisorAssignments;
         _registration = registration;
         _courseLookup = courseLookup;
+        _studentNotes = studentNotes;
         _unitOfWorkManager = unitOfWorkManager;
     }
 
@@ -192,6 +195,29 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         await _submissions.InsertAsync(submission, autoSave: true);
         await submissionUow.CompleteAsync();
         return submission.Id;
+    }
+
+    [UnitOfWork(IsDisabled = true)]
+    public async Task EnsureStudentNoteAsync(Guid submissionId)
+    {
+        if (CurrentUser.Id is null || !await HasAccessAsync())
+            throw new AbpAuthorizationException("This review is not available to this account.");
+        var submission = await _submissions.GetAsync(submissionId);
+        if (submission.SubmittedByUserId != CurrentUser.Id)
+            throw new AbpAuthorizationException("This review is not available to this account.");
+        if (string.IsNullOrWhiteSpace(submission.OverallComment) || submission.StudentNoteWrittenAt.HasValue)
+            return;
+
+        var profile = await _profiles.GetAsync(submission.StudentProfileId);
+        var context = await _courseLookup.GetContextAsync(profile.ExternalStudentId, submission.ExternalTermId);
+        await _studentNotes.EnsureSchedulerCommentAsync(profile.ExternalStudentId,
+            context?.TermName ?? submission.ExternalTermId, submission.OverallComment, submission.SubmittedAt);
+
+        using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+        var stored = await _submissions.GetAsync(submissionId);
+        stored.RecordStudentNoteWritten(Clock.Now);
+        await _submissions.UpdateAsync(stored, autoSave: true);
+        await uow.CompleteAsync();
     }
 
     public async Task<AdvisorReviewEmailDto> GetSubmissionEmailAsync(Guid submissionId)

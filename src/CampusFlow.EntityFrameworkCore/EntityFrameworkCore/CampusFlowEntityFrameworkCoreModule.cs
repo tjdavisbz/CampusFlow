@@ -80,6 +80,9 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
             IStudentInformationSystemDocumentTrackingService,
             ThesisElementsDocumentTrackingService>();
         context.Services.AddTransient<
+            IStudentInformationSystemStudentNotesService,
+            ThesisElementsStudentNotesService>();
+        context.Services.AddTransient<
             IStudentInformationSystemMealPlanService,
             ThesisElementsMealPlanService>();
         context.Services.AddTransient<

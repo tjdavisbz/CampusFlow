@@ -1478,6 +1478,9 @@ namespace CampusFlow.Migrations
                     b.Property<Guid>("StudentProfileId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("StudentNoteWrittenAt")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("timestamp without time zone");
 

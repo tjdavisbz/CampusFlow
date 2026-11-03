@@ -271,6 +271,17 @@ public class ReviewModel : CampusFlowPageModel
     private async Task<IActionResult> DeliverAsync(Guid submissionId,
         AdvisorReviewEmailDto email, FacultyMailAccess access)
     {
+        try
+        {
+            await _advisorPortal.EnsureStudentNoteAsync(submissionId);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Could not save the student note for advisor review {SubmissionId}.", submissionId);
+            await ShowRetryAsync(submissionId, email,
+                "The review was saved, but the message could not be added to Student Notes. No email was sent. Retry when Student Notes is available, or contact Nelson IT.");
+            return Page();
+        }
         var result = await _mailSender.SendAsync(access.AccessToken, access.SenderEmail,
             AdvisorReviewEmailTemplate.Subject(email), AdvisorReviewEmailTemplate.Render(email),
             [email.StudentEmail], HttpContext.RequestAborted, html: true, directToRecipients: true);

@@ -18,6 +18,7 @@ public class CourseReviewSubmission : FullAuditedAggregateRoot<Guid>, IMultiTena
     public int EmailAttemptCount { get; private set; }
     public DateTime? LastEmailAttemptAt { get; private set; }
     public string? LastEmailError { get; private set; }
+    public DateTime? StudentNoteWrittenAt { get; private set; }
 
     protected CourseReviewSubmission() { }
 
@@ -44,5 +45,10 @@ public class CourseReviewSubmission : FullAuditedAggregateRoot<Guid>, IMultiTena
         LastEmailAttemptAt = attemptedAt;
         LastEmailError = accepted ? null : error;
         EmailStatus = accepted ? ReviewEmailStatus.Sent : ReviewEmailStatus.Failed;
+    }
+
+    public void RecordStudentNoteWritten(DateTime writtenAt)
+    {
+        StudentNoteWrittenAt ??= writtenAt;
     }
 }
