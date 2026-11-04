@@ -102,6 +102,10 @@
             <p class="advisor-mail-hint">Previewing may ask you to approve sending mail from your Nelson Microsoft account. Your review will be kept while you approve it.</p>
         }
         <div asp-validation-summary="All" class="advisor-errors" role="alert"></div>
+        @if (Model.AlreadySent)
+        {
+            <p id="advisorAlreadySent" class="advisor-sent-hint" role="status"><i class="fa-solid fa-circle-check"></i> This review was already emailed. Change a decision, course comment, or message and preview it again to send an update.</p>
+        }
         @if (Model.PreviewReady)
         {
             <section class="advisor-card">
@@ -109,7 +113,7 @@
                 <div class="advisor-email-preview">@Html.Raw(Model.EmailPreviewHtml)</div>
             </section>
         }
-        <div class="submit-bar"><a asp-page="/Advisor/Index">Cancel</a><button type="submit" asp-page-handler="Preview"><i class="fa-regular fa-eye"></i> Preview email</button>@if (Model.PreviewReady && Model.MailConnected){<button type="submit" asp-page-handler="Submit" data-action="submit-review"><i class="fa-solid fa-check"></i> Save review and email student</button>}</div>
+        <div class="submit-bar"><a asp-page="/Advisor/Index">Cancel</a><button type="submit" asp-page-handler="Preview"><i class="fa-regular fa-eye"></i> Preview email</button>@if (Model.AlreadySent){<button type="button" disabled aria-describedby="advisorAlreadySent"><i class="fa-solid fa-check"></i> Already sent</button>}else if (Model.PreviewReady && Model.MailConnected){<button type="submit" asp-page-handler="Submit" data-action="submit-review"><i class="fa-solid fa-check"></i> Save review and email student</button>}</div>
     </form>
     }
 </main>

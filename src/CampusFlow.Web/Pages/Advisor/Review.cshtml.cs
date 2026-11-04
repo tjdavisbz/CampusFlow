@@ -68,6 +68,7 @@ public class ReviewModel : CampusFlowPageModel
     public bool MailConnected { get; private set; }
     public Guid? FailedEmailSubmissionId { get; private set; }
     public string? EmailNotice { get; private set; }
+    public bool AlreadySent { get; private set; }
 
     [BindProperty]
     public SubmitAdvisorReviewInput Input { get; set; } = new();
@@ -79,6 +80,7 @@ public class ReviewModel : CampusFlowPageModel
     {
         if (!await _advisorPortal.HasAccessAsync()) return Forbid();
         await LoadAsync(studentProfileId, term);
+        await RefreshAlreadySentAsync();
         return Page();
     }
 
@@ -86,10 +88,16 @@ public class ReviewModel : CampusFlowPageModel
     {
         if (!await _advisorPortal.HasAccessAsync()) return Forbid();
         await LoadAsync(Input.StudentProfileId, Input.ExternalTermId, populateInput: false);
+        await RefreshAlreadySentAsync();
         var email = await _advisorPortal.PreviewEmailAsync(Input);
         if (!MailAddress.TryCreate(email.StudentEmail, out _))
         {
             ModelState.AddModelError(string.Empty, "The student's email address is not available for delivery.");
+            return Page();
+        }
+        if (AlreadySent)
+        {
+            ShowPreview(email);
             return Page();
         }
         if (!MailConnected)
@@ -121,6 +129,12 @@ public class ReviewModel : CampusFlowPageModel
                 Convert.FromHexString(Fingerprint())))
         {
             ModelState.AddModelError(string.Empty, "Preview the current decisions and message before saving.");
+            return Page();
+        }
+        await RefreshAlreadySentAsync();
+        if (AlreadySent)
+        {
+            EmailNotice = "This review was already emailed. Change a course decision, course comment, or message, then preview the update before sending again.";
             return Page();
         }
         var access = await GetMailAccessAsync();
@@ -222,6 +236,7 @@ public class ReviewModel : CampusFlowPageModel
             }
             Input = draft;
             await LoadAsync(draft.StudentProfileId, draft.ExternalTermId, populateInput: false);
+            await RefreshAlreadySentAsync();
             var email = await _advisorPortal.PreviewEmailAsync(Input);
             if (!MailAddress.TryCreate(email.StudentEmail, out _))
             {
@@ -270,6 +285,18 @@ public class ReviewModel : CampusFlowPageModel
                 Comment = course.AdvisorComment
             });
         }
+    }
+
+    private async Task RefreshAlreadySentAsync()
+    {
+        if (CurrentUser.Id is not Guid userId) return;
+        var sent = await _submissions.GetListAsync(submission =>
+            submission.StudentProfileId == Input.StudentProfileId &&
+            submission.ExternalTermId == Input.ExternalTermId &&
+            submission.SubmittedByUserId == userId &&
+            submission.EmailStatus == ReviewEmailStatus.Sent);
+        var latest = sent.OrderByDescending(submission => submission.SubmittedAt).FirstOrDefault();
+        AlreadySent = AdvisorReviewSendGuard.AlreadySent(Input, latest);
     }
 
     private async Task<IActionResult> DeliverAsync(Guid submissionId,
