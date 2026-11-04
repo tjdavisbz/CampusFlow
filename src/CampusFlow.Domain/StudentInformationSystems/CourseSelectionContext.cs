@@ -1,3 +1,5 @@
+using System;
+
 namespace CampusFlow.StudentInformationSystems;
 
 public sealed record CourseSelectionContext(
@@ -7,4 +9,9 @@ public sealed record CourseSelectionContext(
     string TermName,
     string AttendanceType,
     decimal MaximumAllowedCredits,
-    string CollegeLevel = "");
+    string CollegeLevel = "",
+    string ApplicantStatus = "")
+{
+    public bool IsMatriculated => string.Equals(ApplicantStatus.Trim(), "Matriculated",
+        StringComparison.OrdinalIgnoreCase);
+}

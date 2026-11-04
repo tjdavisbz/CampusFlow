@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -57,7 +59,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
                 status.TextTerm,
                 student.AttendanceType,
                 status.MaxAllowedHours,
-                status.CollegeLevel
+                status.CollegeLevel,
+                student.ProspectStatus
             FROM [dbo].[CAMS_StudentStatus_View] status
             INNER JOIN [dbo].[CAMS_Student_View] student
                 ON student.StudentUID = status.StudentUID
@@ -77,7 +80,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
             reader.GetString(2).Trim(),
             reader.GetString(3).Trim(),
             Convert.ToDecimal(reader.GetValue(4)),
-            reader.IsDBNull(5) ? string.Empty : Convert.ToString(reader.GetValue(5))!.Trim());
+            reader.IsDBNull(5) ? string.Empty : Convert.ToString(reader.GetValue(5))!.Trim(),
+            reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim());
     }
 
     public async Task<IReadOnlyList<CourseSelectionContext>> GetEligibleContextsAsync(
@@ -94,7 +98,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
                 student.AttendanceType,
                 status.MaxAllowedHours,
                 term.TermStartDate,
-                status.CollegeLevel
+                status.CollegeLevel,
+                student.ProspectStatus
             FROM [dbo].[CAMS_StudentStatus_View] status
             INNER JOIN [dbo].[TermCalendar] term
                 ON term.TermCalendarID = status.TermCalendarID
@@ -116,7 +121,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
             results.Add(new CourseSelectionContext(Provider, reader.GetInt32(0).ToString(),
                 reader.GetInt32(1).ToString(), reader.GetString(2).Trim(), reader.GetString(3).Trim(),
                 Convert.ToDecimal(reader.GetValue(4)),
-                reader.IsDBNull(6) ? string.Empty : Convert.ToString(reader.GetValue(6))!.Trim()));
+                reader.IsDBNull(6) ? string.Empty : Convert.ToString(reader.GetValue(6))!.Trim(),
+                reader.IsDBNull(7) ? string.Empty : reader.GetString(7).Trim()));
         }
         return results;
     }
@@ -241,6 +247,30 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
                 reader.IsDBNull(11) ? null : reader.GetDateTime(11)));
         }
         return registrations;
+    }
+
+    public async Task<IReadOnlySet<string>> GetActiveRegistrationIdsAsync(
+        IReadOnlyCollection<string> externalRegistrationIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = externalRegistrationIds.Where(x => int.TryParse(x, out _))
+            .Distinct(StringComparer.Ordinal).ToArray();
+        if (ids.Length == 0) return new HashSet<string>(StringComparer.Ordinal);
+
+        const string sql = """
+            SELECT CAST(academic.SRAcademicID AS varchar(30))
+            FROM dbo.SRAcademic academic
+            INNER JOIN OPENJSON(@RegistrationIds) ids
+                ON academic.SRAcademicID = TRY_CONVERT(int, ids.[value])
+            WHERE academic.EffectiveWithdrawDate IS NULL
+            """;
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@RegistrationIds", SqlDbType.NVarChar, -1).Value = JsonSerializer.Serialize(ids);
+        var active = new HashSet<string>(StringComparer.Ordinal);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) active.Add(reader.GetString(0));
+        return active;
     }
 
     public async Task<bool> HasNonWithdrawnCourseAttemptAsync(

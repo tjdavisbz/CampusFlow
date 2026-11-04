@@ -354,6 +354,7 @@ public class CampusFlowDbContext :
             b.Property(x => x.ExternalAdvisorId).IsRequired().HasMaxLength(64);
             b.Property(x => x.AdvisorEmail).IsRequired().HasMaxLength(256);
             b.Property(x => x.AdvisorDisplayName).IsRequired().HasMaxLength(256);
+            b.Property(x => x.IncludeGraduatingStudents).HasDefaultValue(true);
             b.HasIndex(x => new { x.TenantId, x.AttendanceType, x.EffectiveFrom });
             b.HasIndex(x => new { x.TenantId, x.AdvisorEmail, x.IsActive });
         });

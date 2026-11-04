@@ -56,9 +56,11 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
             ModelState.AddModelError(string.Empty, "Each attendance type can appear only once.");
 
         var selections = new Dictionary<string, List<AdvisorLookupResult>>(StringComparer.OrdinalIgnoreCase);
+        var graduationOptions = new Dictionary<string, Dictionary<string, bool>>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in Rows)
         {
             var emails = ReadEmails(row.AdvisorEmailsJson).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            graduationOptions[row.AttendanceType] = ReadGraduationOptions(row.GraduationOptionsJson);
             var resolved = new List<AdvisorLookupResult>();
             foreach (var email in emails)
             {
@@ -75,8 +77,12 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
             foreach (var row in Rows)
             {
                 row.Advisors = selections.GetValueOrDefault(row.AttendanceType, [])
-                    .Select(x => new SelectedAdvisor(x.Email, x.DisplayName)).ToArray();
+                    .Select(x => new SelectedAdvisor(x.Email, x.DisplayName,
+                        graduationOptions.GetValueOrDefault(row.AttendanceType, []).GetValueOrDefault(x.Email, true)))
+                    .ToArray();
                 row.AdvisorEmailsJson = JsonSerializer.Serialize(row.Advisors.Select(x => x.Email));
+                row.GraduationOptionsJson = JsonSerializer.Serialize(row.Advisors.ToDictionary(
+                    x => x.Email, x => x.IncludeGraduatingStudents));
             }
             Theme = _themeProvider.Get(CurrentTenant.Name);
             return Page();
@@ -96,9 +102,17 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
                 await _assignments.UpdateAsync(assignment, autoSave: true);
             }
             var currentEmails = current.Select(x => x.AdvisorEmail).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var assignment in current.Where(x => desiredEmails.Contains(x.AdvisorEmail)))
+            {
+                var include = graduationOptions[row.AttendanceType].GetValueOrDefault(assignment.AdvisorEmail, true);
+                if (assignment.IncludeGraduatingStudents == include) continue;
+                assignment.SetIncludeGraduatingStudents(include);
+                await _assignments.UpdateAsync(assignment, autoSave: true);
+            }
             foreach (var advisor in desired.Where(x => !currentEmails.Contains(x.Email)))
                 await _assignments.InsertAsync(new AdvisorAssignment(_guidGenerator.Create(), CurrentTenant.Id,
-                    row.AttendanceType, advisor.ExternalAdvisorId, advisor.Email, advisor.DisplayName, now),
+                    row.AttendanceType, advisor.ExternalAdvisorId, advisor.Email, advisor.DisplayName, now,
+                    includeGraduatingStudents: graduationOptions[row.AttendanceType].GetValueOrDefault(advisor.Email, true)),
                     autoSave: true);
         }
         Alerts.Success("Advisor assignments were saved.");
@@ -120,9 +134,12 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
         {
             var advisors = active.Where(x => string.Equals(x.AttendanceType, type,
                 StringComparison.OrdinalIgnoreCase)).OrderBy(x => x.AdvisorDisplayName)
-                .Select(x => new SelectedAdvisor(x.AdvisorEmail, x.AdvisorDisplayName)).ToArray();
+                .Select(x => new SelectedAdvisor(x.AdvisorEmail, x.AdvisorDisplayName,
+                    x.IncludeGraduatingStudents)).ToArray();
             return new RoutingRow { AttendanceType = type, AdvisorEmailsJson =
-                JsonSerializer.Serialize(advisors.Select(x => x.Email)), Advisors = advisors };
+                JsonSerializer.Serialize(advisors.Select(x => x.Email)), GraduationOptionsJson =
+                JsonSerializer.Serialize(advisors.ToDictionary(x => x.Email, x => x.IncludeGraduatingStudents)),
+                Advisors = advisors };
         }).ToList();
     }
 
@@ -139,12 +156,20 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
         catch (JsonException) { return []; }
     }
 
+    private static Dictionary<string, bool> ReadGraduationOptions(string json)
+    {
+        try { return new Dictionary<string, bool>(JsonSerializer.Deserialize<Dictionary<string, bool>>(json) ?? [],
+            StringComparer.OrdinalIgnoreCase); }
+        catch (JsonException) { return new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase); }
+    }
+
     public class RoutingRow
     {
         [Required] public string AttendanceType { get; set; } = string.Empty;
         public string AdvisorEmailsJson { get; set; } = "[]";
+        public string GraduationOptionsJson { get; set; } = "{}";
         public IReadOnlyList<SelectedAdvisor> Advisors { get; set; } = [];
     }
 
-    public sealed record SelectedAdvisor(string Email, string Name);
+    public sealed record SelectedAdvisor(string Email, string Name, bool IncludeGraduatingStudents);
 }

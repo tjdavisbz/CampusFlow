@@ -218,10 +218,13 @@ public sealed class ThesisElementsCourseRegistrationService : IStudentInformatio
                 ["termCalendarID"] = termId,
                 ["regEffectiveDT"] = DateTime.UtcNow,
                 ["checkConflicts"] = true,
-                ["checkPreReqs"] = true,
+                // Elements currently rejects students taking the prerequisite in progress.
+                // Temporarily leave prerequisite enforcement to advisor review until its
+                // in-progress semantics can be validated; keep the other checks enabled.
+                ["checkPreReqs"] = false,
                 ["registerSaveOption"] = "Portal",
                 ["checkCoReqs"] = true,
-                ["checkPreReqInEquiv"] = true,
+                ["checkPreReqInEquiv"] = false,
                 ["autoLoadCoReqs"] = false,
                 ["notifyRepeats"] = true,
                 ["checkFinPackageLoad"] = true,
@@ -243,22 +246,6 @@ public sealed class ThesisElementsCourseRegistrationService : IStudentInformatio
         string token, CancellationToken cancellationToken)
     {
         var offeringId = ReadInt(offering["srOfferID"]);
-        var masterCourseId = ReadInt(offering["srMasterID"]);
-
-        var prerequisite = await SendForDataNodeAsync(HttpMethod.Post,
-            "api/academic/register/check-prerequisites-validation", new JsonObject
-            {
-                ["srMasterID"] = masterCourseId,
-                ["studentUID"] = studentUid,
-                ["checkEquivalents"] = true,
-                ["returnvalue"] = false,
-                ["termcalendarID"] = termId
-            }, token, cancellationToken);
-        var prerequisiteMessage = ReadString(prerequisite);
-        if (!string.IsNullOrWhiteSpace(prerequisiteMessage))
-            throw new CourseRegistrationValidationException(
-                $"You do not meet the prerequisite requirements for this course. {prerequisiteMessage.Trim()}");
-
         var corequisite = (await SendForDataNodeAsync(HttpMethod.Post,
             "api/academic/register/check-corequisites-validation", new JsonObject
             {

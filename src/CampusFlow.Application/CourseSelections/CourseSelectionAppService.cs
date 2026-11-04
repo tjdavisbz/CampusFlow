@@ -68,7 +68,8 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var policy = await GetCurrentPolicyAsync(externalTermId, profile, context);
         var offerings = await _lookup.GetAvailableOfferingsAsync(externalTermId);
         var sectionMappings = await GetSectionMappingsAsync();
-        var registrations = await _lookup.GetRegistrationsAsync(profile.ExternalStudentId, externalTermId);
+        var registrations = (await _lookup.GetRegistrationsAsync(profile.ExternalStudentId, externalTermId))
+            .Where(x => x.EffectiveWithdrawDate is null).ToArray();
         var courseAttempts = await GetCourseAttemptsAsync(profile);
         var reviewQuery = await _reviews.GetQueryableAsync();
         var reviews = await AsyncExecuter.ToListAsync(reviewQuery.Where(x =>
@@ -258,7 +259,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         var configurations = await _termConfigurations.GetListAsync();
         var now = Clock.Now;
         var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
-        contexts = contexts.Where(x => configurations.Any(c => c.ExternalTermId == x.ExternalTermId &&
+        contexts = contexts.Where(x => x.IsMatriculated && configurations.Any(c => c.ExternalTermId == x.ExternalTermId &&
             c.IsOpenForStudent(now, profile.StudentId, x.CollegeLevel, x.AttendanceType))).ToArray();
         return contexts
             .Select(x => new CourseSelectionTermDto
@@ -454,11 +455,13 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         CourseSelectionContext? context = null)
     {
         var now = Clock.Now;
+        context ??= await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId);
+        if (context is null || !context.IsMatriculated)
+            throw new UserFriendlyException("Course selection is available only to matriculated students. Please contact Admissions if your status needs to be updated.");
         var termConfiguration = await _termConfigurations.FindAsync(x => x.ExternalTermId == externalTermId);
         if (termConfiguration is not null)
         {
-            context ??= await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId);
-            if (context is null || !termConfiguration.IsOpenForStudent(now, profile.StudentId,
+            if (!termConfiguration.IsOpenForStudent(now, profile.StudentId,
                 context.CollegeLevel, context.AttendanceType))
                 throw new UserFriendlyException("Registration is not currently open for that term.");
             return termConfiguration.CreatePolicy(allowOutsideWindow: !termConfiguration.IsOpen(now));
