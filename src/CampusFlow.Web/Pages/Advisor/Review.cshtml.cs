@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.Uow;
 using CampusFlowIdentityUser = Volo.Abp.Identity.IdentityUser;
 
 namespace CampusFlow.Web.Pages.Advisor;
@@ -35,13 +36,15 @@ public class ReviewModel : CampusFlowPageModel
     private readonly IdentityUserManager _userManager;
     private readonly SignInManager<CampusFlowIdentityUser> _signInManager;
     private readonly IRepository<CourseReviewSubmission, Guid> _submissions;
+    private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly ILogger<ReviewModel> _logger;
 
     public ReviewModel(IAdvisorPortalAppService advisorPortal, ITenantThemeProvider tenantThemeProvider,
         FacultyMailConnection mailConnection, AdvisorReviewMailDraftStore mailDrafts,
         FacultyGraphMailSender mailSender,
         IdentityUserManager userManager, SignInManager<CampusFlowIdentityUser> signInManager,
-        IRepository<CourseReviewSubmission, Guid> submissions, ILogger<ReviewModel> logger)
+        IRepository<CourseReviewSubmission, Guid> submissions, IUnitOfWorkManager unitOfWorkManager,
+        ILogger<ReviewModel> logger)
     {
         _advisorPortal = advisorPortal;
         _tenantThemeProvider = tenantThemeProvider;
@@ -51,6 +54,7 @@ public class ReviewModel : CampusFlowPageModel
         _userManager = userManager;
         _signInManager = signInManager;
         _submissions = submissions;
+        _unitOfWorkManager = unitOfWorkManager;
         _logger = logger;
     }
 
@@ -287,10 +291,14 @@ public class ReviewModel : CampusFlowPageModel
             [email.StudentEmail], HttpContext.RequestAborted, html: true, directToRecipients: true);
         try
         {
+            // EnsureStudentNoteAsync commits in its own unit of work. Read the submission again in a
+            // fresh unit of work so its concurrency stamp is current after Graph accepts the email.
+            using var recordUow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
             var submission = await _submissions.GetAsync(submissionId);
             if (submission.SubmittedByUserId != CurrentUser.Id) return Forbid();
             submission.RecordEmailResult(Clock.Now, result.Accepted, result.Error);
             await _submissions.UpdateAsync(submission, autoSave: true);
+            await recordUow.CompleteAsync();
         }
         catch (Exception exception)
         {
