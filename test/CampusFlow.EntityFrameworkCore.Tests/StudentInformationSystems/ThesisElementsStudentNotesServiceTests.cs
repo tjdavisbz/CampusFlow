@@ -26,6 +26,7 @@ public sealed class ThesisElementsStudentNotesServiceTests
         Assert.Equal(12345, body["studentUID"]!.GetValue<int>());
         Assert.Equal(0, body["studentNotesID"]!.GetValue<int>());
         Assert.Equal("Public", body["viewerAccess"]!.GetValue<string>());
+        Assert.Equal(string.Empty, body["groupAccess"]!.GetValue<string>());
         Assert.Equal("Please meet with your advisor.", body["note"]!.GetValue<string>());
         Assert.Equal(0, body["transcriptPurposeID"]!.GetValue<int>());
     }

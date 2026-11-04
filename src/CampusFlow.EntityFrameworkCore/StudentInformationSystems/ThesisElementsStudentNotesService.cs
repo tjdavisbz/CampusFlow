@@ -86,7 +86,7 @@ public sealed class ThesisElementsStudentNotesService : IStudentInformationSyste
             ["viewerAccess"] = "Public",
             ["subject"] = subject,
             ["note"] = comment,
-            ["groupAccess"] = null,
+            ["groupAccess"] = "",
             ["facultyID"] = null,
             ["transcriptPurposeID"] = 0
         };
