@@ -360,7 +360,10 @@ public class IndexModel : CampusFlowPageModel
 
         try
         {
-            var mealPlan = await _mealPlans.GetAsync();
+            var mealPlan = await _mealPlans.GetAsync(term.ExternalTermId);
+            journey.HousingRequired = mealPlan.HousingRequired;
+            journey.HasHousingAssignment = mealPlan.HasHousingAssignment;
+            journey.MealPlanEligible = mealPlan.MealPlanEligible;
             journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
             journey.MealPlanRequired = journey.MealPlanEnabled;
             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
@@ -407,6 +410,9 @@ public class IndexModel : CampusFlowPageModel
         public bool HasSelectedCourses { get; set; }
         public bool IsAwaitingAdvisor { get; set; }
         public bool CourseSelectionEnabled { get; set; }
+        public bool HousingRequired { get; set; }
+        public bool HasHousingAssignment { get; set; }
+        public bool MealPlanEligible { get; set; }
         public bool MealPlanEnabled { get; set; }
         public bool MealPlanRequired { get; set; }
         public bool MealPlanSelected { get; set; }
@@ -435,18 +441,29 @@ public class IndexModel : CampusFlowPageModel
                     ? new("Course selection", "Courses have been selected for this term.", "complete", courseUrl, "View courses")
                     : new("Course selection", "Choose the courses you plan to take.", "action", courseUrl, "Select courses"));
 
-            Steps.Add(!BillApprovalEnabled || !MealPlanEnabled
+            var housingUrl = $"/Housing?term={Uri.EscapeDataString(Term.ExternalTermId)}";
+            if (HousingRequired)
+                Steps.Add(HasHousingAssignment
+                    ? new("Housing", "Your housing assignment is recorded.", "complete", housingUrl, "View housing")
+                    : new("Housing", "Contact Student Services for a housing assignment before approving your bill.", "action", housingUrl, "View housing"));
+
+            if (MealPlanEligible)
+            Steps.Add(!HasHousingAssignment
+                ? new("Meal plan", "A housing assignment is required before choosing a meal plan.", "disabled", null, "Housing required")
+                : !BillApprovalEnabled || !MealPlanEnabled
                 ? RegistrationJourneyStep.ComingSoon("Meal plan")
                 : !MealPlanRequired
-                ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", "/Housing", "View options")
+                ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", housingUrl, "View options")
                 : MealPlanSelected
-                    ? new("Meal plan", "Your housing and meal-plan choice has been recorded.", "complete", "/Housing", "View selection")
-                    : new("Meal plan", "Choose the housing and meal-plan option that applies to you.", "action", "/Housing", "Choose plan"));
+                    ? new("Meal plan", "Your housing and meal-plan choice has been recorded.", "complete", housingUrl, "View selection")
+                    : new("Meal plan", "Choose the housing and meal-plan option that applies to you.", "action", housingUrl, "Choose plan"));
 
             Steps.Add(!BillApprovalEnabled
                 ? RegistrationJourneyStep.ComingSoon("Bill approval")
                 : BillApproved
                 ? new("Bill approval", "Your bill has been reviewed and approved.", "complete", billUrl, "View agreement")
+                : HousingRequired && !HasHousingAssignment
+                ? new("Bill approval", "A housing assignment is required before bill approval.", "disabled", null, "Housing required")
                 : new("Bill approval", "Review your charges, payment choice, and agreement.", "action", billUrl, "Review bill"));
         }
     }

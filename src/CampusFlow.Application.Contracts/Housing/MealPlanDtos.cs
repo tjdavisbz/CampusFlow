@@ -14,6 +14,12 @@ public sealed class MealPlanOptionDto
 
 public sealed class MealPlanSelectionDto
 {
+    public string ExternalTermId { get; set; } = "";
+    public bool HousingRequired { get; set; }
+    public bool HasHousingAssignment { get; set; }
+    public bool MealPlanEligible { get; set; }
+    public HousingChoice AssignedHousingChoice { get; set; }
+    public bool IsSelectionOpen { get; set; }
     public string StudentName { get; set; } = null!;
     public string StudentId { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
@@ -29,6 +35,7 @@ public sealed class MealPlanSelectionDto
 
 public sealed class SaveMealPlanSelectionInput
 {
+    public string? ExternalTermId { get; set; }
     public HousingChoice HousingChoice { get; set; }
     public int? ExternalMealPlanId { get; set; }
 }

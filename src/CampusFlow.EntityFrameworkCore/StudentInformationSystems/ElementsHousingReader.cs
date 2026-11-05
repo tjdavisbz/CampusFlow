@@ -17,6 +17,42 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
     private SqlConnection Connection() => new(configuration.GetConnectionString("ThesisElementsReadOnly")
         ?? throw new InvalidOperationException("The Elements read-only connection is not configured."));
 
+    public async Task<StudentHousingEligibility> GetStudentEligibilityAsync(int studentUid, int termCalendarId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = Connection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand("""
+            SELECT s.AttendanceType, COALESCE(ss.Campus, s.Campus, ''), room.PropertyName
+            FROM dbo.CAMS_Student_View s
+            LEFT JOIN dbo.CAMS_StudentStatus_View ss ON ss.StudentUID=s.StudentUID AND ss.TermCalendarID=@TermId
+            OUTER APPLY (
+                SELECT TOP (1) p.PropertyName
+                FROM StudentLife.HousingPeriodRoomAssignments a
+                JOIN StudentLife.HousingPeriods hp ON hp.HousingPeriodID=a.HousingPeriodID AND hp.IsDeleted=0
+                JOIN dbo.TermCalendar t ON t.TermCalendarID=@TermId
+                    AND hp.StartDate<=t.TermEndDate AND hp.EndDate>=t.TermStartDate
+                JOIN StudentLife.HousingPeriodRooms r ON r.HousingPeriodRoomID=a.HousingPeriodRoomID
+                    AND r.HousingPeriodID=a.HousingPeriodID AND r.IsDeleted=0
+                JOIN StudentLife.HousingPeriodProperties p ON p.HousingPeriodPropertyID=r.HousingPeriodPropertyID
+                    AND p.HousingPeriodID=a.HousingPeriodID AND p.IsDeleted=0
+                WHERE a.StudentUID=s.StudentUID AND a.IsDeleted=0
+                ORDER BY a.CreatedOn DESC, a.HousingPeriodRoomAssignmentID DESC
+            ) room
+            WHERE s.StudentUID=@StudentUid;
+            """, connection) { CommandTimeout = 60 };
+        command.Parameters.Add("@StudentUid", SqlDbType.Int).Value = studentUid;
+        command.Parameters.Add("@TermId", SqlDbType.Int).Value = termCalendarId;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            throw new InvalidOperationException("The student housing eligibility record is unavailable.");
+        var result = new StudentHousingEligibility(reader.IsDBNull(0) ? "" : reader.GetString(0),
+            reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2));
+        if (await reader.ReadAsync(cancellationToken))
+            throw new InvalidOperationException("The student has multiple status records for this term.");
+        return result;
+    }
+
     public async Task<List<HousingPeriodOption>> GetPeriodsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = Connection();
@@ -210,7 +246,7 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
     }
 
     public async Task<StudentHousingAssignment?> GetStudentAssignmentAsync(int studentUid,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, int? termCalendarId = null)
     {
         if (studentUid <= 0) return null;
         await using var connection = Connection();
@@ -228,11 +264,14 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
               ON p.HousingPeriodPropertyID = r.HousingPeriodPropertyID
              AND p.HousingPeriodID = a.HousingPeriodID AND p.IsDeleted = 0
             WHERE a.StudentUID = @StudentUid AND a.IsDeleted = 0
+              AND (@TermId IS NULL OR EXISTS (SELECT 1 FROM dbo.TermCalendar t
+                   WHERE t.TermCalendarID=@TermId AND hp.StartDate<=t.TermEndDate AND hp.EndDate>=t.TermStartDate))
             ORDER BY CASE WHEN SYSUTCDATETIME() BETWEEN hp.StartDate AND hp.EndDate THEN 0
                           WHEN hp.StartDate > SYSUTCDATETIME() THEN 1 ELSE 2 END,
                      hp.StartDate DESC, a.HousingPeriodRoomAssignmentID DESC;
             """, connection) { CommandTimeout = 60 };
         command.Parameters.Add("@StudentUid", SqlDbType.Int).Value = studentUid;
+        command.Parameters.Add("@TermId", SqlDbType.Int).Value = (object?)termCalendarId ?? DBNull.Value;
         int periodId, roomId;
         StudentHousingAssignment result;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -244,6 +283,7 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
                 PeriodName = reader.GetString(2), Building = reader.GetString(3), Room = reader.GetString(4)
             };
         }
+        if (StudentHousingEligibility.IsCommuterBuilding(result.Building)) return result;
         await using var roommates = new SqlCommand("""
             SELECT s.FirstName, s.LastName
             FROM StudentLife.HousingPeriodRoomAssignments a

@@ -56,6 +56,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly PayflowOptions _payflowOptions;
     private readonly ILogger<BillApprovalModel> _logger;
     private readonly ILegacyBillApprovalLookup _legacyApprovals;
+    private readonly CampusFlow.Housing.IMealPlanAppService _mealPlans;
 
     public BillApprovalModel(
         ITenantThemeProvider themeProvider,
@@ -83,7 +84,7 @@ public class BillApprovalModel : CampusFlowPageModel
         IPayflowGateway payflowGateway,
         IOptions<PayflowOptions> payflowOptions,
         ILogger<BillApprovalModel> logger,
-        ILegacyBillApprovalLookup legacyApprovals)
+        ILegacyBillApprovalLookup legacyApprovals, CampusFlow.Housing.IMealPlanAppService mealPlans)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
@@ -111,6 +112,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _payflowOptions = payflowOptions.Value;
         _logger = logger;
         _legacyApprovals = legacyApprovals;
+        _mealPlans = mealPlans;
     }
 
     public TenantTheme Theme { get; private set; } = new(
@@ -122,6 +124,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public string? TermCode { get; private set; }
     public string? ExternalTermId { get; private set; }
     public bool IsUnavailable { get; private set; }
+    public string? UnavailableReason { get; private set; }
     public IReadOnlyList<BillApprovalTermConfiguration> AvailableTerms { get; private set; } = [];
     public IReadOnlyList<StudentCourseScheduleItem> Courses { get; private set; } = [];
     public string? BookstoreUrl { get; private set; }
@@ -229,6 +232,15 @@ public class BillApprovalModel : CampusFlowPageModel
             BookstoreUrl = CampusStoreLinks.ForCourses(_configuration, CurrentTenant.Name, TermName, Courses);
             ExternalTermId = courseTerm?.ExternalTermId;
             ExternalTermId ??= termConfiguration?.ExternalTermId;
+
+            var housing = profile.Provider == StudentInformationSystemProvider.ThesisElements
+                ? await _mealPlans.GetAsync(ExternalTermId) : null;
+            if (housing is { HousingRequired: true, HasHousingAssignment: false })
+            {
+                IsUnavailable = true;
+                UnavailableReason = "A housing assignment is required before bill approval. Contact Student Services.";
+                return;
+            }
 
             var allTransactions = await billingTask;
             Charges = allTransactions.Where(x => x.TermCode == TermCode)

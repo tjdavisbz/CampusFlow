@@ -39,6 +39,7 @@ public class HousingModel : CampusFlowPageModel
         _currentStudentView = currentStudentView;
     }
 
+    [BindProperty(SupportsGet = true)] public string? Term { get; set; }
     [BindProperty] public SaveMealPlanSelectionInput Input { get; set; } = new();
     [BindProperty(SupportsGet = true)] public bool Saved { get; set; }
     public MealPlanSelectionDto? Selection { get; private set; }
@@ -52,29 +53,24 @@ public class HousingModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         try
         {
+            Selection = await _mealPlans.GetAsync(Term);
+            if (!Selection.HousingRequired) { IsUnavailable = true; return; }
+            Input.ExternalTermId = Selection.ExternalTermId;
             var student = await _currentStudentView.GetProfileAsync();
             if (student?.Provider == StudentInformationSystemProvider.ThesisElements &&
-                int.TryParse(student.ExternalStudentId, out var studentUid))
-                CurrentAssignment = await _housingReader.GetStudentAssignmentAsync(studentUid);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(exception, "Unable to load the student's current housing assignment.");
-        }
-        try
-        {
-            if (!await IsEnabledAsync())
+                int.TryParse(student.ExternalStudentId, out var studentUid) && int.TryParse(Selection.ExternalTermId, out var termId))
+                CurrentAssignment = await _housingReader.GetStudentAssignmentAsync(studentUid, termCalendarId: termId);
+            if (!Selection.IsSelectionOpen || !Selection.MealPlanEligible || !Selection.HasHousingAssignment)
             {
                 IsUnavailable = true;
                 return;
             }
-            Selection = await _mealPlans.GetAsync();
             if (!Selection.Options.Values.Any(x => x.Count > 0))
             {
                 IsUnavailable = true;
                 return;
             }
-            Input.HousingChoice = Selection.SelectedHousingChoice ?? HousingChoice.OnCampus;
+            Input.HousingChoice = Selection.AssignedHousingChoice;
             Input.ExternalMealPlanId = Selection.SelectedMealPlanId;
         }
         catch (Exception exception)
@@ -92,7 +88,7 @@ public class HousingModel : CampusFlowPageModel
         try
         {
             var result = await _mealPlans.SaveAsync(Input);
-            return RedirectToPage(new { saved = true });
+            return RedirectToPage(new { saved = true, term = Input.ExternalTermId });
         }
         catch (Exception exception)
         {
