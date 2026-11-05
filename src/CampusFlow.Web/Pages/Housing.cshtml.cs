@@ -60,7 +60,7 @@ public class HousingModel : CampusFlowPageModel
             if (student?.Provider == StudentInformationSystemProvider.ThesisElements &&
                 int.TryParse(student.ExternalStudentId, out var studentUid) && int.TryParse(Selection.ExternalTermId, out var termId))
                 CurrentAssignment = await _housingReader.GetStudentAssignmentAsync(studentUid, termCalendarId: termId);
-            if (!Selection.IsSelectionOpen || !Selection.MealPlanEligible || !Selection.HasHousingAssignment)
+            if (Selection.IsLockedByBillApproval || !Selection.IsSelectionOpen || !Selection.MealPlanEligible || !Selection.HasHousingAssignment)
             {
                 IsUnavailable = true;
                 return;
@@ -82,9 +82,6 @@ public class HousingModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!await IsEnabledAsync())
-            return RedirectToPage("/Index");
-
         try
         {
             var result = await _mealPlans.SaveAsync(Input);
@@ -115,6 +112,4 @@ public class HousingModel : CampusFlowPageModel
         _ => string.Empty
     };
 
-    private async Task<bool> IsEnabledAsync() =>
-        (await _billApprovalTermConfigurations.GetListAsync()).Any(x => x.IsOpen(_clock.Now));
 }

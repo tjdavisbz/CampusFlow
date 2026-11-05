@@ -22,6 +22,7 @@ public class MealPlanSelectionTests
     private readonly IStudentInformationSystemMealPlanService _sis = Substitute.For<IStudentInformationSystemMealPlanService>();
     private readonly IElementsHousingReader _housing = Substitute.For<IElementsHousingReader>();
     private readonly MealPlanAppService _service;
+    private readonly IBillApprovalCompletionLookup _completion = Substitute.For<IBillApprovalCompletionLookup>();
     private readonly IClock _clock = Substitute.For<IClock>();
 
     public MealPlanSelectionTests()
@@ -55,7 +56,7 @@ public class MealPlanSelectionTests
             }, new StudentMealPlanTerm[] { new(270, "Spring 2027", new(2027, 1, 1), new(2027, 5, 1)) }, 270, Array.Empty<StudentHousingStatusOption>(), null));
         _service = new(Substitute.For<IRepository<StudentProfile, Guid>>(), current, configurations,
             Substitute.For<IRepository<StudentHousingSelection, Guid>>(), new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
-            _housing, terms, _clock);
+            _housing, terms, _clock, _completion);
     }
 
     private void Eligibility(string attendance, string? building) =>
@@ -119,6 +120,17 @@ public class MealPlanSelectionTests
     {
         Eligibility("Residential Undergraduate", "Bridges");
         await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new() { ExternalTermId = "270", HousingChoice = HousingChoice.OnCampus, ExternalMealPlanId = 4 }));
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task Approved_bill_locks_direct_meal_plan_submissions()
+    {
+        Eligibility("Residential Undergraduate", "Bridges");
+        _completion.IsApprovedAsync(Arg.Any<StudentProfile>(), "270", Arg.Any<CancellationToken>()).Returns(true);
+        var view = await _service.GetAsync("270");
+        Assert.True(view.IsLockedByBillApproval);
+        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new() { ExternalTermId = "270", HousingChoice = HousingChoice.OnCampus, ExternalMealPlanId = 2 }));
         await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default);
     }
 

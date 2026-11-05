@@ -49,8 +49,9 @@ public class BillApprovalModel : CampusFlowPageModel
         var source = await _configurations.GetAsync(sourceId.Value);
         Input = new InputModel { Id = source.Id, ExternalTermId = source.ExternalTermId,
             OpensAt = source.OpensAt, ClosesAt = source.ClosesAt, IsEnabled = source.IsEnabled,
-            AgreementTemplateId = source.AgreementTemplateId, PaymentPlanPolicyId = source.PaymentPlanPolicyId };
-        if (copyFrom.HasValue) { Input.Id = null; Input.ExternalTermId = string.Empty; Input.IsEnabled = false; }
+            AgreementTemplateId = source.AgreementTemplateId, PaymentPlanPolicyId = source.PaymentPlanPolicyId, TestAccessEnabled = source.TestAccessEnabled,
+            TestStudentIds = string.Join(Environment.NewLine, source.GetTestStudentIds()) };
+        if (copyFrom.HasValue) { Input.Id = null; Input.ExternalTermId = string.Empty; Input.IsEnabled = false; Input.TestAccessEnabled = false; Input.TestStudentIds = string.Empty; }
     }
 
     public async Task<IActionResult> OnPostSaveAsync()
@@ -61,17 +62,28 @@ public class BillApprovalModel : CampusFlowPageModel
         if (Agreements.All(x => x.Value != Input.AgreementTemplateId.ToString())) ModelState.AddModelError("Input.AgreementTemplateId", "Choose an agreement.");
         if (PaymentPlans.All(x => x.Value != Input.PaymentPlanPolicyId.ToString())) ModelState.AddModelError("Input.PaymentPlanPolicyId", "Choose a payment plan.");
         if (Configurations.Any(x => x.ExternalTermId == Input.ExternalTermId && x.Id != Input.Id)) ModelState.AddModelError("Input.ExternalTermId", "That term already has Bill Approval settings.");
+        var testIds = (Input.TestStudentIds ?? string.Empty).Split(new[] { ',', ';', ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var validation = new BillApprovalTermConfiguration(Guid.NewGuid(), CurrentTenant.Id, Input.ExternalTermId,
+            "", "", DateTime.Today, DateTime.Today.AddDays(1), false, Guid.Empty, Guid.Empty);
+        try { validation.ConfigureTestAccess(Input.TestAccessEnabled, testIds); }
+        catch (ArgumentException exception) { ModelState.AddModelError("Input.TestStudentIds", exception.Message); }
         if (!ModelState.IsValid) return Page();
         var term = (await GetTermsAsync()).Single(x => x.ExternalTermId == Input.ExternalTermId);
         if (Input.Id.HasValue)
         {
             var existing = await _configurations.GetAsync(Input.Id.Value);
             existing.Update(Input.OpensAt, Input.ClosesAt, Input.IsEnabled, Input.AgreementTemplateId, Input.PaymentPlanPolicyId);
+            existing.ConfigureTestAccess(Input.TestAccessEnabled, testIds);
             await _configurations.UpdateAsync(existing, autoSave: true);
         }
-        else await _configurations.InsertAsync(new BillApprovalTermConfiguration(_guidGenerator.Create(), CurrentTenant.Id,
-            term.ExternalTermId, term.TermCode, term.DisplayName, Input.OpensAt, Input.ClosesAt,
-            Input.IsEnabled, Input.AgreementTemplateId, Input.PaymentPlanPolicyId), autoSave: true);
+        else
+        {
+            var configuration = new BillApprovalTermConfiguration(_guidGenerator.Create(), CurrentTenant.Id,
+                term.ExternalTermId, term.TermCode, term.DisplayName, Input.OpensAt, Input.ClosesAt,
+                Input.IsEnabled, Input.AgreementTemplateId, Input.PaymentPlanPolicyId);
+            configuration.ConfigureTestAccess(Input.TestAccessEnabled, testIds);
+            await _configurations.InsertAsync(configuration, autoSave: true);
+        }
         Alerts.Success($"{term.DisplayName} Bill Approval settings were saved.");
         return RedirectToPage();
     }
@@ -96,6 +108,8 @@ public class BillApprovalModel : CampusFlowPageModel
         public DateTime OpensAt { get; set; } = DateTime.Today;
         public DateTime ClosesAt { get; set; } = DateTime.Today.AddMonths(3);
         public bool IsEnabled { get; set; }
+        public bool TestAccessEnabled { get; set; }
+        public string TestStudentIds { get; set; } = string.Empty;
         public Guid AgreementTemplateId { get; set; }
         public Guid PaymentPlanPolicyId { get; set; }
     }

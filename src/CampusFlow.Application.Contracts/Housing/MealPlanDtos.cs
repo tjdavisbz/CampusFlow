@@ -20,6 +20,7 @@ public sealed class MealPlanSelectionDto
     public bool MealPlanEligible { get; set; }
     public HousingChoice AssignedHousingChoice { get; set; }
     public bool IsSelectionOpen { get; set; }
+    public bool IsLockedByBillApproval { get; set; }
     public string StudentName { get; set; } = null!;
     public string StudentId { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
