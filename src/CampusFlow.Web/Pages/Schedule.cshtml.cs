@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CampusFlow.Branding;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.Web.Students;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
@@ -16,6 +17,7 @@ namespace CampusFlow.Web.Pages;
 public class ScheduleModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
+    private readonly IStudentTermSelection _selectedTerm;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
@@ -28,9 +30,10 @@ public class ScheduleModel : CampusFlowPageModel
         ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
-        ILogger<ScheduleModel> logger)
+        ILogger<ScheduleModel> logger, IStudentTermSelection selectedTerm)
     {
         _tenantThemeProvider = tenantThemeProvider;
+        _selectedTerm = selectedTerm;
         _studentProfileRepository = studentProfileRepository;
         _currentStudentView = currentStudentView;
         _scheduleLookups = scheduleLookups.ToArray();
@@ -48,7 +51,7 @@ public class ScheduleModel : CampusFlowPageModel
     public IReadOnlyList<ScheduleTermGroup> CurrentAndUpcomingTerms { get; private set; } = [];
     public IReadOnlyList<ScheduleTermGroup> HistoricalTerms { get; private set; } = [];
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(string? term = null)
     {
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null)
@@ -77,7 +80,7 @@ public class ScheduleModel : CampusFlowPageModel
             var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             var currentTerm = termLookup is null
                 ? null
-                : await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+                : await _selectedTerm.ResolveAsync(profile, termLookup, term, cancellationToken: HttpContext.RequestAborted);
             CurrentTermCode = currentTerm?.TermCode;
 
             var courses = await scheduleLookup.GetScheduleAsync(

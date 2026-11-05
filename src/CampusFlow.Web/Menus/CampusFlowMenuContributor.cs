@@ -101,8 +101,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                 var showHousing = false;
                 try
                 {
+                    var termLookup = context.ServiceProvider.GetServices<CampusFlow.StudentInformationSystems.IStudentInformationSystemTermLookup>()
+                        .SingleOrDefault(x => x.Provider == studentProfile.Provider);
+                    var selectedTerm = termLookup is null ? null : await context.ServiceProvider
+                        .GetRequiredService<CampusFlow.Web.Students.IStudentTermSelection>().ResolveAsync(studentProfile, termLookup);
                     showHousing = (await context.ServiceProvider.GetRequiredService<CampusFlow.Housing.IMealPlanAppService>()
-                        .GetAsync()).HousingRequired;
+                        .GetAsync(selectedTerm?.ExternalTermId)).HousingRequired;
                 }
                 catch (Exception exception)
                 {

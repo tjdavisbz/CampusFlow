@@ -92,7 +92,7 @@
     {
         <section class="semester-summary" aria-labelledby="semester-heading">
             <div>
-                <span class="summary-label">Current term</span>
+                <span class="summary-label">Selected term</span>
                 <h2 id="semester-heading">@(Model.CurrentTerm?.DisplayName ?? "Term information unavailable")</h2>
             </div>
             @if (Model.DashboardTerms.Count > 0 && Model.CurrentTerm is not null)

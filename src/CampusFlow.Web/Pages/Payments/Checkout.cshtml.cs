@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using CampusFlow.Payments;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.Web.Students;
+using CampusFlow.BillApprovals;
 using CampusFlow.Web.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +22,7 @@ namespace CampusFlow.Web.Pages.Payments;
 public class CheckoutModel : CampusFlowPageModel
 {
     private readonly ICurrentStudentView _studentView;
+    private readonly IStudentTermSelection _selectedTerm;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemPaymentPostingService> _paymentPostingServices;
@@ -33,8 +36,9 @@ public class CheckoutModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         IEnumerable<IStudentInformationSystemPaymentPostingService> paymentPostingServices,
         IRepository<PayflowPayment, Guid> payments, IPayflowGateway gateway,
-        IOptions<PayflowOptions> options, ILogger<CheckoutModel> logger)
+        IOptions<PayflowOptions> options, ILogger<CheckoutModel> logger, IStudentTermSelection selectedTerm)
     {
+        _selectedTerm = selectedTerm;
         _studentView = studentView; _billingLookups = billingLookups.ToArray();
         _termLookups = termLookups.ToArray(); _paymentPostingServices = paymentPostingServices.ToArray();
         _payments = payments;
@@ -53,6 +57,10 @@ public class CheckoutModel : CampusFlowPageModel
     public string SecurityCode { get; set; } = string.Empty;
     [BindProperty, StringLength(20), Display(Name = "Billing ZIP/postal code")]
     public string? PostalCode { get; set; }
+    [BindProperty(SupportsGet = true)] public string? Term { get; set; }
+    [BindProperty(SupportsGet = true)] public bool IncludeFutureTerms { get; set; }
+    public StudentInformationSystemTerm? SelectedTerm { get; private set; }
+    public decimal OverallBalance { get; private set; }
     public decimal OutstandingBalance { get; private set; }
     public decimal ConvenienceFee => _options.CalculateConvenienceFee(Amount);
     public decimal TotalCharge => Amount + ConvenienceFee;
@@ -79,6 +87,7 @@ public class CheckoutModel : CampusFlowPageModel
         var profile = await RequireWritableStudentAsync();
         if (profile is null) return RedirectToPage("/Billing");
         OutstandingBalance = await LoadBalanceAsync(profile);
+        if (SelectedTerm is null) ModelState.AddModelError(string.Empty, "The payment term could not be verified. No payment was made.");
         if (!_options.IsConfigured) ModelState.AddModelError(string.Empty, "Online payments are not configured yet.");
         if (OutstandingBalance <= 0) ModelState.AddModelError(string.Empty, "There is no balance due.");
         if (Amount > OutstandingBalance) ModelState.AddModelError(nameof(Amount), "The payment cannot exceed your current balance.");
@@ -97,6 +106,13 @@ public class CheckoutModel : CampusFlowPageModel
         var totalCharge = Amount + convenienceFee;
         var payment = new PayflowPayment(id, CurrentTenant.Id, CurrentUser.Id!.Value, profile.Id,
             profile.ExternalStudentId, Amount, convenienceFee, _options.Currency, tokenId, _options.TestMode);
+        if (!int.TryParse(SelectedTerm?.ExternalTermId, out var postingTermId))
+        {
+            ModelState.AddModelError(string.Empty, "The payment term could not be verified. No payment was made.");
+            ClearSensitiveFields();
+            return Page();
+        }
+        payment.SetElementsTerm(postingTermId);
         await _payments.InsertAsync(payment, autoSave: true);
         try
         {
@@ -116,12 +132,9 @@ public class CheckoutModel : CampusFlowPageModel
             {
                 try
                 {
-                    var termLookup = _termLookups.Single(x => x.Provider == profile.Provider);
                     var postingService = _paymentPostingServices.Single(x => x.Provider == profile.Provider);
-                    var term = await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted)
-                               ?? throw new InvalidOperationException("No current Elements term is configured.");
-                    if (!int.TryParse(term.ExternalTermId, out var termCalendarId))
-                        throw new InvalidOperationException("The current Elements term identifier is invalid.");
+                    var termCalendarId = payment.ElementsTermId
+                        ?? throw new InvalidOperationException("The payment's posting term is missing.");
                     var posting = await postingService.PostAsync(profile.ExternalStudentId, termCalendarId,
                         payment.Amount, payment.ConvenienceFee, response.Reference ?? string.Empty, payment.IsTest,
                         payment.CreationTime,
@@ -171,8 +184,15 @@ public class CheckoutModel : CampusFlowPageModel
     {
         var lookup = _billingLookups.SingleOrDefault(x => x.Provider == profile.Provider);
         if (lookup is null) return 0;
+        var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+        if (termLookup is null) return 0;
+        SelectedTerm = await _selectedTerm.ResolveAsync(profile, termLookup, Term, cancellationToken: HttpContext.RequestAborted);
+        if (SelectedTerm is null) return 0;
+        Term = SelectedTerm.ExternalTermId;
         var items = await lookup.GetTransactionsAsync(profile.ExternalStudentId, HttpContext.RequestAborted);
-        return items.Where(x => !x.IsVoided).Sum(x => x.BalanceChange);
+        var balance = StudentBillingBalance.Calculate(items, SelectedTerm.TermCode);
+        OverallBalance = balance.Overall;
+        return IncludeFutureTerms ? balance.Overall : balance.ThroughSelectedTerm;
     }
 
     private async Task RetryPendingElementsPaymentsAsync(StudentProfile profile)
@@ -188,13 +208,15 @@ public class CheckoutModel : CampusFlowPageModel
         var postingService = _paymentPostingServices.SingleOrDefault(x => x.Provider == profile.Provider);
         if (termLookup is null || postingService is null) return;
         var term = await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
-        if (term is null || !int.TryParse(term.ExternalTermId, out var termCalendarId)) return;
+        int? fallbackTermId = int.TryParse(term?.ExternalTermId, out var currentId) ? currentId : null;
 
         foreach (var payment in pending.Where(x => !string.IsNullOrWhiteSpace(x.PayflowReference)))
         {
+            var targetTermId = payment.ElementsTermId ?? fallbackTermId;
+            if (!targetTermId.HasValue) continue;
             try
             {
-                var result = await postingService.PostAsync(payment.ExternalStudentId, termCalendarId,
+                var result = await postingService.PostAsync(payment.ExternalStudentId, targetTermId.Value,
                     payment.Amount, payment.ConvenienceFee, payment.PayflowReference!, payment.IsTest,
                     payment.CreationTime,
                     HttpContext.RequestAborted);

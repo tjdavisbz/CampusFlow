@@ -8,6 +8,7 @@ using CampusFlow.Web.Portals;
 using Volo.Abp.MultiTenancy;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.Web.Students;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,6 +32,7 @@ namespace CampusFlow.Web.Pages;
 public class IndexModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
+    private readonly IStudentTermSelection _selectedTerm;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemStudentLookup> _studentLookups;
@@ -78,7 +80,7 @@ public class IndexModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
         IConfiguration configuration,
         IRepository<PortalAnnouncement, Guid> announcements,
-        ILegacyBillApprovalLookup legacyApprovals, IBillApprovalCompletionLookup completion)
+        ILegacyBillApprovalLookup legacyApprovals, IBillApprovalCompletionLookup completion, IStudentTermSelection selectedTerm)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -104,6 +106,7 @@ public class IndexModel : CampusFlowPageModel
         _announcements = announcements;
         _legacyApprovals = legacyApprovals;
         _completion = completion;
+        _selectedTerm = selectedTerm;
     }
 
     public string? TenantName { get; private set; }
@@ -214,12 +217,11 @@ public class IndexModel : CampusFlowPageModel
                         .Select(sisTerm => new DashboardTermOption(sisTerm.ExternalTermId,
                             sisTerm.DisplayName, sisTerm.StartDate, sisTerm.EndDate));
                     DashboardTerms = configuredOptions.Concat(announcementOptions).ToArray();
-                    var selectedId = !string.IsNullOrWhiteSpace(term) && DashboardTerms.Any(x => x.ExternalTermId == term)
-                        ? term
-                        : configuredTerms.FirstOrDefault(x => x.IsDashboardDefault)?.ExternalTermId;
-                    selectedId ??= (await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted))?.ExternalTermId;
-                    selectedId ??= DashboardTerms.FirstOrDefault()?.ExternalTermId;
-                    CurrentTerm = sisTerms.FirstOrDefault(x => x.ExternalTermId == selectedId);
+                    CurrentTerm = await _selectedTerm.ResolveAsync(profile, termLookup,
+                        DashboardTerms.Any(x => x.ExternalTermId == term) ? term : null,
+                        configuredTerms.FirstOrDefault(x => x.IsDashboardDefault)?.ExternalTermId,
+                        HttpContext.RequestAborted);
+                    var selectedId = CurrentTerm?.ExternalTermId;
                     AnnouncementTerms = DashboardTerms.Where(option =>
                         option.ExternalTermId != selectedId && activeAnnouncements.Any(announcement =>
                             announcement.Terms.Contains(option.DisplayName, StringComparer.OrdinalIgnoreCase)))

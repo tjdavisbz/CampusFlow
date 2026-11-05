@@ -6,6 +6,7 @@ using CampusFlow.Branding;
 using CampusFlow.CourseSelections;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.Web.Students;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ namespace CampusFlow.Web.Pages;
 public class CourseSelectionModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
+    private readonly IStudentTermSelection _selectedTerm;
     private readonly IRepository<StudentProfile, Guid> _profiles;
     private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
@@ -31,9 +33,10 @@ public class CourseSelectionModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
         IEnumerable<IStudentInformationSystemDegreeAuditLookup> degreeAuditLookups,
         ICourseSelectionAppService courseSelection,
-        ILogger<CourseSelectionModel> logger)
+        ILogger<CourseSelectionModel> logger, IStudentTermSelection selectedTerm)
     {
         _tenantThemeProvider = tenantThemeProvider;
+        _selectedTerm = selectedTerm;
         _profiles = profiles;
         _currentStudentView = currentStudentView;
         _termLookups = termLookups.ToArray();
@@ -216,7 +219,7 @@ public class CourseSelectionModel : CampusFlowPageModel
                 var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
                 var currentTerm = termLookup is null
                     ? null
-                    : await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+                    : await _selectedTerm.ResolveAsync(profile, termLookup, cancellationToken: HttpContext.RequestAborted);
                 selectedTermId = currentTerm is not null &&
                                  EligibleTerms.Any(x => x.ExternalTermId == currentTerm.ExternalTermId)
                     ? currentTerm.ExternalTermId

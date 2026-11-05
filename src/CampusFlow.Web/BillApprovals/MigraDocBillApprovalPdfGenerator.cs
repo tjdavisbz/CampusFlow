@@ -196,7 +196,7 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
             row.Cells[2].AddParagraph(item.DueDescription);
             AddMoney(row.Cells[3], item.Amount);
         }
-        section.AddParagraph($"Payment-plan enrollment fee included: {Money(approval.PaymentPlanFee)}").Format.Font.Italic = true;
+        section.AddParagraph($"Payment Plan Fee included: {Money(approval.PaymentPlanFee)}").Format.Font.Italic = true;
     }
 
     private static void AddAgreement(Section section, BillApproval approval)

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CampusFlow.BillApprovals;
@@ -33,9 +35,13 @@ public class BillApprovalAccessHandlerTests
 {
     private readonly CampusFlow.Web.Pages.BillApprovalModel _model;
     private readonly IMealPlanAppService _meal=Substitute.For<IMealPlanAppService>();
+    private readonly IStudentInformationSystemBillingRecalculationService _recalculation=Substitute.For<IStudentInformationSystemBillingRecalculationService>();
     private readonly IPayflowGateway _gateway=Substitute.For<IPayflowGateway>();
     private readonly IStudentInformationSystemBillingLookup _billing=Substitute.For<IStudentInformationSystemBillingLookup>();
     private readonly BillApprovalTermConfiguration _term;
+    private readonly IStudentInformationSystemPaymentPlanLookup _planLookup=Substitute.For<IStudentInformationSystemPaymentPlanLookup>();
+    private readonly IRepository<AgreementTemplate,Guid> _agreements=Substitute.For<IRepository<AgreementTemplate,Guid>>();
+    private readonly IRepository<PaymentPlanPolicy,Guid> _policies=Substitute.For<IRepository<PaymentPlanPolicy,Guid>>();
     private readonly IRepository<BillApproval,Guid> _approvals=Substitute.For<IRepository<BillApproval,Guid>>();
 
     public BillApprovalAccessHandlerTests()
@@ -56,16 +62,18 @@ public class BillApprovalAccessHandlerTests
         var clock=Substitute.For<IClock>();clock.Now.Returns(new DateTime(2026,11,5));
         _term=new(Guid.NewGuid(),owner,"269","B27S","Spring 2027",new(2026,12,1),new(2027,2,1),false,Guid.NewGuid(),Guid.NewGuid());
         var terms=Substitute.For<IRepository<BillApprovalTermConfiguration,Guid>>();terms.GetListAsync(Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new List<BillApprovalTermConfiguration>{_term});
+        _planLookup.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
+        _recalculation.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
         _meal.GetAsync("269").Returns(new MealPlanSelectionDto{ExternalTermId="269",HousingRequired=false});
         var theme=Substitute.For<ITenantThemeProvider>();
         _model=new(theme,Substitute.For<IRepository<StudentProfile,Guid>>(),current,Array.Empty<IStudentInformationSystemStudentLookup>(),
-            new[]{termLookup},new[]{schedule},new[]{_billing},new[]{aid},Array.Empty<IStudentInformationSystemPaymentPlanLookup>(),
+            new[]{termLookup},new[]{schedule},new[]{_billing},new[]{aid},new[]{_planLookup},
             Array.Empty<IStudentInformationSystemDocumentTrackingService>(),Array.Empty<IStudentInformationSystemPaymentPostingService>(),
-            new ConfigurationBuilder().Build(),Substitute.For<IRepository<AgreementTemplate,Guid>>(),Substitute.For<IRepository<PaymentPlanPolicy,Guid>>(),
+            new ConfigurationBuilder().Build(),_agreements,_policies,
             terms,_approvals,Substitute.For<IRepository<BillApprovalArtifact,Guid>>(),Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
             Substitute.For<IBillApprovalPdfGenerator>(),Substitute.For<IGuidGenerator>(),clock,Substitute.For<IRepository<PayflowPayment,Guid>>(),
             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
-            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>())
+            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>(), Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation})
         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
     }
 
@@ -111,6 +119,71 @@ public class BillApprovalAccessHandlerTests
         Assert.True(_model.IsUnavailable);
         Assert.Empty(_gateway.ReceivedCalls());
         await _approvals.DidNotReceiveWithAnyArgs().InsertAsync(default!,default,default);
+    }
+
+    [Fact]
+    public async Task Recalculation_completes_before_the_bill_is_read()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        await _model.OnGetAsync("B27S");
+        Assert.False(_model.IsUnavailable);
+        Received.InOrder(()=>
+        {
+            _recalculation.RecalculateAsync("10","269",Arg.Any<Guid>(),Arg.Any<CancellationToken>());
+            _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task Recalculation_failure_stops_the_review_without_reading_a_stale_ledger()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _recalculation.RecalculateAsync("10","269",Arg.Any<Guid>(),Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Still processing")));
+        await _model.OnGetAsync("B27S");
+        Assert.True(_model.IsUnavailable);
+        await _billing.DidNotReceive().GetTransactionsAsync("10",Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_changed_review_cannot_be_paid_without_reviewing_the_updated_amounts()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        await _model.OnGetAsync("B27S");_model.ReviewVersion=_model.CurrentReviewVersion;
+        _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentBillingTransaction(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",DateTime.Today,"Tuition",1000,0,1000,true,false)});
+        await _model.OnPostPaymentAsync("B27S");
+        Assert.False(_model.ModelState.IsValid);Assert.Empty(_gateway.ReceivedCalls());
+        Assert.NotEqual(_model.ReviewVersion,_model.CurrentReviewVersion);
+    }
+
+    [Fact]
+    public async Task Accepted_deferred_bill_records_the_configured_fee_and_fee_inclusive_remaining_balance()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentBillingTransaction(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",DateTime.Today,"Tuition",1000,0,1000,true,false)});
+        _planLookup.GetPaymentPlanContextAsync("10","269",Arg.Any<CancellationToken>()).Returns(new StudentPaymentPlanContext("Full Time","Graduate",true));
+        var policy=new PaymentPlanPolicy(_term.PaymentPlanPolicyId,null,"Test",1,DateTime.Today,125,3,0,0,"[]","[]","[\"February 28\",\"March 30\"]","[]",true);
+        _policies.GetQueryableAsync().Returns(new[]{policy}.AsQueryable());
+        _agreements.GetAsync(_term.AgreementTemplateId,Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new AgreementTemplate(_term.AgreementTemplateId,null,"Test",1,DateTime.Today,"Agreement","[]",true));
+        BillApproval? saved=null;
+        _approvals.InsertAsync(Arg.Do<BillApproval>(row=>saved=row),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(c=>c.Arg<BillApproval>());
+        await _model.OnGetAsync("B27S");Assert.False(_model.IsUnavailable);
+        Assert.Equal(125m,_model.PaymentPlanFee);Assert.Equal(1125m,_model.DeferredBalance);
+        _model.ReviewVersion=_model.CurrentReviewVersion;_model.AgreementAcceptedInput=true;_model.PaymentChoiceInput="Deferred";
+        await _model.OnPostAsync("B27S");
+        Assert.NotNull(saved);Assert.Equal(125m,saved.PaymentPlanFee);Assert.Equal(1125m,saved.RemainingBalance);
+        Assert.Equal(1125m,JsonSerializer.Deserialize<List<StudentPaymentInstallment>>(saved.PaymentScheduleJson)!.Sum(x=>x.Amount));
+        Assert.Empty(_gateway.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task Replaced_billing_row_identifiers_with_identical_reviewed_values_do_not_make_a_review_stale()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        var row=new StudentBillingTransaction(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",DateTime.Today,"Tuition",1000,0,1000,true,false);
+        _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{row});
+        await _model.OnGetAsync("B27S");var version=_model.CurrentReviewVersion;
+        _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{row with {ExternalTransactionId="replacement"}});
+        await _model.OnGetAsync("B27S");Assert.Equal(version,_model.CurrentReviewVersion);
     }
 
 }

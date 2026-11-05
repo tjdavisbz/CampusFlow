@@ -57,15 +57,24 @@
     {
         <section class="balance-grid" aria-label="Account balances">
             <article class="balance-card balance-primary">
+                <div class="balance-details"><span>Balance through @(Model.SelectedTermName ?? "selected term")</span>
+                    <strong>@Model.FormatCurrency(Model.CurrentBalance)</strong>
+                    <small>Includes selected and previous terms; excludes future terms.</small></div>
+                <div class="balance-payment">
+                    @if (Model.CanPaySelectedTerm) { <a class="payment-link" asp-page="/Payments/Checkout" asp-route-term="@Model.SelectedTermId">Pay this balance</a> }
+                    else { <span>@(Model.CurrentBalance <= 0 ? "No payment is due through this term." : "Online payments are not available.")</span> }
+                </div>
+            </article>
+            <article class="balance-card balance-primary">
                 <div class="balance-details">
                     <span>Overall balance</span>
                     <strong>@Model.FormatCurrency(Model.OverallBalance)</strong>
-                    <small>Includes posted and pending account activity</small>
+                    <small>Includes posted and pending activity for all terms, including future terms.</small>
                 </div>
                 <div class="balance-payment">
                     @if (Model.CanMakePayment)
                     {
-                        <a class="payment-link" asp-page="/Payments/Checkout"><i class="fa-solid fa-lock" aria-hidden="true"></i> Make a payment</a>
+                        <a class="payment-link" asp-page="/Payments/Checkout" asp-route-term="@Model.SelectedTermId" asp-route-includeFutureTerms="true"><i class="fa-solid fa-lock" aria-hidden="true"></i> Pay all terms</a>
                         <small>@(Model.IsPaymentTestMode ? "Payflow test mode — no real charges." : "Secure checkout powered by PayPal.")</small>
                     }
                     else
@@ -94,8 +103,8 @@
                 <section class="term-ledgers active-term-ledgers" aria-labelledby="active-activity-heading">
                     <div class="section-heading">
                         <div>
-                            <span>Now and next</span>
-                            <h2 id="active-activity-heading">Current &amp; upcoming activity</h2>
+                            <span>Selected term and later</span>
+                            <h2 id="active-activity-heading">Selected &amp; upcoming activity</h2>
                         </div>
                         <p>Recent charges, credits, and pending items for active and future terms.</p>
                     </div>

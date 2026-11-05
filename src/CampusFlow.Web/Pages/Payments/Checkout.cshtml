@@ -21,12 +21,14 @@
         {
             <div class="payflow-heading"><div><span>Secure checkout</span><h1>Make a payment</h1></div><i class="fa-solid fa-shield-halved"></i></div>
             <p>Enter your card details below. CampusFlow sends them securely to PayPal and does not store the card number or security code.</p>
+            <p>Payment term: <strong>@Model.SelectedTerm?.DisplayName</strong>. @(Model.IncludeFutureTerms ? "This amount includes all terms, including future charges." : "This amount includes the selected term and earlier terms; future charges are excluded.")</p>
             <form method="post" id="direct-payment-form" autocomplete="on">
+                <input type="hidden" asp-for="Term" /><input type="hidden" asp-for="IncludeFutureTerms" />
                 <div asp-validation-summary="ModelOnly" class="validation"></div>
                 <label asp-for="Amount">Payment amount</label>
                 <div class="amount-input"><span>$</span><input asp-for="Amount" inputmode="decimal" /></div>
                 <span asp-validation-for="Amount" class="validation"></span>
-                <small>Current balance: @UsdCurrency.Format(Model.OutstandingBalance)</small>
+                <small>@(Model.IncludeFutureTerms ? "Overall balance" : "Balance through selected term"): @UsdCurrency.Format(Model.OutstandingBalance)</small>
                 <dl class="payment-summary" data-fee-rate="@Model.ConvenienceFeePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">
                     <div><dt>Payment</dt><dd id="payment-subtotal">@UsdCurrency.Format(Model.Amount)</dd></div>
                     <div><dt>Convenience fee (@Model.ConvenienceFeePercent.ToString("0.##")%)</dt><dd id="payment-fee">@UsdCurrency.Format(Model.ConvenienceFee)</dd></div>

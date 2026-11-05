@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using CampusFlow.Web.Students;
 using System.Linq;
 using System.Threading.Tasks;
 using CampusFlow.Branding;
@@ -24,11 +26,13 @@ public class HousingModel : CampusFlowPageModel
     private readonly ILogger<HousingModel> _logger;
     private readonly IElementsHousingReader _housingReader;
     private readonly ICurrentStudentView _currentStudentView;
+    private readonly IStudentTermSelection _selectedTerm;
+    private readonly IReadOnlyCollection<IStudentInformationSystemTermLookup> _termLookups;
 
     public HousingModel(ITenantThemeProvider themeProvider, IMealPlanAppService mealPlans,
         IRepository<BillApprovalTermConfiguration, Guid> billApprovalTermConfigurations,
         IClock clock, ILogger<HousingModel> logger, IElementsHousingReader housingReader,
-        ICurrentStudentView currentStudentView)
+        ICurrentStudentView currentStudentView, IStudentTermSelection selectedTerm, IEnumerable<IStudentInformationSystemTermLookup> termLookups)
     {
         _themeProvider = themeProvider;
         _mealPlans = mealPlans;
@@ -37,6 +41,8 @@ public class HousingModel : CampusFlowPageModel
         _logger = logger;
         _housingReader = housingReader;
         _currentStudentView = currentStudentView;
+        _selectedTerm = selectedTerm;
+        _termLookups = termLookups.ToArray();
     }
 
     [BindProperty(SupportsGet = true)] public string? Term { get; set; }
@@ -53,10 +59,13 @@ public class HousingModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         try
         {
+            var student = await _currentStudentView.GetProfileAsync();
+            var lookup = _termLookups.SingleOrDefault(x => x.Provider == student?.Provider);
+            if (student is not null && lookup is not null)
+                Term = (await _selectedTerm.ResolveAsync(student, lookup, Term, cancellationToken: HttpContext.RequestAborted))?.ExternalTermId;
             Selection = await _mealPlans.GetAsync(Term);
             if (!Selection.HousingRequired) { IsUnavailable = true; return; }
             Input.ExternalTermId = Selection.ExternalTermId;
-            var student = await _currentStudentView.GetProfileAsync();
             if (student?.Provider == StudentInformationSystemProvider.ThesisElements &&
                 int.TryParse(student.ExternalStudentId, out var studentUid) && int.TryParse(Selection.ExternalTermId, out var termId))
                 CurrentAssignment = await _housingReader.GetStudentAssignmentAsync(studentUid, termCalendarId: termId);

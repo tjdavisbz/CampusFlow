@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CampusFlow.Branding;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.Web.Students;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Domain.Repositories;
@@ -15,6 +16,7 @@ namespace CampusFlow.Web.Pages;
 public class FinancialAidModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
+    private readonly IStudentTermSelection _selectedTerm;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidLookup> _awardLookups;
@@ -29,9 +31,10 @@ public class FinancialAidModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemFinancialAidLookup> awardLookups,
         IEnumerable<IStudentInformationSystemFinancialAidDecisionService> decisionServices,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
-        ILogger<FinancialAidModel> logger)
+        ILogger<FinancialAidModel> logger, IStudentTermSelection selectedTerm)
     {
         _tenantThemeProvider = tenantThemeProvider;
+        _selectedTerm = selectedTerm;
         _studentProfileRepository = studentProfileRepository;
         _currentStudentView = currentStudentView;
         _awardLookups = awardLookups.ToArray();
@@ -58,7 +61,7 @@ public class FinancialAidModel : CampusFlowPageModel
     [Microsoft.AspNetCore.Mvc.TempData]
     public bool StatusIsError { get; set; }
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(string? term = null)
     {
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null)
@@ -87,7 +90,7 @@ public class FinancialAidModel : CampusFlowPageModel
             var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             var currentTerm = termLookup is null
                 ? null
-                : await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+                : await _selectedTerm.ResolveAsync(profile, termLookup, term, cancellationToken: HttpContext.RequestAborted);
             CurrentTermCode = currentTerm?.TermCode;
             CurrentTermName = currentTerm?.DisplayName;
 
