@@ -43,7 +43,7 @@ public class IndexModel : CampusFlowPageModel
     public int LastResult => Math.Min(PageNumber * PageSize, MatchingStudents);
 
     public async Task<IActionResult> OnGetAsync([FromQuery] string? term = null,
-        [FromQuery] string? search = null, [FromQuery] int page = 1)
+        [FromQuery] string? search = null, [FromQuery] int queuePage = 1)
     {
         if (!await _advisorPortal.HasAccessAsync()) return Forbid();
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
@@ -58,7 +58,7 @@ public class IndexModel : CampusFlowPageModel
             ? []
             : await _advisorPortal.GetQueueAsync(SelectedTerm.ExternalTermId);
         TotalWaiting = queue.Count;
-        var result = AdvisorQueuePaging.Apply(queue, search, page, PageSize);
+        var result = AdvisorQueuePaging.Apply(queue, search, queuePage, PageSize);
         Search = result.Search;
         MatchingStudents = result.MatchingStudents;
         PageNumber = result.PageNumber;

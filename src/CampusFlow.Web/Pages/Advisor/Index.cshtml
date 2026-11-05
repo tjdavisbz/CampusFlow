@@ -54,9 +54,9 @@
             @if (Model.TotalPages > 1)
             {
                 <nav class="advisor-queue-pagination" aria-label="Student queue pages">
-                    @if (Model.PageNumber > 1) { <a asp-page="/Advisor/Index" asp-route-term="@Model.SelectedTerm?.ExternalTermId" asp-route-search="@Model.Search" asp-route-page="@(Model.PageNumber - 1)">Previous</a> }
+                    @if (Model.PageNumber > 1) { <a asp-page="/Advisor/Index" asp-route-term="@Model.SelectedTerm?.ExternalTermId" asp-route-search="@Model.Search" asp-route-queuePage="@(Model.PageNumber - 1)">Previous</a> }
                     <span>Page @Model.PageNumber of @Model.TotalPages</span>
-                    @if (Model.PageNumber < Model.TotalPages) { <a asp-page="/Advisor/Index" asp-route-term="@Model.SelectedTerm?.ExternalTermId" asp-route-search="@Model.Search" asp-route-page="@(Model.PageNumber + 1)">Next</a> }
+                    @if (Model.PageNumber < Model.TotalPages) { <a asp-page="/Advisor/Index" asp-route-term="@Model.SelectedTerm?.ExternalTermId" asp-route-search="@Model.Search" asp-route-queuePage="@(Model.PageNumber + 1)">Next</a> }
                 </nav>
             }
         }
