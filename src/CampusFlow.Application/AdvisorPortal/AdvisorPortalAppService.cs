@@ -58,6 +58,11 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         var profileQuery = await _profiles.GetQueryableAsync();
         var profiles = await AsyncExecuter.ToListAsync(profileQuery.Where(x => profileIds.Contains(x.Id)));
         var profileById = profiles.ToDictionary(x => x.Id);
+        var graduationQuery = await _graduationIntents.GetQueryableAsync();
+        var termIds = pending.Select(x => x.ExternalTermId).Distinct().ToArray();
+        var graduationIntents = (await AsyncExecuter.ToListAsync(graduationQuery.Where(x =>
+            profileIds.Contains(x.StudentProfileId) && termIds.Contains(x.ExternalTermId))))
+            .ToDictionary(x => (x.StudentProfileId, x.ExternalTermId), x => x.IntendsToGraduate);
 
         return pending
             .GroupBy(x => new { x.StudentProfileId, x.ExternalTermId })
@@ -72,6 +77,9 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
                     StudentName = profile.DisplayName,
                     StudentId = profile.StudentId,
                     AttendanceType = group.Select(x => x.AttendanceType).FirstOrDefault() ?? string.Empty,
+                    IntendsToGraduate = graduationIntents.TryGetValue(
+                        (group.Key.StudentProfileId, group.Key.ExternalTermId), out var intendsToGraduate)
+                        ? intendsToGraduate : null,
                     PendingCourseCount = group.Count(),
                     WaitingSince = group.Min(x => x.CreationTime)
                 };
@@ -102,6 +110,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         var pendingIds = reviews.Select(x => x.ExternalCourseRegistrationId).ToHashSet(StringComparer.Ordinal);
         var activeCourses = registrations.Where(x => x.EffectiveWithdrawDate is null &&
             !pendingIds.Contains(x.ExternalRegistrationId));
+        var graduationIntent = await _graduationIntents.FindAsync(x =>
+            x.StudentProfileId == studentProfileId && x.ExternalTermId == externalTermId);
 
         return new AdvisorStudentReviewDto
         {
@@ -111,6 +121,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             StudentId = profile.StudentId,
             StudentEmail = profile.Email,
             AttendanceType = reviews.Select(x => x.AttendanceType).FirstOrDefault() ?? string.Empty,
+            IntendsToGraduate = graduationIntent?.IntendsToGraduate,
             ExistingCourses = activeCourses.Select(x => new AdvisorScheduledCourseDto
             {
                 CourseCode = CourseSelectionCourseCode.Format(x.Department, x.CourseCode, x.CourseType),

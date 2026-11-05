@@ -18,7 +18,7 @@
 <main class="advisor-shell">
     <a class="back-link" asp-page="/Advisor/Index"><i class="fa-solid fa-arrow-left"></i> Back to review queue</a>
     <header class="review-hero">
-        <div><span>Course review</span><h1>@Model.Review.StudentName</h1><p>ID @Model.Review.StudentId · @Model.Review.AttendanceType</p></div>
+        <div><span>Course review</span><h1>@Model.Review.StudentName <span class="graduation-intent @(Model.Review.IntendsToGraduate == true ? "is-yes" : Model.Review.IntendsToGraduate == false ? "is-no" : "is-unanswered")">Graduating: @(Model.Review.IntendsToGraduate == true ? "Yes" : Model.Review.IntendsToGraduate == false ? "No" : "Not answered")</span></h1><p>ID @Model.Review.StudentId · @Model.Review.AttendanceType</p></div>
         <div class="queue-count"><strong>@Model.Review.Courses.Count</strong><span>pending courses</span></div>
     </header>
 

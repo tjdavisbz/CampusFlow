@@ -10,6 +10,7 @@ public sealed class AdvisorQueueItemDto
     public string StudentName { get; set; } = null!;
     public string StudentId { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
+    public bool? IntendsToGraduate { get; set; }
     public int PendingCourseCount { get; set; }
     public DateTime WaitingSince { get; set; }
 }
@@ -36,6 +37,7 @@ public sealed class AdvisorStudentReviewDto
     public string StudentId { get; set; } = null!;
     public string StudentEmail { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
+    public bool? IntendsToGraduate { get; set; }
     public List<AdvisorCourseReviewDto> Courses { get; set; } = [];
     public List<AdvisorScheduledCourseDto> ExistingCourses { get; set; } = [];
 }
