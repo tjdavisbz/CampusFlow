@@ -55,6 +55,12 @@
                 {
                     <p>Your agreement is complete. Your downloadable copy is being prepared.</p>
                 }
+                @if (Model.LegacyApproval is null)
+                {
+                    <p>Document delivery and completion notifications may still be processing.</p>
+                    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage)) { <p>@Model.StatusMessage</p> }
+                    <form method="post" asp-page-handler="GeneratePdf" asp-route-term="@Model.TermCode"><button class="secondary" type="submit">Retry pending completion work</button></form>
+                }
                 @if (Model.BookstoreUrl is not null)
                 {
                     <p><a href="@Model.BookstoreUrl" target="_blank" rel="noopener noreferrer">Get your course materials now <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></p>

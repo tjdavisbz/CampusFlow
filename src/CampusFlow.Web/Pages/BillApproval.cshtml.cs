@@ -26,6 +26,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.BlobStoring;
 using Volo.Abp.Guids;
 using Volo.Abp.Timing;
+using Volo.Abp.BackgroundJobs;
 
 namespace CampusFlow.Web.Pages;
 
@@ -59,6 +60,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly ILogger<BillApprovalModel> _logger;
     private readonly ILegacyBillApprovalLookup _legacyApprovals;
     private readonly IBillApprovalCompletionLookup _completion;
+    private readonly IBackgroundJobManager _jobs;
     private readonly IStudentTermSelection _selectedTerm;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingRecalculationService> _recalculations;
     private readonly CampusFlow.Housing.IMealPlanAppService _mealPlans;
@@ -89,7 +91,7 @@ public class BillApprovalModel : CampusFlowPageModel
         IPayflowGateway payflowGateway,
         IOptions<PayflowOptions> payflowOptions,
         ILogger<BillApprovalModel> logger,
-        ILegacyBillApprovalLookup legacyApprovals, CampusFlow.Housing.IMealPlanAppService mealPlans, IBillApprovalCompletionLookup completion, IStudentTermSelection selectedTerm, IEnumerable<IStudentInformationSystemBillingRecalculationService> recalculations)
+        ILegacyBillApprovalLookup legacyApprovals, CampusFlow.Housing.IMealPlanAppService mealPlans, IBillApprovalCompletionLookup completion, IStudentTermSelection selectedTerm, IEnumerable<IStudentInformationSystemBillingRecalculationService> recalculations, IBackgroundJobManager jobs)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
@@ -121,6 +123,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _completion = completion;
         _selectedTerm = selectedTerm;
         _recalculations = recalculations.ToArray();
+        _jobs = jobs;
     }
 
     public TenantTheme Theme { get; private set; } = new(
@@ -523,80 +526,20 @@ public class BillApprovalModel : CampusFlowPageModel
             await _billApprovals.InsertAsync(approval, autoSave: true);
         else
             await _billApprovals.UpdateAsync(approval, autoSave: true);
-        var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
-        if (artifact is null)
-        {
-            artifact = new BillApprovalArtifact(_guidGenerator.Create(), CurrentTenant.Id, approval.Id);
-            await _artifacts.InsertAsync(artifact, autoSave: true);
-        }
-
-        byte[] pdfBytes;
-        try
-        {
-            pdfBytes = await GeneratePdfAsync(approval, artifact);
-        }
-        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
-        {
-            artifact.MarkPdfFailed(exception.Message, _clock.Now);
-            await _artifacts.UpdateAsync(artifact, autoSave: true);
-            _logger.LogError(exception, "Agreement {BillApprovalId} was recorded, but its PDF could not be generated.", approval.Id);
-            StatusMessage = "Your agreement was securely recorded. The approved document is still being prepared.";
-            return RedirectToPage(new { term });
-        }
-        try
-        {
-            await UploadToDocumentTrackingAsync(approval, artifact, pdfBytes);
-            StatusMessage = "Your agreement was recorded, and your approved bill is available in CampusFlow and Elements Document Tracking.";
-        }
-        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
-        {
-            artifact.MarkDocumentUploadFailed(exception.Message, _clock.Now);
-            await _artifacts.UpdateAsync(artifact, autoSave: true);
-            _logger.LogError(exception, "Approved bill {BillApprovalId} could not be delivered to Elements Document Tracking.", approval.Id);
-            StatusMessage = "Your agreement and PDF are secure. Delivery to Elements Document Tracking is still pending.";
-        }
+        await _jobs.EnqueueAsync(new BillApprovalCompletionJobArgs(CurrentTenant.Id!.Value,approval.Id));
+        StatusMessage = "Your bill is approved. Your document and completion notifications are being prepared.";
         return RedirectToPage(new { term });
     }
 
     public async Task<IActionResult> OnPostGeneratePdfAsync([FromQuery] string term)
     {
-        if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term)) return NotFound();
+        if (_currentStudentView.IsImpersonating || CurrentUser.Id is null || CurrentTenant.Id is null || string.IsNullOrWhiteSpace(term)) return NotFound();
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null) return NotFound();
-        var approval = await _billApprovals.FindAsync(x =>
-            x.StudentProfileId == profile.Id && x.TermCode == term && x.AcceptedAt != null);
+        var approval = await _billApprovals.FindAsync(x => x.StudentProfileId == profile.Id && x.TermCode == term && x.AcceptedAt != null);
         if (approval is null) return NotFound();
-        var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
-        if (artifact is null)
-        {
-            artifact = new BillApprovalArtifact(_guidGenerator.Create(), CurrentTenant.Id, approval.Id);
-            await _artifacts.InsertAsync(artifact, autoSave: true);
-        }
-        byte[] pdfBytes;
-        try
-        {
-            pdfBytes = await GeneratePdfAsync(approval, artifact);
-        }
-        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
-        {
-            artifact.MarkPdfFailed(exception.Message, _clock.Now);
-            await _artifacts.UpdateAsync(artifact, autoSave: true);
-            _logger.LogError(exception, "Approved bill {BillApprovalId} could not be generated.", approval.Id);
-            StatusMessage = "Your agreement is secure, but the approved document could not be prepared yet.";
-            return RedirectToPage(new { term });
-        }
-        try
-        {
-            await UploadToDocumentTrackingAsync(approval, artifact, pdfBytes);
-            StatusMessage = "Your approved bill is ready and has been added to Elements Document Tracking.";
-        }
-        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
-        {
-            artifact.MarkDocumentUploadFailed(exception.Message, _clock.Now);
-            await _artifacts.UpdateAsync(artifact, autoSave: true);
-            _logger.LogError(exception, "Approved bill {BillApprovalId} could not be delivered to Elements Document Tracking.", approval.Id);
-            StatusMessage = "Your PDF is ready, but delivery to Elements Document Tracking is still pending.";
-        }
+        await _jobs.EnqueueAsync(new BillApprovalCompletionJobArgs(CurrentTenant.Id.Value,approval.Id));
+        StatusMessage = "Pending completion work has been queued. Previously confirmed deliveries will not be repeated.";
         return RedirectToPage(new { term });
     }
 
@@ -614,39 +557,6 @@ public class BillApprovalModel : CampusFlowPageModel
             return NotFound();
         var bytes = await _pdfs.GetAllBytesAsync(artifact.PdfBlobName, HttpContext.RequestAborted);
         return File(bytes, "application/pdf", artifact.PdfFileName);
-    }
-
-    private async Task<byte[]> GeneratePdfAsync(BillApproval approval, BillApprovalArtifact artifact)
-    {
-        var bytes = _pdfGenerator.Generate(approval);
-        var safeStudentId = string.Concat(approval.StudentId.Where(char.IsLetterOrDigit));
-        var safeTermCode = string.Concat(approval.TermCode.Where(char.IsLetterOrDigit));
-        var fileName = $"Approved-Bill-{safeStudentId}-{safeTermCode}.pdf";
-        var blobName = $"{approval.Id:N}/{fileName}";
-        await _pdfs.SaveAsync(blobName, bytes, overrideExisting: true, cancellationToken: HttpContext.RequestAborted);
-        artifact.MarkPdfCompleted(fileName, blobName, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), _clock.Now);
-        await _artifacts.UpdateAsync(artifact, autoSave: true);
-        return bytes;
-    }
-
-    private async Task UploadToDocumentTrackingAsync(
-        BillApproval approval, BillApprovalArtifact artifact, byte[] pdfBytes)
-    {
-        if (artifact.DocumentUploadStatus == BillArtifactOperationStatus.Completed) return;
-        var service = _documentTrackingServices.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
-        var documentTrackingId = artifact.ElementsDocumentTrackingId;
-        if (string.IsNullOrWhiteSpace(documentTrackingId))
-        {
-            documentTrackingId = await service.CreateApprovedBillAsync(new StudentDocumentTrackingRequest(
-                approval.ExternalStudentId, approval.TermName, approval.Id, approval.AcceptedAt!.Value),
-                HttpContext.RequestAborted);
-            artifact.MarkDocumentCreated(documentTrackingId, _clock.Now);
-            await _artifacts.UpdateAsync(artifact, autoSave: true);
-        }
-        if (!await service.HasImageAsync(documentTrackingId, HttpContext.RequestAborted))
-            await service.UploadImageAsync(documentTrackingId, artifact.PdfFileName!, pdfBytes, HttpContext.RequestAborted);
-        artifact.MarkDocumentUploadCompleted(_clock.Now);
-        await _artifacts.UpdateAsync(artifact, autoSave: true);
     }
 
     private async Task<AgreementTemplate?> FindCurrentAgreementAsync(Guid? configuredAgreementId = null)

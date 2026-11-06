@@ -73,7 +73,7 @@ public class BillApprovalAccessHandlerTests
             terms,_approvals,Substitute.For<IRepository<BillApprovalArtifact,Guid>>(),Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
             Substitute.For<IBillApprovalPdfGenerator>(),Substitute.For<IGuidGenerator>(),clock,Substitute.For<IRepository<PayflowPayment,Guid>>(),
             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
-            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>(), Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation})
+            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>(), Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>())
         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
     }
 

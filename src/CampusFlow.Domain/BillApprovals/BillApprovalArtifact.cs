@@ -31,6 +31,13 @@ public class BillApprovalArtifact : FullAuditedEntity<Guid>, IMultiTenant
         BillingEmailStatus = BillArtifactOperationStatus.Pending;
     }
 
+    public void MarkEmailAccepted(bool bookstore, DateTime at)
+    {
+        if (bookstore) BillingEmailStatus = BillArtifactOperationStatus.Completed;
+        else StudentEmailStatus = BillArtifactOperationStatus.Completed;
+        LastAttemptAt=at;
+    }
+
     public void MarkPdfCompleted(string fileName, string blobName, string sha256, DateTime completedAt)
     {
         PdfFileName = fileName;

@@ -20,14 +20,19 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
     private const string ApiConfigurationPath = "StudentInformationSystems:Providers:ThesisElements:Api";
     private const string TrackingConfigurationPath = "BillApproval:DocumentTracking";
     private const string TokenCacheKey = "ThesisElements:DocumentTracking:ApiToken";
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient SharedClient = new();
+    private readonly HttpClient _client;
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _memoryCache;
 
     public ThesisElementsDocumentTrackingService(IConfiguration configuration, IMemoryCache memoryCache)
+    : this(configuration, memoryCache, SharedClient) { }
+
+    internal ThesisElementsDocumentTrackingService(IConfiguration configuration, IMemoryCache memoryCache, HttpClient client)
     {
         _configuration = configuration;
         _memoryCache = memoryCache;
+        _client = client;
     }
 
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
@@ -73,7 +78,7 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
 
         using var httpRequest = CreateRequest(HttpMethod.Post, "api/student/document-tracking/add", token);
         httpRequest.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await HttpClient.SendAsync(httpRequest, cancellationToken);
+        using var response = await _client.SendAsync(httpRequest, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
         for (var attempt = 0; attempt < 5; attempt++)
@@ -90,22 +95,17 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         if (!int.TryParse(documentTrackingId, out var documentId)) return false;
         var token = await GetAccessTokenAsync(cancellationToken);
         using var request = CreateRequest(HttpMethod.Get, $"api/student/document-tracking/viewdocimage/{documentId}", token);
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound) return false;
-        if (!response.IsSuccessStatusCode) return false;
+        response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         if (content.Length == 0) return false;
         if (response.Content.Headers.ContentType?.MediaType?.Contains("json", StringComparison.OrdinalIgnoreCase) != true)
             return true;
-        try
-        {
-            var root = JsonNode.Parse(content);
-            return root?["isSuccess"]?.GetValue<bool>() == true && root["data"] is not null;
-        }
-        catch
-        {
-            return false;
-        }
+        var root = JsonNode.Parse(content);
+        if (root?["isSuccess"]?.GetValue<bool>() != true)
+            throw new InvalidOperationException("Elements could not confirm whether the approved bill image exists.");
+        return root["data"] is not null;
     }
 
     public async Task UploadImageAsync(string documentTrackingId, string fileName, byte[] contents,
@@ -123,10 +123,10 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
         form.Add(file, "uploadingFileObj", Path.GetFileName(fileName));
         request.Content = form;
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
-        if (JsonNode.Parse(content)?["isSuccess"]?.GetValue<bool>() == false)
+        if (JsonNode.Parse(content)?["isSuccess"]?.GetValue<bool>() != true)
             throw new InvalidOperationException("Elements did not accept the approved bill image.");
     }
 
@@ -137,7 +137,7 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         var credentials = $"{GetApiSetting("Username")}:{GetApiSetting("Password")}";
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials)));
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
         var token = JsonNode.Parse(content)?["data"]?["token"]?.GetValue<string>();

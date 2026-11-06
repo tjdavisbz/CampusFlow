@@ -89,6 +89,7 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
             IStudentInformationSystemPaymentPostingService,
             ThesisElementsPaymentPostingService>();
         context.Services.AddTransient<IStudentInformationSystemBillingRecalculationService, ThesisElementsBillingRecalculationService>();
+        context.Services.AddTransient<IStudentInformationSystemBillClearanceService, ThesisElementsBillClearanceService>();
         context.Services.AddMemoryCache();
 
         context.Services.AddAbpDbContext<CampusFlowDbContext>(options =>

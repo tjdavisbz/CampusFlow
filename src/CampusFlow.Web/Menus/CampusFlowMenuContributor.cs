@@ -247,6 +247,8 @@ public class CampusFlowMenuContributor : IMenuContributor
                 studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.ResetIndividualBillApproval,
                     "Reset Bill Approval", "~/Admin/StudentBilling/ResetIndividualBillApproval",
                     icon: "fa fa-arrow-rotate-left", order: 4));
+            if (canManageBillApproval)
+                studentBilling.AddItem(new ApplicationMenuItem("CampusFlow.BillApprovalDelivery", "Bill approval delivery", "~/Admin/StudentBilling/BillApprovalDelivery", icon: "fa fa-envelope", order: 5));
             if (studentBilling.Items.Count > 0)
                 admin.AddItem(studentBilling);
             if (canAddStudentMealPlan)
