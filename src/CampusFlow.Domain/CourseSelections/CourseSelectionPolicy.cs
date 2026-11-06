@@ -55,7 +55,8 @@ public class CourseSelectionPolicy : FullAuditedAggregateRoot<Guid>, IMultiTenan
     public bool CanSelect(CourseSelectionContext context, CourseSelectionOffering offering,
         IReadOnlyCollection<string> courseAttendanceTypes, DateTime at)
     {
-        if (!GetEligibilityRules().IsOpen(at)) return false;
+        var rules = GetEligibilityRules();
+        if (!rules.IsOpen(at) || !rules.AllowsSection(context.AttendanceType, offering.Section)) return false;
         if (!string.Equals(context.ExternalTermId, offering.ExternalTermId, StringComparison.Ordinal))
             return false;
         if (EnforceSectionCapacity && offering.SeatsRemaining <= 0)
@@ -75,7 +76,7 @@ public class CourseSelectionPolicy : FullAuditedAggregateRoot<Guid>, IMultiTenan
         }
         catch (JsonException)
         {
-            return new CourseSelectionEligibilityRules();
+            throw new InvalidOperationException("The course eligibility rules need administrative review.");
         }
     }
 

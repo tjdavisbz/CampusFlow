@@ -11,6 +11,7 @@ using Volo.Abp;
 using Volo.Abp.Authorization;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
+using Microsoft.Extensions.Logging;
 
 namespace CampusFlow.AdvisorPortal;
 
@@ -27,6 +28,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     private readonly IStudentInformationSystemStudentNotesService _studentNotes;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
+    private readonly IReadOnlyCollection<IStudentPrimaryProgramLookup> _programLookups;
+
     public AdvisorPortalAppService(
         IRepository<CourseReview, Guid> reviews,
         IRepository<CourseReviewSubmission, Guid> submissions,
@@ -36,7 +39,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         IStudentInformationSystemCourseRegistrationService registration,
         IStudentInformationSystemCourseSelectionLookup courseLookup,
         IStudentInformationSystemStudentNotesService studentNotes,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
     {
         _reviews = reviews;
         _submissions = submissions;
@@ -47,6 +50,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         _courseLookup = courseLookup;
         _studentNotes = studentNotes;
         _unitOfWorkManager = unitOfWorkManager;
+        _programLookups = programLookups?.ToArray() ?? [];
     }
 
     public async Task<List<AdvisorQueueItemDto>> GetQueueAsync(string? externalTermId = null)
@@ -310,7 +314,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         var first = reviews.First();
         var graduation = await _graduationIntents.FindAsync(x =>
             x.StudentProfileId == first.StudentProfileId && x.ExternalTermId == first.ExternalTermId);
-        if (reviews.Any(x => !CanSee(x, assignments, graduation?.IntendsToGraduate == true)))
+        var programs = await GetScopeProgramsAsync(reviews, assignments);
+        if (reviews.Any(x => !CanSee(x, assignments, graduation?.IntendsToGraduate == true, programs)))
             throw new AbpAuthorizationException("This student is not assigned to the current advisor.");
     }
 
@@ -373,12 +378,29 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         var graduating = (await AsyncExecuter.ToListAsync(graduationQuery.Where(x =>
             profileIds.Contains(x.StudentProfileId) && x.IntendsToGraduate)))
             .Select(x => (x.StudentProfileId, x.ExternalTermId)).ToHashSet();
+        var programs = await GetScopeProgramsAsync(pending, assignments);
         return pending.Where(x => CanSee(x, assignments,
-            graduating.Contains((x.StudentProfileId, x.ExternalTermId)))).ToList();
+            graduating.Contains((x.StudentProfileId, x.ExternalTermId)), programs)).ToList();
     }
 
     private static bool CanSee(CourseReview review, IReadOnlyCollection<AdvisorAssignment> assignments,
-        bool graduating) => assignments.Any(x => x.IncludesStudent(review.AttendanceType, graduating));
+        bool graduating, IReadOnlyDictionary<StudentTermKey, StudentPrimaryProgram> programs) =>
+        assignments.Any(x => x.IncludesStudent(review.AttendanceType, graduating,
+            programs.GetValueOrDefault(new(review.ExternalStudentId, review.ExternalTermId))));
+
+    private async Task<IReadOnlyDictionary<StudentTermKey, StudentPrimaryProgram>> GetScopeProgramsAsync(
+        IReadOnlyCollection<CourseReview> reviews, IReadOnlyCollection<AdvisorAssignment> assignments)
+    {
+        if (!assignments.Any(x => x.GetPrimaryProgramScope().IsRestricted)) return new Dictionary<StudentTermKey, StudentPrimaryProgram>();
+        var lookup = _programLookups.SingleOrDefault(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
+        if (lookup is null) return new Dictionary<StudentTermKey, StudentPrimaryProgram>();
+        try { return (await lookup.GetAsync(reviews.Select(x => new StudentTermKey(x.ExternalStudentId, x.ExternalTermId)).Distinct().ToArray())).ToDictionary(x => x.Key); }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Primary-program access lookup failed; restricted scheduler assignments are denied.");
+            return new Dictionary<StudentTermKey, StudentPrimaryProgram>();
+        }
+    }
 
     private async Task<List<CourseReview>> KeepActiveReviewsAsync(StudentProfile profile,
         string externalTermId, IEnumerable<CourseReview> reviews)

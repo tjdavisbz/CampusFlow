@@ -78,19 +78,34 @@
    <label class="block-field" asp-for="Input.StudentIdsText"><span>Open for specific students</span><small>Enter Student IDs, one per line (or separated by commas). These students can select courses for this term outside the general date window. The term must remain Enabled, and all normal course and student eligibility rules still apply. Clearing the list removes this access.</small><textarea asp-for="Input.StudentIdsText" rows="5" placeholder="20000041293"></textarea><span asp-validation-for="Input.StudentIdsText"></span></label>
   </div>
   <div class="mapping-editor"><div class="mapping-heading"><div><strong>Attendance mappings</strong><small>Choose which offered-course attendance type each student group can use.</small></div><button type="button" id="addMapping"><i class="fa-solid fa-plus"></i> Add row</button></div><div id="mappingRows">
-   @for(var i=0;i<Model.Input.Mappings.Count;i++){<div class="mapping-row"><select asp-for="Input.Mappings[i].StudentAttendanceType"><option value="">Student attendance type…</option>@foreach(var type in Model.AttendanceTypes){<option value="@type">@type</option>}</select><i class="fa-solid fa-arrow-right"></i><select asp-for="Input.Mappings[i].CourseAttendanceType"><option value="">Course attendance type…</option>@foreach(var type in Model.AttendanceTypes){<option value="@type">@type</option>}</select><button type="button" class="remove-mapping" aria-label="Remove mapping"><i class="fa-solid fa-xmark"></i></button></div>}
+   @for(var i=0;i<Model.Input.Mappings.Count;i++){<div class="mapping-row"><select asp-for="Input.Mappings[i].StudentAttendanceType"><option value="">Student attendance type…</option>@foreach(var type in Model.StudentAttendanceTypes){<option value="@type">@type</option>}</select><i class="fa-solid fa-arrow-right"></i><select asp-for="Input.Mappings[i].CourseAttendanceType"><option value="">Course attendance type…</option>@foreach(var type in Model.AttendanceTypes){<option value="@type">@type</option>}</select><button type="button" class="remove-mapping" aria-label="Remove mapping"><i class="fa-solid fa-xmark"></i></button></div>}
   </div><span asp-validation-for="Input.Mappings"></span></div>
+  <div class="mapping-editor">
+   <div class="mapping-heading"><div><strong>Visible section codes by student attendance type</strong><small>For this term, limit each group to the exact Elements section codes entered below. Use the codes for the intended Main, Session 1, Session 2 or delivery mode; session names do not map automatically. Codes are additional restrictions: existing attendance rules, dates, capacity and student eligibility still apply. A group with no row keeps its current section access. Changes affect new selections, not existing enrollments.</small></div><button type="button" id="addSectionVisibility">Add group</button></div>
+   <div id="sectionVisibilityRows">
+    @for(var i=0;i<Model.Input.SectionVisibility.Count;i++){
+     <div class="section-visibility-row"><label>Student attendance type<select asp-for="Input.SectionVisibility[i].StudentAttendanceType"><option value="">Choose…</option>@foreach(var type in Model.StudentAttendanceTypes){<option value="@type">@type</option>}</select></label><label>Allowed section codes<input asp-for="Input.SectionVisibility[i].SectionCodes" placeholder="100, 101, 102" required /></label><button type="button" data-remove-section-rule>Remove</button></div>
+    }
+   </div><span asp-validation-for="Input.SectionVisibility"></span>
+   <template id="sectionVisibilityTemplate"><div class="section-visibility-row"><label>Student attendance type<select name="Input.SectionVisibility[__index__].StudentAttendanceType" required><option value="">Choose…</option>@foreach(var type in Model.StudentAttendanceTypes){<option value="@type">@type</option>}</select></label><label>Allowed section codes<input name="Input.SectionVisibility[__index__].SectionCodes" placeholder="100, 101, 102" required /></label><button type="button" data-remove-section-rule>Remove</button></div></template>
+  </div>
   <button class="primary-action" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save course-selection settings</button>
  </form>
 </main>
 @section scripts {<script>
 document.addEventListener('DOMContentLoaded',()=>{
  const rows=document.getElementById('mappingRows'),add=document.getElementById('addMapping'),form=rows.closest('form');
+ const studentTypes=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.StudentAttendanceTypes));
  const types=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AttendanceTypes));
  function reindex(){[...rows.children].forEach((row,i)=>{row.querySelectorAll('select')[0].name=`Input.Mappings[${i}].StudentAttendanceType`;row.querySelectorAll('select')[1].name=`Input.Mappings[${i}].CourseAttendanceType`})}
  function wire(){rows.querySelectorAll('.remove-mapping').forEach(b=>b.onclick=()=>{b.closest('.mapping-row').remove();reindex()})}
- add.onclick=()=>{const opts='<option value="">Choose…</option>'+types.map(x=>`<option value="${x}">${x}</option>`).join('');rows.insertAdjacentHTML('beforeend',`<div class="mapping-row"><select>${opts}</select><i class="fa-solid fa-arrow-right"></i><select>${opts}</select><button type="button" class="remove-mapping"><i class="fa-solid fa-xmark"></i></button></div>`);reindex();wire()};
+ add.onclick=()=>{const row=document.createElement('div');row.className='mapping-row';for(const choices of [studentTypes,types]){const select=document.createElement('select');select.add(new Option('Choose…',''));choices.forEach(value=>select.add(new Option(value,value)));row.append(select);if(row.children.length===1){const icon=document.createElement('i');icon.className='fa-solid fa-arrow-right';row.append(icon);}}const button=document.createElement('button');button.type='button';button.className='remove-mapping';button.textContent='Remove';row.append(button);rows.append(row);reindex();wire()};
  form.addEventListener('submit',reindex);wire();reindex();
+ const sectionRows=document.getElementById('sectionVisibilityRows');
+ const reindexSections=()=>[...sectionRows.children].forEach((row,i)=>row.querySelectorAll('[name]').forEach(field=>{field.name=field.name.replace(/Input\.SectionVisibility\[(?:\d+|__index__)\]/,`Input.SectionVisibility[${i}]`)}));
+ document.getElementById('addSectionVisibility').addEventListener('click',()=>{sectionRows.append(document.getElementById('sectionVisibilityTemplate').content.cloneNode(true));reindexSections();});
+ sectionRows.addEventListener('click',event=>{const button=event.target.closest('[data-remove-section-rule]');if(button){button.closest('.section-visibility-row').remove();reindexSections();}});
+ form.addEventListener('submit',reindexSections);
  const groupRows=document.getElementById('groupWindowRows'),groupTemplate=document.getElementById('groupWindowTemplate');
  const reindexGroups=()=>{[...groupRows.children].forEach((row,i)=>row.querySelectorAll('[name]').forEach(field=>{field.name=field.name.replace(/Input\.GroupWindows\[(?:\d+|__index__)\]/,`Input.GroupWindows[${i}]`)}))};
  groupRows.addEventListener('click',event=>{const remove=event.target.closest('.remove-group-window');if(remove){remove.closest('[data-group-window]').remove();reindexGroups()}});
