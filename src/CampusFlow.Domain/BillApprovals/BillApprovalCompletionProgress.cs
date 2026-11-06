@@ -13,6 +13,9 @@ public sealed class BillCompletionStepState
     public BillCompletionStatus Status { get; set; }
     public DateTime? AttemptedAt { get; set; }
     public string? Error { get; set; }
+    public DateTime? DocumentCreationAttemptedAt { get; set; }
+    public bool DocumentCreationAllowed { get; set; }
+    public Guid? EmailOperationId { get; set; }
     public Guid? ReconciledBy { get; set; }
     public DateTime? ReconciledAt { get; set; }
 }
@@ -48,6 +51,12 @@ public sealed class BillApprovalCompletionProgress
         if (state.Status is BillCompletionStatus.Completed or BillCompletionStatus.Uncertain or BillCompletionStatus.Running) return false;
         if (step == BillCompletionStep.Document && Step(BillCompletionStep.Pdf).Status != BillCompletionStatus.Completed) return false;
         if (IsEmail(step) && (Step(BillCompletionStep.Cleared).Status != BillCompletionStatus.Completed || Step(BillCompletionStep.Pdf).Status != BillCompletionStatus.Completed)) return false;
+        if (step == BillCompletionStep.Document)
+        {
+            state.DocumentCreationAllowed = !state.DocumentCreationAttemptedAt.HasValue;
+            state.DocumentCreationAttemptedAt ??= now;
+        }
+        if (IsEmail(step)) state.EmailOperationId = Guid.NewGuid();
         state.Status = BillCompletionStatus.Running;state.AttemptedAt = now;state.Error = null;return true;
     }
     public void Finish(BillCompletionStep step, BillCompletionStatus status, string? error = null)

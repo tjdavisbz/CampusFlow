@@ -22,7 +22,7 @@ public class DocumentDeliveryResponseTests
     {
         var p="StudentInformationSystems:Providers:ThesisElements:Api:";
         var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
-        {[p+"BaseUrl"]="https://test.invalid",[p+"TenantHost"]="test.invalid",[p+"Username"]="fake",[p+"Password"]="fake"}).Build();
+        {["BillApproval:DocumentTracking:Enabled"]="true",[p+"BaseUrl"]="https://test.invalid",[p+"TenantHost"]="test.invalid",[p+"Username"]="fake",[p+"Password"]="fake"}).Build();
         return new(configuration,new MemoryCache(new MemoryCacheOptions()),new HttpClient(new Handler(status,body)));
     }
     [Fact] public async Task A_server_error_is_not_treated_as_a_missing_image()=>await Assert.ThrowsAsync<HttpRequestException>(()=>Service(HttpStatusCode.InternalServerError,"{}").HasImageAsync("123"));

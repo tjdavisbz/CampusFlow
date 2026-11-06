@@ -519,6 +519,12 @@ public class BillApprovalModel : CampusFlowPageModel
         approval.UpdateDraft(paymentChoice, ChargesTotal, CreditsTotal, PendingAidTotal,
             paymentChoice == BillPaymentChoice.DeferredPaymentPlan ? DeferredBalance : RemainingBalance,
             paymentChoice == BillPaymentChoice.DeferredPaymentPlan ? PaymentPlanFee : 0m, scheduleJson, reviewSnapshotJson);
+        if (BillApprovalNotification.IsNonProduction(_configuration))
+        {
+            try { BillApprovalTestRecipient.Capture(approval, CurrentUser.Id.Value, CurrentUser.Email, _clock.Now); }
+            catch (BillCompletionPreparationException exception)
+            { ModelState.AddModelError(string.Empty, exception.Message); return Page(); }
+        }
         approval.Accept(Agreement.Id, Agreement.Version, Agreement.ContentHtml, _clock.Now,
             HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent.ToString());
 

@@ -37,6 +37,7 @@ public class AzureBillApprovalMailSender : IBillApprovalMailSender
             message.CC.Select(x=>new EmailAddress(x.Address)),message.Bcc.Select(x=>new EmailAddress(x.Address)));
         var email=new EmailMessage(message.From!.Address,recipients,new EmailContent(message.Subject){PlainText=message.Body});
         email.UserEngagementTrackingDisabled=true;
+        foreach (var address in message.ReplyToList) email.ReplyTo.Add(new EmailAddress(address.Address));
         foreach(var key in message.Headers.AllKeys)
             if(key is not null && key.StartsWith("X-CampusFlow-",StringComparison.Ordinal))email.Headers.Add(key,message.Headers[key]);
         foreach(var attachment in message.Attachments)
@@ -45,7 +46,9 @@ public class AzureBillApprovalMailSender : IBillApprovalMailSender
             email.Attachments.Add(new EmailAttachment(attachment.Name,attachment.ContentType.MediaType,bytes));
         }
         using var timeout=new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        var operation=await client.SendAsync(WaitUntil.Completed,email,timeout.Token);
+        var operation = Guid.TryParse(message.Headers["X-CampusFlow-Operation-ID"], out var operationId)
+            ? await client.SendAsync(WaitUntil.Completed, email, operationId, timeout.Token)
+            : await client.SendAsync(WaitUntil.Completed, email, timeout.Token);
         if(operation.Value.Status!=EmailSendStatus.Succeeded)throw new InvalidOperationException("Azure email did not confirm the send operation.");
         // Succeeded confirms the service send operation, not delivery into a recipient's inbox.
     }

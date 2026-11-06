@@ -23,6 +23,18 @@ public class AzureBillApprovalMailSenderTests
         message.Attachments.Add(new Attachment(new System.IO.MemoryStream(new byte[]{1,2}),"approved.pdf","application/pdf"));
         await sender.SendAsync(message);Assert.NotNull(sent);Assert.Equal("studentbilling@nelson.edu",sent.SenderAddress);Assert.Single(sent.Recipients.BCC);Assert.Single(sent.Attachments);
     }
+    [Fact]
+    public async Task A_persisted_operation_id_and_reply_to_are_used_by_the_Azure_transport()
+    {
+        var id=Guid.NewGuid();var client=Substitute.For<EmailClient>();var operation=Substitute.For<EmailSendOperation>();
+        operation.Value.Returns(EmailModelFactory.EmailSendResult(id.ToString(),EmailSendStatus.Succeeded));
+        EmailMessage? sent=null;client.SendAsync(WaitUntil.Completed,Arg.Do<EmailMessage>(x=>sent=x),id,Arg.Any<CancellationToken>()).Returns(operation);
+        var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{{"BillApproval:Notifications:AzureEndpoint","https://test.communication.azure.com/"}}).Build();
+        using var message=new MailMessage("sender@azurecomm.net","tester@nelson.edu","Test","Synthetic test");
+        message.ReplyToList.Add("StudentBilling@nelson.edu");message.Headers.Add("X-CampusFlow-Operation-ID",id.ToString("D"));
+        await new AzureBillApprovalMailSender(config,client).SendAsync(message);
+        Assert.Equal("StudentBilling@nelson.edu",Assert.Single(sent!.ReplyTo).Address);
+    }
     [Theory][InlineData("http://test.communication.azure.com/")][InlineData("https://test.communication.azure.com.evil.test/")][InlineData("")]
     public void Invalid_endpoints_leave_transport_unconfigured(string endpoint)
     {

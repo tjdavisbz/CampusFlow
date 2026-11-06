@@ -18,9 +18,9 @@ public class BillClearanceServiceTests
         public JsonObject Current=Sample();public JsonObject? Patch;public int Requests;public bool Ambiguous;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
         {
-            Requests++;Assert.Equal("app-elm-nonprod-usc-integrationapi.azurewebsites.net",request.RequestUri!.Host);
+            Requests++;Assert.Equal(request.RequestUri!.AbsolutePath.EndsWith("Authenticate") ? "app-elm-nonprod-usc-integrationapi.azurewebsites.net" : "np-usc-gateway.thesiscloud.com",request.RequestUri.Host);
             if(request.RequestUri.AbsolutePath.EndsWith("Authenticate"))return Response("{\"data\":{\"token\":\"fake\"}}");
-            Assert.Equal("FinancialAid",string.Join("",request.Headers.GetValues("Module")));
+            Assert.Equal("Registration",string.Join("",request.Headers.GetValues("Module")));
             if(request.Method==HttpMethod.Patch){Patch=JsonNode.Parse(await request.Content!.ReadAsStringAsync(token))!.AsObject();Current=Patch.DeepClone().AsObject();return Response("{\"isSuccess\":true}");}
             if(request.RequestUri.AbsolutePath.EndsWith("select-items"))return Response(Ambiguous?"{\"isSuccess\":true,\"data\":{\"statusLookup1\":[{\"uniqueId\":5,\"displayText\":\"Cleared\"}],\"statusLookup2\":[{\"uniqueId\":6045,\"displayText\":\"Cleared\"}]}}":"{\"isSuccess\":true,\"data\":{\"statusLookup2\":[{\"uniqueId\":6045,\"displayText\":\"Cleared\"}]}}");
             Assert.EndsWith("/user-defined/123",request.RequestUri.AbsolutePath);return Response(new JsonObject{["isSuccess"]=true,["data"]=Current.DeepClone()}.ToJsonString());
@@ -33,15 +33,21 @@ public class BillClearanceServiceTests
         "uDefCurr1":123.45,"uDefCurr2":null,"uDefCurr3":0,"uDefDate1":"2026-11-05T00:00:00",
         "uDefDate2":null,"uDefDate3":null,"uDefDate4":null,"uDefBit1":true,"uDefBit2":false,"uDefBit3":true}
         """)!.AsObject();
-    private static ThesisElementsBillClearanceService Service(Handler handler,bool enabled=true,bool production=false)
+    private static ThesisElementsBillClearanceService Service(Handler handler,bool enabled=true,bool production=false,string? authUrl=null)
     {
         var p="StudentInformationSystems:Providers:ThesisElements:Api:";
         var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
         { ["App:EnvironmentLabel"]="NON-PRODUCTION",["BillApproval:ClearedStatus:Enabled"]=enabled.ToString(),
-          [p+"BaseUrl"]=production?"https://app-elm-prod-usc-integrationapi.azurewebsites.net":"https://app-elm-nonprod-usc-integrationapi.azurewebsites.net",
-          [p+"TenantHost"]="el-np-nel.thesiscloud.com",[p+"Username"]="fake",[p+"Password"]="fake" }).Build();
+          [p+"BaseUrl"]=authUrl??(production?"https://app-elm-prod-usc-integrationapi.azurewebsites.net":"https://app-elm-nonprod-usc-integrationapi.azurewebsites.net"),
+          [p+"RegistrationBaseUrl"]="https://np-usc-gateway.thesiscloud.com",[p+"TenantHost"]="el-np-nel.thesiscloud.com",[p+"Username"]="fake",[p+"Password"]="fake" }).Build();
         return new(configuration,new HttpClient(handler),(student,term,ct)=>{Assert.Equal(10,student);Assert.Equal(269,term);return Task.FromResult(123);});
     }
+    [Theory]
+    [InlineData("http://app-elm-nonprod-usc-integrationapi.azurewebsites.net")]
+    [InlineData("https://app-elm-nonprod-usc-integrationapi.azurewebsites.net/path")]
+    [InlineData("https://app-elm-nonprod-usc-integrationapi.azurewebsites.net:444")]
+    public async Task Unsafe_authentication_urls_never_receive_credentials(string url)
+    {var handler=new Handler();await Assert.ThrowsAsync<InvalidOperationException>(()=>Service(handler,authUrl:url).MarkClearedAsync("10","269"));Assert.Equal(0,handler.Requests);}
     [Fact] public async Task Only_the_cleared_lookup_changes_and_every_other_field_is_preserved()
     {
         var handler=new Handler();var original=handler.Current.DeepClone().AsObject();await Service(handler).MarkClearedAsync("10","269");

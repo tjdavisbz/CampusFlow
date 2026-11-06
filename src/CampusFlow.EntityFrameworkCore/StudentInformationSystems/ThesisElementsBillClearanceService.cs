@@ -28,15 +28,16 @@ public sealed class ThesisElementsBillClearanceService : IStudentInformationSyst
         if(!_configuration.GetValue<bool>("BillApproval:ClearedStatus:Enabled"))throw new InvalidOperationException("Cleared-status updates are not enabled.");
         if(!int.TryParse(externalStudentId,out var student)||student<=0||!int.TryParse(externalTermId,out var term)||term<=0)
             throw new ArgumentException("Valid student and term identifiers are required.");
-        var root=new Uri(Setting("BaseUrl").TrimEnd('/')+"/");
-        if(root.Scheme!="https"||!root.IsDefaultPort||root.AbsolutePath!="/"||root.Query.Length!=0||root.Fragment.Length!=0||root.UserInfo.Length!=0)
+        var authRoot=new Uri(Setting("BaseUrl").TrimEnd('/')+"/");
+        var root=new Uri((_configuration[Prefix+"RegistrationBaseUrl"] ?? Setting("BaseUrl")).TrimEnd('/')+"/");
+        if(authRoot.Scheme!="https"||!authRoot.IsDefaultPort||authRoot.AbsolutePath!="/"||authRoot.Query.Length!=0||authRoot.Fragment.Length!=0||authRoot.UserInfo.Length!=0||root.Scheme!="https"||!root.IsDefaultPort||root.AbsolutePath!="/"||root.Query.Length!=0||root.Fragment.Length!=0||root.UserInfo.Length!=0)
             throw new InvalidOperationException("Invalid Elements integration URL.");
         var nonprod=string.Equals(_configuration["App:EnvironmentLabel"],"NON-PRODUCTION",StringComparison.OrdinalIgnoreCase)||
             string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"],"Staging",StringComparison.OrdinalIgnoreCase);
-        if(nonprod&&(root.Host!="app-elm-nonprod-usc-integrationapi.azurewebsites.net"||Setting("TenantHost")!="el-np-nel.thesiscloud.com"))
+        if(nonprod&&(root.Host!="np-usc-gateway.thesiscloud.com"||authRoot.Host!="app-elm-nonprod-usc-integrationapi.azurewebsites.net"||Setting("TenantHost")!="el-np-nel.thesiscloud.com"))
             throw new InvalidOperationException("Non-production clearance cannot target production Elements.");
         var statusId=await _statusId(student,term,cancellationToken);
-        using var auth=new HttpRequestMessage(HttpMethod.Get,new Uri(root,"api/Login/Authenticate"));
+        using var auth=new HttpRequestMessage(HttpMethod.Get,new Uri(authRoot,"api/Login/Authenticate"));
         auth.Headers.Add("TenantHost",Setting("TenantHost"));
         auth.Headers.Authorization=new AuthenticationHeaderValue("Basic",Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
         using var authResponse=await _client.SendAsync(auth,cancellationToken);authResponse.EnsureSuccessStatusCode();
@@ -91,6 +92,7 @@ public sealed class ThesisElementsBillClearanceService : IStudentInformationSyst
         var id=reader.GetInt32(0);if(await reader.ReadAsync(cancellationToken))throw new InvalidOperationException("Multiple student status records exist for this term.");return id;
     }
     private HttpRequestMessage Request(HttpMethod method,Uri uri,string token)
-    {var r=new HttpRequestMessage(method,uri);r.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);r.Headers.Add("TenantHost",Setting("TenantHost"));r.Headers.Add("Module","FinancialAid");return r;}
+    {var r=new HttpRequestMessage(method,uri);r.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);r.Headers.Add("TenantHost",Setting("TenantHost"));r.Headers.Add("Module","Registration");
+        var origin="https://"+Setting("TenantHost").TrimEnd('/');r.Headers.Add("Origin",origin);r.Headers.Referrer=new Uri(origin);return r;}
     private string Setting(string name)=>_configuration[Prefix+name]??throw new InvalidOperationException($"Missing Elements setting '{name}'.");
 }

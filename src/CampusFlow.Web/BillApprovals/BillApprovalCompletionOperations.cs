@@ -67,6 +67,7 @@ public class BillApprovalCompletionOperations(IRepository<BillApprovalArtifact,G
     {
         if(!IsEnabled(step))throw new BillCompletionPreparationException("This completion step has not been enabled.");
         if(step==BillCompletionStep.Pdf){await Pdf(approval);return;}
+        if (BillApprovalNotification.IsNonProduction(configuration)) BillApprovalTestRecipient.Require(approval);
         if(step==BillCompletionStep.Cleared){await clearance.MarkClearedAsync(approval.ExternalStudentId,approval.ExternalTermId);return;}
         if(step==BillCompletionStep.Document)
         {
@@ -74,7 +75,8 @@ public class BillApprovalCompletionOperations(IRepository<BillApprovalArtifact,G
             var id=await InUnit(async()=>{var a=await Artifact(approval);return a.ElementsDocumentTrackingId;});
             if(string.IsNullOrWhiteSpace(id))
             {
-                id=await documents.CreateApprovedBillAsync(new(approval.ExternalStudentId,approval.TermName,approval.Id,approval.AcceptedAt!.Value));
+                id=await documents.CreateApprovedBillAsync(new(approval.ExternalStudentId,approval.TermName,approval.Id,approval.AcceptedAt!.Value,
+                    BillApprovalCompletionProgress.Read(approval).Step(BillCompletionStep.Document).DocumentCreationAllowed));
                 await InUnit(async()=>{var a=await Artifact(approval);a.MarkDocumentCreated(id,DateTime.UtcNow);await artifacts.UpdateAsync(a,autoSave:true);return true;});
             }
             if(!await documents.HasImageAsync(id))await documents.UploadImageAsync(id,pdf.Name,pdf.Bytes);
@@ -93,6 +95,9 @@ public class BillApprovalCompletionOperations(IRepository<BillApprovalArtifact,G
 
 public static class BillApprovalNotification
 {
+    public static bool IsNonProduction(IConfiguration configuration) =>
+        string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(configuration["ASPNETCORE_ENVIRONMENT"], "Staging", StringComparison.OrdinalIgnoreCase);
     public static MailMessage Create(BillApproval approval,StudentProfile profile,BillCompletionStep step,IConfiguration configuration,byte[] pdf,string fileName)
     {
         try
@@ -109,7 +114,7 @@ public static class BillApprovalNotification
             var bookstore=step==BillCompletionStep.BookstoreEmail;
             if(!bookstore && step!=BillCompletionStep.StudentEmail)throw new BillCompletionPreparationException("Unknown notification type.");
             var target=bookstore?Address(Setting("BookstoreAddress","judahsoutfitters@nelson.edu")):Address(profile.Email);
-            var domains=configuration.GetSection("BillApproval:Notifications:StudentEmailDomains").Get<string[]>()??["nelson.edu"];
+            var domains=configuration.GetSection("BillApproval:Notifications:StudentEmailDomains").Get<string[]>()??["nelson.edu","my.nelson.edu"];
             if(!bookstore&&!domains.Contains(target.Host,StringComparer.OrdinalIgnoreCase))
                 throw new BillCompletionPreparationException("The student needs a verified Nelson email address before notification.");
             if(!bookstore&&(pdf.Length==0||string.IsNullOrWhiteSpace(fileName)))throw new BillCompletionPreparationException("The approved PDF is required before emailing the student.");
@@ -117,15 +122,17 @@ public static class BillApprovalNotification
                 Subject=bookstore?$"Bill approval completed - {approval.TermName}":"Approved Bill and Schedule",
                 Body=bookstore?$"{profile.DisplayName} ({approval.StudentId}) has completed bill approval for {approval.TermName}.\n\nApproval reference: {approval.Id:D}\nPlease use the current bookstore voucher process for the student's available purchasing amount.":
                     $"Congratulations, {profile.DisplayName}! Your bill approval for {approval.TermName} is complete.\n\nYour approved bill and schedule are attached. Keep this copy for your records.\n\nPlease contact Student Billing with any questions."};
-            var nonprod=string.Equals(configuration["App:EnvironmentLabel"],"NON-PRODUCTION",StringComparison.OrdinalIgnoreCase)||
-                string.Equals(configuration["ASPNETCORE_ENVIRONMENT"],"Staging",StringComparison.OrdinalIgnoreCase);
+            var nonprod=IsNonProduction(configuration);
             if(nonprod)
             {
-                var test=Address(Setting("NonProductionRecipient",string.Empty));
+                var test=Address(BillApprovalTestRecipient.Require(approval).Email);
                 if(!domains.Contains(test.Host,StringComparer.OrdinalIgnoreCase))throw new BillCompletionPreparationException("A Nelson test recipient is required in non-production.");
                 message.To.Add(test);message.Subject="[NON-PRODUCTION] "+message.Subject;
             }
             else {message.To.Add(target);message.Bcc.Add(billing);}message.Headers.Add("X-CampusFlow-Delivery-ID",$"{approval.Id:N}-{step}");
+            if (configuration["BillApproval:Notifications:ReplyTo"] is { Length: > 0 } replyTo) message.ReplyToList.Add(Address(replyTo));
+            if (BillApprovalCompletionProgress.Read(approval).Step(step).EmailOperationId is Guid operationId)
+                message.Headers.Add("X-CampusFlow-Operation-ID", operationId.ToString("D"));
             if(!bookstore)message.Attachments.Add(new Attachment(new MemoryStream(pdf,false),fileName,"application/pdf"));
             return message;
         }

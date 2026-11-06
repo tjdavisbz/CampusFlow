@@ -41,16 +41,29 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         StudentDocumentTrackingRequest request, CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        if (!int.TryParse(request.ExternalStudentId, out var studentUid))
+        if (!int.TryParse(request.ExternalStudentId, out var studentUid) || studentUid <= 0 || request.ApprovalId == Guid.Empty)
             throw new ArgumentException("The Thesis Elements student identifier is invalid.", nameof(request));
 
         var reference = request.ApprovalId.ToString("N");
         if (await FindDocumentIdAsync(studentUid, reference, cancellationToken) is { } existingId)
             return existingId.ToString(CultureInfo.InvariantCulture);
 
+        if (!request.AllowCreate)
+            throw new CampusFlow.BillApprovals.BillCompletionPreparationException("A document creation was already attempted. Retry can recover an existing record by approval reference; an administrator must confirm no record exists before allowing another creation.");
         var token = await GetAccessTokenAsync(cancellationToken);
-        var description = GetTrackingSetting("DescriptionFormat", "Approved Bill - {TermName}")
-            .Replace("{TermName}", request.TermName, StringComparison.Ordinal);
+        // Elements requires the document type's configured description, including spacing.
+        using var typesRequest = CreateRequest(HttpMethod.Get, "api/manager/lookup-table-options/doc-track-setup/documents", token);
+        using var typesResponse = await _client.SendAsync(typesRequest, cancellationToken);
+        typesResponse.EnsureSuccessStatusCode();
+        var typesBody = JsonNode.Parse(await typesResponse.Content.ReadAsStringAsync(cancellationToken));
+        if (typesBody?["isSuccess"]?.GetValue<bool>() != true || typesBody["data"] is not JsonArray types)
+            throw new InvalidOperationException("Elements document types could not be verified.");
+        var matches = types.Where(x => x?["uniqueID"]?.GetValue<int>() == GetTrackingInt("DocumentNameId")).ToArray();
+        if (matches.Length != 1 || matches[0]?["activeFlag"]?.GetValue<bool>() != true ||
+            matches[0]?["defaultLocationID"]?.GetValue<int>() != GetTrackingInt("LocationId") ||
+            string.IsNullOrWhiteSpace(matches[0]?["description"]?.GetValue<string>()))
+            throw new InvalidOperationException("The approved bill document type or location is missing, inactive or mismatched.");
+        var description = matches[0]!["description"]!.GetValue<string>();
         var acceptedAt = request.AcceptedAt.ToString("O", CultureInfo.InvariantCulture);
         var body = new JsonArray
         {
@@ -62,7 +75,7 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
                 ["docNameId"] = GetTrackingInt("DocumentNameId"),
                 ["docDescription"] = description,
                 ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
-                ["comments"] = "",
+                ["comments"] = "CampusFlow approved bill - " + request.TermName,
                 ["reference"] = reference,
                 ["compDate"] = acceptedAt,
                 ["userDefinedFieldId"] = GetTrackingInt("UserDefinedFieldId"),
@@ -81,18 +94,21 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         using var response = await _client.SendAsync(httpRequest, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
-        for (var attempt = 0; attempt < 5; attempt++)
+        if (JsonNode.Parse(content)?["isSuccess"]?.GetValue<bool>() != true)
+            throw new InvalidOperationException("Elements did not confirm the document creation request.");
+        for (var attempt = 0; attempt < 12; attempt++)
         {
             if (await FindDocumentIdAsync(studentUid, reference, cancellationToken) is { } documentId)
                 return documentId.ToString(CultureInfo.InvariantCulture);
-            await Task.Delay(250, cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
-        throw new InvalidOperationException("Elements created the Document Tracking record but its identifier could not be verified.");
+        throw new InvalidOperationException("The document creation result could not be verified. Review Elements before allowing another creation.");
     }
 
     public async Task<bool> HasImageAsync(string documentTrackingId, CancellationToken cancellationToken = default)
     {
-        if (!int.TryParse(documentTrackingId, out var documentId)) return false;
+        EnsureEnabled();
+        if (!int.TryParse(documentTrackingId, out var documentId) || documentId <= 0) throw new ArgumentException("A valid document tracking identifier is required.");
         var token = await GetAccessTokenAsync(cancellationToken);
         using var request = CreateRequest(HttpMethod.Get, $"api/student/document-tracking/viewdocimage/{documentId}", token);
         using var response = await _client.SendAsync(request, cancellationToken);
@@ -111,7 +127,8 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
     public async Task UploadImageAsync(string documentTrackingId, string fileName, byte[] contents,
         CancellationToken cancellationToken = default)
     {
-        if (!int.TryParse(documentTrackingId, out var documentId))
+        EnsureEnabled();
+        if (!int.TryParse(documentTrackingId, out var documentId) || documentId <= 0)
             throw new ArgumentException("The Elements Document Tracking identifier is invalid.", nameof(documentTrackingId));
         var token = await GetAccessTokenAsync(cancellationToken);
         var trackingModule = Uri.EscapeDataString(GetTrackingSetting("TrackingModule", "Billing"));
@@ -148,9 +165,15 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativeUrl, string? token = null)
     {
-        var request = new HttpRequestMessage(method, $"{GetApiSetting("BaseUrl").TrimEnd('/')}/{relativeUrl.TrimStart('/')}");
+        var baseUrl = relativeUrl.StartsWith("api/Login/", StringComparison.OrdinalIgnoreCase) || relativeUrl.StartsWith("api/manager/", StringComparison.OrdinalIgnoreCase) || relativeUrl == "api/student/document-tracking/add" ? GetApiSetting("BaseUrl") : DocumentBaseUrl;
+        var request = new HttpRequestMessage(method, $"{baseUrl.TrimEnd('/')}/{relativeUrl.TrimStart('/')}");
+        if (!relativeUrl.StartsWith("api/Login/", StringComparison.OrdinalIgnoreCase))
+        {
+            var origin = "https://" + GetApiSetting("TenantHost").TrimEnd('/');
+            request.Headers.Add("Origin", origin); request.Headers.Referrer = new Uri(origin);
+        }
         request.Headers.Add("TenantHost", GetApiSetting("TenantHost"));
-        request.Headers.Add("Module", GetTrackingSetting("ApiModule", "Admissions"));
+        request.Headers.Add("Module", relativeUrl.StartsWith("api/manager/", StringComparison.OrdinalIgnoreCase) ? "Manager" : GetTrackingSetting("ApiModule", "Admissions"));
         if (!string.IsNullOrWhiteSpace(token)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
     }
@@ -162,6 +185,14 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         var connectionString = _configuration.GetConnectionString(connectionName);
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException("The Thesis Elements read-only connection is not configured.");
+        if (IsNonProduction)
+        {
+            var parsed = new SqlConnectionStringBuilder(connectionString);
+            if (!(string.Equals(parsed.DataSource, "sql-elm-nonprod-usc-replica.database.windows.net", StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(parsed.DataSource, "tcp:sql-elm-nonprod-usc-replica.database.windows.net,1433", StringComparison.OrdinalIgnoreCase)) ||
+                !string.Equals(parsed.InitialCatalog, "EL-NP-NEL-DB", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Nonprod document tracking must use the nonprod replica.");
+        }
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         const string sql = """
@@ -177,8 +208,19 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         return value is null or DBNull ? null : Convert.ToInt32(value, CultureInfo.InvariantCulture);
     }
 
+    private string DocumentBaseUrl => GetTrackingSetting("ApiBaseUrl", _configuration[$"{ApiConfigurationPath}:RegistrationBaseUrl"] ?? GetApiSetting("BaseUrl"));
+    private bool IsNonProduction => string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Staging", StringComparison.OrdinalIgnoreCase);
     private void EnsureEnabled()
     {
+        var root = new Uri(DocumentBaseUrl.TrimEnd('/') + "/");
+        var auth = new Uri(GetApiSetting("BaseUrl").TrimEnd('/') + "/");
+        if (auth.Scheme != "https" || !auth.IsDefaultPort || auth.AbsolutePath != "/" || auth.Query.Length != 0 || auth.Fragment.Length != 0 || auth.UserInfo.Length != 0 ||
+            root.Scheme != "https" || !root.IsDefaultPort || root.AbsolutePath != "/" || root.Query.Length != 0 || root.Fragment.Length != 0 || root.UserInfo.Length != 0 ||
+            IsNonProduction && (!string.Equals(root.Host, "np-usc-gateway.thesiscloud.com", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(auth.Host, "app-elm-nonprod-usc-integrationapi.azurewebsites.net", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetApiSetting("TenantHost"), "el-np-nel.thesiscloud.com", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("Document tracking must target the correct Elements environment.");
         if (!_configuration.GetValue($"{TrackingConfigurationPath}:Enabled", false))
             throw new InvalidOperationException("Elements Document Tracking delivery is not enabled.");
     }

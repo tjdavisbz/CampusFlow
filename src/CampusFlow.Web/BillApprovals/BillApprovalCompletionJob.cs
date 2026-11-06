@@ -62,7 +62,7 @@ public class BillApprovalCompletionCoordinator(IRepository<BillApproval,Guid> ap
                     if(p.Step(step).Status is BillCompletionStatus.Completed or BillCompletionStatus.Uncertain or BillCompletionStatus.Running)return false;
                     if(previouslyConfirmed) {p.Finish(step,BillCompletionStatus.Completed);p.Save(a);return false;}
                     if(!enabled) {p.Finish(step,BillCompletionStatus.Disabled,"This delivery step has not been enabled.");p.Save(a);return false;}
-                    var ok=p.Start(step,DateTime.UtcNow);if(ok)p.Save(a);return ok;
+                    var ok=p.Start(step,DateTime.UtcNow);if(ok){p.Save(a);snapshot=a;}return ok;
                 });
                 if(!claimed)continue;
                 var status=BillCompletionStatus.Completed;string? error=null;
