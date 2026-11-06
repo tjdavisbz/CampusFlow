@@ -210,6 +210,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canImpersonateFaculty = !studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.FacultyImpersonation.Default);
         var canManagePlans = !studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
+        var canManageCostTypes = await context.IsGrantedAsync(CampusFlowPermissions.Admin.CostTypes);
         var canManageBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BillApproval);
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
         var canManageAdvisorRouting = canManageRegistration;
@@ -218,7 +219,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
         var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
-        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
+        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageCostTypes || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -236,6 +237,8 @@ public class CampusFlowMenuContributor : IMenuContributor
             if (canManagePlans)
                 studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.PaymentPlans, "Payment Plans",
                     "~/Admin/PaymentPlans", icon: "fa fa-credit-card", order: 2));
+            if (canManageCostTypes)
+                studentBilling.AddItem(new ApplicationMenuItem("CampusFlow.CostTypes", "Cost type rules", "~/Admin/StudentBilling/CostTypes", icon: "fa fa-list"));
             if (canManageBillApproval)
             {
                 studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.BillApprovalConfiguration, "Bill Approval",

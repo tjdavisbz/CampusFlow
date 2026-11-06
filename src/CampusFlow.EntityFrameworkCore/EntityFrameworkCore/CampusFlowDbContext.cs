@@ -1,3 +1,4 @@
+using CampusFlow.CostTypes;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
@@ -53,6 +54,8 @@ public class CampusFlowDbContext :
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
+    public DbSet<CostTypeConfiguration> CostTypeConfigurations { get; set; }
+    public DbSet<CostTypeRun> CostTypeRuns { get; set; }
     public DbSet<HousingRateSchedule> HousingRateSchedules { get; set; }
     public DbSet<PayflowPayment> PayflowPayments { get; set; }
     public DbSet<PortalAnnouncement> PortalAnnouncements { get; set; }
@@ -433,6 +436,26 @@ public class CampusFlowDbContext :
             b.Property(x => x.BaselineJson).IsRequired();
             b.Property(x => x.RoomsJson).IsRequired();
             b.HasIndex(x => new { x.TenantId, x.PeriodId }).IsUnique().HasFilter("\"IsDeleted\" = false");
+        });
+
+        builder.Entity<CostTypeConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CostTypeConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x=>x.RulesJson).IsRequired();
+            b.Property(x=>x.ChangeReason).IsRequired().HasMaxLength(500);
+            b.HasIndex(x=>x.TenantId).IsUnique().HasFilter("\"IsDeleted\" = false");
+        });
+        builder.Entity<CostTypeRun>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "CostTypeRuns", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x=>x.RuleRevision).IsRequired().HasMaxLength(40);
+            b.Property(x=>x.RulesSnapshotJson).IsRequired();
+            b.Property(x=>x.CandidatesJson).IsRequired();
+            b.Property(x=>x.ResultsJson).IsRequired();
+            b.Property(x=>x.State).IsRequired().HasMaxLength(40);
+            b.HasIndex(x=>new { x.TenantId,x.CreationTime });
         });
 
         builder.Entity<HousingRateSchedule>(b =>

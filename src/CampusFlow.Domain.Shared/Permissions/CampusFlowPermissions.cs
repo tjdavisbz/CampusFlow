@@ -22,6 +22,7 @@ public static class CampusFlowPermissions
         public const string BillApproval = Default + ".BillApproval";
         public const string RegistrationRules = Default + ".RegistrationRules";
         public const string AccessManagement = Default + ".AccessManagement";
+        public const string CostTypes = Default + ".CostTypes";
         public const string StudentBilling = Default + ".StudentBilling";
         public const string ResetIndividualBillApproval = StudentBilling + ".ResetIndividualBillApproval";
         public const string BusinessServices = Default + ".BusinessServices";

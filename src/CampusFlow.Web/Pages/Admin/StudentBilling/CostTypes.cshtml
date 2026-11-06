@@ -1,0 +1,32 @@
+@page
+@model CampusFlow.Web.Pages.Admin.StudentBilling.CostTypesModel
+@{ ViewData["Title"] = "Cost type rules"; }
+@section scripts { <script src="~/Pages/Admin/StudentBilling/CostTypes.js" asp-append-version="true"></script> }
+<div id="cost-types">
+@Html.AntiForgeryToken()
+<h1>Cost type rules</h1>
+<p>Choose a cost type using term campus, attendance and primary degree. Rules run in priority order; the first match wins.</p>
+<div class="alert alert-info">Automatic runs are off. Save your rules, preview the proposed changes, then use Run now. Unmapped rules can be saved for review. Records without a valid match are skipped.</div>
+<div id="cost-message" role="status" aria-live="polite"></div>
+<div class="d-flex gap-2 flex-wrap my-3">
+<button id="cost-save" type="button" class="btn btn-primary">Save rules</button>
+<button id="cost-add" type="button" class="btn btn-outline-secondary">Add rule</button>
+<label>Change reason <input id="cost-reason" class="form-control" maxlength="500" /></label>
+<label>Find a rule <input id="cost-search" class="form-control" placeholder="Campus, attendance or cost type" /></label>
+</div>
+<p>Blank campus means any campus. “Missing” degree means no degree value; an empty degree name is a different value.</p>
+<div class="table-responsive"><table class="table table-sm"><thead><tr>
+<!th>Enabled</!th><!th>Priority</!th><!th>Campus</!th><!th>Attendance</!th><!th>Degree condition</!th><!th>Degree</!th><!th>Cost type</!th>
+</tr></thead><tbody id="cost-rules"></tbody></table></div>
+<hr /><h2>Preview and run</h2>
+<div class="d-flex gap-2 align-items-end my-3">
+<label>Student UID (optional) <input id="cost-student" type="number" min="1" class="form-control" /></label>
+<button id="cost-preview" class="btn btn-outline-primary" type="button">Preview</button>
+<button id="cost-run" class="btn btn-primary" type="button" disabled>Run now</button>
+</div>
+<p id="cost-summary"></p><p id="cost-run-note"></p>
+<label>Show <select id="cost-filter" class="form-select"><option>Would change</option><option>Unmapped</option><option>Invalid lookup</option><option>Duplicate record</option><option>Already correct</option><option>All</option></select></label>
+<div class="table-responsive"><table class="table"><thead><tr><!th>Student</!th><!th>Term</!th><!th>Campus / attendance / degree</!th><!th>Current</!th><!th>Proposed</!th><!th>Result</!th></tr></thead><tbody id="cost-preview-rows"></tbody></table></div>
+<p id="cost-limit"></p><ul id="cost-results"></ul>
+<h2>Recent runs</h2><p>Previous results appear here after a run. Check any unconfirmed update in Elements before trying it again.</p><div id="cost-history"></div>
+</div>
