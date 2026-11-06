@@ -119,6 +119,10 @@ public class IndexModel : CampusFlowPageModel
     public string StudentDisplayName { get; private set; } = "Student";
     public StudentInformationSystemTerm? CurrentTerm { get; private set; }
     public IReadOnlyList<DashboardTermOption> DashboardTerms { get; private set; } = [];
+    public IReadOnlyList<BillApprovalTermOption> OpenBillApprovalTerms { get; private set; } = [];
+    public IEnumerable<BillApprovalTermOption> OtherBillApprovalTerms =>
+        OpenBillApprovalTerms.Where(x => x.ExternalTermId != CurrentTerm?.ExternalTermId);
+
     public bool HasStudentAccess { get; private set; }
     public bool HasAdvisorAccess { get; private set; }
     public int AdvisorStudentCount { get; private set; }
@@ -202,6 +206,21 @@ public class IndexModel : CampusFlowPageModel
                 try
                 {
                     var sisTerms = await termLookup.GetTermsAsync(HttpContext.RequestAborted);
+                    BillApprovalTermConfiguration[] openBillTerms = [];
+                    try
+                    {
+                        openBillTerms = (await _billApprovalTermConfigurations.GetListAsync())
+                            .Where(x => x.IsOpenForStudent(Clock.Now, profile.StudentId) &&
+                                sisTerms.Any(term => term.ExternalTermId == x.ExternalTermId))
+                            .OrderByDescending(x => x.TermCode).ToArray();
+                    }
+                    catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+                    {
+                        _logger.LogWarning(exception, "Unable to load available bill-approval terms.");
+                    }
+                    OpenBillApprovalTerms = openBillTerms.Select(x => new BillApprovalTermOption(
+                        x.ExternalTermId, x.TermCode, x.TermName)).ToArray();
+
                     var configuredTerms = (await _registrationTermConfigurations.GetListAsync())
                         .Where(x => x.IsStudentSelectable).OrderByDescending(x => x.TermCode).ToArray();
                     var configuredOptions = configuredTerms.Select(configuration =>
@@ -210,13 +229,24 @@ public class IndexModel : CampusFlowPageModel
                         return new DashboardTermOption(configuration.ExternalTermId, configuration.TermName,
                             sisTerm?.StartDate, sisTerm?.EndDate);
                     }).ToArray();
+                    // An open bill-approval term remains reachable even when course selection
+                    // is closed or its term is not selected for the registration dashboard.
+                    var billOptions = openBillTerms
+                        .Where(x => configuredOptions.All(option => option.ExternalTermId != x.ExternalTermId))
+                        .Select(x =>
+                        {
+                            var sisTerm = sisTerms.Single(term => term.ExternalTermId == x.ExternalTermId);
+                            return new DashboardTermOption(x.ExternalTermId, x.TermName,
+                                sisTerm.StartDate, sisTerm.EndDate);
+                        }).ToArray();
+                    var registrationOptions = configuredOptions.Concat(billOptions).ToArray();
                     var announcementOptions = sisTerms.Where(sisTerm =>
                             activeAnnouncements.Any(announcement => announcement.Terms.Contains(
                                 sisTerm.DisplayName, StringComparer.OrdinalIgnoreCase)) &&
-                            configuredOptions.All(option => option.ExternalTermId != sisTerm.ExternalTermId))
+                            registrationOptions.All(option => option.ExternalTermId != sisTerm.ExternalTermId))
                         .Select(sisTerm => new DashboardTermOption(sisTerm.ExternalTermId,
                             sisTerm.DisplayName, sisTerm.StartDate, sisTerm.EndDate));
-                    DashboardTerms = configuredOptions.Concat(announcementOptions).ToArray();
+                    DashboardTerms = registrationOptions.Concat(announcementOptions).ToArray();
                     CurrentTerm = await _selectedTerm.ResolveAsync(profile, termLookup,
                         DashboardTerms.Any(x => x.ExternalTermId == term) ? term : null,
                         configuredTerms.FirstOrDefault(x => x.IsDashboardDefault)?.ExternalTermId,
@@ -352,7 +382,9 @@ public class IndexModel : CampusFlowPageModel
             if (journey.CourseSelectionEnabled)
             {
                 var selection = await _courseSelection.GetAsync(term.ExternalTermId);
-                journey.HasSelectedCourses = selection.Registrations.Count > 0;
+                // A course-selection response must not erase enrollment already reported
+                // by the schedule, including courses entered directly in Elements.
+                journey.HasSelectedCourses |= selection.Registrations.Count > 0;
                 journey.IsAwaitingAdvisor = selection.Registrations.Any(x => x.NeedsReview);
             }
         }
@@ -440,13 +472,16 @@ public class IndexModel : CampusFlowPageModel
                 ? new("Previous balance", $"${PreviousBalance:N2} needs attention before bill approval.", "action", "/Billing", "Review balance")
                 : new("Previous balance", "No prior balance is blocking bill approval.", "complete", "/Billing", "View account"));
 
-            Steps.Add(!CourseSelectionEnabled
-                ? RegistrationJourneyStep.ComingSoon("Course selection")
-                : IsAwaitingAdvisor
-                ? new("Course selection", "Your selected courses are awaiting advisor review.", "waiting", courseUrl, "View courses")
+            var viewCoursesUrl = CourseSelectionEnabled
+                ? courseUrl
+                : $"/Schedule?term={Uri.EscapeDataString(Term.ExternalTermId)}";
+            Steps.Add(IsAwaitingAdvisor
+                ? new("Course selection", "Your selected courses are awaiting advisor review.", "waiting", viewCoursesUrl, "View courses")
                 : HasSelectedCourses
-                    ? new("Course selection", "Courses have been selected for this term.", "complete", courseUrl, "View courses")
-                    : new("Course selection", "Choose the courses you plan to take.", "action", courseUrl, "Select courses"));
+                    ? new("Course selection", "Courses have been selected for this term.", "complete", viewCoursesUrl, "View courses")
+                    : !CourseSelectionEnabled
+                        ? RegistrationJourneyStep.ComingSoon("Course selection")
+                        : new("Course selection", "Choose the courses you plan to take.", "action", courseUrl, "Select courses"));
 
             var housingUrl = $"/Housing?term={Uri.EscapeDataString(Term.ExternalTermId)}";
             if (HousingRequired)
@@ -490,6 +525,8 @@ public class IndexModel : CampusFlowPageModel
         public static RegistrationJourneyStep ComingSoon(string title) =>
             new(title, "This step is not currently available.", "disabled", null, "Coming soon");
     }
+
+    public sealed record BillApprovalTermOption(string ExternalTermId, string TermCode, string DisplayName);
 
     public sealed record DashboardTermOption(string ExternalTermId, string DisplayName,
         DateTime? StartDate, DateTime? EndDate);

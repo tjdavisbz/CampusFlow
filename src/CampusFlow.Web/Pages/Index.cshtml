@@ -107,6 +107,17 @@
             }
         </section>
 
+        @if (Model.OtherBillApprovalTerms.Any())
+        {
+            <section class="alert alert-info" aria-label="Bill approval for other terms">
+                <strong>Bill approval is available for:</strong>
+                @foreach (var option in Model.OtherBillApprovalTerms)
+                {
+                    <a class="ms-2" asp-page="/BillApproval" asp-route-term="@option.TermCode">@option.DisplayName — Review bill</a>
+                }
+            </section>
+        }
+
         @if (Model.RegistrationJourney is not null)
         {
             <section class="registration-journey" aria-labelledby="registration-journey-heading">
