@@ -51,6 +51,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     public DegreeAuditProgress? AuditProgress { get; private set; }
     public IReadOnlyList<CourseSelectionTermDto> EligibleTerms { get; private set; } = [];
     public bool IsUnavailable { get; private set; }
+    public bool HasStudentStatusHold { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string ErrorTitle { get; private set; } = "Course not added";
     public bool IsReadOnlyStudentView => _currentStudentView.IsImpersonating;
@@ -205,6 +206,7 @@ public class CourseSelectionModel : CampusFlowPageModel
             EligibleTerms = await _courseSelection.GetEligibleTermsAsync();
             if (EligibleTerms.Count == 0)
             {
+                HasStudentStatusHold = await _courseSelection.HasStudentStatusHoldAsync();
                 IsUnavailable = true;
                 return;
             }
@@ -229,6 +231,7 @@ public class CourseSelectionModel : CampusFlowPageModel
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
+            HasStudentStatusHold = exception is Volo.Abp.UserFriendlyException friendly && friendly.Code == RegistrationMessages.StudentStatusHoldCode;
             IsUnavailable = true;
             _logger.LogWarning(exception, "Unable to load Course Selection for the current student.");
         }

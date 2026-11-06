@@ -9,7 +9,7 @@
  <header class="admin-config-hero"><div><span>Admin portal</span><h1>Advisor assignments</h1><p>Choose which advisors can work with each student group.</p></div><i class="fa-solid fa-people-arrows"></i></header>
  <form method="post" asp-page-handler="Save" class="config-card advisor-routing-card">
   <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-  <div class="section-heading"><span>Advisor access</span><h2>Global and attendance-type assignments</h2><p>Search for an active Elements user by name, username, or university email. The Global row spans all attendance types. For each scheduler, choose whether students who marked Yes to graduation are included. A student is visible if any matching assignment includes them.</p></div>
+  <div class="section-heading"><span>Advisor access</span><h2>Global and attendance-type assignments</h2><p>Search for an active Elements user by name, username, or university email. The Global row spans all attendance types. For each scheduler, choose whether students who marked Yes to graduation are included. Narrow an assignment by the student’s primary program, major or degree for the selected term. Check one or more options in each list. Leave every option unchecked in a list to include all values in that list. Program refers to the Elements block-program field, when populated. All selected lists must match; any matching assignment can grant access.</p></div>
   @if(Model.Rows.Count==0){<div class="empty-result"><strong>No attendance types are available</strong><span>Attendance types appear here after Course Selection section mappings are loaded.</span></div>}
   else
   {
@@ -20,9 +20,14 @@
      <input asp-for="Rows[i].AttendanceType" type="hidden" />
      <input asp-for="Rows[i].AdvisorEmailsJson" type="hidden" data-advisor-values />
      <input asp-for="Rows[i].GraduationOptionsJson" type="hidden" data-graduation-options />
+     <input asp-for="Rows[i].ProgramScopesJson" type="hidden" data-program-scopes />
      <div class="advisor-group-title"><strong>@(Model.Rows[i].AttendanceType==CampusFlow.CourseSelections.AdvisorAssignment.GlobalAttendanceType?"Global Advisor":Model.Rows[i].AttendanceType)</strong><span data-advisor-count>@Model.Rows[i].Advisors.Count advisor@(Model.Rows[i].Advisors.Count==1 ? "" : "s") assigned</span></div>
      <div class="advisor-chips" data-advisor-chips>
-      @foreach(var advisor in Model.Rows[i].Advisors){<span class="advisor-chip" data-email="@advisor.Email"><span><strong>@advisor.Name</strong><small>@advisor.Email</small></span><label><input type="checkbox" data-include-graduating checked="@advisor.IncludeGraduatingStudents" /> Include graduating students</label><button type="button" aria-label="Remove @advisor.Name"><i class="fa-solid fa-xmark"></i></button></span>}
+      @foreach(var advisor in Model.Rows[i].Advisors){<span class="advisor-chip" data-email="@advisor.Email"><span><strong>@advisor.Name</strong><small>@advisor.Email</small></span><label><input type="checkbox" data-include-graduating checked="@advisor.IncludeGraduatingStudents" /> Include graduating students</label><fieldset class="primary-program-scope"><legend>Primary program for the selected term</legend>
+       <fieldset class="primary-scope-options" data-scope-major><legend>Major <small>All if none checked</small></legend><div class="primary-scope-choices">@foreach(var choice in Model.ProgramChoices.Where(x=>x.Id>0).DistinctBy(x=>x.Id)){<label class="primary-scope-choice"><input type="checkbox" value="@choice.Id" checked="@advisor.Scope.MajorIds.Contains(choice.Id)" /><span>@choice.Name · @choice.DegreeName</span></label>}</div></fieldset>
+       <fieldset class="primary-scope-options" data-scope-degree><legend>Degree <small>All if none checked</small></legend><div class="primary-scope-choices">@foreach(var choice in Model.ProgramChoices.Where(x=>x.DegreeId>0).DistinctBy(x=>x.DegreeId)){<label class="primary-scope-choice"><input type="checkbox" value="@choice.DegreeId" checked="@advisor.Scope.DegreeIds.Contains(choice.DegreeId!.Value)" /><span>@choice.DegreeName</span></label>}</div></fieldset>
+       <fieldset class="primary-scope-options" data-scope-program><legend>Block program <small>All if none checked</small></legend><div class="primary-scope-choices">@foreach(var choice in Model.ProgramChoices.Where(x=>x.BlockProgramId>0).DistinctBy(x=>x.BlockProgramId)){<label class="primary-scope-choice"><input type="checkbox" value="@choice.BlockProgramId" checked="@advisor.Scope.ProgramIds.Contains(choice.BlockProgramId!.Value)" /><span>@choice.BlockProgramName</span></label>}</div></fieldset>
+      </fieldset><button type="button" aria-label="Remove @advisor.Name"><i class="fa-solid fa-xmark"></i></button></span>}
      </div>
      <div class="advisor-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Search advisors by name or email…" autocomplete="off" data-advisor-search /><span class="advisor-search-status" data-search-status></span></div>
      <div class="advisor-results" data-advisor-results hidden></div>
@@ -30,7 +35,7 @@
    }
    </div>
   }
-  <div class="routing-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Access is controlled here</strong><p>Advisors no longer need a separate advisor role or permission. Use the Global row for access to every student.</p></div></div>
+  <div class="routing-note"><i class="fa-solid fa-shield-halved"></i><div><strong>Access is controlled here</strong><p>Advisors no longer need a separate advisor role or permission. Use the Global row for all attendance types, with any configured primary-program restrictions still enforced.</p></div></div>
   @if(Model.Rows.Count>0){<button class="primary-action" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save advisor assignments</button>}
  </form>
 </main>
@@ -39,6 +44,8 @@
 document.querySelectorAll('[data-advisor-group]').forEach(group => {
  const input=group.querySelector('[data-advisor-search]');
  const values=group.querySelector('[data-advisor-values]');
+ const programScopes=group.querySelector('[data-program-scopes]');
+ const programChoices=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProgramChoices));
  const graduationOptions=group.querySelector('[data-graduation-options]');
  const chips=group.querySelector('[data-advisor-chips]');
  const results=group.querySelector('[data-advisor-results]');
@@ -51,11 +58,13 @@ document.querySelectorAll('[data-advisor-group]').forEach(group => {
   values.value=JSON.stringify(selected());
   graduationOptions.value=JSON.stringify(Object.fromEntries(all.map(chip=>
    [chip.dataset.email,chip.querySelector('[data-include-graduating]').checked])));
+  const ids=(chip,selector)=>[...chip.querySelectorAll(selector+' input:checked')].map(x=>Number(x.value));
+  programScopes.value=JSON.stringify(Object.fromEntries(all.map(chip=>[chip.dataset.email,{MajorIds:ids(chip,'[data-scope-major]'),DegreeIds:ids(chip,'[data-scope-degree]'),ProgramIds:ids(chip,'[data-scope-program]')}])));
   count.textContent=`${all.length} advisor${all.length===1?'':'s'} assigned`;
  };
  const remove=e=>{const button=e.target.closest('button');if(button){button.closest('[data-email]').remove();sync();}};
  chips.addEventListener('click',remove);
- chips.addEventListener('change',e=>{if(e.target.matches('[data-include-graduating]'))sync();});
+ chips.addEventListener('change',e=>{if(e.target.matches('[data-include-graduating],.primary-program-scope input[type=checkbox]'))sync();});
  input.addEventListener('input',()=>{
   clearTimeout(timer);results.hidden=true;status.textContent='';
   const q=input.value.trim();if(q.length<2)return;
@@ -75,7 +84,20 @@ document.querySelectorAll('[data-advisor-group]').forEach(group => {
       chip.innerHTML='<span><strong></strong><small></small></span><label><input type="checkbox" data-include-graduating checked /> Include graduating students</label><button type="button" aria-label="Remove advisor"><i class="fa-solid fa-xmark"></i></button>';
       chip.querySelector('strong').textContent=advisor.name;
       chip.querySelector('small').textContent=advisor.email;
-      chips.appendChild(chip);sync();results.hidden=true;input.value='';
+      const fieldset=document.createElement('fieldset');fieldset.className='primary-program-scope';
+      const legend=document.createElement('legend');legend.textContent='Primary program for the selected term';fieldset.append(legend);
+      for(const [title,key,name] of [['Major','Id','major'],['Degree','DegreeId','degree'],['Block program','BlockProgramId','program']]){
+       const options=document.createElement('fieldset');options.className='primary-scope-options';options.dataset['scope'+name[0].toUpperCase()+name.slice(1)]='';
+       const heading=document.createElement('legend');heading.append(document.createTextNode(title+' '));const hint=document.createElement('small');hint.textContent='All if none checked';heading.append(hint);options.append(heading);
+       const list=document.createElement('div');list.className='primary-scope-choices';
+       const seen=new Set();for(const choice of programChoices){const id=choice[key];if(!id||id<=0||seen.has(id))continue;seen.add(id);
+        const label=document.createElement('label');label.className='primary-scope-choice';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=id;
+        const text=document.createElement('span');text.textContent=name==='major'?choice.Name+' · '+(choice.DegreeName||''):name==='degree'?choice.DegreeName:choice.BlockProgramName;
+        label.append(checkbox,text);list.append(label);
+       }
+       options.append(list);fieldset.append(options);
+      }
+      chip.insertBefore(fieldset,chip.querySelector('button'));chips.appendChild(chip);sync();results.hidden=true;input.value='';
      });
      results.appendChild(button);
     });

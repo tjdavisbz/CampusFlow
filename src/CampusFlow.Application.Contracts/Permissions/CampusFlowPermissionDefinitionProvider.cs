@@ -14,6 +14,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:StudentImpersonation"), MultiTenancySides.Tenant);
         group.AddPermission(CampusFlowPermissions.FacultyImpersonation.Default,
             L("Permission:FacultyImpersonation"), MultiTenancySides.Tenant);
+        group.AddPermission(CampusFlowPermissions.SchedulerImpersonation.Default,
+            L("Permission:SchedulerImpersonation"), MultiTenancySides.Tenant);
         var admin = group.AddPermission(CampusFlowPermissions.Admin.Default,
             L("Permission:Admin"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.GlobalConfiguration,

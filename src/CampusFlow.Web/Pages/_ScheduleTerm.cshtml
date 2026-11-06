@@ -21,35 +21,24 @@
     <div class="course-grid">
         @foreach (var course in Model.Courses)
         {
-            var hasMeeting = !string.IsNullOrWhiteSpace(course.MeetingDays) || course.StartTime is not null;
+            var meetings = CampusFlow.StudentInformationSystems.CourseMeeting.Resolve(course.Meetings, course.MeetingDays, course.StartTime, course.EndTime, course.Room);
             <article class="course-card">
                 <div class="course-card-topline">
                     <span class="course-code">@course.Department @course.CourseNumber</span>
-                    <span class="registration-status">@course.RegistrationStatus</span>
+                    <span class="registration-status">@course.DisplayRegistrationStatus</span>
                 </div>
                 <h3>@course.CourseName</h3>
                 <div class="course-meta">
                     <span><i class="fa-regular fa-user" aria-hidden="true"></i>@course.Instructor</span>
                     <span><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Section @course.Section · @CampusFlow.Web.Pages.ScheduleModel.FormatCredits(course.Credits) credits</span>
-                    @if (hasMeeting)
+                    @foreach (var meeting in meetings)
                     {
-                        <span>
-                            <i class="fa-regular fa-clock" aria-hidden="true"></i>
-                            @(string.IsNullOrWhiteSpace(course.MeetingDays) ? "Meeting time" : course.MeetingDays)
-                            @if (course.StartTime is not null)
-                            {
-                                <text> · @CampusFlow.Web.Pages.ScheduleModel.FormatTime(course.StartTime)–@CampusFlow.Web.Pages.ScheduleModel.FormatTime(course.EndTime)</text>
-                            }
-                        </span>
+                        <span><i class="fa-regular fa-clock" aria-hidden="true"></i>@meeting.DisplayText</span>
+                        @if (!string.IsNullOrWhiteSpace(meeting.Room))
+                        { <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>@meeting.Room</span> }
                     }
-                    else
-                    {
-                        <span class="online-course"><i class="fa-solid fa-laptop" aria-hidden="true"></i>Online</span>
-                    }
-                    @if (hasMeeting)
-                    {
-                        <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>@(course.Room ?? "Room to be announced")</span>
-                    }
+                    @if (meetings.Count == 0)
+                    { <span>No scheduled meeting time</span> }
                     @if (course.StartDate is not null || course.EndDate is not null)
                     {
                         <span>

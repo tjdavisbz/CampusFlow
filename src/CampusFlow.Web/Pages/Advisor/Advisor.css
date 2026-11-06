@@ -27,3 +27,5 @@
 @media(max-width:767.98px){.advisor-hero,.review-hero{align-items:flex-start;flex-direction:column;padding:1.5rem}.queue-count{width:100%}.queue-row{grid-template-columns:auto 1fr auto}.course-total{display:none}.waiting-since{grid-column:2;text-align:left}.overall-card{grid-template-columns:1fr}.card-heading{align-items:flex-start;flex-direction:column}.course-heading{flex-direction:column}.advisor-queue-search>div{flex-wrap:wrap}.advisor-queue-search input{flex-basis:100%}.advisor-queue-pagination{justify-content:center}}
 .advisor-primary{padding:.75rem 1.1rem;border:0;border-radius:.7rem;background:var(--advisor-primary);color:#fff;font-weight:800}.advisor-primary:disabled{opacity:.55}.advisor-email-preview{overflow:auto;border:1px solid var(--border);border-radius:.8rem;max-height:560px;background:#f5f3f8}.advisor-errors{color:#a52b3b;margin:1rem 0}.advisor-errors:empty{display:none}
 .advisor-mail-hint{margin:1rem 0 0;color:#475467;font-size:.9rem}
+
+.student-primary-program { display: inline-block; margin-left: .5rem; color: #475467; font-size: .85rem; font-weight: 600; }

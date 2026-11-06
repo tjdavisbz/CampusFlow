@@ -45,6 +45,26 @@ public class DegreeAuditDisplayTests
         Assert.Same(transfer, Assert.Single(visible));
     }
 
+    [Fact]
+    public void Repeated_instructor_rows_do_not_repeat_an_audit_course()
+    {
+        var course = Course("Major", "Required", "ENG2113", "InP", 100);
+        Assert.Single(DegreeAuditDisplay.CoursesForGroup([course, course], [course, course]));
+    }
+
+    [Fact]
+    public void Progress_counts_each_registration_once_across_requirements_but_keeps_separate_attempts()
+    {
+        var course = Course("Major", "Required", "ENG2113", "InP", 100);
+        var summary = new StudentDegreeAuditSummary(269, 1, 1, "BA", "Example", "2027", 120, 30, 2, 3, "R", false);
+        var audit = new StudentDegreeAuditDetail(summary, 3,
+            [course, course with { RequirementName = "Other" }, course with { MatchedAcademicId = 101 }]);
+        var progress = DegreeAuditProgress.From(audit);
+        Assert.Equal(6, progress.InProgressCredits);
+        Assert.Equal(36, progress.ProjectedCreditsCompleted);
+        Assert.Equal(30, audit.Summary.CreditsCompleted);
+    }
+
     private static StudentDegreeAuditCourse Course(
         string requirement, string group, string code, string status, int academicId = 0) =>
         new(requirement, 9, 3, 0, 0, "R", 1,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CampusFlow.StudentInformationSystems;
 
 namespace CampusFlow.CourseSelections;
 
@@ -16,6 +17,7 @@ public sealed class CourseSelectionOfferingDto
     public string? MeetingDays { get; set; }
     public TimeSpan? StartTime { get; set; }
     public TimeSpan? EndTime { get; set; }
+    public IReadOnlyList<CourseMeeting> Meetings { get; set; } = [];
     public bool CanSelect { get; set; }
     public bool FulfillsDegreeRequirement { get; set; }
     public string? DegreeRequirementName { get; set; }
@@ -33,6 +35,8 @@ public sealed class CourseSelectionRegistrationDto
     public string CourseName { get; set; } = null!;
     public decimal Credits { get; set; }
     public string Status { get; set; } = null!;
+    public bool IsApprovedByScheduler { get; set; }
+    public string DisplayStatus => IsApprovedByScheduler && string.Equals(Status, "Unofficial", System.StringComparison.OrdinalIgnoreCase) ? "Approved" : Status;
     public bool NeedsReview { get; set; }
     public bool CanRemove { get; set; }
 }

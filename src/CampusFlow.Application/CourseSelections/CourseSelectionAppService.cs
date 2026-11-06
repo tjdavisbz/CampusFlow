@@ -30,6 +30,8 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly ILogger<CourseSelectionAppService> _logger;
 
+    private readonly IReadOnlyCollection<IStudentPrimaryProgramLookup> _programLookups;
+
     public CourseSelectionAppService(
         IRepository<StudentProfile, Guid> profiles,
         ICurrentStudentView currentStudentView,
@@ -43,7 +45,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         IStudentInformationSystemCourseRegistrationService registration,
         IEnumerable<IStudentInformationSystemDegreeAuditLookup> degreeAuditLookups,
         IUnitOfWorkManager unitOfWorkManager,
-        ILogger<CourseSelectionAppService> logger)
+        ILogger<CourseSelectionAppService> logger, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
@@ -58,6 +60,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         _degreeAuditLookups = degreeAuditLookups.ToList();
         _unitOfWorkManager = unitOfWorkManager;
         _logger = logger;
+        _programLookups = programLookups?.ToArray() ?? [];
     }
 
     public async Task<CourseSelectionDto> GetAsync(string externalTermId)
@@ -103,6 +106,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 MeetingDays = x.MeetingDays,
                 StartTime = x.StartTime,
                 EndTime = x.EndTime,
+                Meetings = CourseMeeting.Resolve(x.Meetings, x.MeetingDays, x.StartTime, x.EndTime),
                 FulfillsDegreeRequirement = TryGetDegreeRequirement(x, degreeRequirements, out _),
                 DegreeRequirementName = TryGetDegreeRequirement(x, degreeRequirements, out var requirementName)
                     ? requirementName
@@ -123,6 +127,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 CourseName = x.CourseName,
                 Credits = x.Credits,
                 Status = x.RegistrationStatus,
+                IsApprovedByScheduler = reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId && r.Status == CourseReviewStatus.Approved),
                 CanRemove = string.Equals(x.RegistrationStatus, "Unofficial", StringComparison.OrdinalIgnoreCase) &&
                     reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId &&
                                      r.CanStudentRemove),
@@ -253,6 +258,13 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         return "successful";
     }
 
+    public async Task<bool> HasStudentStatusHoldAsync()
+    {
+        var profile = await GetCurrentProfileAsync();
+        var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
+        return contexts.Count > 0 && contexts.All(x => !x.IsMatriculated);
+    }
+
     public async Task<List<CourseSelectionTermDto>> GetEligibleTermsAsync()
     {
         var profile = await GetCurrentProfileAsync();
@@ -334,6 +346,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         if (registrations.Sum(x => x.Credits) + offering.Credits > context.MaximumAllowedCredits)
             throw new UserFriendlyException("Adding that course would exceed your allowed credit limit.");
 
+        var assignment = await GetAdvisorAssignmentAsync(context, profile);
         var snapshot = JsonSerializer.Serialize(offering);
         var operation = new CourseSelectionOperation(GuidGenerator.Create(), CurrentTenant.Id, profile.Id,
             profile.ExternalStudentId, input.ExternalTermId, input.ExternalOfferingId,
@@ -349,7 +362,6 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 input.IdempotencyKey);
             await RecordExternalRegistrationAsync(operation.Id, externalRegistrationId);
 
-            var assignment = await GetAdvisorAssignmentAsync(context.AttendanceType);
             var review = new CourseReview(GuidGenerator.Create(), CurrentTenant.Id, profile.Id,
                 profile.ExternalStudentId, input.ExternalTermId, input.ExternalOfferingId,
                 externalRegistrationId, context.AttendanceType, snapshot,
@@ -456,8 +468,10 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     {
         var now = Clock.Now;
         context ??= await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId);
-        if (context is null || !context.IsMatriculated)
-            throw new UserFriendlyException("Course selection is available only to matriculated students. Please contact Admissions if your status needs to be updated.");
+        if (context is null)
+            throw new UserFriendlyException("You are not eligible to select courses for that term.");
+        if (!context.IsMatriculated)
+            throw new UserFriendlyException(RegistrationMessages.StudentStatusHold, code: RegistrationMessages.StudentStatusHoldCode);
         var termConfiguration = await _termConfigurations.FindAsync(x => x.ExternalTermId == externalTermId);
         if (termConfiguration is not null)
         {
@@ -469,14 +483,27 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         throw new UserFriendlyException("Registration is not configured for that term.");
     }
 
-    private async Task<AdvisorAssignment?> GetAdvisorAssignmentAsync(string attendanceType)
+    private async Task<AdvisorAssignment?> GetAdvisorAssignmentAsync(CourseSelectionContext context, StudentProfile profile)
     {
         using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: false);
         var now = Clock.Now;
-        var query = await _advisorAssignments.GetQueryableAsync();
-        var assignment = await AsyncExecuter.FirstOrDefaultAsync(query.Where(x =>
-            x.IsActive && x.AttendanceType == attendanceType && x.EffectiveFrom <= now &&
-            (x.EffectiveTo == null || x.EffectiveTo > now)).OrderByDescending(x => x.EffectiveFrom));
+        var candidates = (await _advisorAssignments.GetListAsync(x => x.IsActive && x.EffectiveFrom <= now &&
+            (x.EffectiveTo == null || x.EffectiveTo > now)))
+            .Where(x => string.Equals(x.AttendanceType, context.AttendanceType, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.AttendanceType, AdvisorAssignment.GlobalAttendanceType, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var graduating = await _graduationIntents.FindAsync(x => x.StudentProfileId == profile.Id && x.ExternalTermId == context.ExternalTermId);
+        StudentPrimaryProgram? primary = null;
+        if (candidates.Any(x => x.GetPrimaryProgramScope().IsRestricted))
+        {
+            var lookup = _programLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+            if (lookup is not null)
+            {
+                try { primary = (await lookup.GetAsync([new(profile.ExternalStudentId, context.ExternalTermId)])).SingleOrDefault(); }
+                catch (Exception exception) { _logger.LogWarning(exception, "Cannot resolve primary program for scheduler routing; restricted assignments are excluded."); }
+            }
+        }
+        var assignment = candidates.Where(x => x.IncludesStudent(context.AttendanceType, graduating?.IntendsToGraduate == true, primary))
+            .OrderBy(x => x.AttendanceType == AdvisorAssignment.GlobalAttendanceType ? 1 : 0).ThenByDescending(x => x.EffectiveFrom).FirstOrDefault();
         await uow.CompleteAsync();
         return assignment;
     }

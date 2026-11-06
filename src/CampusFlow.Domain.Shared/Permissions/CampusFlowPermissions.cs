@@ -14,6 +14,11 @@ public static class CampusFlowPermissions
         public const string Default = GroupName + ".FacultyImpersonation";
     }
 
+    public static class SchedulerImpersonation
+    {
+        public const string Default = GroupName + ".SchedulerImpersonation";
+    }
+
     public static class Admin
     {
         public const string Default = GroupName + ".Admin";

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
+using Volo.Abp.Data;
 
 namespace CampusFlow.CourseSelections;
 
@@ -118,9 +119,35 @@ public class RegistrationTermConfiguration : FullAuditedAggregateRoot<Guid>, IMu
         IsDashboardDefault = isStudentSelectable && isDashboardDefault;
     }
 
+    public const string SectionVisibilityProperty = "SectionVisibilityRules";
+    public IReadOnlyList<CourseSectionVisibilityRule> GetSectionVisibilityRules()
+    {
+        if (!ExtraProperties.ContainsKey(SectionVisibilityProperty)) return [];
+        try
+        {
+            var rules = JsonSerializer.Deserialize<CourseSectionVisibilityRule[]>(this.GetProperty<string>(SectionVisibilityProperty) ?? "null")
+                ?? throw new JsonException();
+            return ValidateSectionRules(rules);
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        { throw new InvalidOperationException("Course section visibility needs administrative review.", exception); }
+    }
+
+    public void ConfigureSectionVisibility(IEnumerable<CourseSectionVisibilityRule> rules) =>
+        this.SetProperty(SectionVisibilityProperty, JsonSerializer.Serialize(ValidateSectionRules(rules)));
+
+    private static CourseSectionVisibilityRule[] ValidateSectionRules(IEnumerable<CourseSectionVisibilityRule> rules)
+    {
+        var normalized = rules.Select(x => x.Normalize()).ToArray();
+        if (normalized.Length > 100 || normalized.GroupBy(x => x.StudentAttendanceType, StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
+            throw new ArgumentException("Use one section-code rule per student attendance type.");
+        return normalized;
+    }
+
     public CourseSelectionPolicy CreatePolicy(bool allowOutsideWindow = false) => new(Id, TenantId, TermName, 1,
         RegistrationOpensAt, IsEnabled, RequireAdvisorReview, EnforceSectionCapacity,
         AttendanceTypeMappingsJson, JsonSerializer.Serialize(new CourseSelectionEligibilityRules(
             RegistrationOpensAt: allowOutsideWindow ? null : RegistrationOpensAt,
-            RegistrationClosesAt: allowOutsideWindow ? null : RegistrationClosesAt)));
+            RegistrationClosesAt: allowOutsideWindow ? null : RegistrationClosesAt,
+            SectionVisibilityRules: GetSectionVisibilityRules())));
 }

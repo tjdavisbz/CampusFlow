@@ -50,7 +50,14 @@
     {
         <section class="course-selection-message" role="status">
             <i class="fa-regular fa-hourglass-half" aria-hidden="true"></i>
-            <div><h2>Course Selection is temporarily unavailable</h2><p>Please try again shortly.</p></div>
+            <div>
+                @if (Model.HasStudentStatusHold)
+                {
+                    <h2>Registration status hold</h2>
+                    <p>You have a status hold on your account preventing registration, please contact <a href="mailto:Registrar@nelson.edu">Registrar@nelson.edu</a> to resolve the status hold.</p>
+                }
+                else { <h2>Course Selection is temporarily unavailable</h2><p>Please try again shortly.</p> }
+            </div>
         </section>
     }
     else
@@ -110,7 +117,7 @@
                     {
                         <article class="selected-course">
                             <div><strong>@course.CourseCode-@course.Section</strong><h3>@course.CourseName</h3></div>
-                            <div class="course-meta"><span>@course.Credits.ToString("0.##") credits</span><span>@course.Status</span>@if (course.NeedsReview) { <span class="review-badge">Advisor review</span> }
+                            <div class="course-meta"><span>@course.Credits.ToString("0.##") credits</span><span>@course.DisplayStatus</span>@if (course.NeedsReview) { <span class="review-badge">Scheduler review</span> }
                                 @if (course.CanRemove)
                                 {
                                     <form method="post" asp-page-handler="Remove" class="remove-course-form" data-course-name="@course.CourseName" data-course-code="@($"{course.CourseCode}-{course.Section}")">
@@ -162,7 +169,8 @@
                         }
                         <div class="offering-details">
                             <span><i class="fa-regular fa-user"></i> @(course.InstructorName ?? "Instructor to be announced")</span>
-                            @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }
+                            @foreach (var meeting in CampusFlow.StudentInformationSystems.CourseMeeting.Resolve(course.Meetings, course.MeetingDays, course.StartTime, course.EndTime))
+                            { <span><i class="fa-regular fa-clock"></i> @meeting.DisplayText</span> }
                             <span><i class="fa-solid fa-chair"></i> @course.SeatsRemaining seats available</span>
                         </div>
                         <form method="post" asp-page-handler="Add" class="add-course-form">

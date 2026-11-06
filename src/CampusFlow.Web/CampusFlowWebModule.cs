@@ -146,6 +146,7 @@ public class CampusFlowWebModule : AbpModule
         context.Services.AddTransient<ITenantThemeProvider, ConfigurationTenantThemeProvider>();
         context.Services.AddTransient<IBillApprovalPdfGenerator, MigraDocBillApprovalPdfGenerator>();
         context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
+        context.Services.AddTransient<CampusFlow.AdvisorPortal.ICurrentSchedulerView, CurrentSchedulerView>();
         context.Services.Configure<PayflowOptions>(configuration.GetSection(PayflowOptions.SectionName));
         context.Services.AddHttpClient<IPayflowGateway, PayflowGateway>(client =>
             client.Timeout = TimeSpan.FromSeconds(30));
@@ -465,6 +466,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseAuthorization();
         app.UseMiddleware<StudentViewContextMiddleware>();
         app.UseMiddleware<FacultyViewContextMiddleware>();
+        app.UseMiddleware<SchedulerViewContextMiddleware>();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {

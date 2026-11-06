@@ -7,6 +7,8 @@ using CampusFlow.Students;
 using CampusFlow.Web.Components.Toolbar.StudentView;
 using CampusFlow.Web.Components.Toolbar.FacultyView;
 using CampusFlow.Web.Portals;
+using CampusFlow.AdvisorPortal;
+using CampusFlow.Web.Components.Toolbar.SchedulerView;
 using Microsoft.AspNetCore.Http;
 using System.Linq;
 
@@ -35,7 +37,10 @@ public class CampusFlowToolbarContributor : IToolbarContributor
         {
             context.Toolbar.Items.Add(new ToolbarItem(typeof(FacultyViewViewComponent), order: -100));
         }
-		
+        if (httpContext?.User.Claims.Any(x => x.Type == SchedulerViewClaimTypes.Email) == true)
+        {
+            context.Toolbar.Items.Add(new ToolbarItem(typeof(SchedulerViewViewComponent), order: -100));
+        }
         return Task.CompletedTask;
     }
 }

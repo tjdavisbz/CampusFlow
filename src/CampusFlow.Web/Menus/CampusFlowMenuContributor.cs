@@ -137,7 +137,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         {
             var advisor = new ApplicationMenuItem(
                 CampusFlowMenus.Advisor,
-                "Advisor",
+                "Scheduler",
                 icon: "fa fa-user-check",
                 order: 2
             );
@@ -191,6 +191,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         }
 
         var canImpersonateStudent = !studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.StudentImpersonation.Default);
+        var canImpersonateScheduler = !studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.SchedulerImpersonation.Default);
         var canImpersonateFaculty = !studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.FacultyImpersonation.Default);
         var canManagePlans = !studentOnly && await context.IsGrantedAsync(CampusFlowPermissions.Admin.PaymentPlans);
         var canManageGlobalConfiguration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.GlobalConfiguration);
@@ -202,7 +203,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
         var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
-        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
+        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canImpersonateScheduler || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -262,6 +263,8 @@ public class CampusFlowMenuContributor : IMenuContributor
             if (canImpersonateStudent)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateStudent, "Impersonate Student",
                     "~/Admin/ImpersonateStudent", icon: "fa fa-user-secret", order: 7));
+            if (canImpersonateScheduler)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateScheduler, "Impersonate Scheduler", "~/Admin/ImpersonateScheduler", icon: "fa fa-user-check", order: 8));
             if (canImpersonateFaculty)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ImpersonateFaculty, "Impersonate Faculty",
                     "~/Admin/ImpersonateFaculty", icon: "fa fa-chalkboard-user", order: 8));

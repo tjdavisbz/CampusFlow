@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CampusFlow.StudentInformationSystems;
 
 namespace CampusFlow.AdvisorPortal;
 
@@ -10,6 +11,7 @@ public sealed class AdvisorQueueItemDto
     public string StudentName { get; set; } = null!;
     public string StudentId { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
+    public string PrimaryProgram { get; set; } = "";
     public bool? IntendsToGraduate { get; set; }
     public int PendingCourseCount { get; set; }
     public DateTime WaitingSince { get; set; }
@@ -24,6 +26,9 @@ public sealed class AdvisorCourseReviewDto
     public decimal Credits { get; set; }
     public string? InstructorName { get; set; }
     public string? MeetingDays { get; set; }
+    public TimeSpan? StartTime { get; set; }
+    public TimeSpan? EndTime { get; set; }
+    public IReadOnlyList<CourseMeeting> Meetings { get; set; } = [];
     public string Status { get; set; } = null!;
     public string? AdvisorComment { get; set; }
     public string? LastRemovalError { get; set; }
@@ -37,6 +42,7 @@ public sealed class AdvisorStudentReviewDto
     public string StudentId { get; set; } = null!;
     public string StudentEmail { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;
+    public string PrimaryProgram { get; set; } = "";
     public bool? IntendsToGraduate { get; set; }
     public List<AdvisorCourseReviewDto> Courses { get; set; } = [];
     public List<AdvisorScheduledCourseDto> ExistingCourses { get; set; } = [];

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using CampusFlow.CourseSelections;
 using System.Threading.Tasks;
 using CampusFlow.Branding;
 using CampusFlow.StudentInformationSystems;
@@ -16,6 +17,7 @@ namespace CampusFlow.Web.Pages;
 public class ScheduleModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
+    private readonly IRepository<CourseReview, Guid>? _reviews;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
@@ -28,9 +30,10 @@ public class ScheduleModel : CampusFlowPageModel
         ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
-        ILogger<ScheduleModel> logger)
+        ILogger<ScheduleModel> logger, IRepository<CourseReview, Guid>? reviews = null)
     {
         _tenantThemeProvider = tenantThemeProvider;
+        _reviews = reviews;
         _studentProfileRepository = studentProfileRepository;
         _currentStudentView = currentStudentView;
         _scheduleLookups = scheduleLookups.ToArray();
@@ -83,6 +86,12 @@ public class ScheduleModel : CampusFlowPageModel
             var courses = await scheduleLookup.GetScheduleAsync(
                 profile.ExternalStudentId,
                 HttpContext.RequestAborted);
+            if (_reviews is not null)
+            {
+                var approved = (await _reviews.GetListAsync(x => x.StudentProfileId == profile.Id && x.Status == CourseReviewStatus.Approved))
+                    .Select(x => (x.ExternalTermId, x.ExternalCourseRegistrationId)).ToHashSet();
+                courses = courses.Select(x => x with { IsApprovedByScheduler = approved.Contains((x.ExternalTermId, x.ExternalAcademicId)) }).ToArray();
+            }
             var terms = courses
                 .GroupBy(x => new { x.TermCode, x.TermName, x.ExternalTermId })
                 .OrderByDescending(x => x.Key.TermCode)
