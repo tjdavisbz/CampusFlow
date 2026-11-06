@@ -54,18 +54,36 @@ public sealed class ElementsPrimaryProgramLookup(IConfiguration configuration, I
     public async Task<IReadOnlyList<StudentProgramChoice>> GetChoicesAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = Connection(); await connection.OpenAsync(cancellationToken);
+        // Materialize primary references once. Correlated EXISTS over reporting views can expand
+        // the student-program joins for every catalog row on the production replica.
         await using var command = new SqlCommand("""
-            SELECT m.MajorMinorID,LTRIM(RTRIM(m.MajorMinorName)) Name,m.DegreeNameID,m.DegreeName,
-                CAST(NULL AS int) BlockProgramID,CAST(NULL AS varchar(100)) BlockProgram
-            FROM dbo.CAMS_MajorMinorRef_View m
-            WHERE m.ActiveMajor=1 OR EXISTS(SELECT 1 FROM dbo.CAMS_StudentProgram_View p WHERE p.PriProgID=1 AND p.MajorDegreeID=m.MajorMinorID)
-            UNION
-            SELECT 0,'',NULL,NULL,p.ProgramsID,LTRIM(RTRIM(p.Programs)) FROM dbo.Programs p
-            WHERE p.ActiveFlag=1 OR EXISTS(SELECT 1 FROM dbo.CAMS_StudentProgram_View sp WHERE sp.PriProgID=1 AND sp.BlockProgramID=p.ProgramsID)
-            ORDER BY Name;
+            SELECT DISTINCT MajorProgramID,BlockProgramID FROM dbo.StudentProgram WHERE PriProgID=1;
+            SELECT MajorMinorID,LTRIM(RTRIM(MajorMinorName)),DegreeNameID,DegreeName,ActiveMajor
+                FROM dbo.CAMS_MajorMinorRef_View;
+            SELECT ProgramsID,LTRIM(RTRIM(Programs)),ActiveFlag FROM dbo.Programs;
             """, connection) { CommandTimeout = 60 };
+        var majors = new HashSet<int>(); var programs = new HashSet<int>();
         var rows = new List<StudentProgramChoice>(); await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken)) rows.Add(new(reader.GetInt32(0), reader.IsDBNull(1) ? "" : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetInt32(2), reader.IsDBNull(3) ? null : reader.GetString(3).Trim(), reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.IsDBNull(5) ? null : reader.GetString(5).Trim()));
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (!reader.IsDBNull(0)) majors.Add(reader.GetInt32(0));
+            if (!reader.IsDBNull(1)) programs.Add(reader.GetInt32(1));
+        }
+        await reader.NextResultAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var id = reader.GetInt32(0);
+            if ((!reader.IsDBNull(4) && Convert.ToBoolean(reader.GetValue(4))) || majors.Contains(id))
+                rows.Add(new(id,reader.IsDBNull(1)?"":reader.GetString(1),reader.IsDBNull(2)?null:reader.GetInt32(2),reader.IsDBNull(3)?null:reader.GetString(3).Trim()));
+        }
+        await reader.NextResultAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var id = reader.GetInt32(0);
+            if ((!reader.IsDBNull(2) && Convert.ToBoolean(reader.GetValue(2))) || programs.Contains(id))
+                rows.Add(new(0,"",BlockProgramId:id,BlockProgramName:reader.IsDBNull(1)?"":reader.GetString(1).Trim()));
+        }
+        rows = rows.OrderBy(x=>x.Name,StringComparer.OrdinalIgnoreCase).ThenBy(x=>x.Id).ToList();
         return rows;
     }
 }
