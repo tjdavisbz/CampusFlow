@@ -41,6 +41,7 @@
     {
 
     <form method="post" id="advisorReviewForm">
+        <fieldset disabled="@Model.IsReadOnlySchedulerView" style="border:0;padding:0;margin:0;min-width:0">
         <input asp-for="Input.StudentProfileId" type="hidden" />
         <input asp-for="Input.ExternalTermId" type="hidden" />
         <section class="advisor-card">
@@ -110,6 +111,7 @@
             </section>
         }
         <div class="submit-bar"><a asp-page="/Advisor/Index">Cancel</a><button type="submit" asp-page-handler="Preview"><i class="fa-regular fa-eye"></i> Preview email</button>@if (Model.PreviewReady && Model.MailConnected){<button type="submit" asp-page-handler="Submit" data-action="submit-review"><i class="fa-solid fa-check"></i> Save review and email student</button>}</div>
+        </fieldset>
     </form>
     }
 </main>

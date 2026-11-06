@@ -61,6 +61,7 @@ public class ReviewModel : CampusFlowPageModel
     public TenantTheme Theme { get; private set; } = new(
         "CampusFlow", "#274690", "#172554", "#667eea", "#A1A8AE", "#F7F8FA", "#172033",
         null, null, "system-ui, sans-serif", "system-ui, sans-serif", null);
+    public bool IsReadOnlySchedulerView => HttpContext.User.Identities.Any(x => x.AuthenticationType == SchedulerViewClaimTypes.AuthenticationType);
     public AdvisorStudentReviewDto Review { get; private set; } = new();
     public string? EmailPreviewHtml { get; private set; }
     public string? EmailSubject { get; private set; }
@@ -84,6 +85,7 @@ public class ReviewModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostPreviewAsync()
     {
+        if (IsReadOnlySchedulerView) return Forbid();
         if (!await _advisorPortal.HasAccessAsync()) return Forbid();
         await LoadAsync(Input.StudentProfileId, Input.ExternalTermId, populateInput: false);
         var email = await _advisorPortal.PreviewEmailAsync(Input);
@@ -113,6 +115,7 @@ public class ReviewModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostSubmitAsync()
     {
+        if (IsReadOnlySchedulerView) return Forbid();
         if (!await _advisorPortal.HasAccessAsync()) return Forbid();
         await LoadAsync(Input.StudentProfileId, Input.ExternalTermId, populateInput: false);
         var expected = TempData[PreviewKey] as string;
@@ -143,6 +146,7 @@ public class ReviewModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnGetEmailRetryAsync(Guid id)
     {
+        if (IsReadOnlySchedulerView) return Forbid();
         var email = await _advisorPortal.GetSubmissionEmailAsync(id);
         if (email.EmailStatus == nameof(ReviewEmailStatus.Sent)) return RedirectToPage("/Advisor/Index");
         await ShowRetryAsync(id, email, null);
@@ -151,6 +155,7 @@ public class ReviewModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostRetryEmailAsync(Guid submissionId)
     {
+        if (IsReadOnlySchedulerView) return Forbid();
         var email = await _advisorPortal.GetSubmissionEmailAsync(submissionId);
         if (email.EmailStatus == nameof(ReviewEmailStatus.Sent)) return RedirectToPage("/Advisor/Index");
         var access = await GetMailAccessAsync();
@@ -181,6 +186,7 @@ public class ReviewModel : CampusFlowPageModel
     public async Task<IActionResult> OnGetConnectedAsync(Guid studentProfileId, string term,
         Guid? draftId, Guid? submissionId)
     {
+        if (IsReadOnlySchedulerView) return Forbid();
         if (!await _advisorPortal.HasAccessAsync() || CurrentUser.Id is not Guid userId) return Forbid();
         var draft = draftId.HasValue
             ? await _mailDrafts.TakeAsync(draftId.Value, userId, CurrentTenant.Id, HttpContext.RequestAborted)
@@ -257,7 +263,7 @@ public class ReviewModel : CampusFlowPageModel
     {
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         Review = await _advisorPortal.GetStudentReviewAsync(studentProfileId, term);
-        MailConnected = await GetMailAccessAsync() is not null;
+        MailConnected = !IsReadOnlySchedulerView && await GetMailAccessAsync() is not null;
         if (!populateInput) return;
         Input.StudentProfileId = studentProfileId;
         Input.ExternalTermId = term;
@@ -332,7 +338,7 @@ public class ReviewModel : CampusFlowPageModel
         EmailSubject = AdvisorReviewEmailTemplate.Subject(email);
         EmailPreviewHtml = AdvisorReviewEmailTemplate.Render(email);
         EmailNotice = notice ?? "The review is saved, but the email has not been confirmed. Check Sent Items before retrying.";
-        MailConnected = await GetMailAccessAsync() is not null;
+        MailConnected = !IsReadOnlySchedulerView && await GetMailAccessAsync() is not null;
     }
 
     private string Fingerprint() => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
