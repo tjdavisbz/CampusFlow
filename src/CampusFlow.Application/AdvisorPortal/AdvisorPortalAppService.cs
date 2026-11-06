@@ -11,6 +11,7 @@ using Volo.Abp;
 using Volo.Abp.Authorization;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
+using Microsoft.Extensions.Logging;
 
 namespace CampusFlow.AdvisorPortal;
 
@@ -26,6 +27,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     private readonly IStudentInformationSystemCourseSelectionLookup _courseLookup;
     private readonly IStudentInformationSystemStudentNotesService _studentNotes;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly IReadOnlyCollection<IStudentPrimaryProgramLookup> _programLookups;
 
     public AdvisorPortalAppService(
         IRepository<CourseReview, Guid> reviews,
@@ -36,7 +38,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         IStudentInformationSystemCourseRegistrationService registration,
         IStudentInformationSystemCourseSelectionLookup courseLookup,
         IStudentInformationSystemStudentNotesService studentNotes,
-        IUnitOfWorkManager unitOfWorkManager)
+        IUnitOfWorkManager unitOfWorkManager, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
     {
         _reviews = reviews;
         _submissions = submissions;
@@ -47,6 +49,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         _courseLookup = courseLookup;
         _studentNotes = studentNotes;
         _unitOfWorkManager = unitOfWorkManager;
+        _programLookups = programLookups?.ToArray() ?? [];
     }
 
     public async Task<List<AdvisorQueueItemDto>> GetQueueAsync(string? externalTermId = null)
@@ -64,6 +67,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             profileIds.Contains(x.StudentProfileId) && termIds.Contains(x.ExternalTermId))))
             .ToDictionary(x => (x.StudentProfileId, x.ExternalTermId), x => x.IntendsToGraduate);
 
+        var primaryPrograms = await GetPrimaryProgramsAsync(pending.Where(x => profileById.ContainsKey(x.StudentProfileId))
+            .Select(x => new StudentTermKey(profileById[x.StudentProfileId].ExternalStudentId, x.ExternalTermId)).Distinct().ToArray());
         return pending
             .GroupBy(x => new { x.StudentProfileId, x.ExternalTermId })
             .Where(group => profileById.ContainsKey(group.Key.StudentProfileId))
@@ -77,6 +82,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
                     StudentName = profile.DisplayName,
                     StudentId = profile.StudentId,
                     AttendanceType = group.Select(x => x.AttendanceType).FirstOrDefault() ?? string.Empty,
+                    PrimaryProgram = primaryPrograms.GetValueOrDefault(new(profile.ExternalStudentId, group.Key.ExternalTermId))?.Name ?? "",
                     IntendsToGraduate = graduationIntents.TryGetValue(
                         (group.Key.StudentProfileId, group.Key.ExternalTermId), out var intendsToGraduate)
                         ? intendsToGraduate : null,
@@ -110,6 +116,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         var pendingIds = reviews.Select(x => x.ExternalCourseRegistrationId).ToHashSet(StringComparer.Ordinal);
         var activeCourses = registrations.Where(x => x.EffectiveWithdrawDate is null &&
             !pendingIds.Contains(x.ExternalRegistrationId));
+        var primaryPrograms = await GetPrimaryProgramsAsync([new(profile.ExternalStudentId, externalTermId)]);
         var graduationIntent = await _graduationIntents.FindAsync(x =>
             x.StudentProfileId == studentProfileId && x.ExternalTermId == externalTermId);
 
@@ -121,6 +128,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             StudentId = profile.StudentId,
             StudentEmail = profile.Email,
             AttendanceType = reviews.Select(x => x.AttendanceType).FirstOrDefault() ?? string.Empty,
+            PrimaryProgram = primaryPrograms.GetValueOrDefault(new(profile.ExternalStudentId, externalTermId))?.Name ?? "",
             IntendsToGraduate = graduationIntent?.IntendsToGraduate,
             ExistingCourses = activeCourses.Select(x => new AdvisorScheduledCourseDto
             {
@@ -424,10 +432,26 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
             Credits = course?.Credits ?? 0,
             InstructorName = course?.InstructorName,
             MeetingDays = course?.MeetingDays,
+            StartTime = course?.StartTime,
+            EndTime = course?.EndTime,
+            Meetings = course is null ? [] : CourseMeeting.Resolve(course.Meetings, course.MeetingDays, course.StartTime, course.EndTime),
             Status = review.Status.ToString(),
             AdvisorComment = review.AdvisorComment,
             LastRemovalError = review.LastRemovalError
         };
+    }
+
+    private async Task<IReadOnlyDictionary<StudentTermKey, StudentPrimaryProgram>> GetPrimaryProgramsAsync(IReadOnlyCollection<StudentTermKey> keys)
+    {
+        var lookup = _programLookups.SingleOrDefault(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
+        if (lookup is null || !string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase))
+            return new Dictionary<StudentTermKey, StudentPrimaryProgram>();
+        try { return (await lookup.GetAsync(keys)).ToDictionary(x => x.Key); }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Unable to load primary-program labels for the scheduler queue.");
+            return new Dictionary<StudentTermKey, StudentPrimaryProgram>();
+        }
     }
 
     private static string? NormalizeComment(string? comment) =>

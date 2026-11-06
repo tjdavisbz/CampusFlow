@@ -156,13 +156,8 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
             FROM [dbo].[CAMS_SROffer_View] offer
             LEFT JOIN [dbo].[Faculty] faculty
                 ON faculty.FacultyID = offer.FacultyID
-            OUTER APPLY
-            (
-                SELECT TOP (1) s.OfferDays, s.OfferTimeFrom, s.OfferTimeTo
-                FROM [dbo].[SROfferSchedule] s
-                WHERE s.SROfferID = offer.SROfferID
-                ORDER BY s.SROfferScheduleID
-            ) schedule
+            LEFT JOIN [dbo].[SROfferSchedule] schedule
+                ON schedule.SROfferID = offer.SROfferID
             WHERE offer.SemesterID = @TermCalendarID
               AND offer.SRMasterID IS NOT NULL
               AND offer.DisplayInPortal = 1
@@ -197,7 +192,7 @@ public sealed class ThesisElementsCourseSelectionLookup : IStudentInformationSys
                 reader.IsDBNull(16) ? null : reader.GetDateTime(16).TimeOfDay,
                 reader.IsDBNull(17) ? null : reader.GetDateTime(17).TimeOfDay));
         }
-        return offerings;
+        return CourseScheduleNormalization.Offerings(offerings);
     }
 
     public async Task<IReadOnlyList<CourseSelectionRegistration>> GetRegistrationsAsync(

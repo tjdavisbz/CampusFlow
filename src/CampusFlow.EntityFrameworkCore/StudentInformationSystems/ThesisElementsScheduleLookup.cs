@@ -113,6 +113,6 @@ public sealed class ThesisElementsScheduleLookup : IStudentInformationSystemSche
                 reader.IsDBNull(21) ? null : reader.GetString(21).Trim()));
         }
 
-        return courses;
+        return CourseScheduleNormalization.Registrations(courses);
     }
 }

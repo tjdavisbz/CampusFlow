@@ -7,7 +7,7 @@
 @{
     PageLayout.Content.Title = Model.HasStudentAccess && !Model.HasAdvisorAccess
         ? "Student Dashboard"
-        : Model.HasAdvisorAccess && !Model.HasStudentAccess ? "Advisor Dashboard" : "Dashboard";
+        : Model.HasAdvisorAccess && !Model.HasStudentAccess ? "Scheduler Dashboard" : "Dashboard";
     PageLayout.Content.BreadCrumb.ShowCurrent = false;
     PageLayout.Content.ShowToolbar = false;
     PageLayout.Content.MenuItemName = CampusFlowMenus.Home;
@@ -44,7 +44,7 @@
             }
             else if (Model.HasAdvisorAccess)
             {
-                <p>Your student services and advisor responsibilities—all in one place.</p>
+                <p>Your student services and scheduler responsibilities—all in one place.</p>
             }
             else
             {
@@ -58,7 +58,7 @@
             }
             else
             {
-                <span>Current role</span><strong>Advisor</strong>
+                <span>Current role</span><strong>Scheduler</strong>
             }
         </div>
     </section>
@@ -81,7 +81,7 @@
     @if (Model.HasAdvisorAccess)
     {
         <section class="advisor-dashboard-summary" aria-labelledby="advisor-work-heading">
-            <div class="advisor-summary-copy"><span class="summary-label">Advisor work</span><h2 id="advisor-work-heading">Course review queue</h2><p>Students remain here until every selected course has a final decision.</p></div>
+            <div class="advisor-summary-copy"><span class="summary-label">Scheduler work</span><h2 id="advisor-work-heading">Course review queue</h2><p>Students remain here until every selected course has a final decision.</p></div>
             <div class="advisor-metric"><strong>@Model.AdvisorStudentCount</strong><span>Students waiting</span></div>
             <div class="advisor-metric"><strong>@Model.AdvisorCourseCount</strong><span>Courses pending</span></div>
             <a href="/Advisor">Open review queue <i class="fa-solid fa-arrow-right"></i></a>

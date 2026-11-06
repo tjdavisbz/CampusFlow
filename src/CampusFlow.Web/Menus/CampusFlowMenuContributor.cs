@@ -153,7 +153,7 @@ public class CampusFlowMenuContributor : IMenuContributor
         {
             var advisor = new ApplicationMenuItem(
                 CampusFlowMenus.Advisor,
-                "Advisor",
+                "Scheduler",
                 icon: "fa fa-user-check",
                 order: 2
             );
