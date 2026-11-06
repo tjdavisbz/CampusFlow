@@ -55,8 +55,10 @@
             <div><label for="dorm">Filter by dorm</label><select id="dorm" name="dorm"><option value="">All housing</option>
                 @foreach(var dorm in ChapelDorms.Options){<option value="@dorm.Key" selected="@(dorm.Key==Model.Dorm)">@dorm.Name</option>}
             </select><small>Edit the filtered records below without opening students individually.</small></div>
-            <div class="chapel-scan-filter"><label for="showScanInOnly"><input id="showScanInOnly" name="showScanInOnly" type="checkbox" value="true" checked="@Model.ShowScanInOnly" /> Scan-in-only absences</label></div>
-            <button type="submit">Search attendance</button>
+            <div class="chapel-filter-actions">
+                <div class="chapel-scan-filter"><label for="showScanInOnly"><input id="showScanInOnly" name="showScanInOnly" type="checkbox" value="true" checked="@Model.ShowScanInOnly" /> Scan-in-only absences</label></div>
+                <button type="submit">Search attendance</button>
+            </div>
         </form>
         </section>
         @if (Model.Date.HasValue || !string.IsNullOrWhiteSpace(Model.Student) || !string.IsNullOrWhiteSpace(Model.Group) || !string.IsNullOrWhiteSpace(Model.Dorm))
