@@ -92,6 +92,17 @@ public class RegistrationRulesModel : CampusFlowPageModel
         if (Input.Mappings.Any(x => string.IsNullOrWhiteSpace(x.StudentAttendanceType) ||
                                     string.IsNullOrWhiteSpace(x.CourseAttendanceType)))
             ModelState.AddModelError("Input.Mappings", "Complete both attendance types on every mapping row.");
+        var sectionRules = new List<CourseSectionVisibilityRule>();
+        try
+        {
+            sectionRules = Input.SectionVisibility.Select(x => new CourseSectionVisibilityRule(x.StudentAttendanceType,
+                x.SectionCodes.Split(['\r','\n',' ',',',';','\t'], StringSplitOptions.RemoveEmptyEntries)).Normalize()).ToList();
+            if (sectionRules.Count > 100 || sectionRules.GroupBy(x => x.StudentAttendanceType, StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1) ||
+                sectionRules.Select(x => x.StudentAttendanceType).Except(StudentAttendanceTypes, StringComparer.OrdinalIgnoreCase).Any())
+                throw new ArgumentException();
+        }
+        catch (ArgumentException)
+        { ModelState.AddModelError("Input.SectionVisibility", "Use one rule per listed student attendance type, with at least one exact Elements section code."); }
         var duplicate = Configurations.FirstOrDefault(x => x.ExternalTermId == Input.ExternalTermId && x.Id != Input.Id);
         if (duplicate is not null) ModelState.AddModelError("Input.ExternalTermId", "That term already has a configuration. Edit it instead.");
         if (!ModelState.IsValid) return Page();
@@ -105,6 +116,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
             var existing = await _configurations.GetAsync(Input.Id.Value);
             existing.Update(Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
                 Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
+            existing.ConfigureSectionVisibility(sectionRules);
             existing.ConfigureStudentAccess(studentIds);
             existing.ConfigureGroupWindows(Input.AllowAllStudentsDuringWindow,
                 Input.GroupWindows.Select(x => x.ToWindow()));
@@ -117,6 +129,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
                 CurrentTenant.Id, selected.ExternalTermId, selected.TermCode, selected.DisplayName,
                 Input.RegistrationOpensAt, Input.RegistrationClosesAt, Input.IsEnabled,
                 Input.RequireAdvisorReview, Input.EnforceSectionCapacity, mappingsJson);
+            configuration.ConfigureSectionVisibility(sectionRules);
             configuration.ConfigureStudentAccess(studentIds);
             configuration.ConfigureGroupWindows(Input.AllowAllStudentsDuringWindow,
                 Input.GroupWindows.Select(x => x.ToWindow()));
@@ -154,6 +167,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
                 CollegeLevels = x.CollegeLevels.ToList(), AttendanceTypes = x.AttendanceTypes.ToList(),
                 OpensAt = x.OpensAt, ClosesAt = x.ClosesAt
             }).ToList(),
+            SectionVisibility = source.GetSectionVisibilityRules().Select(x => new SectionVisibilityInput { StudentAttendanceType = x.StudentAttendanceType, SectionCodes = string.Join(", ", x.SectionCodes) }).ToList(),
             Mappings = mappings.Select(x => new MappingInput { StudentAttendanceType = x.StudentAttendanceType,
                 CourseAttendanceType = x.CourseAttendanceType }).ToList() };
     }
@@ -161,6 +175,12 @@ public class RegistrationRulesModel : CampusFlowPageModel
     private static string[] ParseStudentIds(string? value) =>
         (value ?? string.Empty).Split(['\r', '\n', '\t', ' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.Ordinal).ToArray();
+
+    public class SectionVisibilityInput
+    {
+        public string StudentAttendanceType { get; set; } = "";
+        public string SectionCodes { get; set; } = "";
+    }
 
     public class InputModel
     {
@@ -174,6 +194,7 @@ public class RegistrationRulesModel : CampusFlowPageModel
         public bool AllowAllStudentsDuringWindow { get; set; } = true;
         public string StudentIdsText { get; set; } = string.Empty;
         public List<GroupWindowInput> GroupWindows { get; set; } = [];
+        public List<SectionVisibilityInput> SectionVisibility { get; set; } = [];
         public List<MappingInput> Mappings { get; set; } = [];
     }
     public class GroupWindowInput

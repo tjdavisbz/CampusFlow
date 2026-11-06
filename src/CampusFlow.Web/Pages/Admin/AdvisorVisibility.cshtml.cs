@@ -24,16 +24,20 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
     private readonly ITenantThemeProvider _themeProvider;
     private readonly IGuidGenerator _guidGenerator;
 
+    private readonly IReadOnlyCollection<IStudentPrimaryProgramLookup> _programLookups;
+    public IReadOnlyList<StudentProgramChoice> ProgramChoices { get; private set; } = [];
+
     public AdvisorVisibilityModel(IRepository<AdvisorAssignment, Guid> assignments,
         IRepository<RegistrationTermConfiguration, Guid> termConfigurations,
         IStudentInformationSystemAdvisorLookup advisorLookup, ITenantThemeProvider themeProvider,
-        IGuidGenerator guidGenerator)
+        IGuidGenerator guidGenerator, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
     {
         _assignments = assignments;
         _termConfigurations = termConfigurations;
         _advisorLookup = advisorLookup;
         _themeProvider = themeProvider;
         _guidGenerator = guidGenerator;
+        _programLookups = programLookups?.ToArray() ?? [];
     }
 
     [BindProperty] public List<RoutingRow> Rows { get; set; } = [];
@@ -52,6 +56,8 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
+        await LoadProgramChoicesAsync();
+        var programOptions = new Dictionary<string, Dictionary<string, PrimaryProgramScope>>(StringComparer.OrdinalIgnoreCase);
         if (Rows.GroupBy(x => x.AttendanceType, StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
             ModelState.AddModelError(string.Empty, "Each attendance type can appear only once.");
 
@@ -59,6 +65,24 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
         var graduationOptions = new Dictionary<string, Dictionary<string, bool>>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in Rows)
         {
+            try
+            {
+                var scopes = JsonSerializer.Deserialize<Dictionary<string, PrimaryProgramScope>>(row.ProgramScopesJson) ?? throw new JsonException();
+                programOptions[row.AttendanceType] = new(scopes, StringComparer.OrdinalIgnoreCase);
+                foreach (var scope in scopes.Values)
+                {
+                    var normalized = scope.Normalize();
+                    if (normalized.MajorIds.Except(ProgramChoices.Select(x => x.Id)).Any() ||
+                        normalized.DegreeIds.Except(ProgramChoices.Where(x => x.DegreeId.HasValue).Select(x => x.DegreeId!.Value)).Any() ||
+                        normalized.ProgramIds.Except(ProgramChoices.Where(x => x.BlockProgramId.HasValue).Select(x => x.BlockProgramId!.Value)).Any())
+                        throw new ArgumentException();
+                }
+            }
+            catch (Exception exception) when (exception is JsonException or ArgumentException)
+            {
+                ModelState.AddModelError(string.Empty, "Choose valid primary program, major and degree restrictions. No assignments were saved.");
+                programOptions[row.AttendanceType] = [];
+            }
             var emails = ReadEmails(row.AdvisorEmailsJson).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             graduationOptions[row.AttendanceType] = ReadGraduationOptions(row.GraduationOptionsJson);
             var resolved = new List<AdvisorLookupResult>();
@@ -78,7 +102,8 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
             {
                 row.Advisors = selections.GetValueOrDefault(row.AttendanceType, [])
                     .Select(x => new SelectedAdvisor(x.Email, x.DisplayName,
-                        graduationOptions.GetValueOrDefault(row.AttendanceType, []).GetValueOrDefault(x.Email, true)))
+                        graduationOptions.GetValueOrDefault(row.AttendanceType, []).GetValueOrDefault(x.Email, true),
+                        programOptions.GetValueOrDefault(row.AttendanceType, []).GetValueOrDefault(x.Email, PrimaryProgramScope.All)))
                     .ToArray();
                 row.AdvisorEmailsJson = JsonSerializer.Serialize(row.Advisors.Select(x => x.Email));
                 row.GraduationOptionsJson = JsonSerializer.Serialize(row.Advisors.ToDictionary(
@@ -105,15 +130,19 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
             foreach (var assignment in current.Where(x => desiredEmails.Contains(x.AdvisorEmail)))
             {
                 var include = graduationOptions[row.AttendanceType].GetValueOrDefault(assignment.AdvisorEmail, true);
-                if (assignment.IncludeGraduatingStudents == include) continue;
+
                 assignment.SetIncludeGraduatingStudents(include);
+                assignment.ConfigurePrimaryProgramScope(programOptions[row.AttendanceType].GetValueOrDefault(assignment.AdvisorEmail, PrimaryProgramScope.All));
                 await _assignments.UpdateAsync(assignment, autoSave: true);
             }
             foreach (var advisor in desired.Where(x => !currentEmails.Contains(x.Email)))
-                await _assignments.InsertAsync(new AdvisorAssignment(_guidGenerator.Create(), CurrentTenant.Id,
+            {
+                var assignment = new AdvisorAssignment(_guidGenerator.Create(), CurrentTenant.Id,
                     row.AttendanceType, advisor.ExternalAdvisorId, advisor.Email, advisor.DisplayName, now,
-                    includeGraduatingStudents: graduationOptions[row.AttendanceType].GetValueOrDefault(advisor.Email, true)),
-                    autoSave: true);
+                    includeGraduatingStudents: graduationOptions[row.AttendanceType].GetValueOrDefault(advisor.Email, true));
+                assignment.ConfigurePrimaryProgramScope(programOptions[row.AttendanceType].GetValueOrDefault(advisor.Email, PrimaryProgramScope.All));
+                await _assignments.InsertAsync(assignment, autoSave: true);
+            }
         }
         Alerts.Success("Advisor assignments were saved.");
         return RedirectToPage();
@@ -122,6 +151,7 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
     private async Task LoadAsync()
     {
         Theme = _themeProvider.Get(CurrentTenant.Name);
+        await LoadProgramChoicesAsync();
         var active = await _assignments.GetListAsync(x => x.IsActive);
         var types = (await _termConfigurations.GetListAsync())
             .SelectMany(x => ReadStudentAttendanceTypes(x.AttendanceTypeMappingsJson))
@@ -135,12 +165,29 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
             var advisors = active.Where(x => string.Equals(x.AttendanceType, type,
                 StringComparison.OrdinalIgnoreCase)).OrderBy(x => x.AdvisorDisplayName)
                 .Select(x => new SelectedAdvisor(x.AdvisorEmail, x.AdvisorDisplayName,
-                    x.IncludeGraduatingStudents)).ToArray();
+                    x.IncludeGraduatingStudents, x.GetPrimaryProgramScope())).ToArray();
             return new RoutingRow { AttendanceType = type, AdvisorEmailsJson =
                 JsonSerializer.Serialize(advisors.Select(x => x.Email)), GraduationOptionsJson =
                 JsonSerializer.Serialize(advisors.ToDictionary(x => x.Email, x => x.IncludeGraduatingStudents)),
+                ProgramScopesJson = JsonSerializer.Serialize(advisors.ToDictionary(x => x.Email, x => x.Scope)),
                 Advisors = advisors };
         }).ToList();
+    }
+
+    private async Task LoadProgramChoicesAsync()
+    {
+        var lookup = _programLookups.SingleOrDefault(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
+        if (lookup is null || !string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return;
+        var choices = (await lookup.GetChoicesAsync(HttpContext.RequestAborted)).ToList();
+        var saved = (await _assignments.GetListAsync(x => x.IsActive)).Select(x => x.GetPrimaryProgramScope()).ToArray();
+        // Keep retired catalog choices selected. Dropping an unavailable choice could silently remove a restriction.
+        foreach (var id in saved.SelectMany(x => x.MajorIds).Distinct().Except(choices.Select(x => x.Id)).ToArray())
+            choices.Add(new(id, $"Unavailable major ({id})"));
+        foreach (var id in saved.SelectMany(x => x.DegreeIds).Distinct().Except(choices.Where(x => x.DegreeId.HasValue).Select(x => x.DegreeId!.Value)).ToArray())
+            choices.Add(new(0, "", id, $"Unavailable degree ({id})"));
+        foreach (var id in saved.SelectMany(x => x.ProgramIds).Distinct().Except(choices.Where(x => x.BlockProgramId.HasValue).Select(x => x.BlockProgramId!.Value)).ToArray())
+            choices.Add(new(0, "", BlockProgramId: id, BlockProgramName: $"Unavailable program ({id})"));
+        ProgramChoices = choices;
     }
 
     private static IEnumerable<string> ReadStudentAttendanceTypes(string json)
@@ -167,9 +214,10 @@ public class AdvisorVisibilityModel : CampusFlowPageModel
     {
         [Required] public string AttendanceType { get; set; } = string.Empty;
         public string AdvisorEmailsJson { get; set; } = "[]";
+        public string ProgramScopesJson { get; set; } = "{}";
         public string GraduationOptionsJson { get; set; } = "{}";
         public IReadOnlyList<SelectedAdvisor> Advisors { get; set; } = [];
     }
 
-    public sealed record SelectedAdvisor(string Email, string Name, bool IncludeGraduatingStudents);
+    public sealed record SelectedAdvisor(string Email, string Name, bool IncludeGraduatingStudents, PrimaryProgramScope Scope);
 }

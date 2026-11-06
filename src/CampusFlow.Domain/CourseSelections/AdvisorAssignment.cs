@@ -1,4 +1,7 @@
 using System;
+using System.Text.Json;
+using Volo.Abp.Data;
+using CampusFlow.StudentInformationSystems;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
 
@@ -35,7 +38,22 @@ public class AdvisorAssignment : FullAuditedAggregateRoot<Guid>, IMultiTenant
 
     public void SetIncludeGraduatingStudents(bool include) => IncludeGraduatingStudents = include;
 
-    public bool IncludesStudent(string attendanceType, bool intendsToGraduate) =>
+    public const string PrimaryProgramScopeProperty = "PrimaryProgramScope";
+
+    public PrimaryProgramScope GetPrimaryProgramScope()
+    {
+        if (!ExtraProperties.ContainsKey(PrimaryProgramScopeProperty)) return PrimaryProgramScope.All;
+        var json = this.GetProperty<string>(PrimaryProgramScopeProperty);
+        try { return (JsonSerializer.Deserialize<PrimaryProgramScope>(json ?? "null") ?? throw new JsonException()).Normalize(); }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        { throw new InvalidOperationException("The scheduler primary-program scope needs administrative review.", exception); }
+    }
+
+    public void ConfigurePrimaryProgramScope(PrimaryProgramScope scope) =>
+        this.SetProperty(PrimaryProgramScopeProperty, JsonSerializer.Serialize(scope.Normalize()));
+
+    public bool IncludesStudent(string attendanceType, bool intendsToGraduate, StudentPrimaryProgram? primaryProgram = null) =>
+        GetPrimaryProgramScope().Includes(primaryProgram) &&
         (!intendsToGraduate || IncludeGraduatingStudents) &&
         (string.Equals(AttendanceType, GlobalAttendanceType, StringComparison.OrdinalIgnoreCase) ||
          string.Equals(AttendanceType, attendanceType, StringComparison.OrdinalIgnoreCase));
