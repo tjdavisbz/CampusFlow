@@ -28,6 +28,7 @@ public class AttendanceModel(
     [BindProperty(SupportsGet = true)] public DateTime? Date { get; set; }
     [BindProperty(SupportsGet = true)] public string? Student { get; set; }
     [BindProperty(SupportsGet = true)] public string? Group { get; set; }
+    [BindProperty(SupportsGet = true)] public string? Dorm { get; set; }
     [BindProperty(SupportsGet = true)] public bool ShowScanInOnly { get; set; }
     public IReadOnlyList<StudentInformationSystemTerm> Terms { get; private set; } = [];
     public IReadOnlyList<string> Groups { get; private set; } = [];
@@ -56,12 +57,12 @@ public class AttendanceModel(
                 if (current is not null) TermId = int.Parse(current.ExternalTermId);
             }
             if (TermId.HasValue) Groups = await attendance.GetGroupNamesAsync(TermId.Value);
-            if (TermId.HasValue && (Date.HasValue || !string.IsNullOrWhiteSpace(Student) || !string.IsNullOrWhiteSpace(Group)))
+            if (TermId.HasValue && (Date.HasValue || !string.IsNullOrWhiteSpace(Student) || !string.IsNullOrWhiteSpace(Group) || !string.IsNullOrWhiteSpace(Dorm)))
             {
-                var found = await attendance.SearchAsync(TermId.Value, Date, Student, Group);
+                var found = await attendance.SearchAsync(TermId.Value, Date, Student, Group, Dorm);
                 IsTruncated = found.Count > ResultLimit;
                 var visible = found.Take(ResultLimit).ToList();
-                if (Date.HasValue && string.IsNullOrWhiteSpace(Student) && string.IsNullOrWhiteSpace(Group) && !IsTruncated)
+                if (Date.HasValue && string.IsNullOrWhiteSpace(Student) && string.IsNullOrWhiteSpace(Group) && string.IsNullOrWhiteSpace(Dorm) && !IsTruncated)
                     SessionSummaries = visible.GroupBy(x => x.ChapelAtLocal).OrderBy(x => x.Key)
                         .Select(x => new ChapelSessionSummary(x.Key, x.Count(),
                             x.Count(r => r.Status == ChapelAttendanceStatus.Present),
@@ -83,12 +84,46 @@ public class AttendanceModel(
 
     public async Task<IActionResult> OnPostUpdateAsync(Guid id, string revision,
         ChapelAttendanceStatus status, string? comment, int termId, DateTime? date, string? student,
-        string? group, bool showScanInOnly)
+        string? group, bool showScanInOnly, string? dorm)
     {
         if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
         await attendance.UpdateAsync(new ChapelAttendanceUpdate(id, revision, status, comment));
         TempData["ChapelMessage"] = "Attendance saved.";
-        return RedirectToPage(new { termId, date = date?.ToString("yyyy-MM-dd"), student, group, showScanInOnly });
+        return RedirectToPage(new { termId, date = date?.ToString("yyyy-MM-dd"), student, group, showScanInOnly, dorm });
+    }
+
+    public async Task<IActionResult> OnPostAutoSaveAsync(Guid id, string revision, ChapelAttendanceStatus? status, string? comment)
+    {
+        if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        if (!ModelState.IsValid || id == Guid.Empty || string.IsNullOrWhiteSpace(revision) || !status.HasValue || !Enum.IsDefined(status.Value) || comment?.Length > 4000)
+            return new JsonResult(new { message = "Choose a valid status and a comment of at most 4,000 characters." }) { StatusCode = 400 };
+        try { return new JsonResult(await attendance.UpdateAsync(new(id, revision, status!.Value, comment))); }
+        catch (Volo.Abp.UserFriendlyException e) { return new JsonResult(new { message = e.Message }) { StatusCode = 409 }; }
+        catch (Volo.Abp.Data.AbpDbConcurrencyException) { return new JsonResult(new { message = "This record changed elsewhere. Reload it before saving." }) { StatusCode = 409 }; }
+    }
+    public async Task<IActionResult> OnGetAttendanceRowAsync(Guid id)
+    {
+        if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        try { return new JsonResult(await attendance.GetRowAsync(id)); }
+        catch (Volo.Abp.UserFriendlyException) { return NotFound(); }
+    }
+    public async Task<IActionResult> OnGetDaySummaryAsync(int termId, DateTime date)
+    {
+        if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) return NotFound();
+        if (termId <= 0 || date == default) return BadRequest();
+        var rows = await attendance.SearchAsync(termId, date, null, null);
+        if (rows.Count > ChapelAttendanceAppService.DaySearchLimit) return BadRequest();
+        return new JsonResult(rows.GroupBy(x => x.ChapelAtLocal).OrderBy(x => x.Key)
+            .Select(x => new
+            {
+                session = x.Key.ToString("yyyy-MM-ddTHH:mm:ss"),
+                total = x.Count(),
+                present = x.Count(r => r.Status == ChapelAttendanceStatus.Present),
+                absent = x.Count(r => r.Status == ChapelAttendanceStatus.Absent),
+                excused = x.Count(r => r.Status == ChapelAttendanceStatus.Excused),
+                scanInOnly = x.Count(r => r.IsScanInOnly),
+                confirmation = $"Credit all {x.Count(r => r.IsScanInOnly)} scan-in-only absences for the {x.Key:h:mm tt} chapel as Present? Use this only if scan-out was waived for this session. This cannot be undone as a group."
+            }));
     }
 
     public async Task<IActionResult> OnPostCreditScanInOnlyAsync(int termId, string sessionAtLocal,

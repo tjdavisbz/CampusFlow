@@ -28,13 +28,14 @@ public class ChapelAttendanceAppService : CampusFlowAppService
     private readonly IRepository<ChapelAttendanceRecord, Guid> _records;
     private readonly IRepository<ChapelGroupMembership, Guid> _groups;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
+    private readonly IChapelDormLookup _dorms;
 
     public ChapelAttendanceAppService(IRepository<ChapelAttendanceRecord, Guid> records,
-        IRepository<ChapelGroupMembership, Guid> groups, IUnitOfWorkManager unitOfWorkManager)
+        IRepository<ChapelGroupMembership, Guid> groups, IUnitOfWorkManager unitOfWorkManager, IChapelDormLookup dorms)
     {
         _records = records;
         _groups = groups;
-        _unitOfWorkManager = unitOfWorkManager;
+        _unitOfWorkManager = unitOfWorkManager; _dorms = dorms;
     }
 
     private Guid Tenant() => CurrentTenant.Id ?? throw new UserFriendlyException("Select a university first.");
@@ -49,11 +50,11 @@ public class ChapelAttendanceAppService : CampusFlowAppService
     }
 
     public async Task<List<ChapelAttendanceRow>> SearchAsync(int termCalendarId, DateTime? date,
-        string? student, string? groupName)
+        string? student, string? groupName, string? dorm = null)
     {
         var tenant = Tenant();
         if (termCalendarId <= 0) throw new UserFriendlyException("Choose a term.");
-        if (date is null && string.IsNullOrWhiteSpace(student) && string.IsNullOrWhiteSpace(groupName))
+        if (date is null && string.IsNullOrWhiteSpace(student) && string.IsNullOrWhiteSpace(groupName) && string.IsNullOrWhiteSpace(dorm))
             throw new UserFriendlyException("Enter a chapel date, student, or group to limit the results.");
 
         var query = (await _records.GetQueryableAsync())
@@ -80,9 +81,47 @@ public class ChapelAttendanceAppService : CampusFlowAppService
                 .Select(x => x.StudentUid);
             query = query.Where(x => members.Contains(x.StudentUid));
         }
+        if (!string.IsNullOrWhiteSpace(dorm))
+        {
+            EnsureNelson(); if (!ChapelDorms.IsValid(dorm)) throw new UserFriendlyException("Choose an available dorm.");
+            var residences = await _dorms.GetResidencesAsync(termCalendarId);
+            var ids = residences.Where(x => x.DormKey == dorm).Select(x => x.StudentId).ToArray();
+            var known = residences.Select(x => x.StudentId).ToArray();
+            query = dorm == "unknown" ? query.Where(x => ids.Contains(x.StudentId) || !known.Contains(x.StudentId)) : query.Where(x => ids.Contains(x.StudentId));
+        }
         var rows = await AsyncExecuter.ToListAsync(query.OrderBy(x => x.ChapelAtLocal)
             .ThenBy(x => x.StudentName).Take(date.HasValue ? DaySearchLimit + 1 : GeneralSearchLimit + 1));
         return rows.Select(Map).ToList();
+    }
+
+    public sealed record DormRosterRow(string StudentId, string StudentName, string DormKey, bool HasChapelRecords);
+    public sealed record DormRosterPage(IReadOnlyList<DormRosterRow> Students, int Total, int Page, int PageSize);
+    public async Task<DormRosterPage> GetDormRosterAsync(int termCalendarId, string dorm, int page = 1, string? student = null)
+    {
+        Tenant(); EnsureNelson(); if (termCalendarId <= 0 || !ChapelDorms.IsValid(dorm) || page < 1 || page > 1000) throw new UserFriendlyException("Choose a term, dorm and valid page.");
+        var residences = (await _dorms.GetResidencesAsync(termCalendarId)).ToList();
+        var chapelQuery = (await _records.GetQueryableAsync()).Where(x => x.TenantId == CurrentTenant.Id && x.TermCalendarId == termCalendarId);
+        if (dorm == "unknown")
+        {
+            var chapel = await AsyncExecuter.ToListAsync(chapelQuery.Select(x => new { x.StudentId, x.StudentName }).Distinct());
+            var known = residences.Select(x => x.StudentId).ToHashSet(StringComparer.Ordinal);
+            foreach (var row in chapel.GroupBy(x => x.StudentId).Where(x => !known.Contains(x.Key))) residences.Add(new(row.Key, row.First().StudentName, "unknown"));
+        }
+        IEnumerable<ChapelResidence> rows = residences.Where(x => x.DormKey == dorm);
+        if (!string.IsNullOrWhiteSpace(student)) foreach (var token in SplitStudentSearch(student)) rows = rows.Where(x => x.StudentId.Contains(token, StringComparison.OrdinalIgnoreCase) || x.StudentName.Contains(token, StringComparison.OrdinalIgnoreCase));
+        var sorted = rows.OrderBy(x => x.StudentName, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.StudentId, StringComparer.Ordinal).ToArray();
+        var visible = sorted.Skip((page - 1) * 100).Take(100).ToArray(); var visibleIds = visible.Select(x => x.StudentId).ToArray();
+        var attended = (await AsyncExecuter.ToListAsync(chapelQuery.Where(x => visibleIds.Contains(x.StudentId)).Select(x => x.StudentId).Distinct())).ToHashSet(StringComparer.Ordinal);
+        return new(visible.Select(x => new DormRosterRow(x.StudentId, x.StudentName, x.DormKey, attended.Contains(x.StudentId))).ToArray(), sorted.Length, page, 100);
+    }
+    public async Task<ChapelAttendanceRow> GetRowAsync(Guid id)
+    {
+        var tenant = Tenant(); var record = await _records.FindAsync(id) ?? throw new UserFriendlyException("Attendance record not found.");
+        if (record.TenantId != tenant) throw new UserFriendlyException("Attendance record not found."); return Map(record);
+    }
+    private void EnsureNelson()
+    {
+        if (!string.Equals(CurrentTenant.Name, "nelson", StringComparison.OrdinalIgnoreCase)) throw new UserFriendlyException("This housing lookup is available only for Nelson.");
     }
 
     public static string[] SplitStudentSearch(string text)
@@ -124,15 +163,22 @@ public class ChapelAttendanceAppService : CampusFlowAppService
         return eligible.Count;
     }
 
+    [UnitOfWork(IsDisabled = true)]
     public async Task<ChapelAttendanceRow> UpdateAsync(ChapelAttendanceUpdate input)
     {
         var tenant = Tenant();
-        var record = await _records.GetAsync(input.Id);
+        using var write = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+        var record = await _records.FindAsync(input.Id) ?? throw new UserFriendlyException("Attendance record not found.");
         if (record.TenantId != tenant) throw new UserFriendlyException("Attendance record not found.");
         if (record.ConcurrencyStamp != input.Revision)
             throw new UserFriendlyException("This attendance record changed. Reload it before saving.");
-        record.SetByStaff(input.Status, input.Comment);
+        if (!Enum.IsDefined(input.Status) || input.Comment?.Length > 4000) throw new UserFriendlyException("Choose a valid status and a comment of at most 4,000 characters.");
+        var normalized = string.IsNullOrWhiteSpace(input.Comment) ? null : input.Comment.Trim();
+        var existing = string.IsNullOrWhiteSpace(record.Comment) ? null : record.Comment.Trim();
+        if (record.Status == input.Status && existing == normalized) return Map(record);
+        record.SetByStaff(input.Status, normalized);
         await _records.UpdateAsync(record, autoSave: true);
+        await write.CompleteAsync();
         return Map(record);
     }
 

@@ -253,6 +253,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                     .AddItem(new ApplicationMenuItem("CampusFlow.HousingRates", "Fee Setup", "~/Admin/Housing/Fees", icon: "fa fa-dollar-sign")));
             if (canManageChapel)
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin, "Chapel", icon: "fa fa-church", order: 6)
+                    .AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin + ".Dorms", "Dorm roster", "~/Admin/Chapel/Dorms", icon: "fa fa-building"))
                     .AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin + ".Attendance", "Attendance", "~/Admin/Chapel/Attendance", icon: "fa fa-clipboard-check"))
                     .AddItem(new ApplicationMenuItem(CampusFlowMenus.ChapelAdmin + ".ExcuseRequests", "Excuse Requests", "~/Admin/Chapel/ExcuseRequests", icon: "fa fa-file-circle-question")));
             if (canManageAdvisorRouting)
