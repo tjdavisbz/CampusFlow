@@ -15,7 +15,7 @@ public static class DegreeAuditDisplay
         IEnumerable<StudentDegreeAuditCourse> groupCourses,
         IReadOnlyCollection<StudentDegreeAuditCourse> auditCourses)
     {
-        var courses = groupCourses.ToArray();
+        var courses = groupCourses.Distinct().ToArray();
         if (courses.Length == 0 || !IsElective(courses[0]))
         {
             return courses;

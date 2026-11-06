@@ -18,7 +18,7 @@
 <main class="advisor-shell">
     <a class="back-link" asp-page="/Advisor/Index"><i class="fa-solid fa-arrow-left"></i> Back to review queue</a>
     <header class="review-hero">
-        <div><span>Course review</span><h1>@Model.Review.StudentName <span class="graduation-intent @(Model.Review.IntendsToGraduate == true ? "is-yes" : Model.Review.IntendsToGraduate == false ? "is-no" : "is-unanswered")">Graduating: @(Model.Review.IntendsToGraduate == true ? "Yes" : Model.Review.IntendsToGraduate == false ? "No" : "Not answered")</span></h1><p>ID @Model.Review.StudentId · @Model.Review.AttendanceType</p></div>
+        <div><span>Course review</span><h1>@Model.Review.StudentName <span class="graduation-intent @(Model.Review.IntendsToGraduate == true ? "is-yes" : Model.Review.IntendsToGraduate == false ? "is-no" : "is-unanswered")">Graduating: @(Model.Review.IntendsToGraduate == true ? "Yes" : Model.Review.IntendsToGraduate == false ? "No" : "Not answered")</span></h1><p>ID @Model.Review.StudentId · @Model.Review.AttendanceType · @Model.Review.PrimaryProgram</p></div>
         <div class="queue-count"><strong>@Model.Review.Courses.Count</strong><span>pending courses</span></div>
     </header>
 
@@ -76,7 +76,8 @@
                         </div>
                         <div class="course-meta">
                             @if (!string.IsNullOrWhiteSpace(course.InstructorName)) { <span><i class="fa-regular fa-user"></i> @course.InstructorName</span> }
-                            @if (!string.IsNullOrWhiteSpace(course.MeetingDays)) { <span><i class="fa-regular fa-clock"></i> @course.MeetingDays</span> }
+                            @foreach (var meeting in CampusFlow.StudentInformationSystems.CourseMeeting.Resolve(course.Meetings, course.MeetingDays, course.StartTime, course.EndTime))
+                            { <span><i class="fa-regular fa-clock"></i> @meeting.DisplayText</span> }
                         </div>
                         @if (!string.IsNullOrWhiteSpace(course.LastRemovalError))
                         {
@@ -94,7 +95,7 @@
             </div>
         </section>
         <section class="advisor-card overall-card">
-            <div><span>Advisor notes</span><h2>Message to the student</h2><p>This message appears at the bottom of the email and is saved to Student Notes as Scheduler Comments for this term.</p></div>
+            <div><span>Scheduler notes</span><h2>Message to the student</h2><p>This message appears at the bottom of the email and is saved to Student Notes as Scheduler Comments for this term.</p></div>
             <textarea asp-for="Input.OverallComment" rows="4" maxlength="4000" placeholder="Add an overall note about the student's schedule"></textarea>
         </section>
         @if (!Model.MailConnected)

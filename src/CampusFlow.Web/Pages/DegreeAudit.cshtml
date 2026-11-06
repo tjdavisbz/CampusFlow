@@ -20,7 +20,11 @@
 <main class="audit-page">
     <header class="audit-hero">
         <div><span>Academic progress</span><h1>Degree Audit</h1><p>See how your completed and in-progress courses apply toward your degree.</p></div>
-        <div class="audit-student"><strong>@Model.StudentDisplayName</strong><span>ID @Model.StudentIdentifier</span></div>
+        <div class="audit-hero-actions">
+            <div class="audit-student"><strong>@Model.StudentDisplayName</strong><span>ID @Model.StudentIdentifier</span></div>
+            @if (Model.SelectedAudit is not null && !Model.IsUnavailable)
+            { <button type="button" class="audit-print-button" data-print-degree-audit><i class="fa-solid fa-print" aria-hidden="true"></i> Print degree audit</button> }
+        </div>
     </header>
 
     @if (Model.IsUnavailable)
@@ -107,6 +111,7 @@
 }
 
 @section scripts {
+    <script src="~/Pages/DegreeAudit.js" asp-append-version="true"></script>
     @if (Model.SelectedAudit is not null && !Model.RefreshComplete && !Model.IsReadOnlyStudentView)
     {
         <script>

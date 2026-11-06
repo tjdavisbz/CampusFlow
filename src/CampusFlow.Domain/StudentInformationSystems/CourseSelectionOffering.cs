@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace CampusFlow.StudentInformationSystems;
 
@@ -23,5 +24,6 @@ public sealed record CourseSelectionOffering(
     TimeSpan? StartTime,
     TimeSpan? EndTime)
 {
+    public IReadOnlyList<CourseMeeting> Meetings { get; init; } = [];
     public int SeatsRemaining => Math.Max(0, MaximumEnrollment - CurrentEnrollment - TemporaryEnrollment);
 }

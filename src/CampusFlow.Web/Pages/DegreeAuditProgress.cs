@@ -21,13 +21,9 @@ public sealed record DegreeAuditProgress(
 
         var inProgressCredits = selectedCourseCredits ?? audit.Courses
                 .Where(course => IsInProgress(course.CourseStatus) && course.Credits > 0)
-                .GroupBy(course => new
-                {
-                    Course = string.IsNullOrWhiteSpace(course.CourseCode)
-                        ? course.MatchedCourseCode.Trim().ToUpperInvariant()
-                        : course.CourseCode.Trim().ToUpperInvariant(),
-                    Term = course.Term.Trim().ToUpperInvariant()
-                })
+                .GroupBy(course => course.MatchedAcademicId > 0
+                    ? $"academic:{course.MatchedAcademicId}"
+                    : $"course:{(string.IsNullOrWhiteSpace(course.CourseCode) ? course.MatchedCourseCode : course.CourseCode).Trim().ToUpperInvariant()}:{course.Term.Trim().ToUpperInvariant()}")
                 .Sum(course => course.Max(item => item.Credits));
         inProgressCredits = Math.Max(0m, inProgressCredits);
         var completed = Math.Min(audit.Summary.CreditsRequired, audit.Summary.CreditsCompleted);

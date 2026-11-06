@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace CampusFlow.StudentInformationSystems;
 
@@ -25,4 +26,9 @@ public sealed record StudentCourseScheduleItem(
     string? Room,
     decimal? MidtermGrade,
     decimal? FinalNumericGrade,
-    string? FinalLetterGrade);
+    string? FinalLetterGrade)
+{
+    public bool IsApprovedByScheduler { get; init; }
+    public string DisplayRegistrationStatus => IsApprovedByScheduler && string.Equals(RegistrationStatus, "Unofficial", System.StringComparison.OrdinalIgnoreCase) ? "Approved" : RegistrationStatus;
+    public IReadOnlyList<CourseMeeting> Meetings { get; init; } = [];
+}

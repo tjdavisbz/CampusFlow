@@ -108,6 +108,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 MeetingDays = x.MeetingDays,
                 StartTime = x.StartTime,
                 EndTime = x.EndTime,
+                Meetings = CourseMeeting.Resolve(x.Meetings, x.MeetingDays, x.StartTime, x.EndTime),
                 FulfillsDegreeRequirement = TryGetDegreeRequirement(x, degreeRequirements, out _),
                 DegreeRequirementName = TryGetDegreeRequirement(x, degreeRequirements, out var requirementName)
                     ? requirementName
@@ -128,6 +129,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 CourseName = x.CourseName,
                 Credits = x.Credits,
                 Status = x.RegistrationStatus,
+                IsApprovedByScheduler = reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId && r.Status == CourseReviewStatus.Approved),
                 CanRemove = !locked && string.Equals(x.RegistrationStatus, "Unofficial", StringComparison.OrdinalIgnoreCase) &&
                     reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId &&
                                      r.CanStudentRemove),
@@ -256,6 +258,13 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         if (grade is "I" or "IP" or "INP")
             return "pending";
         return "successful";
+    }
+
+    public async Task<bool> HasStudentStatusHoldAsync()
+    {
+        var profile = await GetCurrentProfileAsync();
+        var contexts = await _lookup.GetEligibleContextsAsync(profile.ExternalStudentId);
+        return contexts.Count > 0 && contexts.All(x => !x.IsMatriculated);
     }
 
     public async Task<List<CourseSelectionTermDto>> GetEligibleTermsAsync()
@@ -470,8 +479,10 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     {
         var now = Clock.Now;
         context ??= await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId);
-        if (context is null || !context.IsMatriculated)
-            throw new UserFriendlyException("Course selection is available only to matriculated students. Please contact Admissions if your status needs to be updated.");
+        if (context is null)
+            throw new UserFriendlyException("You are not eligible to select courses for that term.");
+        if (!context.IsMatriculated)
+            throw new UserFriendlyException(RegistrationMessages.StudentStatusHold, code: RegistrationMessages.StudentStatusHoldCode);
         var termConfiguration = await _termConfigurations.FindAsync(x => x.ExternalTermId == externalTermId);
         if (termConfiguration is not null)
         {

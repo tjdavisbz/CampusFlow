@@ -17,6 +17,31 @@ namespace CampusFlow.Application.Tests.BillApprovals;
 public class ApprovedCourseSelectionTests
 {
     [Theory]
+    [InlineData("Matriculated", false)]
+    [InlineData("Accepted", true)]
+    [InlineData("Pre-Accept", true)]
+    [InlineData("Conditionally matriculated", true)]
+    [InlineData("no-context", false)]
+    public async Task Status_hold_message_is_distinguished_from_a_closed_window_or_missing_record(string status, bool expected)
+    {
+        var current = Substitute.For<ICurrentStudentView>();
+        current.GetProfileAsync(Arg.Any<CancellationToken>()).Returns(new StudentProfile(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            new(StudentInformationSystemProvider.ThesisElements,"10","100","student@example.test","Test",null,"Student")));
+        var lookup = Substitute.For<IStudentInformationSystemCourseSelectionLookup>();
+        lookup.GetEligibleContextsAsync("10", Arg.Any<CancellationToken>()).Returns(status == "no-context" ? Array.Empty<CourseSelectionContext>() :
+            new CourseSelectionContext[]{new(StudentInformationSystemProvider.ThesisElements,"10","269","Spring 2027","Residential",18,ApplicantStatus:status)});
+        var registration = Substitute.For<IStudentInformationSystemCourseRegistrationService>();
+        var service = new CourseSelectionAppService(Substitute.For<IRepository<StudentProfile,Guid>>(),current,
+            Substitute.For<IRepository<RegistrationTermConfiguration,Guid>>(),Substitute.For<IRepository<AdvisorAssignment,Guid>>(),
+            Substitute.For<IRepository<CourseReview,Guid>>(),Substitute.For<IRepository<CourseSelectionOperation,Guid>>(),
+            Substitute.For<IRepository<StudentGraduationIntent,Guid>>(),Substitute.For<IRepository<CourseSectionAttendanceTypeMapping,Guid>>(),
+            lookup,registration,Array.Empty<IStudentInformationSystemDegreeAuditLookup>(),Substitute.For<IUnitOfWorkManager>(),
+            NullLogger<CourseSelectionAppService>.Instance,Substitute.For<IBillApprovalCompletionLookup>());
+        Assert.Equal(expected, await service.HasStudentStatusHoldAsync());
+        Assert.Empty(registration.ReceivedCalls());
+    }
+
+    [Theory]
     [InlineData("add")]
     [InlineData("remove")]
     [InlineData("graduation")]
