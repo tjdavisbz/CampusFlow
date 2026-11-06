@@ -1,0 +1,2392 @@
+[
+  {
+    "Priority": 1,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "NULL",
+    "Degree": null,
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 2,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "NULL",
+    "Degree": null,
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 3,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Biblical Studies - MTS ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 4,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Biblical/Theological Studies - Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 5,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Children and Family ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 6,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Christian Ministry ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 7,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Clinical Mental Health Counseling ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 8,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Clinical Psychology ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 9,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Counseling Psychology - Graduate ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 10,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Curriculum and Instruction ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 11,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Education - Graduate ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 12,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Educational Leadership ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 13,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "English - Graduate",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 14,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "General Psychology - Graduate",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 15,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "History - Graduate ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 16,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Intercultural Studies - Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 17,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Interdisciplinary Studies - Graduate ",
+    "CostType": "GRAD3",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 18,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Master of Business Administration ",
+    "CostType": "GRAD2",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 19,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Master of Divinity ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 20,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Non-Degree Seeking ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 21,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Organizational Leadership - Graduate ",
+    "CostType": "GRAD3",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 22,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Practical Theology -Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 23,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "School Counseling ",
+    "CostType": "GRAD4",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 24,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Theological Studies - Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 25,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Theological Studies - MTS ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 26,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Transformational Leadership - Graduate",
+    "CostType": "GRAD3",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 27,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Biblical Studies - MTS ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 28,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Biblical/Theological Studies - Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 29,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Children and Family ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 30,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Christian Ministry ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 31,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Clinical Mental Health Counseling ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 32,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Clinical Psychology ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 33,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Counseling Psychology - Graduate ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 34,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Curriculum and Instruction ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 35,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Education - Graduate ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 36,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Educational Leadership ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 37,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "English - Graduate",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 38,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "General Psychology - Graduate",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 39,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "History - Graduate ",
+    "CostType": "GRAD6",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 40,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Intercultural Studies - Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 41,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Interdisciplinary Studies - Graduate ",
+    "CostType": "GRAD3",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 42,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Master of Business Administration ",
+    "CostType": "GRAD2",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 43,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Master of Divinity ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 44,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Non-Degree Seeking ",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 45,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Organizational Leadership - Graduate ",
+    "CostType": "GRAD3",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 46,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Practical Theology -Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 47,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "School Counseling ",
+    "CostType": "GRAD4",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 48,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Theological Studies - Graduate ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 49,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Theological Studies - MTS ",
+    "CostType": "GRAD5",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 50,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Transformational Leadership - Graduate",
+    "CostType": "GRAD3",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 51,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Advanced Certification Track-School Counselor",
+    "CostType": "AC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 52,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Advanced Certification Track-School Counselor",
+    "CostType": "AC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 53,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Advanced Certification Track-Principal",
+    "CostType": "AC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 54,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Advanced Certification Track-Principal",
+    "CostType": "AC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 55,
+    "Campus": "Main",
+    "Attendance": "Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Human Services Counseling - Graduate",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 56,
+    "Campus": "Main",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "EXACT",
+    "Degree": "Human Services Counseling - Graduate",
+    "CostType": "GRAD1",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 57,
+    "Campus": null,
+    "Attendance": "Doctoral",
+    "DegreeMatch": "EXACT",
+    "Degree": "Doctor of Ministry",
+    "CostType": "DOC MIN",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 58,
+    "Campus": null,
+    "Attendance": "Doctoral",
+    "DegreeMatch": "EXACT",
+    "Degree": "Business Administration - DBA",
+    "CostType": "DOC BA",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 59,
+    "Campus": null,
+    "Attendance": "Doctoral",
+    "DegreeMatch": "EXACT",
+    "Degree": "Leadership",
+    "CostType": "DOC MIN",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 60,
+    "Campus": null,
+    "Attendance": "Doctoral",
+    "DegreeMatch": "EXACT",
+    "Degree": "Leadership and Creative Communication",
+    "CostType": "DOC MIN",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 61,
+    "Campus": null,
+    "Attendance": "Doctoral",
+    "DegreeMatch": "EXACT",
+    "Degree": "Leadership and Cultural Engagement",
+    "CostType": "DOC MIN",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 62,
+    "Campus": "Active Duty",
+    "Attendance": "Distance Education",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "AD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 63,
+    "Campus": "Active Duty",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "AD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 64,
+    "Campus": "Active Duty",
+    "Attendance": "Residential Undergraduate",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "AD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 65,
+    "Campus": "AIC",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DCAIC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 66,
+    "Campus": "AIC",
+    "Attendance": "AIC Online",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "AIC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 67,
+    "Campus": "AIC",
+    "Attendance": "American Indian College",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "AIC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 68,
+    "Campus": "Alamogordo_NM",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 69,
+    "Campus": "Alamogordo_NM",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 70,
+    "Campus": "Alt Cert",
+    "Attendance": "Alternative Certification",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "AC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 71,
+    "Campus": "Alt Cert",
+    "Attendance": "Distance Graduate",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "GRAD AC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 72,
+    "Campus": "Asheboro_NC",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 73,
+    "Campus": "Asheboro_NC",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "ASHEBORO",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 74,
+    "Campus": "Battle Creek_MI",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 75,
+    "Campus": "Battle Creek_MI",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 76,
+    "Campus": "Beaumont_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 77,
+    "Campus": "Beaumont_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 78,
+    "Campus": "Bellevue_NE",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 79,
+    "Campus": "Bellevue_NE",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 80,
+    "Campus": "Bowie_MD",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 81,
+    "Campus": "Bowie_MD",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 82,
+    "Campus": "Carrollton_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 83,
+    "Campus": "Carrollton_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM850",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 84,
+    "Campus": "Chandler_AZ_DS",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 85,
+    "Campus": "Chandler_AZ_DS",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 86,
+    "Campus": "Charlotte_MI",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 87,
+    "Campus": "Charlotte_MI",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 88,
+    "Campus": "Claremore_OK",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 89,
+    "Campus": "Claremore_OK",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 90,
+    "Campus": "Colorado Springs_CO",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 91,
+    "Campus": "Colorado Springs_CO",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 92,
+    "Campus": "Columbus_OH",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 93,
+    "Campus": "Columbus_OH",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 94,
+    "Campus": "Conroe_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 95,
+    "Campus": "Conroe_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 96,
+    "Campus": "Corona_CA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 97,
+    "Campus": "Corona_CA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 98,
+    "Campus": "Cottonwood_AZ",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 99,
+    "Campus": "Cottonwood_AZ",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 100,
+    "Campus": "Deltona_FL",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 101,
+    "Campus": "Deltona_FL",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM2000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 102,
+    "Campus": "DeSoto_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 103,
+    "Campus": "DeSoto_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 104,
+    "Campus": "Detroit_MI",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 105,
+    "Campus": "Detroit_MI",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 106,
+    "Campus": "Dickinson_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 107,
+    "Campus": "Dickinson_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 108,
+    "Campus": "District Bundle",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "District Bundle",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 109,
+    "Campus": "DSOM",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 110,
+    "Campus": "DSOM",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 111,
+    "Campus": "ECCHO",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 112,
+    "Campus": "Fayetteville_AR",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 113,
+    "Campus": "Fayetteville_AR",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 114,
+    "Campus": "Fort Wayne_IN",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 115,
+    "Campus": "Fort Wayne_IN",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 116,
+    "Campus": "Fresno_CA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 117,
+    "Campus": "Fresno_CA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 118,
+    "Campus": "Germantown_WI",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 119,
+    "Campus": "Germantown_WI",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM5000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 120,
+    "Campus": "Griffin_GA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 121,
+    "Campus": "Griffin_GA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 122,
+    "Campus": "Heber Springs_AR",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 123,
+    "Campus": "Heber Springs_AR",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 124,
+    "Campus": "Haverhill_MA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 125,
+    "Campus": "Haverhill_MA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 126,
+    "Campus": "Highland_AR",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 127,
+    "Campus": "Highland_AR",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 128,
+    "Campus": "Houston_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 129,
+    "Campus": "Houston_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 130,
+    "Campus": "Hutto_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 131,
+    "Campus": "Hutto_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 132,
+    "Campus": "Kansas City_MO",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 133,
+    "Campus": "Kansas City_MO",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 134,
+    "Campus": "Kingman_AZ",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 135,
+    "Campus": "Kingman_AZ",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 136,
+    "Campus": "Lafayette_IN",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 137,
+    "Campus": "Lafayette_IN",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM2200",
+    "CostTypeId": 93,
+    "Enabled": true
+  },
+  {
+    "Priority": 138,
+    "Campus": "Lafayette_LA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 139,
+    "Campus": "Lafayette_LA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 140,
+    "Campus": "Las Vegas_NV",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 141,
+    "Campus": "Las Vegas_NV",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 142,
+    "Campus": "Lawton_OK",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "LAWTON",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 143,
+    "Campus": "Loveland_CO",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 144,
+    "Campus": "Loveland_CO",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 145,
+    "Campus": "Macon_GA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "NORTHPLACE",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 146,
+    "Campus": "Main",
+    "Attendance": "Consortium",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "CC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 147,
+    "Campus": "Main",
+    "Attendance": "Distance Education",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DE",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 148,
+    "Campus": "Main",
+    "Attendance": "Doctoral",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DOC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 149,
+    "Campus": "Main",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 150,
+    "Campus": "Main",
+    "Attendance": "Residential Undergraduate",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "Default",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 151,
+    "Campus": "Main",
+    "Attendance": "SAGU Phoenix",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "Phoenix",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 152,
+    "Campus": "Mandeville_LA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 153,
+    "Campus": "Mandeville_LA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 154,
+    "Campus": "Marlton_NJ",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 155,
+    "Campus": "Marlton_NJ",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 156,
+    "Campus": "Memphis_TN",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 157,
+    "Campus": "Memphis_TN",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 158,
+    "Campus": "Mercy Prep",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 159,
+    "Campus": "Munford_TN",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 160,
+    "Campus": "Munford_TN",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 161,
+    "Campus": "Muskegon_MI",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 162,
+    "Campus": "Muskegon_MI",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 163,
+    "Campus": "N Little Rock_AR",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 164,
+    "Campus": "N Little Rock_AR",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1250",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 165,
+    "Campus": "Nashville_TN",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 166,
+    "Campus": "Nashville_TN",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 167,
+    "Campus": "New Boston_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 168,
+    "Campus": "New Boston_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 169,
+    "Campus": "Norman_OK",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 170,
+    "Campus": "Norman_OK",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 171,
+    "Campus": "Oaks_MA",
+    "Attendance": "Distance Education",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DE",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 172,
+    "Campus": "Oaks_MA",
+    "Attendance": "Residential Undergraduate",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DE",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 173,
+    "Campus": "Oaks_Main",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "OAKS",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 174,
+    "Campus": "Oaks_Main",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 175,
+    "Campus": "Ocala_FL",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 176,
+    "Campus": "Ocala_FL",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 177,
+    "Campus": "Omaha_NE",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 178,
+    "Campus": "Omaha_NE",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 179,
+    "Campus": "Park Hills_MO",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 180,
+    "Campus": "Park Hills_MO",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 181,
+    "Campus": "Pearland_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 182,
+    "Campus": "Pearland_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 183,
+    "Campus": "Penitas_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 184,
+    "Campus": "Penitas_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 185,
+    "Campus": "Phoenix_AZ",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 186,
+    "Campus": "Phoenix_AZ_AZMN",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 187,
+    "Campus": "Phoenixville_PA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 188,
+    "Campus": "Phoenixville_PA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD NO FEE",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 189,
+    "Campus": "Plainview_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 190,
+    "Campus": "Plainview_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 191,
+    "Campus": "Princeton_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 192,
+    "Campus": "Princeton_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 193,
+    "Campus": "Radiant_CO",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 194,
+    "Campus": "Radiant_CO",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 195,
+    "Campus": "Rehrersburg_PA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 196,
+    "Campus": "Rehrersburg_PA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 197,
+    "Campus": "Rhema_OK",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 198,
+    "Campus": "Rhema_OK",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "RHEMA",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 199,
+    "Campus": "Roscoe_IL",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 200,
+    "Campus": "Roscoe_IL",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM3000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 201,
+    "Campus": "Sachse_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "NORTHPLACE",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 202,
+    "Campus": "San Antonio_TX_HPSM",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 203,
+    "Campus": "San Antonio_TX_HPSM",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 204,
+    "Campus": "San Antonio_TX_INSM",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 205,
+    "Campus": "San Antonio_TX_INSM",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 206,
+    "Campus": "San Antonio_TX_SAGU",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 207,
+    "Campus": "San Antonio_TX_SAGU",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 208,
+    "Campus": "San Antonio_TX_WSM",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 209,
+    "Campus": "San Antonio_TX_WSM",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 210,
+    "Campus": "Siloam Springs_AR",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 211,
+    "Campus": "Siloam Springs_AR",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 212,
+    "Campus": "Spokane_WA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 213,
+    "Campus": "Spokane_WA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 214,
+    "Campus": "Southern Star",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 215,
+    "Campus": "Surprise_AZ",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 216,
+    "Campus": "Surprise_AZ",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM3000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 217,
+    "Campus": "Tahlequah_OK",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 218,
+    "Campus": "Tahlequah_OK",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 219,
+    "Campus": "TCKIA",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 220,
+    "Campus": "Thibodaux_LA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 221,
+    "Campus": "Thibodaux_LA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 222,
+    "Campus": "Visalia_CA",
+    "Attendance": "Doctoral",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DOC SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 223,
+    "Campus": "Visalia_CA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 224,
+    "Campus": "Visalia_CA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM4000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 225,
+    "Campus": "Waco_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 226,
+    "Campus": "Waco_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 227,
+    "Campus": "Wasilla_AK",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 228,
+    "Campus": "Wasilla_AK",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM4000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 229,
+    "Campus": "Westgate_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM6000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 230,
+    "Campus": "Westgate_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM6000",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 231,
+    "Campus": "Wichita Falls_TX",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 232,
+    "Campus": "Wichita Falls_TX",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 233,
+    "Campus": "Wichita_KS",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 234,
+    "Campus": "Wichita_KS",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 235,
+    "Campus": "Zebulon_GA",
+    "Attendance": "Graduate SOM",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM GRAD",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 236,
+    "Campus": "Zebulon_GA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM1500",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 237,
+    "Campus": "ZVisalia_CA",
+    "Attendance": "School of Ministry",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "SOM",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 238,
+    "Campus": "CCS",
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  },
+  {
+    "Priority": 239,
+    "Campus": null,
+    "Attendance": "Dual Credit",
+    "DegreeMatch": "ANY",
+    "Degree": null,
+    "CostType": "DC",
+    "CostTypeId": null,
+    "Enabled": true
+  }
+]

@@ -43,6 +43,7 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
 
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
+        context.Services.AddTransient<CampusFlow.CostTypes.ICostTypeElements, CampusFlow.CostTypes.ElementsCostTypeService>();
         context.Services.AddTransient<
             IStudentInformationSystemStudentLookup,
             ThesisElementsStudentLookup>();
@@ -90,6 +91,7 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
             ThesisElementsPaymentPostingService>();
         context.Services.AddTransient<CampusFlow.Chapel.IChapelDormLookup, ElementsChapelDormLookup>();
         context.Services.AddTransient<IStudentPrimaryProgramLookup, ElementsPrimaryProgramLookup>();
+        context.Services.AddTransient<IStudentInformationSystemMealPlanRemovalService, ThesisElementsMealPlanRemovalService>();
         context.Services.AddMemoryCache();
 
         context.Services.AddAbpDbContext<CampusFlowDbContext>(options =>

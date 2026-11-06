@@ -26,14 +26,19 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
         "workForcePellTuitionAndFees", "institutionalLimitApplied"
     ];
 
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient SharedClient = new();
+    private readonly HttpClient _client;
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _memoryCache;
 
     public ThesisElementsFinancialAidDecisionService(IConfiguration configuration, IMemoryCache memoryCache)
+        : this(configuration, memoryCache, SharedClient) { }
+
+    internal ThesisElementsFinancialAidDecisionService(IConfiguration configuration, IMemoryCache memoryCache, HttpClient client)
     {
         _configuration = configuration;
         _memoryCache = memoryCache;
+        _client = client;
     }
 
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
@@ -66,11 +71,13 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
     public async Task SubmitDecisionAsync(string externalStudentId, string externalAwardId,
         StudentFinancialAidDecision decision, CancellationToken cancellationToken = default)
     {
-        if (!int.TryParse(externalStudentId, out var studentUid) || !int.TryParse(externalAwardId, out var awardId))
+        if (!int.TryParse(externalStudentId, out var studentUid) || studentUid <= 0 || !int.TryParse(externalAwardId, out var awardId) || awardId <= 0)
         {
             throw new ArgumentException("The Thesis Elements student or award identifier is invalid.");
         }
 
+        if (decision is not (StudentFinancialAidDecision.Accept or StudentFinancialAidDecision.Decline))
+            throw new ArgumentOutOfRangeException(nameof(decision));
         var token = await GetAccessTokenAsync(cancellationToken);
         var award = await GetStudentAwardAsync(studentUid, awardId, token, cancellationToken);
         if (HasRecordedDecision(award["studentAccepted"]))
@@ -83,12 +90,22 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
         using var request = CreateRequest(HttpMethod.Put,
             $"api/financial-aid/maintenance/awards/financial-awards/{awardId}", token);
         request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
         if (JsonNode.Parse(content)?["isSuccess"]?.GetValue<bool>() != true)
         {
             throw new InvalidOperationException("Elements did not accept the financial aid decision.");
+        }
+        var after = await GetStudentAwardAsync(studentUid, awardId, token, cancellationToken);
+        foreach (var property in body)
+        {
+            var readName = property.Key == "transDate" ? "distributionDate" : property.Key;
+            var preserved = property.Key == "studentAccepted"
+                ? ReadDecision(after[readName]) == (int)decision
+                : JsonNode.DeepEquals(property.Value, after[readName]);
+            if (!after.ContainsKey(readName) || !preserved)
+                throw new InvalidOperationException("The award decision could not be verified without changing other fields. Check Elements before retrying.");
         }
     }
 
@@ -112,6 +129,12 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
                 body[propertyName] = value?.DeepClone();
             }
         }
+        // The GET contract calls this distributionDate; PUT calls it transDate.
+        body.Remove("distributionDate");
+        body["transDate"] = award["distributionDate"]?.DeepClone();
+        foreach (var name in RequestProperties)
+            if (!award.ContainsKey(name))
+                throw new InvalidOperationException($"Elements did not return award field '{name}'; no decision was sent.");
         body["studentAccepted"] = (int)decision;
         return body;
     }
@@ -155,10 +178,13 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
     {
         using var request = CreateRequest(HttpMethod.Get,
             $"api/financial-aid/maintenance/awards/financial-awards/{studentUid}", token);
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
-        return JsonNode.Parse(content)?["data"]?["getFinancialAwardDetails"]?.AsArray()
+        var root = JsonNode.Parse(content);
+        if (root?["isSuccess"]?.GetValue<bool>() != true)
+            throw new InvalidOperationException("Elements did not return a successful award response.");
+        return root["data"]?["getFinancialAwardDetails"]?.AsArray()
             ?? throw new InvalidOperationException("Elements did not return the student's awards.");
     }
 
@@ -178,7 +204,7 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
         var credentials = $"{GetRequiredSetting("Username")}:{GetRequiredSetting("Password")}";
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials)));
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
         response.EnsureSuccessStatusCode();
         var token = JsonNode.Parse(content)?["data"]?["token"]?.GetValue<string>();

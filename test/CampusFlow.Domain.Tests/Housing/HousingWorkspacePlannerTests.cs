@@ -38,9 +38,7 @@ public class HousingWorkspacePlannerTests
             .ShouldBeEmpty();
         HousingWorkspacePlanner.Compare([imported], [Room(1, 1, 2)], requireCapacityCompliance: true)
             .Count.ShouldBe(1);
-        var exception = Should.Throw<ArgumentException>(() => HousingWorkspacePlanner.Compare(
-            [imported], [Room(1, 1, 2, 3)], requireCapacityCompliance: true));
-        exception.Message.ShouldContain("Hall / Room 1 has 3 students but capacity is 2");
+        HousingWorkspacePlanner.Compare([imported], [Room(1, 1, 2, 3)], requireCapacityCompliance:true).ShouldBeEmpty();
     }
     [Fact]
     public void Vacancy_does_not_create_a_single_room_surcharge()

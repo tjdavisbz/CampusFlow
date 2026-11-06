@@ -29,6 +29,8 @@ public class AdminMealPlanContextDto
     public List<AdminMealPlanTermDto> Terms { get; set; } = [];
     public List<AdminHousingStatusDto> HousingStatuses { get; set; } = [];
     public int? CurrentHousingStatusId { get; set; }
+    public bool CanRemove { get; set; }
+    public List<AdminMealPlanAssignmentDto> Assignments { get; set; } = [];
     public List<AdminMealPlanOptionDto> Options { get; set; } = [];
 }
 
@@ -50,4 +52,14 @@ public class AssignStudentMealPlanInput
     public int TermCalendarId { get; set; }
     public int HousingStatusId { get; set; }
     public int MealPlanId { get; set; }
+}
+
+public sealed record AdminMealPlanAssignmentDto(int AssignmentId,int MealPlanId,int TermCalendarId,string Name,decimal? Amount);
+public class RemoveStudentMealPlanInput
+{
+    public string ExternalStudentId { get; set; } = "";
+    public int TermCalendarId { get; set; }
+    public int AssignmentId { get; set; }
+    public int MealPlanId { get; set; }
+    public bool Confirmed { get; set; }
 }

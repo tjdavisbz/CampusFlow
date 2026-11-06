@@ -9,7 +9,7 @@
         <p>Plan room assignments together. Save changes here before reviewing what needs to change in Elements.</p></header>
     @if (Model.CanApplyToElements)
     {
-        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Capacity and notes are not sent; the portal stops if those fields changed.</div>
+        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Reviewed capacity changes are saved to this housing period in Elements. Notes stay in CampusFlow. If an apply needs review, inspect live Elements data before refreshing and retrying.</div>
     }
     else
     {
@@ -29,9 +29,10 @@
     <p id="housing-summary"></p>
     <section id="housing-capacity-warning" class="housing-capacity-warning" role="alert" hidden>
         <strong id="housing-capacity-title"></strong>
-        <p>These assignments came from Elements. You can review and save the draft, but Apply to Elements is blocked until every room is within its configured capacity.</p>
+        <p>These assignments came from Elements. You can review and save the draft, but New assignments cannot exceed capacity. An unrelated existing violation does not block fixing another room. Capacity edits must accommodate the occupants remaining in that room.</p>
         <ul id="housing-capacity-list"></ul>
     </section>
+    <p>Elements supports 1–10 students per room. For larger commuter groups, set up multiple rooms under Commuter or Commuter Dorm in Elements, then refresh this period. Commuter rooms create no CampusFlow housing charge and do not use intentional-single rates.</p>
     <p>CampusFlow uses the amounts saved in <a href="~/Admin/Housing/Fees">Housing Fee Setup</a>, not the Elements room rate. Save a fee schedule for this term before applying assignments. Intentional-single charges appear as separate lines. Refreshed assignments start with the Standard rate choice.</p>
     <div class="housing-toolbar">
         <label>Filter assignments <input id="housing-filter" class="form-control" type="search" placeholder="Building, room, student, rate, or notes" /></label>

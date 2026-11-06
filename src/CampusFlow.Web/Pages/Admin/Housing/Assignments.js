@@ -12,7 +12,7 @@
         warning.hidden = !rooms.length;
         list.replaceChildren();
         if (!rooms.length) return;
-        el('capacity-title').textContent = `${rooms.length} room${rooms.length === 1 ? '' : 's'} over capacity — Apply to Elements is blocked`;
+        el('capacity-title').textContent = `${rooms.length} room${rooms.length === 1 ? '' : 's'} over capacity — review affected rooms`;
         rooms.forEach(room => {
             const item = document.createElement('li');
             item.textContent = `${room.building} / ${room.name}: ${room.occupants.length} assigned, capacity ${room.capacity}`;
@@ -23,7 +23,7 @@
         el('period').disabled = busy;
         el('refresh').disabled = busy || !el('period').value;
         ['save','preview'].forEach(x => el(x).disabled = busy || !state);
-        if (el('apply')) el('apply').disabled = busy || !state || overCapacityRooms().length > 0;
+        if (el('apply')) el('apply').disabled = busy || !state || ['Running','Needs review'].includes(state.applyStatus);
         el('clear').disabled = busy || !state || !selected.size;
         el('rows').querySelectorAll('input,select,button').forEach(x => x.disabled = busy);
         updateSelectionUi();
@@ -45,7 +45,7 @@
         if (!state) { el('summary').textContent = 'No saved draft. Refresh to load rooms and assignments from Elements.'; return; }
         const assigned = state.rooms.reduce((n,r) => n + r.occupants.length, 0);
         const beds = state.rooms.reduce((n,r) => n + r.capacity, 0);
-        el('summary').textContent = `${assigned} assigned · ${beds - assigned} vacant · ${state.rooms.length} rooms · ${dirty ? 'Unsaved changes' : 'Draft saved'} · Last refresh ${new Date(state.refreshedAt).toLocaleString()}`;
+        el('summary').textContent = `${assigned} assigned · ${beds - assigned} vacant · ${state.rooms.length} rooms · ${dirty ? 'Unsaved changes' : 'Draft saved'}${state.applyStatus ? ' · Last apply: '+state.applyStatus : ''} · Last refresh ${new Date(state.refreshedAt).toLocaleString()}`;
     }
     function cell(row, text) { const td = document.createElement('td'); if (text !== undefined) td.textContent = text; row.append(td); return td; }
     function input(type, label, value, change) {
@@ -110,9 +110,9 @@
                 if (slot === 0) {
                     const count = input('number', `Capacity for ${room.building} ${room.name}`, room.capacity, value => {
                         const n = Number(value);
-                        if (!Number.isInteger(n) || n < room.occupants.length || n < 0 || n > 1000) { message('Capacity must accommodate the assigned students (maximum 1,000).', true); render(); return; }
+                        if (!Number.isInteger(n) || n < room.occupants.length || n < 1 || n > 10) { message('Elements capacity must be between 1 and 10 and accommodate the students remaining in the room. Use multiple commuter rooms for larger groups.', true); render(); return; }
                         room.capacity = n; changed(); render();
-                    }); count.min = room.occupants.length; count.max = 1000; capacity.append(count);
+                    }); count.min = Math.max(1, room.occupants.length); count.max = 10; capacity.append(count);
                 }
                 const student = cell(row);
                 if (occupant) student.textContent = occupant.name;
@@ -164,11 +164,11 @@
         const changes = await request('Preview', undefined, {periodId:state.periodId});
         if (rateRevision !== await request('RateRevision', undefined, {periodId:state.periodId}))
             throw new Error('Housing fee amounts changed during the preview. Review again before applying.');
-        const actionable = changes.filter(x => ['Assign','Move','Remove','Rate review'].includes(x.action));
-        if (!actionable.length) { message('There are no assignment or rate changes to apply to Elements.'); return; }
+        const actionable = changes.filter(x => ['Assign','Move','Remove','Rate review','Capacity'].includes(x.action));
+        if (!actionable.length) { message('There are no assignment, rate or capacity changes to apply to Elements.'); return; }
         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
-        if (!confirm(`Apply ${actionable.length} assignment/rate change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
+        if (!confirm(`Apply ${actionable.length} assignment/rate/capacity change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
         state = await request('Apply', {periodId:state.periodId, revision:state.revision,
             rateRevision, confirmed:true});
         dirty = false; selected.clear(); render();

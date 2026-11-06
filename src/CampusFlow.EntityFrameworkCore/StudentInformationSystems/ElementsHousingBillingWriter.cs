@@ -121,6 +121,7 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
                               !housingDocumentIds.Contains(x.TransactionDocumentId)))
             throw new InvalidOperationException("A CampusFlow housing reference points to an unexpected transaction document.");
         var replaceable = sameTerm.Where(x => housingDocumentIds.Contains(x.TransactionDocumentId)).ToList();
+        RequireOwnedReferences(replaceable.Select(x=>x.Reference),references);
         if (references.Any(reference => replaceable.Count(x =>
                 string.Equals(x.Reference, reference, StringComparison.OrdinalIgnoreCase)) > 1))
             throw new InvalidOperationException("Duplicate CampusFlow housing charge references require manual review.");
@@ -145,8 +146,6 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
                     termCalendarId, references[i], wanted, cancellationToken);
             }
         }
-        foreach (var entry in replaceable.Where(x => !references.Contains(x.Reference, StringComparer.OrdinalIgnoreCase)))
-            await DeleteEntryAsync(token, entry.Id, cancellationToken);
         var confirmed = await GetEntriesAsync(token, studentUid, batchId, cancellationToken);
         if (confirmed.Any(x => x.TermCalendarId == termCalendarId &&
                                housingDocumentIds.Contains(x.TransactionDocumentId) &&
@@ -165,7 +164,13 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
             housingDocumentIds, cancellationToken);
     }
 
-    private async Task<int?> FindBatchByCommentAsync(string token, string comment,
+    internal static void RequireOwnedReferences(IEnumerable<string> references,IReadOnlyCollection<string> expected)
+    {
+        if(references.Any(x=>!expected.Contains(x,StringComparer.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("An unrecognized housing charge is in the CampusFlow batch. Review it manually; it will not be replaced or deleted.");
+    }
+
+    private async Task<IReadOnlyList<int>> FindBatchesByCommentAsync(string token, string comment,
         CancellationToken cancellationToken)
     {
         using var request = Request(HttpMethod.Get, "/api/billing/cashier-entry/select-items", token);
@@ -176,8 +181,8 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         var matches = batches.OfType<JsonObject>()
             .Where(x => string.Equals(x["comment"]?.GetValue<string>(), comment, StringComparison.OrdinalIgnoreCase))
             .Select(x => x["batchMasterID"]?.GetValue<int>() ?? 0).Where(x => x > 0).Distinct().ToList();
-        if (matches.Count > 1) throw new InvalidOperationException("Multiple matching housing batches require manual review.");
-        if (matches.Count == 1) return matches[0];
+        // Elements can have several generated-rent batches. Read each batch but mutate
+        // only the verified generated entry for this one student and term.
         // The cashier selector can omit an open batch that is still accessible by ID.
         // The replica is used only to identify that batch; its entries are read live above.
         await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
@@ -190,9 +195,7 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         var replicaMatches = new List<int>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken)) replicaMatches.Add(reader.GetInt32(0));
-        if (replicaMatches.Count > 1)
-            throw new InvalidOperationException("Multiple matching Elements rent batches require manual review.");
-        return replicaMatches.Count == 1 ? replicaMatches[0] : null;
+        return matches.Concat(replicaMatches).Distinct().Order().ToArray();
     }
 
     private async Task RemoveElementsGeneratedRentAsync(string token, int studentUid, int termCalendarId,
@@ -200,9 +203,10 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
     {
         // Assignment can create a rent entry at $0 or at the configured room rate.
         // Remove only the exact vendor-generated entry for this student and term.
-        var batchId = await FindBatchByCommentAsync(token, ElementsRentBatchComment, cancellationToken);
-        if (batchId is null) return;
-        var entries = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
+        var batchIds = await FindBatchesByCommentAsync(token, ElementsRentBatchComment, cancellationToken);
+        foreach(var batchId in batchIds)
+        {
+        var entries = await GetEntriesAsync(token, studentUid, batchId, cancellationToken);
         var generatedRent = entries.Where(x => x.StudentUid == studentUid && x.TermCalendarId == termCalendarId &&
                                           housingDocumentIds.Contains(x.TransactionDocumentId) &&
                                           x.Amount >= 0 &&
@@ -211,10 +215,11 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
             .ToList();
         foreach (var entry in generatedRent)
             await DeleteEntryAsync(token, entry.Id, cancellationToken);
-        if (generatedRent.Count == 0) return;
-        var remaining = await GetEntriesAsync(token, studentUid, batchId.Value, cancellationToken);
+        if (generatedRent.Count == 0) continue;
+        var remaining = await GetEntriesAsync(token, studentUid, batchId, cancellationToken);
         if (generatedRent.Any(x => remaining.Any(y => y.Id == x.Id)))
             throw new InvalidOperationException("Elements did not confirm removal of its generated rent entry.");
+        }
     }
 
     private async Task<List<BatchEntry>> GetEntriesAsync(string token, int studentUid, int batchId,

@@ -32,6 +32,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             new FixedLocalizableString("Manage BibliU configuration"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.BibliuExport,
             new FixedLocalizableString("Read BibliU exports"), MultiTenancySides.Tenant);
+        admin.AddChild(CampusFlowPermissions.Admin.CostTypes,
+            new FixedLocalizableString("Manage cost-type mappings and manual runs"), MultiTenancySides.Tenant);
         var studentBilling = admin.AddChild(CampusFlowPermissions.Admin.StudentBilling,
             L("Permission:Admin.StudentBilling"), MultiTenancySides.Tenant);
         studentBilling.AddChild(CampusFlowPermissions.Admin.ResetIndividualBillApproval,
@@ -42,6 +44,8 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             new Volo.Abp.Localization.FixedLocalizableString("Manage housing assignment drafts"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.ChapelAttendance,
             new FixedLocalizableString("Manage chapel attendance"), MultiTenancySides.Tenant);
+        businessServices.AddChild(CampusFlowPermissions.Admin.RemoveStudentMealPlan,
+            new FixedLocalizableString("Remove individual student meal-plan assignments"), MultiTenancySides.Tenant);
         businessServices.AddChild(CampusFlowPermissions.Admin.AddStudentMealPlan,
             L("Permission:Admin.BusinessServices.AddStudentMealPlan"), MultiTenancySides.Tenant);
     }

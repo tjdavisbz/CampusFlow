@@ -16,7 +16,7 @@ using Volo.Abp.DependencyInjection;
 namespace CampusFlow.StudentInformationSystems;
 
 // Room-assignment writes require an explicit flag and the exact matching Elements environment.
-public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignmentWriter, ITransientDependency
+public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAssignmentWriter, ITransientDependency
 {
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
     private const string TokenCacheKey = "ThesisElements:Housing:IntegrationToken";
@@ -71,11 +71,11 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
         using var response = await _client.SendAsync(request, cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         var data = root["data"] as JsonArray;
-        if (data is null) return null;
+        if (data is null) throw new InvalidOperationException("Elements returned an invalid assignment list.");
         var matches = data.OfType<JsonObject>()
             .Where(x => ReadInt(x, "housingPeriodID") == periodId)
             .Select(x => (Building: ReadString(x, "building"), Room: ReadString(x, "roomName")))
-            .Distinct().ToList();
+            .ToList();
         if (matches.Count > 1)
             throw new InvalidOperationException("Elements returned multiple room assignments for one student and period.");
         if (matches.Count == 0) return null;
@@ -159,7 +159,8 @@ public sealed class ElementsHousingAssignmentWriter : IElementsHousingAssignment
 
     private static bool MatchesHost(string value, string host) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.AbsolutePath == "/" &&
+        uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.UserInfo) &&
+        string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment) &&
         string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesReplicaHost(string value, string host) =>
