@@ -20,7 +20,7 @@
 
 <main class="housing-page">
     <header class="housing-hero">
-        <div><span>Campus living</span><h1>Housing & Meal Plan</h1><p>Tell us where you’ll live and choose the dining plan that fits your semester.</p></div>
+        <div><span>Campus living</span><h1>Housing & Meal Plan</h1><p>View your housing assignment and select an available meal plan for your semester.</p></div>
         @if (Model.Selection is not null) { <div class="housing-student"><strong>@Model.Selection.StudentName</strong><span>ID @Model.Selection.StudentId</span></div> }
     </header>
 
@@ -36,15 +36,18 @@
             <div class="housing-current-grid">
                 <div><span>Residence</span><strong>@Model.CurrentAssignment.Building</strong></div>
                 <div><span>Room</span><strong>@Model.CurrentAssignment.Room</strong></div>
+                @if (!StudentHousingEligibility.IsCommuterBuilding(Model.CurrentAssignment.Building))
+                {
                 <div><span>Roommate@(Model.CurrentAssignment.Roommates.Count == 1 ? "" : "s")</span>
                     <strong>@(Model.CurrentAssignment.Roommates.Count == 0 ? "None currently assigned" : string.Join(", ", Model.CurrentAssignment.Roommates))</strong></div>
+                }
             </div>
         }
     </section>
 
     @if (Model.IsUnavailable || Model.Selection is null)
     {
-        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Housing selection is currently unavailable</h2><p>Your room assignment above is still available when one has been recorded.</p></div></section>
+        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Meal plan selection is unavailable</h2><p>@(Model.Selection is { IsLockedByBillApproval: true } ? "Your bill is approved for this term. Contact Student Billing to request changes." : Model.Selection is { MealPlanEligible: false, HousingRequired: true } ? "Your housing includes your meal plan; a separate selection is not required." : Model.Selection is { HasHousingAssignment: false, HousingRequired: true } ? "A housing assignment is required before you can select a meal plan or approve your bill. Contact Student Services." : "Meal plan selection is not currently open for your record and term.")</p></div></section>
     }
     else
     {
@@ -64,20 +67,14 @@
         else
         {
         <form method="post" id="housing-form">
-            <section class="housing-section">
-                <div class="section-heading"><span>Step 1</span><h2>Where will you live?</h2><p>Your housing choice determines which meal plans are available.</p></div>
-                <div class="choice-grid">
-                    @foreach (var choice in Enum.GetValues<HousingChoice>())
-                    {
-                        <label class="choice-card"><input type="radio" asp-for="Input.HousingChoice" value="@choice" /><span class="choice-check"><i class="fa-solid fa-check"></i></span><i class="choice-icon fa-solid @(choice == HousingChoice.Commuter ? "fa-house" : choice == HousingChoice.SeniorHousing ? "fa-building-user" : "fa-building")"></i><strong>@HousingModel.ChoiceName(choice)</strong><small>@HousingModel.ChoiceDescription(choice)</small></label>
-                    }
-                </div>
-            </section>
+            <input type="hidden" asp-for="Input.ExternalTermId" />
+            <input type="hidden" asp-for="Input.HousingChoice" />
+            <p>Your meal plan options are based on your assigned housing: @HousingModel.ChoiceName(Model.Selection.AssignedHousingChoice).</p>
 
             <section class="housing-section">
-                <div class="section-heading"><span>Step 2</span><h2>Choose your meal plan</h2><p>Prices shown include applicable taxes.</p></div>
+                <div class="section-heading"><span>Dining</span><h2>Choose your meal plan</h2><p>Prices shown include applicable taxes.</p></div>
                 <div asp-validation-summary="All" class="housing-errors"></div>
-                @foreach (var choice in Enum.GetValues<HousingChoice>())
+                @foreach (var choice in new[] { Model.Selection.AssignedHousingChoice })
                 {
                     <div class="plan-grid" data-choice="@choice">
                         @foreach (var plan in Model.Selection.Options[choice])
@@ -100,20 +97,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('housing-form');
   if (!form) return;
-  const choices = [...form.querySelectorAll('input[name="Input.HousingChoice"]')];
-  const planGroups = [...form.querySelectorAll('.plan-grid')];
-  function updatePlans() {
-    const selected = choices.find(x => x.checked)?.value;
-    planGroups.forEach(group => {
-      const visible = group.dataset.choice === selected;
-      group.hidden = !visible;
-      group.querySelectorAll('input').forEach(input => input.disabled = !visible);
-    });
-    const visibleChecked = form.querySelector('.plan-grid:not([hidden]) input:checked');
-    if (!visibleChecked) form.querySelector('.plan-grid:not([hidden]) input')?.click();
-  }
-  choices.forEach(x => x.addEventListener('change', updatePlans));
-  updatePlans();
   form.addEventListener('submit', () => {
     const modal = document.getElementById('housing-processing');
     modal.classList.add('visible'); modal.setAttribute('aria-hidden', 'false');

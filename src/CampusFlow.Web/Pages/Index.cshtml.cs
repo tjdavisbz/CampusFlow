@@ -53,6 +53,7 @@ public class IndexModel : CampusFlowPageModel
     private readonly IConfiguration _configuration;
     private readonly IRepository<PortalAnnouncement, Guid> _announcements;
     private readonly ILegacyBillApprovalLookup _legacyApprovals;
+    private readonly IBillApprovalCompletionLookup _completion;
 
     public IndexModel(
         ITenantThemeProvider tenantThemeProvider,
@@ -77,7 +78,7 @@ public class IndexModel : CampusFlowPageModel
         IEnumerable<IStudentInformationSystemScheduleLookup> scheduleLookups,
         IConfiguration configuration,
         IRepository<PortalAnnouncement, Guid> announcements,
-        ILegacyBillApprovalLookup legacyApprovals)
+        ILegacyBillApprovalLookup legacyApprovals, IBillApprovalCompletionLookup completion)
     {
         _tenantThemeProvider = tenantThemeProvider;
         _studentProfileRepository = studentProfileRepository;
@@ -102,6 +103,7 @@ public class IndexModel : CampusFlowPageModel
         _configuration = configuration;
         _announcements = announcements;
         _legacyApprovals = legacyApprovals;
+        _completion = completion;
     }
 
     public string? TenantName { get; private set; }
@@ -360,7 +362,10 @@ public class IndexModel : CampusFlowPageModel
 
         try
         {
-            var mealPlan = await _mealPlans.GetAsync();
+            var mealPlan = await _mealPlans.GetAsync(term.ExternalTermId);
+            journey.HousingRequired = mealPlan.HousingRequired;
+            journey.HasHousingAssignment = mealPlan.HasHousingAssignment;
+            journey.MealPlanEligible = mealPlan.MealPlanEligible;
             journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
             journey.MealPlanRequired = journey.MealPlanEnabled;
             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
@@ -374,17 +379,10 @@ public class IndexModel : CampusFlowPageModel
         try
         {
             var billTerm = (await _billApprovalTermConfigurations.GetListAsync())
-                .FirstOrDefault(x => x.ExternalTermId == term.ExternalTermId && x.IsOpen(Clock.Now));
-            journey.BillApprovalEnabled = billTerm is not null;
-            var approval = billTerm is null
-                ? null
-                : await _billApprovals.FirstOrDefaultAsync(x =>
-                    x.StudentProfileId == profile.Id && x.ExternalTermId == term.ExternalTermId);
-            journey.BillApproved = approval?.Status is BillApprovalStatus.Approved
-                or BillApprovalStatus.DocumentPending
-                or BillApprovalStatus.Completed;
-            if (billTerm is not null && approval is null && profile.Provider == StudentInformationSystemProvider.ThesisElements)
-                journey.BillApproved = (await _legacyApprovals.FindAsync(profile.ExternalStudentId, term.ExternalTermId))?.CountsAsApproved == true;
+                .FirstOrDefault(x => x.ExternalTermId == term.ExternalTermId);
+            journey.BillApprovalEnabled = billTerm?.IsOpenForStudent(Clock.Now, profile.StudentId) == true;
+            journey.BillApprovalAvailability = billTerm?.Availability(Clock.Now, profile.StudentId) ?? "unavailable";
+            journey.BillApproved = await _completion.IsApprovedAsync(profile, term.ExternalTermId, HttpContext.RequestAborted);
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
@@ -407,11 +405,15 @@ public class IndexModel : CampusFlowPageModel
         public bool HasSelectedCourses { get; set; }
         public bool IsAwaitingAdvisor { get; set; }
         public bool CourseSelectionEnabled { get; set; }
+        public bool HousingRequired { get; set; }
+        public bool HasHousingAssignment { get; set; }
+        public bool MealPlanEligible { get; set; }
         public bool MealPlanEnabled { get; set; }
         public bool MealPlanRequired { get; set; }
         public bool MealPlanSelected { get; set; }
         public bool BillApproved { get; set; }
         public bool BillApprovalEnabled { get; set; }
+        public string BillApprovalAvailability { get; set; } = "unavailable";
         public bool HasUnavailableData { get; set; }
         public string? BookstoreUrl { get; set; }
         public List<RegistrationJourneyStep> Steps { get; } = [];
@@ -423,9 +425,18 @@ public class IndexModel : CampusFlowPageModel
             Steps.Clear();
             var courseUrl = $"/CourseSelection?term={Uri.EscapeDataString(Term.ExternalTermId)}";
             var billUrl = $"/BillApproval?term={Uri.EscapeDataString(Term.TermCode)}";
-            Steps.Add(PreviousBalance > 50
-                ? new("Previous balance", $"${PreviousBalance:N2} needs attention before registration.", "action", "/Billing", "Review balance")
-                : new("Previous balance", "No prior balance is blocking registration.", "complete", "/Billing", "View account"));
+            if (BillApproved)
+            {
+                Steps.Add(new("Previous balance", "Bill approval is complete for this term.", "complete", null, "Complete"));
+                Steps.Add(new("Course selection", "Course selection is locked after bill approval.", "complete", null, "Complete"));
+                if (HousingRequired) Steps.Add(new("Housing", "Housing review is complete for this term.", "complete", null, "Complete"));
+                if (MealPlanEligible) Steps.Add(new("Meal plan", "Meal plan selection is locked after bill approval.", "complete", null, "Complete"));
+                Steps.Add(new("Bill approval", "Your bill has been reviewed and approved.", "complete", billUrl, "View agreement"));
+                return;
+            }
+            Steps.Add(BillApprovalAccessRules.HasBlockingPreviousBalance(PreviousBalance)
+                ? new("Previous balance", $"${PreviousBalance:N2} needs attention before bill approval.", "action", "/Billing", "Review balance")
+                : new("Previous balance", "No prior balance is blocking bill approval.", "complete", "/Billing", "View account"));
 
             Steps.Add(!CourseSelectionEnabled
                 ? RegistrationJourneyStep.ComingSoon("Course selection")
@@ -435,20 +446,40 @@ public class IndexModel : CampusFlowPageModel
                     ? new("Course selection", "Courses have been selected for this term.", "complete", courseUrl, "View courses")
                     : new("Course selection", "Choose the courses you plan to take.", "action", courseUrl, "Select courses"));
 
-            Steps.Add(!BillApprovalEnabled || !MealPlanEnabled
-                ? RegistrationJourneyStep.ComingSoon("Meal plan")
+            var housingUrl = $"/Housing?term={Uri.EscapeDataString(Term.ExternalTermId)}";
+            if (HousingRequired)
+                Steps.Add(HasHousingAssignment
+                    ? new("Housing", "Your housing assignment is recorded.", "complete", housingUrl, "View housing")
+                    : new("Housing", "Contact Student Services for a housing assignment before approving your bill.", "action", housingUrl, "View housing"));
+
+            if (MealPlanEligible)
+            Steps.Add(!HasHousingAssignment
+                ? new("Meal plan", "A housing assignment is required before choosing a meal plan.", "disabled", null, "Housing required")
+                : !BillApprovalEnabled || !MealPlanEnabled
+                ? UnavailableBillStep("Meal plan")
                 : !MealPlanRequired
-                ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", "/Housing", "View options")
+                ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", housingUrl, "View options")
                 : MealPlanSelected
-                    ? new("Meal plan", "Your housing and meal-plan choice has been recorded.", "complete", "/Housing", "View selection")
-                    : new("Meal plan", "Choose the housing and meal-plan option that applies to you.", "action", "/Housing", "Choose plan"));
+                    ? new("Meal plan", "Your housing and meal-plan choice has been recorded.", "complete", housingUrl, "View selection")
+                    : new("Meal plan", "Choose the housing and meal-plan option that applies to you.", "action", housingUrl, "Choose plan"));
 
             Steps.Add(!BillApprovalEnabled
-                ? RegistrationJourneyStep.ComingSoon("Bill approval")
+                ? UnavailableBillStep("Bill approval")
                 : BillApproved
                 ? new("Bill approval", "Your bill has been reviewed and approved.", "complete", billUrl, "View agreement")
+                : BillApprovalAccessRules.HasBlockingPreviousBalance(PreviousBalance)
+                ? new("Bill approval", "Your previous balance needs attention before bill approval.", "disabled", null, "Balance required")
+                : HousingRequired && !HasHousingAssignment
+                ? new("Bill approval", "A housing assignment is required before bill approval.", "disabled", null, "Housing required")
                 : new("Bill approval", "Review your charges, payment choice, and agreement.", "action", billUrl, "Review bill"));
         }
+
+        private RegistrationJourneyStep UnavailableBillStep(string title) => BillApprovalAvailability switch
+        {
+            "upcoming" => RegistrationJourneyStep.ComingSoon(title),
+            "closed" => new(title, "The selection window for this term has closed.", "disabled", null, "Closed"),
+            _ => new(title, "This step is not currently available for this term.", "disabled", null, "Unavailable")
+        };
     }
 
     public sealed record RegistrationJourneyStep(

@@ -32,7 +32,7 @@
 
     @if (Model.IsUnavailable)
     {
-        <section class="notice" role="status"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Your bill review is temporarily unavailable</h2><p>No information has been changed. Please try again shortly.</p></div></section>
+        <section class="notice" role="status"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Your bill review is temporarily unavailable</h2><p>@(Model.UnavailableReason ?? "No information has been changed. Please try again shortly.")</p></div></section>
     }
     else
     {

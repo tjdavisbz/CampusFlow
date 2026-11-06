@@ -98,6 +98,18 @@ public class CampusFlowMenuContributor : IMenuContributor
                 string.Equals(context.ServiceProvider.GetRequiredService<Volo.Abp.MultiTenancy.ICurrentTenant>().Name,
                     "nelson", StringComparison.OrdinalIgnoreCase))
             {
+                var showHousing = false;
+                try
+                {
+                    showHousing = (await context.ServiceProvider.GetRequiredService<CampusFlow.Housing.IMealPlanAppService>()
+                        .GetAsync()).HousingRequired;
+                }
+                catch (Exception exception)
+                {
+                    context.ServiceProvider.GetRequiredService<ILogger<CampusFlowMenuContributor>>()
+                        .LogWarning(exception, "Unable to determine housing menu eligibility.");
+                }
+                if (showHousing)
                 student.AddItem(new ApplicationMenuItem(
                     CampusFlowMenus.Housing,
                     "My Housing",

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.BillApprovals;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
@@ -29,6 +30,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     private readonly IReadOnlyCollection<IStudentInformationSystemDegreeAuditLookup> _degreeAuditLookups;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly ILogger<CourseSelectionAppService> _logger;
+    private readonly IBillApprovalCompletionLookup _completion;
 
     private readonly IReadOnlyCollection<IStudentPrimaryProgramLookup> _programLookups;
 
@@ -45,7 +47,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         IStudentInformationSystemCourseRegistrationService registration,
         IEnumerable<IStudentInformationSystemDegreeAuditLookup> degreeAuditLookups,
         IUnitOfWorkManager unitOfWorkManager,
-        ILogger<CourseSelectionAppService> logger, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
+        ILogger<CourseSelectionAppService> logger, IBillApprovalCompletionLookup completion, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
@@ -60,12 +62,14 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         _degreeAuditLookups = degreeAuditLookups.ToList();
         _unitOfWorkManager = unitOfWorkManager;
         _logger = logger;
+        _completion = completion;
         _programLookups = programLookups?.ToArray() ?? [];
     }
 
     public async Task<CourseSelectionDto> GetAsync(string externalTermId)
     {
         var profile = await GetCurrentProfileAsync();
+        var locked = await _completion.IsApprovedAsync(profile, externalTermId);
         var context = await _lookup.GetContextAsync(profile.ExternalStudentId, externalTermId)
             ?? throw new UserFriendlyException("You are not eligible to select courses for that term.");
         var policy = await GetCurrentPolicyAsync(externalTermId, profile, context);
@@ -83,6 +87,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
 
         return new CourseSelectionDto
         {
+            IsLockedByBillApproval = locked,
             ExternalTermId = context.ExternalTermId,
             TermName = context.TermName,
             AttendanceType = context.AttendanceType,
@@ -114,7 +119,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 WasPreviouslyTaken = previousAttempt is not null,
                 PreviousGrade = GetPreviousGrade(previousAttempt),
                 PreviousAttemptOutcome = GetPreviousAttemptOutcome(previousAttempt),
-                CanSelect = CanSelect(policy, context, x, sectionMappings) &&
+                CanSelect = !locked && CanSelect(policy, context, x, sectionMappings) &&
                     registrations.All(r => r.ExternalOfferingId != x.ExternalOfferingId)
                 };
             }).ToList(),
@@ -128,7 +133,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
                 Credits = x.Credits,
                 Status = x.RegistrationStatus,
                 IsApprovedByScheduler = reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId && r.Status == CourseReviewStatus.Approved),
-                CanRemove = string.Equals(x.RegistrationStatus, "Unofficial", StringComparison.OrdinalIgnoreCase) &&
+                CanRemove = !locked && string.Equals(x.RegistrationStatus, "Unofficial", StringComparison.OrdinalIgnoreCase) &&
                     reviews.Any(r => r.ExternalCourseRegistrationId == x.ExternalRegistrationId &&
                                      r.CanStudentRemove),
                 NeedsReview = reviews.Any(r =>
@@ -289,6 +294,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
             throw new UserFriendlyException("Please choose Yes or No before saving.");
 
         var profile = await GetCurrentProfileAsync();
+        await EnsureChangesAllowedAsync(profile, input.ExternalTermId);
         var context = await _lookup.GetContextAsync(profile.ExternalStudentId, input.ExternalTermId);
         if (context is null)
             throw new UserFriendlyException("You are not eligible to select courses for that term.");
@@ -324,6 +330,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         using (var readUow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: false))
         {
             profile = await GetCurrentProfileAsync();
+            await EnsureChangesAllowedAsync(profile, input.ExternalTermId);
             policy = await GetCurrentPolicyAsync(input.ExternalTermId, profile);
             await readUow.CompleteAsync();
         }
@@ -402,6 +409,7 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
         using (var readUow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: false))
         {
             profile = await GetCurrentProfileAsync();
+            await EnsureChangesAllowedAsync(profile, input.ExternalTermId);
             await readUow.CompleteAsync();
         }
 
@@ -461,6 +469,12 @@ public class CourseSelectionAppService : CampusFlowAppService, ICourseSelectionA
     {
         return await _currentStudentView.GetProfileAsync()
             ?? throw new UserFriendlyException("Your student profile could not be found.");
+    }
+
+    private async Task EnsureChangesAllowedAsync(StudentProfile profile, string externalTermId)
+    {
+        if (await _completion.IsApprovedAsync(profile, externalTermId))
+            throw new UserFriendlyException("Your bill is approved for this term. Contact Student Billing to request course changes.");
     }
 
     private async Task<CourseSelectionPolicy> GetCurrentPolicyAsync(string externalTermId, StudentProfile profile,

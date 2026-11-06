@@ -56,6 +56,8 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly PayflowOptions _payflowOptions;
     private readonly ILogger<BillApprovalModel> _logger;
     private readonly ILegacyBillApprovalLookup _legacyApprovals;
+    private readonly IBillApprovalCompletionLookup _completion;
+    private readonly CampusFlow.Housing.IMealPlanAppService _mealPlans;
 
     public BillApprovalModel(
         ITenantThemeProvider themeProvider,
@@ -83,7 +85,7 @@ public class BillApprovalModel : CampusFlowPageModel
         IPayflowGateway payflowGateway,
         IOptions<PayflowOptions> payflowOptions,
         ILogger<BillApprovalModel> logger,
-        ILegacyBillApprovalLookup legacyApprovals)
+        ILegacyBillApprovalLookup legacyApprovals, CampusFlow.Housing.IMealPlanAppService mealPlans, IBillApprovalCompletionLookup completion)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
@@ -111,6 +113,8 @@ public class BillApprovalModel : CampusFlowPageModel
         _payflowOptions = payflowOptions.Value;
         _logger = logger;
         _legacyApprovals = legacyApprovals;
+        _mealPlans = mealPlans;
+        _completion = completion;
     }
 
     public TenantTheme Theme { get; private set; } = new(
@@ -122,6 +126,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public string? TermCode { get; private set; }
     public string? ExternalTermId { get; private set; }
     public bool IsUnavailable { get; private set; }
+    public string? UnavailableReason { get; private set; }
     public IReadOnlyList<BillApprovalTermConfiguration> AvailableTerms { get; private set; } = [];
     public IReadOnlyList<StudentCourseScheduleItem> Courses { get; private set; } = [];
     public string? BookstoreUrl { get; private set; }
@@ -211,7 +216,12 @@ public class BillApprovalModel : CampusFlowPageModel
 
             var currentTerm = await currentTermTask;
             var configuredTerms = await _termConfigurations.GetListAsync();
-            AvailableTerms = configuredTerms.Where(x => x.IsOpen(_clock.Now)).OrderByDescending(x => x.TermCode).ToArray();
+            var approvedTerms = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var configured in configuredTerms)
+                if (await _completion.IsApprovedAsync(profile, configured.ExternalTermId, HttpContext.RequestAborted))
+                    approvedTerms.Add(configured.ExternalTermId);
+            AvailableTerms = configuredTerms.Where(x => x.IsOpenForStudent(_clock.Now, profile.StudentId) || approvedTerms.Contains(x.ExternalTermId))
+                .OrderByDescending(x => x.TermCode).ToArray();
             TermCode = string.IsNullOrWhiteSpace(term)
                 ? AvailableTerms.FirstOrDefault(x => x.TermCode == currentTerm?.TermCode)?.TermCode ?? AvailableTerms.FirstOrDefault()?.TermCode
                 : term;
@@ -229,6 +239,27 @@ public class BillApprovalModel : CampusFlowPageModel
             BookstoreUrl = CampusStoreLinks.ForCourses(_configuration, CurrentTenant.Name, TermName, Courses);
             ExternalTermId = courseTerm?.ExternalTermId;
             ExternalTermId ??= termConfiguration?.ExternalTermId;
+
+            var alreadyApproved = ExternalTermId is not null && approvedTerms.Contains(ExternalTermId);
+            var housing = !alreadyApproved && profile.Provider == StudentInformationSystemProvider.ThesisElements
+                ? await _mealPlans.GetAsync(ExternalTermId) : null;
+            if (housing is { HousingRequired: true, HasHousingAssignment: false })
+            {
+                IsUnavailable = true;
+                UnavailableReason = "A housing assignment is required before bill approval. Contact Student Services.";
+                return;
+            }
+
+            if (!alreadyApproved)
+            {
+                var previousBalance = await billingLookup.GetPreviousBalanceAsync(profile.ExternalStudentId, ExternalTermId!, HttpContext.RequestAborted);
+                if (BillApprovalAccessRules.HasBlockingPreviousBalance(previousBalance))
+                {
+                    IsUnavailable = true;
+                    UnavailableReason = "Your previous balance needs attention before bill approval. You may still select courses and a meal plan. Contact Student Billing.";
+                    return;
+                }
+            }
 
             var allTransactions = await billingTask;
             Charges = allTransactions.Where(x => x.TermCode == TermCode)
@@ -288,7 +319,7 @@ public class BillApprovalModel : CampusFlowPageModel
     {
         InitialStep = "payment";
         await OnGetAsync(term, InitialStep, PaymentPurposeInput);
-        if (LegacyApproval?.CountsAsApproved == true) return RedirectToPage(new { term });
+        if (IsAlreadyAccepted) return RedirectToPage(new { term });
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (_currentStudentView.IsImpersonating || CurrentUser.Id is null || profile is null)
             return Unauthorized();
@@ -389,6 +420,7 @@ public class BillApprovalModel : CampusFlowPageModel
 
     public async Task<IActionResult> OnPostAsync([FromQuery] string? term = null)
     {
+        if (_currentStudentView.IsImpersonating) return Unauthorized();
         await OnGetAsync(term);
         if (LegacyApproval?.CountsAsApproved == true)
         {

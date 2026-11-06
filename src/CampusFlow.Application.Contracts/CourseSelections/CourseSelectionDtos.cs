@@ -43,6 +43,7 @@ public sealed class CourseSelectionRegistrationDto
 
 public sealed class CourseSelectionDto
 {
+    public bool IsLockedByBillApproval { get; set; }
     public string ExternalTermId { get; set; } = null!;
     public string TermName { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;

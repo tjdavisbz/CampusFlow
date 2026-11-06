@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.BillApprovals;
+using Volo.Abp.Timing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
@@ -21,13 +23,18 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
     private readonly IRepository<StudentHousingSelection, Guid> _selections;
     private readonly IReadOnlyCollection<IStudentInformationSystemMealPlanService> _services;
     private readonly ILogger<MealPlanAppService> _logger;
+    private readonly IElementsHousingReader _housing;
+    private readonly IRepository<BillApprovalTermConfiguration, Guid> _terms;
+    private readonly IClock _clock;
+    private readonly IBillApprovalCompletionLookup _completion;
 
     public MealPlanAppService(IRepository<StudentProfile, Guid> profiles,
         ICurrentStudentView currentStudentView,
         IRepository<MealPlanConfiguration, Guid> configurations,
         IRepository<StudentHousingSelection, Guid> selections,
         IEnumerable<IStudentInformationSystemMealPlanService> services,
-        ILogger<MealPlanAppService> logger)
+        ILogger<MealPlanAppService> logger, IElementsHousingReader housing,
+        IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion)
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
@@ -35,35 +42,50 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         _selections = selections;
         _services = services.ToArray();
         _logger = logger;
+        _housing = housing;
+        _terms = terms;
+        _clock = clock;
+        _completion = completion;
     }
 
-    public async Task<MealPlanSelectionDto> GetAsync()
+    public async Task<MealPlanSelectionDto> GetAsync(string? externalTermId = null)
     {
         var profile = await GetProfileAsync();
         var service = _services.SingleOrDefault(x => x.Provider == profile.Provider)
             ?? throw new UserFriendlyException("Meal plan selection is not available for your student record.");
-        var context = await service.GetContextAsync(profile.ExternalStudentId);
+        var terms = await _terms.GetListAsync();
+        var term = string.IsNullOrWhiteSpace(externalTermId)
+            ? terms.OrderByDescending(x => x.IsOpenForStudent(_clock.Now, profile.StudentId)).ThenBy(x => Math.Abs((x.OpensAt - _clock.Now).TotalDays)).FirstOrDefault()
+            : terms.SingleOrDefault(x => x.ExternalTermId == externalTermId);
+        if (term is null || !int.TryParse(term.ExternalTermId, out var termId) ||
+            !int.TryParse(profile.ExternalStudentId, out var studentUid))
+            throw new UserFriendlyException("A meal plan selection period is not available.");
+        var eligibility = await _housing.GetStudentEligibilityAsync(studentUid, termId);
+        var context = await service.GetContextAsync(profile.ExternalStudentId, termId);
+        var selectionTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == termId)
+            ?? throw new UserFriendlyException("The meal plan term is unavailable.");
         var configs = await _configurations.GetListAsync(x => x.IsActive);
-        var catalogByName = context.Catalog
+        var catalogByName = context.Catalog.Where(x => x.StartDate <= selectionTerm.EndDate && x.EndDate >= selectionTerm.StartDate)
             .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.StartDate).First(), StringComparer.OrdinalIgnoreCase);
 
         var result = new MealPlanSelectionDto
         {
+            ExternalTermId = term.ExternalTermId,
+            HousingRequired = eligibility.HousingRequired,
+            HasHousingAssignment = eligibility.HasAssignment,
+            MealPlanEligible = eligibility.MealPlanEligible,
+            AssignedHousingChoice = eligibility.AssignedChoice,
+            IsSelectionOpen = term.IsOpenForStudent(_clock.Now, profile.StudentId),
+            IsLockedByBillApproval = await _completion.IsApprovedAsync(profile, term.ExternalTermId),
             StudentName = profile.DisplayName,
             StudentId = profile.StudentId,
             AttendanceType = context.AttendanceType,
         };
 
-        var datedPlans = context.Catalog.Where(x => !x.Name.Equals("John", StringComparison.OrdinalIgnoreCase)).ToList();
-        if (datedPlans.Count > 0)
-        {
-            var latestStart = datedPlans.Max(x => x.StartDate);
-            var activeTerm = datedPlans.Where(x => x.StartDate == latestStart).ToList();
-            result.TermName = latestStart.ToString("MMMM yyyy");
-            result.TermStartDate = activeTerm.Min(x => x.StartDate);
-            result.TermEndDate = activeTerm.Max(x => x.EndDate);
-        }
+        result.TermName = selectionTerm.StartDate.ToString("MMMM yyyy");
+        result.TermStartDate = selectionTerm.StartDate;
+        result.TermEndDate = selectionTerm.EndDate;
 
         var selection = string.IsNullOrWhiteSpace(result.TermName)
             ? null
@@ -76,7 +98,8 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         foreach (var choice in Enum.GetValues<HousingChoice>())
         {
             result.Options[choice] = configs
-                .Where(x => AllowsChoice(x, choice) && AllowsAttendanceType(x, context.AttendanceType))
+                .Where(x => eligibility.MealPlanEligible && eligibility.HasAssignment && choice == eligibility.AssignedChoice
+                    && AllowsChoice(x, choice) && AllowsAttendanceType(x, context.AttendanceType))
                 .OrderBy(x => x.SortOrder)
                 .Select(x =>
                 {
@@ -104,7 +127,13 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
             throw new Volo.Abp.Authorization.AbpAuthorizationException("Student impersonation is read-only.");
         if (!Enum.IsDefined(input.HousingChoice)) throw new UserFriendlyException("Choose a housing option.");
         var profile = await GetProfileAsync();
-        var view = await GetAsync();
+        var view = await GetAsync(input.ExternalTermId);
+        if (view.IsLockedByBillApproval)
+            throw new UserFriendlyException("Your bill is approved for this term. Contact Student Billing to request changes.");
+        if (!view.IsSelectionOpen || !view.MealPlanEligible || !view.HasHousingAssignment)
+            throw new UserFriendlyException("Meal plan selection is not available for your student record and term.");
+        if (input.HousingChoice != view.AssignedHousingChoice)
+            throw new UserFriendlyException("Your meal plan options must match your assigned housing.");
         var option = view.Options[input.HousingChoice].SingleOrDefault(x => x.ExternalMealPlanId == input.ExternalMealPlanId);
         if (option is null) throw new UserFriendlyException("Choose an available meal plan.");
 
@@ -142,7 +171,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
             }
         }
         await _selections.UpdateAsync(selection, autoSave: true);
-        return await GetAsync();
+        return await GetAsync(view.ExternalTermId);
     }
 
     private async Task<StudentProfile> GetProfileAsync()

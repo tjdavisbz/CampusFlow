@@ -54,7 +54,7 @@ public class CourseSelectionModel : CampusFlowPageModel
     public bool HasStudentStatusHold { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string ErrorTitle { get; private set; } = "Course not added";
-    public bool IsReadOnlyStudentView => _currentStudentView.IsImpersonating;
+    public bool IsReadOnlyStudentView => _currentStudentView.IsImpersonating || Selection?.IsLockedByBillApproval == true;
     public string FilterPreferenceKey => CurrentUser.Id?.ToString("N") ?? "anonymous";
 
     [BindProperty(SupportsGet = true)]
