@@ -38,6 +38,34 @@ public class ElementsCostTypeTests
     public void Guard_rejects_disabled_or_wrong_destinations(string key,string value) =>
         Should.Throw<InvalidOperationException>(()=>Service(key,value).EnsureRunEnabled());
     [Fact]
+    public void Explicit_production_configuration_allows_only_its_own_manual_run() => ProductionService().EnsureRunEnabled();
+    [Theory]
+    [InlineData("CostTypes:EnableProductionRuns","false")]
+    [InlineData("CostTypes:EnableNonProductionRuns","true")]
+    [InlineData("App:EnvironmentLabel","NON-PRODUCTION")]
+    [InlineData("ASPNETCORE_ENVIRONMENT","Staging")]
+    [InlineData("ASPNETCORE_ENVIRONMENT","Development")]
+    [InlineData("StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl","https://app-elm-nonprod-usc-integrationapi.azurewebsites.net")]
+    [InlineData("StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl","http://app-elm-prod-usc-integrationapi.azurewebsites.net")]
+    [InlineData("StudentInformationSystems:Providers:ThesisElements:Api:RegistrationBaseUrl","https://np-usc-gateway.thesiscloud.com")]
+    [InlineData("StudentInformationSystems:Providers:ThesisElements:Api:TenantHost","el-np-nel.thesiscloud.com")]
+    [InlineData("ConnectionStrings:ThesisElementsReadOnly","Server=sql-elm-nonprod-usc-replica.database.windows.net;Database=EL-NP-NEL-DB")]
+    public void Production_gate_rejects_disabled_mixed_or_cross_environment_settings(string key,string value) =>
+        Should.Throw<InvalidOperationException>(()=>ProductionService(key,value).EnsureRunEnabled());
+    private static ElementsCostTypeService ProductionService(string? key=null,string? value=null)
+    {
+        const string prefix="StudentInformationSystems:Providers:ThesisElements:Api:";
+        var settings=new Dictionary<string,string?>
+        {
+            ["CostTypes:EnableProductionRuns"]="true",["CostTypes:EnableNonProductionRuns"]="false",
+            ["ASPNETCORE_ENVIRONMENT"]="Production",[prefix+"BaseUrl"]="https://app-elm-prod-usc-integrationapi.azurewebsites.net",
+            [prefix+"RegistrationBaseUrl"]="https://el-usc-gateway.thesiscloud.com",[prefix+"TenantHost"]="el-nel.thesiscloud.com",
+            ["ConnectionStrings:ThesisElementsReadOnly"]="Server=sql-elm-prod-usc-replica.database.windows.net;Database=EL-NEL-DB"
+        };
+        if(key is not null)settings[key]=value;
+        return new(new ConfigurationBuilder().AddInMemoryCollection(settings).Build(),new MemoryCache(new MemoryCacheOptions()));
+    }
+    [Fact]
     public void Change_preserves_unrelated_fields_and_uses_the_selected_terms_target()
     {
         var status=Status();var candidate=Candidate(status);

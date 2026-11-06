@@ -9,6 +9,10 @@ namespace CampusFlow.Web.Pages.Admin.StudentBilling;
 [ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
 public class CostTypesModel(ICostTypeAppService service) : CampusFlowPageModel
 {
+    public bool IsReadOnlyView => HttpContext?.User.HasClaim(claim =>
+        claim.Type == CampusFlow.Students.StudentViewClaimTypes.ExternalStudentId ||
+        claim.Type == CampusFlow.Web.Portals.FacultyViewClaimTypes.FacultyId ||
+        claim.Type == CampusFlow.AdvisorPortal.SchedulerViewClaimTypes.Email) == true;
     public void OnGet() { }
     public async Task<JsonResult> OnGetHistoryAsync() => new(await service.GetHistoryAsync());
     public async Task<JsonResult> OnGetSetupAsync() => new(await service.GetAsync());

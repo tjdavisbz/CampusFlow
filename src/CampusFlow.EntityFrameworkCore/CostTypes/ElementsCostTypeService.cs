@@ -15,12 +15,12 @@ using Volo.Abp.DependencyInjection;
 
 namespace CampusFlow.CostTypes;
 
-// Manual validation runs are restricted to the verified non-production Elements tenant.
+// Manual runs require an explicit gate and matching endpoints for their own Elements environment.
 [ExposeServices(typeof(ICostTypeElements))]
 public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDependency
 {
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
-    private const string TokenCacheKey = "ThesisElements:NonProductionCostTypes:IntegrationToken";
+    private string TokenCacheKey => "ThesisElements:CostTypes:" + Setting("TenantHost") + ":IntegrationToken";
     private static readonly HttpClient SharedHttpClient = new();
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
@@ -38,23 +38,36 @@ public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDepen
 
     public void EnsureRunEnabled()
     {
-        if (!_configuration.GetValue<bool>("CostTypes:EnableNonProductionRuns") ||
-            !string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase) ||
-            !MatchesHost(Setting("BaseUrl"), "app-elm-nonprod-usc-integrationapi.azurewebsites.net") ||
-            !MatchesHost(Setting("RegistrationBaseUrl"), "np-usc-gateway.thesiscloud.com") ||
-            !string.Equals(Setting("TenantHost"), "el-np-nel.thesiscloud.com", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Cost-type runs are enabled only for the verified Nelson non-production Elements tenant.");
+        var nonProduction = EnsureEnvironment();
+        var ownFlag = nonProduction ? "CostTypes:EnableNonProductionRuns" : "CostTypes:EnableProductionRuns";
+        var otherFlag = nonProduction ? "CostTypes:EnableProductionRuns" : "CostTypes:EnableNonProductionRuns";
+        if (!_configuration.GetValue<bool>(ownFlag) || _configuration.GetValue<bool>(otherFlag))
+            throw new InvalidOperationException("Manual cost-type runs must be explicitly enabled only for their own Elements environment.");
+    }
+
+    private bool EnsureEnvironment()
+    {
+        var nonProduction = string.Equals(_configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase);
+        var production = string.IsNullOrWhiteSpace(_configuration["App:EnvironmentLabel"]) ||
+            string.Equals(_configuration["App:EnvironmentLabel"], "PRODUCTION", StringComparison.OrdinalIgnoreCase);
+        if ((!nonProduction && !production) || production && !string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Production", StringComparison.OrdinalIgnoreCase) ||
+            !MatchesHost(Setting("BaseUrl"), nonProduction ? "app-elm-nonprod-usc-integrationapi.azurewebsites.net" : "app-elm-prod-usc-integrationapi.azurewebsites.net") ||
+            !MatchesHost(Setting("RegistrationBaseUrl"), nonProduction ? "np-usc-gateway.thesiscloud.com" : "el-usc-gateway.thesiscloud.com") ||
+            !string.Equals(Setting("TenantHost"), nonProduction ? "el-np-nel.thesiscloud.com" : "el-nel.thesiscloud.com", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cost-type access requires the verified Nelson Elements environment.");
         var connectionString = _configuration.GetConnectionString("ThesisElementsReadOnly");
-        if (string.IsNullOrWhiteSpace(connectionString))
-            throw new InvalidOperationException("The non-production Elements replica is not configured.");
+        if (string.IsNullOrWhiteSpace(connectionString)) throw new InvalidOperationException("The Elements reporting connection is not configured.");
         var replica = new SqlConnectionStringBuilder(connectionString);
-        if (!MatchesReplicaHost(replica.DataSource) ||
-            !string.Equals(replica.InitialCatalog, "EL-NP-NEL-DB", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Cost-type runs require the Nelson non-production Elements replica.");
+        var host = nonProduction ? "sql-elm-nonprod-usc-replica.database.windows.net" : "sql-elm-prod-usc-replica.database.windows.net";
+        if (!(string.Equals(replica.DataSource,host,StringComparison.OrdinalIgnoreCase) || string.Equals(replica.DataSource,"tcp:"+host+",1433",StringComparison.OrdinalIgnoreCase)) ||
+            !string.Equals(replica.InitialCatalog,nonProduction ? "EL-NP-NEL-DB" : "EL-NEL-DB",StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cost-type access requires the matching Nelson Elements replica.");
+        return nonProduction;
     }
 
     public async Task<List<CostTypeChoice>> GetChoicesAsync()
     {
+        EnsureEnvironment();
         await using var connection=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
         await connection.OpenAsync();
         await using var command=new SqlCommand("SELECT CostTypeID,CostType,Description FROM dbo.CostType WHERE ActiveFlag=1 ORDER BY CostType,CostTypeID",connection);
@@ -64,6 +77,7 @@ public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDepen
     }
     public async Task<List<CostTypePreviewRow>> PreviewAsync(List<CostTypeRule> rules,int? studentUid)
     {
+        EnsureEnvironment();
         await using var connection=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
         await connection.OpenAsync();
         await using var command=new SqlCommand(PreviewSql,connection) { CommandTimeout=120 };
@@ -182,11 +196,11 @@ public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDepen
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
         using var response = await _client.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("Non-production Elements authentication failed.");
+            throw new InvalidOperationException("Elements authentication failed.");
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         var token = JsonNode.Parse(body)?["data"]?["token"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Non-production Elements did not return an authentication token.");
+            throw new InvalidOperationException("Elements did not return an authentication token.");
         _cache.Set(TokenCacheKey, token, TimeSpan.FromMinutes(10));
         return token;
     }
@@ -211,7 +225,7 @@ public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDepen
         try { root = JsonNode.Parse(body) as JsonObject; }
         catch (JsonException) { root = null; }
         if (!response.IsSuccessStatusCode || root?["isSuccess"]?.GetValue<bool>() != true)
-            throw new InvalidOperationException($"Non-production Elements rejected the cost-type request (HTTP {(int)response.StatusCode}).");
+            throw new InvalidOperationException($"Elements rejected the cost-type request (HTTP {(int)response.StatusCode}).");
         return root;
     }
 
