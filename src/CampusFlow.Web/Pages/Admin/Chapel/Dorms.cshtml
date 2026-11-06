@@ -1,0 +1,28 @@
+@page
+@model CampusFlow.Web.Pages.Admin.Chapel.DormsModel
+@using CampusFlow.Chapel
+@{ViewData["Title"]="Chapel dorm roster";}
+<main class="container py-4">
+<h1>Chapel dorm roster</h1>
+<p>View students by their housing for the selected term. Off campus requires a commuter assignment or explicit commuter status; missing or conflicting housing appears under Housing not identified.</p>
+<p><a asp-page="Attendance">Chapel attendance</a></p>
+<form method="get" class="d-flex flex-wrap gap-3 mb-4">
+<label>Term <select asp-for="TermId" class="form-select">@foreach(var term in Model.Terms){<option value="@term.ExternalTermId">@term.DisplayName</option>}</select></label>
+<label>Dorm <select asp-for="Dorm" class="form-select"><option value="">Choose a dorm</option>@foreach(var dorm in ChapelDorms.Options){<option value="@dorm.Key">@dorm.Name</option>}</select></label>
+<label>Student name or ID <input asp-for="Student" maxlength="100" class="form-control" /></label><button type="submit" class="btn btn-primary">View students</button>
+</form>
+@if(Model.Error is not null){<p role="alert" class="alert alert-danger">@Model.Error</p>}
+@if(Model.Roster is not null)
+{
+<p>@Model.Roster.Total matching students · Page @Model.Roster.Page</p>
+<table class="table"><thead><tr><th>Student</th><th>Student ID</th><th>Chapel records</th></tr></thead><tbody>
+@foreach(var row in Model.Roster.Students)
+{<tr><td>@row.StudentName</td><td>@row.StudentId</td><td>@if(row.HasChapelRecords){<a asp-page="Attendance" asp-route-termId="@Model.TermId" asp-route-student="@row.StudentId">View attendance</a>}else{<span>No chapel records for this term</span>}</td></tr>}
+</tbody></table>
+@if(Model.Roster.Students.Count==0){<p>No matching students. Housing changes may take time to appear.</p>}
+<nav aria-label="Roster pages">
+@if(Model.PageNumber>1){<a asp-route-termId="@Model.TermId" asp-route-dorm="@Model.Dorm" asp-route-student="@Model.Student" asp-route-pageNumber="@(Model.PageNumber-1)">Previous</a>}
+@if(Model.PageNumber*Model.Roster.PageSize<Model.Roster.Total){<a asp-route-termId="@Model.TermId" asp-route-dorm="@Model.Dorm" asp-route-student="@Model.Student" asp-route-pageNumber="@(Model.PageNumber+1)">Next</a>}
+</nav>
+}
+</main>

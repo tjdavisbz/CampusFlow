@@ -18,8 +18,12 @@
     <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor;--tenant-surface:@Model.Theme.SurfaceColor;--tenant-text:@Model.Theme.TextColor;--tenant-heading-font:@Model.Theme.HeadingFontFamily;--tenant-body-font:@Model.Theme.BodyFontFamily}</style>
 }
 
-<main class="chapel-page chapel-admin-page">
+@section scripts { <script src="~/Pages/Admin/Chapel/Attendance.js" asp-append-version="true"></script> }
+<main id="chapel-attendance-workspace" class="chapel-page chapel-admin-page" data-summary-url="@(Model.SessionSummaries.Count>0 ? Url.Page(null,"DaySummary",new{termId=Model.TermId,date=Model.Date?.ToString("yyyy-MM-dd")}) : "")">
     <header class="chapel-hero"><span>Chapel administration</span><h1>Attendance</h1><p>Find a chapel session or student, then update the attendance record.</p></header>
+    <p class="chapel-admin-note">Status and comment edits save automatically after you pause typing. Check the save message before leaving. <a asp-page="Dorms" asp-route-termId="@Model.TermId">View dorm roster</a></p>
+    <p id="chapel-save-summary" class="chapel-admin-note" role="status" aria-live="polite"></p>
+    <noscript><p class="alert alert-info">Automatic saving requires JavaScript. Use Save change for each edited record.</p></noscript>
     @if (!string.IsNullOrWhiteSpace(Model.Message)) { <div class="alert alert-success" role="status">@Model.Message</div> }
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage)) { <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div> }
     @if (Model.IsUnavailable) { <section class="chapel-message" role="status"><i class="fa-regular fa-circle-exclamation" aria-hidden="true"></i><div><h2>Attendance is temporarily unavailable</h2><p>Please try again later.</p></div></section> }
@@ -41,26 +45,30 @@
             <div><label for="group">Group</label><select id="group" name="group"><option value="">All groups</option>
                 @foreach (var group in Model.Groups) { <option value="@group" selected="@(group == Model.Group)">@group</option> }
             </select></div>
+            <div><label for="dorm">Dorm</label><select id="dorm" name="dorm"><option value="">All housing</option>
+                @foreach(var dorm in ChapelDorms.Options){<option value="@dorm.Key" selected="@(dorm.Key==Model.Dorm)">@dorm.Name</option>}
+            </select></div>
             <div class="chapel-scan-filter"><label for="showScanInOnly"><input id="showScanInOnly" name="showScanInOnly" type="checkbox" value="true" checked="@Model.ShowScanInOnly" /> Scan-in-only absences</label></div>
             <button type="submit">Search attendance</button>
         </form>
         </section>
-        @if (Model.Date.HasValue || !string.IsNullOrWhiteSpace(Model.Student) || !string.IsNullOrWhiteSpace(Model.Group))
+        @if (Model.Date.HasValue || !string.IsNullOrWhiteSpace(Model.Student) || !string.IsNullOrWhiteSpace(Model.Group) || !string.IsNullOrWhiteSpace(Model.Dorm))
         {
             @if (Model.SessionSummaries.Count > 0)
             {
                 <section class="chapel-panel chapel-session-review" aria-labelledby="chapel-day-heading">
                     <div class="chapel-toolbar"><div><span>Day review</span><h2 id="chapel-day-heading">@Model.Date?.ToString("MMMM d, yyyy")</h2></div></div>
                     <p class="chapel-admin-note">Each chapel session is separate. The correction below credits only imported absences labeled “Scan In Only”; it does not change other absences, excuses, or staff decisions.</p>
+                    <p id="chapel-totals-message" class="chapel-admin-note" role="status"></p>
                     <div class="chapel-session-list">
                     @foreach (var session in Model.SessionSummaries)
                     {
                         var confirmation = $"Credit all {session.ScanInOnly} scan-in-only absences for the {session.ChapelAtLocal:h:mm tt} chapel as Present? Use this only if scan-out was waived for this session. This cannot be undone as a group.";
-                        <div class="chapel-session-card">
-                            <div><strong>@session.ChapelAtLocal.ToString("h:mm tt") chapel</strong><span>@session.Total students · @session.Present present · @session.Absent absent · @session.Excused excused · @session.ScanInOnly scan-in-only</span></div>
+                        <div class="chapel-session-card" data-session="@session.ChapelAtLocal.ToString("yyyy-MM-ddTHH:mm:ss")">
+                            <div><strong>@session.ChapelAtLocal.ToString("h:mm tt") chapel</strong><span data-session-counts>@session.Total students · @session.Present present · @session.Absent absent · @session.Excused excused · @session.ScanInOnly scan-in-only</span></div>
                             @if (session.ScanInOnly > 0)
                             {
-                                <form method="post" asp-page-handler="CreditScanInOnly" data-confirmation="@confirmation" onsubmit="return confirm(this.dataset.confirmation);">
+                                <form method="post" asp-page-handler="CreditScanInOnly" data-bulk-credit data-confirmation="@confirmation" onsubmit="return confirm(this.dataset.confirmation);">
                                     <input type="hidden" name="termId" value="@Model.TermId" />
                                     <input type="hidden" name="sessionAtLocal" value="@session.ChapelAtLocal.ToString("yyyy-MM-ddTHH:mm:ss")" />
                                     <input type="hidden" name="expectedCount" value="@session.ScanInOnly" />
@@ -81,10 +89,10 @@
                 @foreach (var row in Model.Rows)
                 {
                     var formId = "chapel-" + row.Id.ToString("N");
-                    <tr>
+                    <tr data-attendance-row>
                         <td data-label="Student"><strong>@row.StudentName</strong><span class="chapel-time">@row.StudentId</span></td>
                         <td data-label="Chapel session">@row.ChapelAtLocal.ToString("MMM d, yyyy h:mm tt")</td>
-                        <td data-label="Attendance decision"><span class="chapel-status @row.Status.ToString().ToLowerInvariant()">@row.Status</span><label for="status-@formId">Change status</label>
+                        <td data-label="Attendance decision"><span data-attendance-status class="chapel-status @row.Status.ToString().ToLowerInvariant()">@row.Status</span><label for="status-@formId">Change status</label>
                             <select id="status-@formId" name="status" form="@formId">
                                 @foreach (var value in Enum.GetValues<ChapelAttendanceStatus>())
                                 {
@@ -94,16 +102,19 @@
                             <label for="comment-@formId">Comment</label>
                             <input id="comment-@formId" name="comment" form="@formId" value="@row.Comment" maxlength="4000" placeholder="Optional note" />
                         </td>
-                        <td data-label="Source">@row.Source</td>
-                        <td data-label="Action"><form id="@formId" method="post" asp-page-handler="Update">
+                        <td data-label="Source" data-attendance-source>@row.Source</td>
+                        <td data-label="Action"><form id="@formId" method="post" asp-page-handler="Update" data-chapel-autosave>
                             <input type="hidden" name="id" value="@row.Id" />
                             <input type="hidden" name="revision" value="@row.Revision" />
                             <input type="hidden" name="termId" value="@Model.TermId" />
                             <input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" />
                             <input type="hidden" name="student" value="@Model.Student" />
                             <input type="hidden" name="group" value="@Model.Group" />
+                            <input type="hidden" name="dorm" value="@Model.Dorm" />
                             <input type="hidden" name="showScanInOnly" value="@Model.ShowScanInOnly.ToString().ToLowerInvariant()" />
-                            <button type="submit">Save change</button>
+                            <span data-save-message role="status" aria-live="polite">Up to date</span>
+                            <button type="submit" data-save-now>Save change</button>
+                            <button type="button" data-reload-record hidden>Reload saved record</button>
                         </form></td>
                     </tr>
                 }

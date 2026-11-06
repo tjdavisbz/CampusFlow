@@ -47,3 +47,8 @@
     .chapel-admin-table td[data-label="Attendance decision"] > .chapel-status { grid-column: 2; justify-self: start; }
     .chapel-admin-note { padding: 1rem; }
 }
+
+[data-save-message] { display:block; margin-bottom:.5rem; font-size:.85rem; }
+[data-save-message][data-state="error"], [data-save-message][data-state="conflict"] { color:#b42318; font-weight:700; }
+[data-save-message][data-state="saving"], [data-save-message][data-state="pending"] { color:#854a0e; }
+.chapel-admin-table [data-reload-record] { margin-top:.5rem; background:#475467; }
