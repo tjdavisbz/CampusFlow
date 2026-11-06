@@ -14,6 +14,16 @@
 @if(Model.Error is not null){<p role="alert" class="alert alert-danger">@Model.Error</p>}
 @if(Model.Roster is not null)
 {
+<section class="card card-body mb-4" aria-labelledby="dorm-attendance-heading">
+<h2 id="dorm-attendance-heading">Edit @ChapelDorms.Name(Model.Dorm!) attendance</h2>
+<p>Open this dorm’s attendance for a chapel date, then change students’ statuses and comments directly in the list. Changes save automatically.</p>
+<form method="get" asp-page="Attendance" class="d-flex flex-wrap align-items-end gap-3">
+    <input type="hidden" name="termId" value="@Model.TermId" />
+    <input type="hidden" name="dorm" value="@Model.Dorm" />
+    <label>Chapel date <input type="date" name="date" required class="form-control" /></label>
+    <button type="submit" class="btn btn-primary">Edit dorm attendance</button>
+</form>
+</section>
 <p>@Model.Roster.Total matching students · Page @Model.Roster.Page</p>
 <table class="table"><thead><tr><th>Student</th><th>Student ID</th><th>Chapel records</th></tr></thead><tbody>
 @foreach(var row in Model.Roster.Students)

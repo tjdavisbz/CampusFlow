@@ -20,8 +20,15 @@
 
 @section scripts { <script src="~/Pages/Admin/Chapel/Attendance.js" asp-append-version="true"></script> }
 <main id="chapel-attendance-workspace" class="chapel-page chapel-admin-page" data-summary-url="@(Model.SessionSummaries.Count>0 ? Url.Page(null,"DaySummary",new{termId=Model.TermId,date=Model.Date?.ToString("yyyy-MM-dd")}) : "")">
-    <header class="chapel-hero"><span>Chapel administration</span><h1>Attendance</h1><p>Find a chapel session or student, then update the attendance record.</p></header>
-    <p class="chapel-admin-note">Status and comment edits save automatically after you pause typing. Check the save message before leaving. <a asp-page="Dorms" asp-route-termId="@Model.TermId">View dorm roster</a></p>
+    <header class="chapel-hero"><span>Chapel administration</span><h1>Attendance</h1><p>Find a chapel session, dorm, or student, then update attendance directly in the list.</p></header>
+    <p class="chapel-admin-note">Status and comment edits save automatically after you pause typing. Check the save message before leaving. <a asp-page="Dorms" asp-route-termId="@Model.TermId" asp-route-dorm="@Model.Dorm">View dorm roster</a></p>
+    @if (!Model.IsUnavailable && ChapelDorms.IsValid(Model.Dorm ?? ""))
+    {
+        <section class="alert alert-info" aria-label="Selected dorm attendance">
+            <strong>@ChapelDorms.Name(Model.Dorm!) attendance@(Model.Date.HasValue ? $" · {Model.Date.Value:MMMM d, yyyy}" : "")</strong>
+            <p class="mb-0">@(Model.Date.HasValue ? "Edit students’ statuses and comments below. Your changes save automatically while this filter stays selected." : "Choose a chapel date below to edit this dorm’s attendance for that day.")</p>
+        </section>
+    }
     <p id="chapel-save-summary" class="chapel-admin-note" role="status" aria-live="polite"></p>
     <noscript><p class="alert alert-info">Automatic saving requires JavaScript. Use Save change for each edited record.</p></noscript>
     @if (!string.IsNullOrWhiteSpace(Model.Message)) { <div class="alert alert-success" role="status">@Model.Message</div> }
@@ -40,14 +47,14 @@
                     }
                 </select>
             </div>
-            <div><label for="date">Chapel date</label><input id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><small>Choose a date to see everyone for that day.</small></div>
+            <div><label for="date">Chapel date</label><input id="date" name="date" type="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><small>Combine a date and dorm to edit that dorm’s students for the day.</small></div>
             <div><label for="student">Student ID or name</label><input id="student" name="student" value="@Model.Student" maxlength="100" placeholder="First and last name, or part of either" /><small>Middle names are optional; partial names work.</small></div>
             <div><label for="group">Group</label><select id="group" name="group"><option value="">All groups</option>
                 @foreach (var group in Model.Groups) { <option value="@group" selected="@(group == Model.Group)">@group</option> }
             </select></div>
-            <div><label for="dorm">Dorm</label><select id="dorm" name="dorm"><option value="">All housing</option>
+            <div><label for="dorm">Filter by dorm</label><select id="dorm" name="dorm"><option value="">All housing</option>
                 @foreach(var dorm in ChapelDorms.Options){<option value="@dorm.Key" selected="@(dorm.Key==Model.Dorm)">@dorm.Name</option>}
-            </select></div>
+            </select><small>Edit the filtered records below without opening students individually.</small></div>
             <div class="chapel-scan-filter"><label for="showScanInOnly"><input id="showScanInOnly" name="showScanInOnly" type="checkbox" value="true" checked="@Model.ShowScanInOnly" /> Scan-in-only absences</label></div>
             <button type="submit">Search attendance</button>
         </form>

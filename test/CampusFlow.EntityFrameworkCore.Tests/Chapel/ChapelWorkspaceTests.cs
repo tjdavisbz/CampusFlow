@@ -25,10 +25,10 @@ public class ChapelWorkspaceTests : CampusFlowEntityFrameworkCoreTestBase
         // by the shared Elements dorm lookup.
         return GetRequiredService<ICurrentTenant>().Change(_tenant, "nelson");
     }
-    private async Task<Guid> Seed(string studentId = "001", int term = 268)
+    private async Task<Guid> Seed(string studentId = "001", int term = 268, DateTime? date = null)
     {
         var id = Guid.NewGuid(); await WithUnitOfWorkAsync(async () =>
-        { await GetRequiredService<IRepository<ChapelAttendanceRecord, Guid>>().InsertAsync(new(id, _tenant, term, _nextStudentUid++, studentId, "Test Student", new DateTime(2026, 10, 1, 9, 30, 0), ChapelAttendanceStatus.Absent, "Scan In Only"), autoSave: true); }); return id;
+        { await GetRequiredService<IRepository<ChapelAttendanceRecord, Guid>>().InsertAsync(new(id, _tenant, term, _nextStudentUid++, studentId, "Test Student", date ?? new DateTime(2026, 10, 1, 9, 30, 0), ChapelAttendanceStatus.Absent, "Scan In Only"), autoSave: true); }); return id;
     }
     [Fact]
     public async Task Noop_does_not_mark_an_imported_row_as_staff_or_change_its_revision()
@@ -74,6 +74,27 @@ public class ChapelWorkspaceTests : CampusFlowEntityFrameworkCoreTestBase
         _dorms.GetResidencesAsync(268, default).Returns(new ChapelResidence[] { new("001", "Test Student", "bridges"), new("002", "Other", "kendrick") });
         await WithUnitOfWorkAsync(async () =>
         { var rows = await Service().SearchAsync(268, null, null, null, "bridges"); Assert.Equal("001", Assert.Single(rows).StudentId); Assert.All(rows, x => Assert.Equal(268, x.TermCalendarId)); });
+    }
+    [Fact]
+    public async Task Dorm_and_date_list_can_edit_multiple_students_without_changing_other_dates_dorms_or_terms()
+    {
+        using var tenant = Tenant();
+        var first = await Seed("001"); var second = await Seed("002");
+        var otherDay = await Seed("001", date: new DateTime(2026, 10, 2, 9, 30, 0));
+        var otherDorm = await Seed("003"); var otherTerm = await Seed("001", 269);
+        _dorms.GetResidencesAsync(268, default).Returns(new ChapelResidence[]
+        { new("001", "First student", "bridges"), new("002", "Second student", "bridges"), new("003", "Other student", "teeter") });
+        var service = Service(); System.Collections.Generic.List<ChapelAttendanceRow> rows = [];
+        await WithUnitOfWorkAsync(async () => rows = await service.SearchAsync(268, new DateTime(2026, 10, 1), null, null, "bridges"));
+        Assert.Equal(new[] { first, second }.OrderBy(x => x), rows.Select(x => x.Id).OrderBy(x => x));
+        foreach (var row in rows) await service.UpdateAsync(new(row.Id, row.Revision, ChapelAttendanceStatus.Present, "Dorm attendance reviewed"));
+        await WithUnitOfWorkAsync(async () =>
+        {
+            var reloaded = await service.SearchAsync(268, new DateTime(2026, 10, 1), null, null, "bridges");
+            Assert.Equal(2, reloaded.Count); Assert.All(reloaded, row => Assert.Equal(ChapelAttendanceStatus.Present, row.Status));
+            foreach (var id in new[] { otherDay, otherDorm, otherTerm })
+                Assert.Equal(ChapelAttendanceStatus.Absent, (await service.GetRowAsync(id)).Status);
+        });
     }
     [Fact]
     public async Task Missing_housing_is_unknown_and_never_becomes_off_campus()
