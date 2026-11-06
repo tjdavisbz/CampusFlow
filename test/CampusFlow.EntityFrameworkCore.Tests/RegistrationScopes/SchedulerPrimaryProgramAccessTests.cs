@@ -22,14 +22,16 @@ namespace CampusFlow.EntityFrameworkCore.Tests.RegistrationScopes;
 public class SchedulerPrimaryProgramAccessTests : CampusFlowEntityFrameworkCoreTestBase
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Queue_direct_review_and_submit_use_only_the_selected_terms_primary_program(bool lookupUnavailable)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Queue_direct_review_and_submit_use_only_the_selected_terms_primary_program(bool lookupUnavailable, bool impersonating)
     {
         var tenantId = Guid.NewGuid();
         using var tenant = GetRequiredService<ICurrentTenant>().Change(tenantId, "nelson");
         using var actor = GetRequiredService<ICurrentPrincipalAccessor>().Change(new ClaimsPrincipal(new ClaimsIdentity([
-            new Claim(AbpClaimTypes.UserId, Guid.NewGuid().ToString()), new Claim(AbpClaimTypes.Email, "scheduler@example.test")], "Test")));
+            new Claim(AbpClaimTypes.UserId, Guid.NewGuid().ToString()), new Claim(AbpClaimTypes.Email, impersonating ? "admin@example.test" : "scheduler@example.test")], "Test")));
         var profile = new StudentProfile(Guid.NewGuid(), tenantId, Guid.NewGuid(),
             new(StudentInformationSystemProvider.ThesisElements, "100", "1000", "student@example.test", "Test", null, "Student"));
         var assignment = new AdvisorAssignment(Guid.NewGuid(), tenantId, "Residential", "1", "scheduler@example.test", "Scheduler", DateTime.UtcNow.AddDays(-1));
@@ -51,20 +53,33 @@ public class SchedulerPrimaryProgramAccessTests : CampusFlowEntityFrameworkCoreT
             if (lookupUnavailable) throw new InvalidOperationException("Replica unavailable");
             return call.ArgAt<IReadOnlyCollection<StudentTermKey>>(0).Select(key => new StudentPrimaryProgram(key, key.ExternalTermId == "269" ? 10 : 11, "Primary major")).ToArray();
         });
+        var view = Substitute.For<ICurrentSchedulerView>();
+        view.IsActive.Returns(impersonating); view.Email.Returns("scheduler@example.test");
         var writer = Substitute.For<IStudentInformationSystemCourseRegistrationService>();
         var service = new AdvisorPortalAppService(GetRequiredService<IRepository<CourseReview,Guid>>(), GetRequiredService<IRepository<CourseReviewSubmission,Guid>>(),
             GetRequiredService<IRepository<StudentProfile,Guid>>(), GetRequiredService<IRepository<AdvisorAssignment,Guid>>(), GetRequiredService<IRepository<StudentGraduationIntent,Guid>>(),
-            writer, courseLookup, Substitute.For<IStudentInformationSystemStudentNotesService>(), GetRequiredService<IUnitOfWorkManager>(), [programs]) { LazyServiceProvider = GetRequiredService<IAbpLazyServiceProvider>() };
+            writer, courseLookup, Substitute.For<IStudentInformationSystemStudentNotesService>(), GetRequiredService<IUnitOfWorkManager>(), [programs], view) { LazyServiceProvider = GetRequiredService<IAbpLazyServiceProvider>() };
         await WithUnitOfWorkAsync(async () => {
             // Extra-properties scopes survive a real database round trip.
             var stored = await GetRequiredService<IRepository<AdvisorAssignment,Guid>>().GetAsync(assignment.Id);
             Assert.Equal(10, Assert.Single(stored.GetPrimaryProgramScope().MajorIds));
             var queue = await service.GetQueueAsync();
-            if (lookupUnavailable) Assert.Empty(queue); else Assert.Equal("269", Assert.Single(queue).ExternalTermId);
+            if (lookupUnavailable) Assert.Empty(queue);
+            else
+            {
+                var student = Assert.Single(queue);
+                Assert.Equal("269", student.ExternalTermId);
+                Assert.Equal("Primary major", student.PrimaryProgram);
+            }
             await Assert.ThrowsAsync<AbpAuthorizationException>(() => service.GetStudentReviewAsync(profile.Id, "268"));
             if (!lookupUnavailable) Assert.Single((await service.GetStudentReviewAsync(profile.Id, "269")).Courses);
         });
         await Assert.ThrowsAsync<AbpAuthorizationException>(() => service.SubmitAsync(new(){StudentProfileId=profile.Id,ExternalTermId="268"}));
         Assert.Empty(writer.ReceivedCalls());
+        if (impersonating)
+        {
+            view.IsActive.Returns(false);
+            await WithUnitOfWorkAsync(async () => Assert.False(await service.HasAccessAsync()));
+        }
     }
 }

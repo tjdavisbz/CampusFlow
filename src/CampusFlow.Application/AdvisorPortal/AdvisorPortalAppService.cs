@@ -29,6 +29,13 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     private readonly IUnitOfWorkManager _unitOfWorkManager;
     private readonly IReadOnlyCollection<IStudentPrimaryProgramLookup> _programLookups;
 
+    private readonly ICurrentSchedulerView? _schedulerView;
+    private string? AccessEmail => _schedulerView?.IsActive == true ? _schedulerView.Email : CurrentUser.Email;
+    private void EnsureWritable()
+    {
+        if (_schedulerView?.IsActive == true) throw new AbpAuthorizationException("Scheduler impersonation is read-only.");
+    }
+
     public AdvisorPortalAppService(
         IRepository<CourseReview, Guid> reviews,
         IRepository<CourseReviewSubmission, Guid> submissions,
@@ -38,7 +45,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         IStudentInformationSystemCourseRegistrationService registration,
         IStudentInformationSystemCourseSelectionLookup courseLookup,
         IStudentInformationSystemStudentNotesService studentNotes,
-        IUnitOfWorkManager unitOfWorkManager, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null)
+        IUnitOfWorkManager unitOfWorkManager, IEnumerable<IStudentPrimaryProgramLookup>? programLookups = null,
+        ICurrentSchedulerView? schedulerView = null)
     {
         _reviews = reviews;
         _submissions = submissions;
@@ -50,6 +58,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         _studentNotes = studentNotes;
         _unitOfWorkManager = unitOfWorkManager;
         _programLookups = programLookups?.ToArray() ?? [];
+        _schedulerView = schedulerView;
     }
 
     public async Task<List<AdvisorQueueItemDto>> GetQueueAsync(string? externalTermId = null)
@@ -97,8 +106,8 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
 
     public async Task<bool> HasAccessAsync()
     {
-        if (string.IsNullOrWhiteSpace(CurrentUser.Email)) return false;
-        return (await GetActiveAssignmentsAsync(CurrentUser.Email)).Count > 0;
+        if (string.IsNullOrWhiteSpace(AccessEmail)) return false;
+        return (await GetActiveAssignmentsAsync(AccessEmail)).Count > 0;
     }
 
     public async Task<AdvisorStudentReviewDto> GetStudentReviewAsync(
@@ -159,6 +168,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
 
     public async Task<Guid> SubmitAsync(SubmitAdvisorReviewInput input)
     {
+        EnsureWritable();
         if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(CurrentUser.Email))
             throw new UserFriendlyException("Your advisor identity could not be resolved.");
         if (string.IsNullOrWhiteSpace(input.ExternalTermId))
@@ -225,6 +235,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
     [UnitOfWork(IsDisabled = true)]
     public async Task EnsureStudentNoteAsync(Guid submissionId)
     {
+        EnsureWritable();
         if (CurrentUser.Id is null || !await HasAccessAsync())
             throw new AbpAuthorizationException("This review is not available to this account.");
         var submission = await _submissions.GetAsync(submissionId);
@@ -247,6 +258,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
 
     public async Task<AdvisorReviewEmailDto> GetSubmissionEmailAsync(Guid submissionId)
     {
+        EnsureWritable();
         var submission = await _submissions.GetAsync(submissionId);
         if (CurrentUser.Id != submission.SubmittedByUserId || !await HasAccessAsync())
             throw new AbpAuthorizationException("This review message is not available to this account.");
@@ -314,7 +326,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
 
     private async Task EnsureAssignedToStudentAsync(IReadOnlyCollection<CourseReview> reviews)
     {
-        var assignments = await GetActiveAssignmentsAsync(CurrentUser.Email);
+        var assignments = await GetActiveAssignmentsAsync(AccessEmail);
         var first = reviews.First();
         var graduation = await _graduationIntents.FindAsync(x =>
             x.StudentProfileId == first.StudentProfileId && x.ExternalTermId == first.ExternalTermId);
@@ -376,7 +388,7 @@ public class AdvisorPortalAppService : CampusFlowAppService, IAdvisorPortalAppSe
         var activeIds = await _courseLookup.GetActiveRegistrationIdsAsync(
             pending.Select(x => x.ExternalCourseRegistrationId).Distinct().ToArray());
         pending = CourseReviewReconciliation.KeepActivePending(pending, activeIds);
-        var assignments = await GetActiveAssignmentsAsync(CurrentUser.Email);
+        var assignments = await GetActiveAssignmentsAsync(AccessEmail);
         var profileIds = pending.Select(x => x.StudentProfileId).Distinct().ToArray();
         var graduationQuery = await _graduationIntents.GetQueryableAsync();
         var graduating = (await AsyncExecuter.ToListAsync(graduationQuery.Where(x =>

@@ -13,7 +13,8 @@ public class CostTypesModel(ICostTypeAppService service) : CampusFlowPageModel
 {
     public bool IsReadOnlyView => HttpContext?.User.HasClaim(claim =>
         claim.Type == StudentViewClaimTypes.ExternalStudentId ||
-        claim.Type == FacultyViewClaimTypes.FacultyId) == true;
+        claim.Type == FacultyViewClaimTypes.FacultyId ||
+        claim.Type == CampusFlow.AdvisorPortal.SchedulerViewClaimTypes.Email) == true;
     public void OnGet() { }
     public async Task<JsonResult> OnGetHistoryAsync() => new(await service.GetHistoryAsync());
     public async Task<JsonResult> OnGetSetupAsync() => new(await service.GetAsync());

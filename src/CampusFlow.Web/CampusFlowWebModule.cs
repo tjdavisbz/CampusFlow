@@ -148,6 +148,7 @@ public class CampusFlowWebModule : AbpModule
         context.Services.AddTransient<IBillApprovalCompletionOperations, BillApprovalCompletionOperations>();
         context.Services.AddTransient<IBillApprovalMailSender, AzureBillApprovalMailSender>();
         context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
+        context.Services.AddTransient<CampusFlow.AdvisorPortal.ICurrentSchedulerView, CurrentSchedulerView>();
         context.Services.AddHttpContextAccessor();
         context.Services.AddTransient<CampusFlow.Web.Students.IStudentTermSelection, CampusFlow.Web.Students.StudentTermSelection>();
         context.Services.Configure<PayflowOptions>(configuration.GetSection(PayflowOptions.SectionName));
@@ -469,6 +470,7 @@ public class CampusFlowWebModule : AbpModule
         app.UseAuthorization();
         app.UseMiddleware<StudentViewContextMiddleware>();
         app.UseMiddleware<FacultyViewContextMiddleware>();
+        app.UseMiddleware<SchedulerViewContextMiddleware>();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {
