@@ -132,13 +132,23 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
     public async Task<HousingPricingContext> GetPricingAsync(int periodId,
         CancellationToken cancellationToken = default)
     {
-        var nonProduction = string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION",
-            StringComparison.OrdinalIgnoreCase);
-        var termId = periodId switch { 1 => 268, 2 when !nonProduction => 269, _ => 0 };
-        if (termId == 0)
-            throw new InvalidOperationException("This housing period has not been approved for CampusFlow billing.");
         await using var connection = Connection();
         await connection.OpenAsync(cancellationToken);
+        await using var termLookup=new SqlCommand("""
+            SELECT t.TermCalendarID,t.TermStartDate,t.TermEndDate
+            FROM StudentLife.HousingPeriods hp
+            JOIN dbo.TermCalendar t ON CAST(hp.StartDate AS date)=CAST(t.TermStartDate AS date)
+                AND CAST(hp.EndDate AS date)=CAST(t.TermEndDate AS date)
+            WHERE hp.HousingPeriodID=@PeriodId AND hp.IsDeleted=0 AND t.TermCalendarID IN (268,269);
+            """,connection);
+        termLookup.Parameters.Add("@PeriodId",SqlDbType.Int).Value=periodId;
+        int termId;DateTime expectedStart,expectedEnd;
+        await using(var termReader=await termLookup.ExecuteReaderAsync(cancellationToken))
+        {
+            if(!await termReader.ReadAsync(cancellationToken))throw new InvalidOperationException("This housing period has no unique reviewed Fall 2026 or Spring 2027 billing term.");
+            termId=termReader.GetInt32(0);expectedStart=termReader.GetDateTime(1).Date;expectedEnd=termReader.GetDateTime(2).Date;
+            if(await termReader.ReadAsync(cancellationToken))throw new InvalidOperationException("Housing period billing term is ambiguous.");
+        }
         await using var command = new SqlCommand("""
             SELECT HousingPeriodName, StartDate, EndDate
             FROM StudentLife.HousingPeriods
@@ -163,24 +173,11 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         command.Parameters.Add("@PeriodId", SqlDbType.Int).Value = periodId;
         command.Parameters.Add("@TermId", SqlDbType.Int).Value = termId;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var expectedName = (periodId, nonProduction) switch
-        {
-            (1, true) => "Fall 2026 Prod",
-            (1, false) => "Fall 2026",
-            (2, false) => "Spring 2027",
-            _ => ""
-        };
-        var expectedStart = periodId == 1 ? new DateTime(2026, 8, 24) : new DateTime(2027, 1, 11);
-        var expectedEnd = periodId == 1 ? new DateTime(2026, 12, 11) : new DateTime(2027, 4, 30);
         if (!await reader.ReadAsync(cancellationToken) ||
-            !string.Equals(reader.GetString(0), expectedName, StringComparison.OrdinalIgnoreCase) ||
             reader.GetDateTime(1).Date != expectedStart || reader.GetDateTime(2).Date != expectedEnd)
-            throw new InvalidOperationException("The housing period has not been approved for CampusFlow billing.");
+            throw new InvalidOperationException("The housing period changed during billing review.");
         await reader.NextResultAsync(cancellationToken);
-        var expectedProperties = nonProduction ? 9 : 10;
-        var expectedRooms = nonProduction ? 536 : periodId == 1 ? 540 : 512;
-        if (!await reader.ReadAsync(cancellationToken) || reader.GetInt32(0) != expectedProperties ||
-            reader.GetInt32(1) != expectedRooms)
+        if (!await reader.ReadAsync(cancellationToken) || reader.GetInt32(0) <= 0 || reader.GetInt32(1) <= 0)
             throw new InvalidOperationException("The Elements housing properties or rooms changed. Review the period before applying charges.");
         await reader.NextResultAsync(cancellationToken);
         var fees = new List<HousingTermFee>();

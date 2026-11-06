@@ -4,7 +4,7 @@
 @using Volo.Abp.AspNetCore.Mvc.UI.Layout
 @inject IPageLayout PageLayout
 @{
-    PageLayout.Content.Title = "Add Student Meal Plan";
+    PageLayout.Content.Title = "Manage Student Meal Plans";
     PageLayout.Content.MenuItemName = CampusFlowMenus.AddStudentMealPlan;
 }
 @section styles {
@@ -13,7 +13,7 @@
 }
 
 <main class="meal-admin-shell">
-    <header class="meal-admin-hero"><div><span>Business Services</span><h1>Add Student Meal Plan</h1><p>Set a student's term housing status and assign an available meal plan in Elements.</p></div><i class="fa-solid fa-utensils"></i></header>
+    <header class="meal-admin-hero"><div><span>Business Services</span><h1>Manage Student Meal Plans</h1><p>Review a student's meal-plan assignments, assign an available plan or remove an individual assignment in Elements.</p></div><i class="fa-solid fa-utensils"></i></header>
 
     <section class="meal-card">
         <div class="section-heading"><span>Step 1</span><h2>Find a student</h2><p>Search by name, student ID, Elements ID, or email address.</p></div>
@@ -36,6 +36,26 @@
                 <select name="housingStatus" aria-label="Housing status">@foreach(var status in Model.Context.HousingStatuses){<option value="@status.Id" selected="@(status.Id == Model.HousingStatus ? "selected" : null)">@status.Name</option>}</select>
                 <button type="submit">Apply</button>
             </form>
+            <div class="section-heading plan-heading"><h2>Current assignments for this term</h2></div>
+            @if(Model.Context.Assignments.Count==0){<p>No assigned meal plans were returned for this term.</p>}
+            @foreach(var assignment in Model.Context.Assignments)
+            {
+                <article class="meal-card"><strong>@assignment.Name</strong><p>Assignment @assignment.AssignmentId · @(assignment.Amount.HasValue ? assignment.Amount.Value.ToString("C2") : "Amount unavailable")</p>
+                @if(Model.CanRemove && Model.Context.CanRemove)
+                {
+                    <p>Remove only this student's assignment for the selected term. Elements may retain its charge, so review and adjust billing separately. This does not request a refund or change housing status.</p>
+                    <form method="post" asp-page-handler="Remove">
+                        <input type="hidden" name="RemoveInput.ExternalStudentId" value="@Model.Context.Student.ExternalStudentId" />
+                        <input type="hidden" name="RemoveInput.TermCalendarId" value="@assignment.TermCalendarId" />
+                        <input type="hidden" name="RemoveInput.AssignmentId" value="@assignment.AssignmentId" />
+                        <input type="hidden" name="RemoveInput.MealPlanId" value="@assignment.MealPlanId" />
+                        <label class="confirm-check"><input type="checkbox" name="RemoveInput.Confirmed" value="true" required /> I verified this student, term and assignment and intend to remove it.</label>
+                        <button type="submit" class="btn btn-danger">Remove assignment</button>
+                    </form>
+                }
+                else {<p>Removal requires the removal permission and enabled administrative removal setting.</p>}
+                </article>
+            }
             <div class="section-heading plan-heading"><span>Step 3</span><h2>Choose a meal plan</h2></div>
             @if (Model.Context.HousingStatuses.Count == 0){<div class="notice error">Elements did not return a housing-status option for this student and term.</div>}
             @if (Model.Context.Options.Count == 0){<div class="notice">No active meal plans are currently available in Elements.</div>}

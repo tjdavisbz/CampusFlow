@@ -21,14 +21,19 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
     private const string ConnectionStringName = "ThesisElementsReadOnly";
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api";
     private const string TokenCacheKey = "ThesisElements:MealPlan:IntegrationToken";
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient SharedClient = new();
+    private readonly HttpClient _client;
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
 
     public ThesisElementsMealPlanService(IConfiguration configuration, IMemoryCache cache)
+        : this(configuration, cache, SharedClient) { }
+
+    internal ThesisElementsMealPlanService(IConfiguration configuration, IMemoryCache cache, HttpClient client)
     {
         _configuration = configuration;
         _cache = cache;
+        _client = client;
     }
 
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
@@ -97,11 +102,13 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
         if (context.Options.All(x => x.Id != housingStatusId))
             throw new InvalidOperationException("The selected housing status is not valid for this student and term.");
         var status = context.RegisterStatus ?? throw new InvalidOperationException("Elements returned no student-status record.");
+        if(status["termCalendarID"]?.GetValue<int>()!=termCalendarId||status["studentStatusID"]?.GetValue<int>() is not >0)
+            throw new InvalidOperationException("Elements returned a different student term status.");
         status["residentCommuterID"] = housingStatusId;
         var token = await GetTokenAsync(cancellationToken);
         using var request = CreateRequest(HttpMethod.Put, "/api/academic/register/student-status", token, "Registration");
         request.Content = new StringContent(BuildUpdateStudentStatus(status).ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode || JsonNode.Parse(body)?["isSuccess"]?.GetValue<bool>() != true)
             throw new InvalidOperationException($"Elements housing-status update failed ({(int)response.StatusCode}).");
@@ -117,7 +124,7 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
             "/api/student-life/housing/meal-plan/assign-meal-plan", token);
         request.Content = new StringContent(JsonSerializer.Serialize(new { mealPlanID = mealPlanId, studentUID = studentUid }),
             Encoding.UTF8, "application/json");
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"Elements meal-plan assignment failed ({(int)response.StatusCode}).");
@@ -133,7 +140,7 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
         request.Headers.Add("TenantHost", Setting("TenantHost"));
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
             Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Elements authentication failed.");
         var token = JsonNode.Parse(body)?["data"]?["token"]?.GetValue<string>();
@@ -148,7 +155,7 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
         var token = await GetTokenAsync(cancellationToken);
         using var request = CreateRequest(HttpMethod.Get,
             $"/api/academic/register/student-status-select-items/{termCalendarId}/{studentUid}", token, "Registration");
-        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        using var response = await _client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Elements could not load housing choices.");
         var data = JsonNode.Parse(body)?["data"]?.AsObject()
@@ -169,14 +176,15 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
             "nonStateReporting", "degreeSeeking", "lastDateOfAttendance", "institutionalSAPID", "studentWorker",
             "governmentalSAPID", "commentPosition", "transcriptComment", "leaveOfAbsence", "leaveOfAbsenceDue"];
         var result = new JsonObject();
-        foreach (var name in names) result[name] = source[name]?.DeepClone();
+        foreach (var name in names)
+        {if(!source.ContainsKey(name))throw new InvalidOperationException("Elements omitted a student status field; no housing-status change was sent.");result[name]=source[name]?.DeepClone();}
         return result;
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string route, string token, string module = "StudentLife")
     {
         var tenantHost = Setting("TenantHost").TrimEnd('/');
-        var request = new HttpRequestMessage(method, $"{Setting("RegistrationBaseUrl").TrimEnd('/')}/{route.TrimStart('/')}");
+        var request = new HttpRequestMessage(method, $"{Setting("BaseUrl").TrimEnd('/')}/{route.TrimStart('/')}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.Add("Module", module);
         request.Headers.Add("TenantHost", tenantHost);

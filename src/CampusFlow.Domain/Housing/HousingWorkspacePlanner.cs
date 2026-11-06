@@ -14,15 +14,21 @@ public static class HousingWorkspacePlanner
             desired.Select(x => x.Id).Distinct().Count() != desired.Count ||
             !baseline.Select(x => x.Id).Order().SequenceEqual(desired.Select(x => x.Id).Order()))
             throw new ArgumentException("The complete room list must be retained. Refresh to load new rooms from Elements.");
+        if (desired.Any(x => x.Capacity < 0 || x.Capacity > 1000))
+            throw new ArgumentException("Room capacity must be between 0 and 1,000.");
+        if(desired.Any(x=>x.Capacity!=baseline.Single(b=>b.Id==x.Id).Capacity&&(x.Capacity<1||x.Capacity>10)))
+            throw new ArgumentException("Elements room capacity must be between 1 and 10. Use multiple commuter rooms for larger commuter groups.");
         if (requireCapacityCompliance)
         {
-            if (desired.Any(x => x.Capacity < 0 || x.Capacity > 1000))
-                throw new ArgumentException("Room capacity must be between 0 and 1,000 before applying to Elements.");
-            var overCapacity = desired.Where(x => x.Occupants.Count > x.Capacity).ToList();
+            // Existing unrelated violations must not prevent fixing another room. A room
+            // may remain over capacity only when its capacity is unchanged and no one is added.
+            var overCapacity = desired.Where(x => x.Occupants.Count > x.Capacity &&
+                (x.Capacity != baseline.Single(b => b.Id == x.Id).Capacity ||
+                 x.Occupants.Any(o => !baseline.Single(b => b.Id == x.Id).Occupants.Any(old => old.StudentUid == o.StudentUid)))).ToList();
             if (overCapacity.Count > 0)
             {
                 var first = overCapacity[0];
-                throw new ArgumentException($"{first.Building} / {first.Name} has {first.Occupants.Count} students but capacity is {first.Capacity}. Resolve all {overCapacity.Count} over-capacity room(s) before applying to Elements.");
+                throw new ArgumentException($"{first.Building} / {first.Name} has {first.Occupants.Count} students but capacity is {first.Capacity}. Fix this room’s capacity or remove the added assignments before applying to Elements.");
             }
         }
         var occupants = desired.SelectMany(x => x.Occupants).ToList();

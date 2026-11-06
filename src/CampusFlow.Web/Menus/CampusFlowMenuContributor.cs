@@ -259,7 +259,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                 var businessServices = new ApplicationMenuItem(CampusFlowMenus.BusinessServicesAdmin,
                     "Business Services", icon: "fa fa-briefcase", order: 5);
                 businessServices.AddItem(new ApplicationMenuItem(CampusFlowMenus.AddStudentMealPlan,
-                    "Add Student Meal Plan", "~/Admin/BusinessServices/AddStudentMealPlan",
+                    "Manage Student Meal Plans", "~/Admin/BusinessServices/AddStudentMealPlan",
                     icon: "fa fa-utensils", order: 1));
                 admin.AddItem(businessServices);
             }

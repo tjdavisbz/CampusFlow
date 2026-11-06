@@ -46,12 +46,15 @@ public class HousingWorkspaceOccupant
     public string Notes { get; set; } = "";
 }
 
+public sealed record HousingCapacityChange(int RoomId, int PreviousCapacity, int Capacity);
+
 public class HousingWorkspaceState
 {
     public Guid Id { get; set; }
     public string Revision { get; set; } = "";
     public int PeriodId { get; set; }
     public DateTime RefreshedAt { get; set; }
+    public string? ApplyStatus { get; set; }
     public List<HousingWorkspaceRoom> Rooms { get; set; } = [];
 }
 

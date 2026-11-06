@@ -36,6 +36,9 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
     [BindProperty(SupportsGet = true)] public int? MealPlan { get; set; }
     [BindProperty] public AssignInputModel Input { get; set; } = new();
 
+    [BindProperty] public RemoveStudentMealPlanInput RemoveInput { get; set; } = new();
+    public bool CanRemove { get; private set; }
+
     public TenantTheme Theme { get; private set; } = null!;
     public IReadOnlyList<AdminMealPlanStudentDto> Results { get; private set; } = [];
     public AdminMealPlanContextDto? Context { get; private set; }
@@ -45,6 +48,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
     public async Task OnGetAsync()
     {
         Theme = _themeProvider.Get(CurrentTenant.Name);
+        CanRemove=(await AuthorizationService.AuthorizeAsync(User,CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded;
         if (!string.IsNullOrWhiteSpace(Query) && Query.Trim().Length >= 2)
         {
             try { Results = await _service.SearchStudentsAsync(Query); }
@@ -89,6 +93,15 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         Alerts.Success($"{housing.Name} and {Preview!.Name} were assigned to {Context.Student.Name} ({Context.Student.StudentId}).");
         return RedirectToPage(new { query = Context.Student.StudentId, student = Input.ExternalStudentId,
             term = Input.TermCalendarId });
+    }
+
+    public async Task<IActionResult> OnPostRemoveAsync()
+    {
+        if(!(await AuthorizationService.AuthorizeAsync(User,CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded)return Forbid();
+        if(!RemoveInput.Confirmed || RemoveInput.TermCalendarId<=0 || RemoveInput.AssignmentId<=0 || RemoveInput.MealPlanId<=0 || string.IsNullOrWhiteSpace(RemoveInput.ExternalStudentId))return BadRequest();
+        await _service.RemoveAsync(RemoveInput);
+        Alerts.Success("The meal-plan assignment was removed from Elements. Elements may retain its charge. Review billing separately; no refund or housing-status change was requested.");
+        return RedirectToPage(new{student=RemoveInput.ExternalStudentId,term=RemoveInput.TermCalendarId});
     }
 
     public class AssignInputModel

@@ -26,6 +26,7 @@ public static class CampusFlowPermissions
         public const string StudentBilling = Default + ".StudentBilling";
         public const string ResetIndividualBillApproval = StudentBilling + ".ResetIndividualBillApproval";
         public const string BusinessServices = Default + ".BusinessServices";
+        public const string RemoveStudentMealPlan = BusinessServices + ".RemoveStudentMealPlan";
         public const string AddStudentMealPlan = BusinessServices + ".AddStudentMealPlan";
         public const string BibliuConfiguration = Default + ".BibliuConfiguration";
         public const string BibliuExport = Default + ".BibliuExport";

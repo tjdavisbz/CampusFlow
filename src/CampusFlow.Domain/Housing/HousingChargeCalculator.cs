@@ -63,6 +63,13 @@ public static class HousingChargeCalculator
         IReadOnlyCollection<HousingRateAmount> configuredRates,
         int singleTransactionDocumentId, int singleAccountsReceivableTypeId = 0)
     {
+        _ = GetRateDefinitions(termCalendarId);
+        if (StudentHousingEligibility.IsCommuterBuilding(building))
+        {
+            if (rateChoice != "Standard" || intentionalSingle)
+                throw new ArgumentException("Commuter assignments have no housing charge and cannot use a special rate or intentional-single surcharge.");
+            return Array.Empty<HousingChargeLine>();
+        }
         if (singleTransactionDocumentId <= 0)
             throw new ArgumentException("The Single transaction document is not configured.");
         var definition = GetRateDefinitions(termCalendarId).SingleOrDefault(x =>
