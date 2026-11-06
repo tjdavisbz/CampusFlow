@@ -1,4 +1,5 @@
 using System;
+using Volo.Abp.Data;
 using Volo.Abp.Domain.Entities.Auditing;
 using Volo.Abp.MultiTenancy;
 
@@ -15,6 +16,15 @@ public class PayflowPayment : FullAuditedAggregateRoot<Guid>, IMultiTenant
     public string ExternalStudentId { get; private set; } = null!;
     public decimal Amount { get; private set; }
     public decimal ConvenienceFee { get; private set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int? ElementsTermId => this.GetProperty<int?>("ElementsTermId");
+    public void SetElementsTerm(int termId)
+    {
+        if (termId <= 0) throw new ArgumentOutOfRangeException(nameof(termId));
+        if (ElementsTermId.HasValue && ElementsTermId != termId)
+            throw new InvalidOperationException("A payment's posting term cannot be changed.");
+        this.SetProperty("ElementsTermId", termId);
+    }
     public decimal TotalCharged => Amount + ConvenienceFee;
     public string Currency { get; private set; } = null!;
     public string SecureTokenId { get; private set; } = null!;

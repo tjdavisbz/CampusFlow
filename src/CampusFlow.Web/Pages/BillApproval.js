@@ -50,6 +50,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (paymentTotalValue) paymentTotalValue.textContent = currency.format(total);
         if (paymentSubmitText) paymentSubmitText.textContent = `Pay ${currency.format(total)} securely`;
         if (planPreview) planPreview.hidden = !isDeferred;
+        const balanceSummary = document.querySelector('#approvalRemainingBalance');
+        if (balanceSummary) balanceSummary.textContent = currency.format(Number(isDeferred ? balanceSummary.dataset.deferred : balanceSummary.dataset.base) || 0);
+        const headline = document.querySelector('#approvalHeadlineBalance');
+        if (headline && balanceSummary) headline.textContent = currency.format(Math.max(0, Number(isDeferred ? balanceSummary.dataset.deferred : balanceSummary.dataset.base) || 0));
+        const planFeeSummary = document.querySelector('#approvalPlanFee');
+        if (planFeeSummary) planFeeSummary.hidden = !isDeferred;
     };
     document.querySelectorAll('[name="paymentChoice"]').forEach(choice => choice.addEventListener('change', () => {
         updatePaymentAction();

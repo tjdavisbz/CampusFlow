@@ -96,16 +96,16 @@
     else
     {
         <section class="aid-summary">
-            <div><span>Current term awards</span><strong>@FinancialAidModel.FormatCurrency(Model.CurrentTermAwards)</strong></div>
-            <p>@(Model.CurrentTermName ?? "Current academic term")</p>
+            <div><span>Selected term awards</span><strong>@FinancialAidModel.FormatCurrency(Model.CurrentTermAwards)</strong></div>
+            <p>@(Model.CurrentTermName ?? "Selected academic term")</p>
         </section>
 
         @if (Model.CurrentAndUpcomingTerms.Count > 0)
         {
             <section class="aid-awards active-aid-awards" aria-labelledby="current-awards-heading">
                 <div class="aid-section-heading">
-                    <div><span>Now and next</span><h2 id="current-awards-heading">Current &amp; upcoming awards</h2></div>
-                    <p>Awards available for the current and future terms.</p>
+                    <div><span>Selected term and later</span><h2 id="current-awards-heading">Selected &amp; upcoming awards</h2></div>
+                    <p>Awards available for the selected and future terms.</p>
                 </div>
                 @foreach (var term in Model.CurrentAndUpcomingTerms)
                 {

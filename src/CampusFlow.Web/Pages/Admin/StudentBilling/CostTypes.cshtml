@@ -2,10 +2,13 @@
 @model CampusFlow.Web.Pages.Admin.StudentBilling.CostTypesModel
 @{ ViewData["Title"] = "Cost type rules"; }
 @section scripts { <script src="~/Pages/Admin/StudentBilling/CostTypes.js" asp-append-version="true"></script> }
-<div id="cost-types">
+<div id="cost-types" data-read-only="@Model.IsReadOnlyView.ToString().ToLowerInvariant()">
 @Html.AntiForgeryToken()
 <h1>Cost type rules</h1>
-@if(Model.IsReadOnlyView){<p class="alert alert-warning">This portal view is read-only. Exit the view before saving or running cost-type rules.</p>}
+@if (Model.IsReadOnlyView)
+{
+    <div class="alert alert-warning" role="alert">You are in a read-only portal view. Exit that view using the banner at the top, then return here to save rules, create a preview or run updates.</div>
+}
 <p>Choose a cost type using term campus, attendance and primary degree. Rules run in priority order; the first match wins.</p>
 <div class="alert alert-info">Automatic runs are off. Save your rules, preview the proposed changes, then use Run now. Unmapped rules can be saved for review. Records without a valid match are skipped.</div>
 <div id="cost-message" role="status" aria-live="polite"></div>
@@ -20,12 +23,18 @@
 <!th>Enabled</!th><!th>Priority</!th><!th>Campus</!th><!th>Attendance</!th><!th>Degree condition</!th><!th>Degree</!th><!th>Cost type</!th>
 </tr></thead><tbody id="cost-rules"></tbody></table></div>
 <hr /><h2>Preview and run</h2>
+<ol>
+<li>Review the rules above, enter a change reason and choose <strong>Save rules</strong>.</li>
+<li>Choose <strong>Preview</strong> to find accounts and review what would change. Preview does not update cost types.</li>
+<li>When changes are ready, choose <strong>Run now</strong> and confirm the reviewed changes. This updates Elements cost types and may affect billing.</li>
+</ol>
 <div class="d-flex gap-2 align-items-end my-3">
-<label>Student UID (optional) <input id="cost-student" type="number" min="1" class="form-control" /></label>
+<label>Student UID (optional) <input id="cost-student" type="number" min="1" max="2147483647" step="1" aria-describedby="cost-student-help" class="form-control" /></label>
 <button id="cost-preview" class="btn btn-outline-primary" type="button">Preview</button>
-<button id="cost-run" class="btn btn-primary" type="button" disabled>Run now</button>
+<button id="cost-run" aria-describedby="cost-run-note" class="btn btn-primary" type="button" disabled>Run now</button>
 </div>
-<p id="cost-summary"></p><p id="cost-run-note"></p>
+<p id="cost-student-help">Use the Elements UID, not the longer Student ID. Leave it blank to preview all accounts.</p>
+<p id="cost-summary"></p><p id="cost-run-note" role="status" aria-live="polite">Loading rules…</p>
 <label>Show <select id="cost-filter" class="form-select"><option>Would change</option><option>Unmapped</option><option>Invalid lookup</option><option>Duplicate record</option><option>Already correct</option><option>All</option></select></label>
 <div class="table-responsive"><table class="table"><thead><tr><!th>Student</!th><!th>Term</!th><!th>Campus / attendance / degree</!th><!th>Current</!th><!th>Proposed</!th><!th>Result</!th></tr></thead><tbody id="cost-preview-rows"></tbody></table></div>
 <p id="cost-limit"></p><ul id="cost-results"></ul>

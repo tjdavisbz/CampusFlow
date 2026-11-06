@@ -1,0 +1,44 @@
+@page
+@model CampusFlow.Web.Pages.Admin.StudentBilling.BillApprovalDeliveryModel
+@using CampusFlow.BillApprovals
+@using CampusFlow.Web.Pages.Admin.StudentBilling
+@{ ViewData["Title"]="Bill approval delivery"; }
+<main class="container py-4">
+<h1>Bill approval delivery</h1>
+<p>Review completion work for the 50 most recent approved bills, or search by Student ID. Email confirmation means the mail service accepted the send operation; it does not prove inbox delivery.</p>
+@if(!string.IsNullOrWhiteSpace(Model.Notice)){<p role="status" class="alert alert-info">@Model.Notice</p>}
+<section class="card mb-4"><div class="card-body"><h2 class="h4">Completion setup</h2>
+@foreach(var check in Model.SetupChecks){<p><strong>@check.Name: @(check.Configured ? "Configured" : "Not enabled / incomplete")</strong><br/>@check.Detail</p>}
+@if(Model.IsNonProduction){<form method="post" asp-page-handler="TestEmail"><input type="hidden" asp-for="StudentId" /><button type="submit" class="btn btn-outline-primary" disabled="@Model.IsReadOnlyView">Send setup test and synthetic PDF to my signed-in email</button></form><p class="small">This sends one test message to you. It does not approve a bill or change Elements.</p>}
+</div></section>
+<form method="get" class="mb-4"><label for="student-id">Student ID</label><input id="student-id" asp-for="StudentId" /><button type="submit" class="btn btn-primary">Search</button></form>
+@foreach(var row in Model.Rows)
+{
+<section class="card mb-4"><div class="card-body">
+<h2 class="h4">@row.StudentId · @row.Term</h2><p>Approved @row.ApprovedAt.ToString("g") · Reference @row.Id</p>
+@if(Model.IsNonProduction){<p>Nonprod delivery: @(row.TestRecipient ?? "No signed-in test recipient recorded; external steps will be blocked.")</p>
+@if(row.TestRecipient is null){<form method="post" asp-page-handler="PrepareTest"><input type="hidden" name="id" value="@row.Id" /><label><input type="checkbox" name="confirmedTest" value="true" required /> Use my signed-in school email for this nonprod test approval.</label><button class="btn btn-outline-primary" type="submit">Prepare test recipient</button></form>}}
+<table class="table"><thead><tr><th>Completion step</th><th>Status</th><th>Details</th></tr></thead><tbody>
+@foreach(var step in Enum.GetValues<BillCompletionStep>())
+{
+var state=row.Progress.Step(step);
+<tr><td>@BillApprovalDeliveryModel.StepName(step)</td><td>@BillApprovalDeliveryModel.StatusName(state.Status)</td><td>@state.Error
+@if(state.EmailOperationId is Guid operation){<p class="small">Azure operation: @operation</p>}
+@if(state.Status==BillCompletionStatus.Uncertain && BillApprovalCompletionProgress.IsEmail(step))
+{
+<form method="post" asp-page-handler="ConfirmSent"><input type="hidden" name="id" value="@row.Id" /><input type="hidden" name="step" value="@step" /><input type="hidden" asp-for="StudentId" />
+<label><input type="checkbox" name="confirmedSent" value="true" required /> I checked the delivery logs and this message was accepted.</label><button type="submit" class="btn btn-outline-secondary btn-sm">Record confirmed send</button></form>
+}
+</td></tr>
+}
+</tbody></table>
+@if(row.NoStoredDocument && row.Progress.Step(BillCompletionStep.Document).Status==BillCompletionStatus.Failed && row.Progress.Step(BillCompletionStep.Document).DocumentCreationAttemptedAt.HasValue)
+{<form method="post" asp-page-handler="AllowDocumentCreation"><input type="hidden" name="id" value="@row.Id" /><label><input type="checkbox" name="confirmedNoDocument" value="true" required /> I checked Elements using this approval reference and confirmed no matching document exists. Allow another creation attempt.</label><button type="submit" class="btn btn-outline-secondary">Record confirmed document absence</button></form>}
+<form method="post" asp-page-handler="Retry"><input type="hidden" name="id" value="@row.Id" /><input type="hidden" asp-for="StudentId" />
+@if(row.Progress.Steps.Values.Any(x=>x.Status==BillCompletionStatus.Uncertain))
+{<label class="d-block"><input type="checkbox" name="confirmedUnsent" value="true" /> I checked the delivery logs: none of the remaining uncertain messages were accepted and no send is still in progress. Allow those messages to be retried.</label>}
+<button type="submit" class="btn btn-primary" disabled="@row.Progress.IsComplete">Retry pending work</button></form>
+</div></section>
+}
+@if(Model.Rows.Count==0){<p>No matching approved bills.</p>}
+</main>

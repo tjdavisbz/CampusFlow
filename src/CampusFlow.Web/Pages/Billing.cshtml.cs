@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CampusFlow.Branding;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
+using CampusFlow.Web.Students;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,7 @@ namespace CampusFlow.Web.Pages;
 public class BillingModel : CampusFlowPageModel
 {
     private readonly ITenantThemeProvider _tenantThemeProvider;
+    private readonly IStudentTermSelection _selectedTerm;
     private readonly IRepository<StudentProfile, Guid> _studentProfileRepository;
     private readonly ICurrentStudentView _currentStudentView;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
@@ -30,9 +32,10 @@ public class BillingModel : CampusFlowPageModel
         ICurrentStudentView currentStudentView,
         IEnumerable<IStudentInformationSystemBillingLookup> billingLookups,
         IEnumerable<IStudentInformationSystemTermLookup> termLookups,
-        ILogger<BillingModel> logger, IOptions<PayflowOptions> payflow)
+        ILogger<BillingModel> logger, IOptions<PayflowOptions> payflow, IStudentTermSelection selectedTerm)
     {
         _tenantThemeProvider = tenantThemeProvider;
+        _selectedTerm = selectedTerm;
         _studentProfileRepository = studentProfileRepository;
         _currentStudentView = currentStudentView;
         _billingLookups = billingLookups.ToArray();
@@ -48,6 +51,10 @@ public class BillingModel : CampusFlowPageModel
     public string StudentIdentifier { get; private set; } = "Unavailable";
     public decimal PostedBalance { get; private set; }
     public decimal PendingBalance { get; private set; }
+    public decimal CurrentBalance { get; private set; }
+    public string? SelectedTermName { get; private set; }
+    public string? SelectedTermId { get; private set; }
+    public bool CanPaySelectedTerm => CanMakePayment && CurrentBalance > 0;
     public decimal OverallBalance => PostedBalance + PendingBalance;
     public bool IsBillingUnavailable { get; private set; }
     public IReadOnlyList<BillingTermGroup> Terms { get; private set; } = [];
@@ -63,7 +70,7 @@ public class BillingModel : CampusFlowPageModel
     public static string FormatCurrencyValue(decimal amount) =>
         CampusFlow.Web.Formatting.UsdCurrency.Format(amount);
 
-    public async Task OnGetAsync()
+    public async Task OnGetAsync(string? term = null)
     {
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null)
@@ -93,8 +100,10 @@ public class BillingModel : CampusFlowPageModel
             var termLookup = _termLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             var currentTerm = termLookup is null
                 ? null
-                : await termLookup.GetCurrentTermAsync(HttpContext.RequestAborted);
+                : await _selectedTerm.ResolveAsync(profile, termLookup, term, cancellationToken: HttpContext.RequestAborted);
             CurrentTermCode = currentTerm?.TermCode;
+            SelectedTermName = currentTerm?.DisplayName;
+            SelectedTermId = currentTerm?.ExternalTermId;
             var transactions = await billingLookup.GetTransactionsAsync(
                 profile.ExternalStudentId,
                 HttpContext.RequestAborted);
@@ -103,6 +112,8 @@ public class BillingModel : CampusFlowPageModel
             PostedBalance = activeTransactions.Where(x => !x.IsPending).Sum(x => x.BalanceChange);
             PendingBalance = activeTransactions.Where(x => x.IsPending).Sum(x => x.BalanceChange);
 
+            if (currentTerm is not null)
+                CurrentBalance = CampusFlow.BillApprovals.StudentBillingBalance.Calculate(activeTransactions, currentTerm.TermCode).ThroughSelectedTerm;
             Terms = CreateTermGroups(transactions);
 
             CurrentAndUpcomingTerms = currentTerm is null

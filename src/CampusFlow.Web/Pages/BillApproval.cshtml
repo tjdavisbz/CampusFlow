@@ -32,7 +32,7 @@
 
     @if (Model.IsUnavailable)
     {
-        <section class="notice" role="status"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Your bill review is temporarily unavailable</h2><p>@(Model.UnavailableReason ?? "No information has been changed. Please try again shortly.")</p></div></section>
+        <section class="notice" role="status"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Your bill review is temporarily unavailable</h2><p>@(Model.UnavailableReason ?? "We could not finish refreshing your bill. Please try again shortly or contact Student Billing.")</p></div></section>
     }
     else
     {
@@ -54,6 +54,12 @@
                 else
                 {
                     <p>Your agreement is complete. Your downloadable copy is being prepared.</p>
+                }
+                @if (Model.LegacyApproval is null)
+                {
+                    <p>Document delivery and completion notifications may still be processing.</p>
+                    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage)) { <p>@Model.StatusMessage</p> }
+                    <form method="post" asp-page-handler="GeneratePdf" asp-route-term="@Model.TermCode"><button class="secondary" type="submit">Retry pending completion work</button></form>
                 }
                 @if (Model.BookstoreUrl is not null)
                 {
@@ -102,12 +108,13 @@
                     <div class="section-title"><div><span>Step 2</span><h2>Choose how to cover your balance</h2></div><p>Your selection will be recorded with this approval.</p></div>
                     <div class="choice-grid">
                         <label><input type="radio" name="paymentChoice" value="PayNow" checked="@(Model.InitialPaymentChoice == "PayNow")"><span class="choice-icon"><i class="fa-solid fa-credit-card"></i></span><strong>Pay remaining balance</strong><small>Pay @BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0)) today.</small></label>
-                        <label><input type="radio" name="paymentChoice" value="Deferred" checked="@(Model.InitialPaymentChoice == "Deferred")"><span class="choice-icon"><i class="fa-solid fa-calendar-check"></i></span><strong>Deferred payment plan</strong><small>Split the balance into installments. A $100 enrollment fee applies@(Model.DeferredDueToday > 0 ? $"; {BillApprovalModel.Currency(Model.DeferredDueToday)} is due today" : "; no payment is due today").</small></label>
+                        <label><input type="radio" name="paymentChoice" value="Deferred" disabled="@(Model.PaymentPlan is null)" checked="@(Model.InitialPaymentChoice == "Deferred")"><span class="choice-icon"><i class="fa-solid fa-calendar-check"></i></span><strong>Deferred payment plan</strong><small>Split the balance into installments. A @BillApprovalModel.Currency(Model.PaymentPlanFee) Payment Plan Fee applies@(Model.DeferredDueToday > 0 ? $"; {BillApprovalModel.Currency(Model.DeferredDueToday)} is due today" : "; no payment is due today").</small></label>
                     </div>
                     @if (Model.PaymentPlan is not null)
                     {
                         <section class="plan-preview" id="planPreview" hidden="@(Model.InitialPaymentChoice != "Deferred")">
-                            <div><span>Your estimated plan</span><strong>@Model.PaymentPlan.Installments.Count payments · $100 fee included</strong></div>
+                            <div><span>Your estimated plan</span><strong>@Model.PaymentPlan.Installments.Count payments · @BillApprovalModel.Currency(Model.PaymentPlanFee) Payment Plan Fee included</strong></div>
+                            <p>Total after anticipated aid, including the Payment Plan Fee: <strong>@BillApprovalModel.Currency(Model.DeferredBalance)</strong></p>
                             <div class="installments">
                                 @foreach (var installment in Model.PaymentPlan.Installments)
                                 {
@@ -121,6 +128,7 @@
                           data-deferred-amount="@Model.DeferredDueToday.ToString(System.Globalization.CultureInfo.InvariantCulture)"
                           data-fee-rate="@Model.ConvenienceFeePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
                           data-deferred-due-today="@(Model.DeferredDueToday > 0 ? "true" : "false")">
+                        <input type="hidden" name="ReviewVersion" value="@Model.CurrentReviewVersion" />
                         <input type="hidden" asp-for="PaymentPurposeInput" id="paymentPurposeInput" />
                         @{ var initialPaymentAmount = Model.InitialPaymentChoice == "Deferred" ? Model.DeferredDueToday : Math.Max(Model.RemainingBalance, 0); }
                         <dl class="payment-amount">
@@ -193,6 +201,7 @@
                 <section class="approval-step" data-step="finish" hidden>
                     <div class="finish-icon"><i class="fa-solid fa-file-circle-check"></i></div><span class="eyebrow">Step @(Model.RemainingBalance > 0 ? 4 : 3)</span><h2>Ready for final approval</h2><p>Your review is complete. Final approval will securely record your agreement and prepare a copy for your records.</p>
                     <form method="post" data-processing-form>
+                        <input type="hidden" name="ReviewVersion" value="@Model.CurrentReviewVersion" />
                         <input type="hidden" asp-for="PaymentChoiceInput" id="paymentChoiceInput" value="@(Model.RemainingBalance <= 0 ? "NoBalanceDue" : "PayNow")" />
                         <input type="hidden" asp-for="AgreementAcceptedInput" id="agreementAcceptedInput" value="false" />
                         <button class="primary final-button" type="submit" id="finalApprovalButton" data-has-balance="@(Model.RemainingBalance > 0 ? "true" : "false")" disabled><i class="fa-solid fa-lock"></i> Record agreement</button>
@@ -203,8 +212,8 @@
             </div>
 
             <aside class="summary-card">
-                <span>Amount to resolve</span><strong>@BillApprovalModel.Currency(Math.Max(Model.RemainingBalance, 0))</strong><p>for @Model.TermName</p>
-                <dl><div><dt>Term charges</dt><dd>@BillApprovalModel.Currency(Model.ChargesTotal)</dd></div><div><dt>Payments &amp; credits</dt><dd>-@BillApprovalModel.Currency(Model.CreditsTotal)</dd></div><div><dt>Expected financial aid</dt><dd>-@BillApprovalModel.Currency(Model.PendingAidTotal)</dd></div><div class="total"><dt>Remaining balance</dt><dd>@BillApprovalModel.Currency(Model.RemainingBalance)</dd></div></dl>
+                <span>Amount to resolve</span><strong id="approvalHeadlineBalance">@BillApprovalModel.Currency(Math.Max(Model.InitialPaymentChoice == "Deferred" ? Model.DeferredBalance : Model.RemainingBalance, 0))</strong><p>for @Model.TermName</p>
+                <dl><div><dt>Term charges</dt><dd>@BillApprovalModel.Currency(Model.ChargesTotal)</dd></div><div><dt>Payments &amp; credits</dt><dd>-@BillApprovalModel.Currency(Model.CreditsTotal)</dd></div><div><dt>Expected financial aid</dt><dd>-@BillApprovalModel.Currency(Model.PendingAidTotal)</dd></div><div id="approvalPlanFee" hidden="@(Model.InitialPaymentChoice != "Deferred")"><dt>Payment Plan Fee</dt><dd>@BillApprovalModel.Currency(Model.PaymentPlanFee)</dd></div><div class="total"><dt>Remaining balance</dt><dd id="approvalRemainingBalance" data-base="@Model.RemainingBalance.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-deferred="@Model.DeferredBalance.ToString(System.Globalization.CultureInfo.InvariantCulture)">@BillApprovalModel.Currency(Model.InitialPaymentChoice == "Deferred" ? Model.DeferredBalance : Model.RemainingBalance)</dd></div></dl>
                 <div class="summary-status"><i class="fa-solid fa-rotate"></i><span><strong>Live account review</strong>Includes posted and pending activity.</span></div>
             </aside>
         </div>

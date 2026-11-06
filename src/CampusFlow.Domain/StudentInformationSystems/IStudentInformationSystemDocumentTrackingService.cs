@@ -8,7 +8,8 @@ public sealed record StudentDocumentTrackingRequest(
     string ExternalStudentId,
     string TermName,
     Guid ApprovalId,
-    DateTime AcceptedAt);
+    DateTime AcceptedAt,
+    bool AllowCreate = true);
 
 public interface IStudentInformationSystemDocumentTrackingService
 {

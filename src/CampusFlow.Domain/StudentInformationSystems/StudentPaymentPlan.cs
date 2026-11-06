@@ -10,7 +10,10 @@ public sealed record StudentPaymentPlan(
     string FullTimeStatus,
     string AttendanceType,
     bool IsCommuter,
-    IReadOnlyList<StudentPaymentInstallment> Installments);
+    IReadOnlyList<StudentPaymentInstallment> Installments)
+{
+    public decimal PaymentPlanFee { get; init; }
+}
 
 public sealed record StudentPaymentInstallment(int Number, decimal Amount, string DueDescription);
 
@@ -68,7 +71,7 @@ public static class StudentPaymentPlanCalculator
             installments.Add(new StudentPaymentInstallment(index + 2, amount, dates[index]));
         }
 
-        return new StudentPaymentPlan(balance, anticipatedAid, remaining, context.FullTimeStatus, context.AttendanceType, context.IsCommuter, installments);
+        return new StudentPaymentPlan(balance, anticipatedAid, remaining, context.FullTimeStatus, context.AttendanceType, context.IsCommuter, installments) { PaymentPlanFee = policy.EnrollmentFee };
     }
 
     private static IReadOnlyList<string> SelectDates(string termName, StudentPaymentPlanPolicy policy) =>

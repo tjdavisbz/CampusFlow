@@ -101,8 +101,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                 var showHousing = false;
                 try
                 {
+                    var termLookup = context.ServiceProvider.GetServices<CampusFlow.StudentInformationSystems.IStudentInformationSystemTermLookup>()
+                        .SingleOrDefault(x => x.Provider == studentProfile.Provider);
+                    var selectedTerm = termLookup is null ? null : await context.ServiceProvider
+                        .GetRequiredService<CampusFlow.Web.Students.IStudentTermSelection>().ResolveAsync(studentProfile, termLookup);
                     showHousing = (await context.ServiceProvider.GetRequiredService<CampusFlow.Housing.IMealPlanAppService>()
-                        .GetAsync()).HousingRequired;
+                        .GetAsync(selectedTerm?.ExternalTermId)).HousingRequired;
                 }
                 catch (Exception exception)
                 {
@@ -247,6 +251,8 @@ public class CampusFlowMenuContributor : IMenuContributor
                 studentBilling.AddItem(new ApplicationMenuItem(CampusFlowMenus.ResetIndividualBillApproval,
                     "Reset Bill Approval", "~/Admin/StudentBilling/ResetIndividualBillApproval",
                     icon: "fa fa-arrow-rotate-left", order: 4));
+            if (canManageBillApproval)
+                studentBilling.AddItem(new ApplicationMenuItem("CampusFlow.BillApprovalDelivery", "Bill approval delivery", "~/Admin/StudentBilling/BillApprovalDelivery", icon: "fa fa-envelope", order: 5));
             if (studentBilling.Items.Count > 0)
                 admin.AddItem(studentBilling);
             if (canAddStudentMealPlan)
