@@ -23,7 +23,7 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         await using var connection = Connection();
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand("""
-            SELECT s.AttendanceType, COALESCE(ss.Campus, s.Campus, ''), room.PropertyName
+            SELECT s.AttendanceType, COALESCE(NULLIF(LTRIM(RTRIM(ss.Campus)), ''), s.Campus, ''), room.PropertyName, s.Campus
             FROM dbo.CAMS_Student_View s
             LEFT JOIN dbo.CAMS_StudentStatus_View ss ON ss.StudentUID=s.StudentUID AND ss.TermCalendarID=@TermId
             OUTER APPLY (
@@ -47,7 +47,7 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         if (!await reader.ReadAsync(cancellationToken))
             throw new InvalidOperationException("The student housing eligibility record is unavailable.");
         var result = new StudentHousingEligibility(reader.IsDBNull(0) ? "" : reader.GetString(0),
-            reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2));
+            reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3));
         if (await reader.ReadAsync(cancellationToken))
             throw new InvalidOperationException("The student has multiple status records for this term.");
         return result;

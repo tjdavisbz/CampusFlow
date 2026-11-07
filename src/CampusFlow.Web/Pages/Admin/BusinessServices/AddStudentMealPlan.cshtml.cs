@@ -63,6 +63,8 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
             Context = await _service.GetContextAsync(Student, Term);
             Term ??= Context.SelectedTermCalendarId;
             HousingStatus ??= Context.CurrentHousingStatusId;
+            if (!Context.HousingStatuses.Any(x => x.Id == HousingStatus))
+                HousingStatus = Context.HousingStatuses.FirstOrDefault()?.Id;
             Preview = MealPlan.HasValue
                 ? Context.Options.SingleOrDefault(x => x.MealPlanId == MealPlan.Value)
                 : null;
@@ -72,7 +74,15 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
     public async Task<IActionResult> OnPostAssignAsync()
     {
         Theme = _themeProvider.Get(CurrentTenant.Name);
+        CanRemove = (await AuthorizationService.AuthorizeAsync(User, CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded;
+        // Assignment and removal are separate forms. Only validate the submitted assignment input.
+        foreach (var key in ModelState.Keys.Where(x => x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
+            ModelState.Remove(key);
         Context = await _service.GetContextAsync(Input.ExternalStudentId, Input.TermCalendarId);
+        Student = Context.Student.ExternalStudentId;
+        Term = Context.SelectedTermCalendarId;
+        HousingStatus = Input.HousingStatusId;
+        MealPlan = Input.MealPlanId;
         Preview = Context.Options.SingleOrDefault(x => x.MealPlanId == Input.MealPlanId);
         if (Preview is null)
             ModelState.AddModelError("Input.MealPlanId", "That meal plan is no longer available.");
@@ -90,7 +100,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
             MealPlanId = Input.MealPlanId
         });
         var housing = Context.HousingStatuses.Single(x => x.Id == Input.HousingStatusId);
-        Alerts.Success($"{housing.Name} and {Preview!.Name} were assigned to {Context.Student.Name} ({Context.Student.StudentId}).");
+        Alerts.Success($"{housing.Name} and {Preview!.Name} were verified in Elements for {Context.Student.Name} ({Context.Student.StudentId}). Review the billing batch separately; a charge or refund has not been verified.");
         return RedirectToPage(new { query = Context.Student.StudentId, student = Input.ExternalStudentId,
             term = Input.TermCalendarId });
     }

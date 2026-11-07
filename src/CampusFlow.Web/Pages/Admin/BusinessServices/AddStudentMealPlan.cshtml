@@ -13,6 +13,10 @@
 }
 
 <main class="meal-admin-shell">
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="notice error" role="alert"><strong>The selection was not applied.</strong><div asp-validation-summary="All"></div></div>
+    }
     <header class="meal-admin-hero"><div><span>Business Services</span><h1>Manage Student Meal Plans</h1><p>Review a student's meal-plan assignments, assign an available plan or remove an individual assignment in Elements.</p></div><i class="fa-solid fa-utensils"></i></header>
 
     <section class="meal-card">
@@ -37,6 +41,14 @@
                 <button type="submit">Apply</button>
             </form>
             <div class="section-heading plan-heading"><h2>Current assignments for this term</h2></div>
+            @if (!Model.CanRemove)
+            {
+                <p class="notice">Your account can add meal plans but does not have permission to remove assignments. Ask an administrator for the separate meal-plan removal permission.</p>
+            }
+            else if (!Model.Context.CanRemove)
+            {
+                <p class="notice">Meal-plan removal is not enabled for this environment. Ask an administrator to review its setup.</p>
+            }
             @if(Model.Context.Assignments.Count==0){<p>No assigned meal plans were returned for this term.</p>}
             @foreach(var assignment in Model.Context.Assignments)
             {
@@ -57,6 +69,10 @@
                 </article>
             }
             <div class="section-heading plan-heading"><span>Step 3</span><h2>Choose a meal plan</h2></div>
+            @if (Model.Context.Options.Count == 0)
+            {
+                <p class="notice">There are no active meal plans for the selected term. The meal-plan catalog for that term must be configured in Elements before an assignment can be made.</p>
+            }
             @if (Model.Context.HousingStatuses.Count == 0){<div class="notice error">Elements did not return a housing-status option for this student and term.</div>}
             @if (Model.Context.Options.Count == 0){<div class="notice">No active meal plans are currently available in Elements.</div>}
             else

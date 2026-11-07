@@ -87,6 +87,8 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
             ?? throw new UserFriendlyException("That housing status is no longer available.");
         var option = context.Options.SingleOrDefault(x => x.MealPlanId == input.MealPlanId)
             ?? throw new UserFriendlyException("That meal plan is no longer available.");
+        if (context.Assignments.Any(x => x.MealPlanId == input.MealPlanId && x.TermCalendarId == input.TermCalendarId))
+            throw new UserFriendlyException("This meal plan is already assigned for the selected term. Review the current assignment instead of adding it again.");
         try
         {
             await _mealPlans.UpdateHousingStatusAsync(input.ExternalStudentId, input.TermCalendarId,
@@ -101,6 +103,19 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         try
         {
             await _mealPlans.AssignAsync(input.ExternalStudentId, input.MealPlanId);
+            var verified = false;
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    var assignments = await _removal.GetAssignmentsAsync(input.ExternalStudentId);
+                    verified = assignments.Any(x => x.MealPlanId == input.MealPlanId && x.TermCalendarId == input.TermCalendarId);
+                    if (verified) break;
+                }
+                catch (InvalidOperationException) when (attempt < 2) { }
+                if (attempt < 2) await Task.Delay(1000);
+            }
+            if (!verified) throw new InvalidOperationException("The requested meal assignment was not returned by Elements for the selected term.");
             _logger.LogWarning(
                 "Housing status {HousingStatusId} ({HousingStatusName}) and meal plan {MealPlanId} ({MealPlanName}) were assigned to student {StudentId} for term {TermCalendarId} by administrator {UserId}.",
                 housingStatus.Id, housingStatus.Name, option.MealPlanId, option.Name, context.Student.StudentId,
@@ -110,7 +125,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         {
             _logger.LogError(exception, "Elements meal-plan assignment failed for student {StudentId}.",
                 context.Student.StudentId);
-            throw new UserFriendlyException($"The housing status was updated to {housingStatus.Name}, but Elements could not assign the meal plan. Please retry the meal-plan assignment.");
+            throw new UserFriendlyException($"The housing status was updated to {housingStatus.Name}, but the meal-plan assignment could not be confirmed. Refresh and check current assignments and Elements before trying again; the request may already have succeeded.");
         }
     }
 
