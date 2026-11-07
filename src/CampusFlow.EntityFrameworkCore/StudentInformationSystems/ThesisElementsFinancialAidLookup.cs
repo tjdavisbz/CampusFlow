@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -38,22 +39,13 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
         }
 
         const string sql = """
-            SELECT
-                FinancialAwardID,
-                TermCalendarID,
-                Term,
-                TextTerm,
-                TransDate,
-                AwardType,
-                AwardStatus,
-                [Description],
-                Amount,
-                SentToBilling,
-                StudentAccepted,
-                StudentAcceptedTime
-            FROM [dbo].[CAMS_FinancialAward_View]
-            WHERE StudentUID = @StudentUID
-            ORDER BY Term DESC, TransDate DESC, FinancialAwardID DESC
+            SELECT f.FinancialAwardID, f.TermCalendarID, f.Term, f.TextTerm, f.TransDate,
+                f.AwardType, f.AwardStatus, f.[Description], f.Amount, f.SentToBilling,
+                f.StudentAccepted, f.StudentAcceptedTime, r.IsALoan, f.[Lock]
+            FROM dbo.CAMS_FinancialAward_View f
+            LEFT JOIN dbo.FinancialAwardRef r ON r.AwardTypeID=f.TransTypeID
+            WHERE f.StudentUID = @StudentUID
+            ORDER BY f.Term DESC, f.TransDate DESC, f.FinancialAwardID DESC
             """;
 
         await using var connection = new SqlConnection(connectionString);
@@ -78,11 +70,21 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
                 reader.IsDBNull(8) ? 0m : Convert.ToDecimal(reader.GetValue(8)),
                 ReadBoolean(reader, 9),
                 reader.IsDBNull(10) ? null : Convert.ToInt32(reader.GetValue(10)),
-                reader.IsDBNull(11) ? null : Convert.ToDateTime(reader.GetValue(11))));
+                reader.IsDBNull(11) ? null : Convert.ToDateTime(reader.GetValue(11)),
+                ReadLoanFlag(reader.IsDBNull(12) ? null : reader.GetValue(12)), ReadBoolean(reader, 13)));
         }
 
+        if (awards.Select(x => x.ExternalAwardId).Distinct().Count() != awards.Count)
+            throw new InvalidOperationException("Financial aid award-type references are ambiguous.");
         return awards;
     }
+
+    internal static bool? ReadLoanFlag(object? value) => Convert.ToString(value)?.Trim().ToLowerInvariant() switch
+    {
+        "true" or "yes" or "1" => true,
+        "false" or "no" or "0" => false,
+        _ => null
+    };
 
     private static bool ReadBoolean(SqlDataReader reader, int ordinal)
     {

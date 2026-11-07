@@ -41,6 +41,7 @@ public class BillApprovalModel : CampusFlowPageModel
     private readonly IReadOnlyCollection<IStudentInformationSystemScheduleLookup> _scheduleLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemBillingLookup> _billingLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidLookup> _aidLookups;
+    private readonly IReadOnlyCollection<IStudentInformationSystemFinancialAidDecisionService> _aidDecisions;
     private readonly IReadOnlyCollection<IStudentInformationSystemPaymentPlanLookup> _paymentPlanLookups;
     private readonly IReadOnlyCollection<IStudentInformationSystemDocumentTrackingService> _documentTrackingServices;
     private readonly IReadOnlyCollection<IStudentInformationSystemPaymentPostingService> _paymentPostingServices;
@@ -91,7 +92,7 @@ public class BillApprovalModel : CampusFlowPageModel
         IPayflowGateway payflowGateway,
         IOptions<PayflowOptions> payflowOptions,
         ILogger<BillApprovalModel> logger,
-        ILegacyBillApprovalLookup legacyApprovals, CampusFlow.Housing.IMealPlanAppService mealPlans, IBillApprovalCompletionLookup completion, IStudentTermSelection selectedTerm, IEnumerable<IStudentInformationSystemBillingRecalculationService> recalculations, IBackgroundJobManager jobs)
+        ILegacyBillApprovalLookup legacyApprovals, CampusFlow.Housing.IMealPlanAppService mealPlans, IBillApprovalCompletionLookup completion, IStudentTermSelection selectedTerm, IEnumerable<IStudentInformationSystemBillingRecalculationService> recalculations, IBackgroundJobManager jobs, IEnumerable<IStudentInformationSystemFinancialAidDecisionService>? aidDecisions = null)
     {
         _themeProvider = themeProvider;
         _profiles = profiles;
@@ -101,6 +102,7 @@ public class BillApprovalModel : CampusFlowPageModel
         _scheduleLookups = scheduleLookups.ToArray();
         _billingLookups = billingLookups.ToArray();
         _aidLookups = aidLookups.ToArray();
+        _aidDecisions = aidDecisions?.ToArray() ?? [];
         _paymentPlanLookups = paymentPlanLookups.ToArray();
         _documentTrackingServices = documentTrackingServices.ToArray();
         _paymentPostingServices = paymentPostingServices.ToArray();
@@ -288,8 +290,16 @@ public class BillApprovalModel : CampusFlowPageModel
             AccountBalance = allTransactions
                 .Where(x => !x.IsVoided && string.CompareOrdinal(x.TermCode, TermCode) <= 0)
                 .Sum(x => x.BalanceChange);
-            Aid = (await aidTask).Where(x => x.TermCode == TermCode)
-                .OrderByDescending(x => x.Amount).ToArray();
+            var termAid = (await aidTask).Where(x => x.ExternalTermId == ExternalTermId).ToArray();
+            var decisionReader = _aidDecisions.SingleOrDefault(x => x.Provider == profile.Provider);
+            if (decisionReader is not null)
+            {
+                var decisions = await decisionReader.GetDecisionsAsync(profile.ExternalStudentId, HttpContext.RequestAborted);
+                if (termAid.Any(x => !decisions.ContainsKey(x.ExternalAwardId)))
+                    throw new InvalidOperationException("Financial aid decisions could not be verified.");
+                termAid = termAid.Select(x => x with { StudentAccepted = decisions[x.ExternalAwardId] }).ToArray();
+            }
+            Aid = termAid.Where(IsEligibleAid).OrderByDescending(x => x.Amount).ToArray();
             var paymentPlanLookup = _paymentPlanLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             if (RemainingBalance > 0 && paymentPlanLookup is not null && !string.IsNullOrWhiteSpace(ExternalTermId))
             {
@@ -621,6 +631,5 @@ public class BillApprovalModel : CampusFlowPageModel
     }
 
     private static bool IsEligibleAid(StudentFinancialAidAward award) =>
-        award.Amount > 0 && !award.IsSentToBilling && award.StudentAccepted != 0 &&
-        !award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase);
+        FinancialAidRules.IncludeInBillApproval(award);
 }

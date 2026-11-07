@@ -15,4 +15,6 @@ public sealed record StudentFinancialAidAward(
     decimal Amount,
     bool IsSentToBilling,
     int? StudentAccepted,
-    DateTime? StudentAcceptedTime);
+    DateTime? StudentAcceptedTime,
+    bool? IsLoan = null,
+    bool IsLocked = false);

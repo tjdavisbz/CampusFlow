@@ -31,46 +31,10 @@
 }
 
 @section scripts {
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const dialog = document.getElementById("aid-decision-dialog");
-            const form = document.getElementById("aid-decision-form");
-            const title = document.getElementById("aid-dialog-title");
-            const message = document.getElementById("aid-dialog-message");
-            const awardName = document.getElementById("aid-dialog-award");
-            const awardAmount = document.getElementById("aid-dialog-amount");
-            const decisionInput = document.getElementById("aid-dialog-decision");
-            const awardInput = document.getElementById("aid-dialog-award-id");
-            const submitButton = document.getElementById("aid-dialog-submit");
-
-            document.querySelectorAll("[data-aid-decision]").forEach(button => {
-                button.addEventListener("click", () => {
-                    const decision = button.dataset.aidDecision;
-                    const isDecline = decision === "Decline";
-                    title.textContent = isDecline ? "Decline this award?" : "Accept this award?";
-                    message.textContent = isDecline
-                        ? "This award will not be available toward your student account."
-                        : "This award will be marked as accepted in Elements.";
-                    awardName.textContent = button.dataset.awardName;
-                    awardAmount.textContent = button.dataset.awardAmount;
-                    decisionInput.value = decision;
-                    awardInput.value = button.dataset.awardId;
-                    submitButton.textContent = isDecline ? "Yes, decline award" : "Yes, accept award";
-                    submitButton.classList.toggle("decline", isDecline);
-                    dialog.classList.toggle("decline", isDecline);
-                    dialog.showModal();
-                });
-            });
-
-            document.getElementById("aid-dialog-cancel").addEventListener("click", () => dialog.close());
-            dialog.addEventListener("click", event => {
-                if (event.target === dialog) dialog.close();
-            });
-        });
-    </script>
+    <abp-script src="/Pages/FinancialAid.js" />
 }
 
-<main class="aid-page">
+<main class="aid-page" data-restore-term="@Model.OpenTermCode" data-restore-requested="@(!string.IsNullOrWhiteSpace(Request.Query["openTerm"]) ? "true" : "false")">
     <header class="aid-header">
         <div>
             <div class="aid-eyebrow">Student funding</div>
@@ -111,7 +75,8 @@
                 {
                     @await Html.PartialAsync("_FinancialAidTerm", term, new ViewDataDictionary(ViewData)
                     {
-                        ["Open"] = term.TermCode == Model.CurrentTermCode
+                        ["Open"] = term.TermCode == Model.OpenTermCode,
+                        ["ReadOnly"] = Model.IsReadOnlyView
                     })
                 }
             </section>
@@ -128,16 +93,21 @@
                 {
                     @await Html.PartialAsync("_FinancialAidTerm", term, new ViewDataDictionary(ViewData)
                     {
-                        ["Open"] = false
+                        ["Open"] = term.TermCode == Model.OpenTermCode,
+                        ["ReadOnly"] = Model.IsReadOnlyView
                     })
                 }
             </section>
         }
-        <p class="aid-note"><i class="fa-solid fa-circle-info"></i> Awards already accepted or declined can only be changed by the Financial Aid Office.</p>
+        <p class="aid-note"><i class="fa-solid fa-circle-info"></i> Awards already accepted, declined, locked or sent to student accounts must be reviewed by the Financial Aid Office.</p>
     }
 
     <dialog id="aid-decision-dialog" class="aid-dialog" aria-labelledby="aid-dialog-title">
-        <form id="aid-decision-form" method="post" asp-page-handler="Decision">
+        <form id="aid-decision-form" method="post" asp-page-handler="Decision" data-accept-all-action="@Url.Page("/FinancialAid", "AcceptAll")">
+            <input id="aid-dialog-term" type="hidden" name="externalTermId" />
+            <input id="aid-dialog-open-term" type="hidden" name="openTermCode" />
+            <input id="aid-dialog-award-ids" type="hidden" name="awardIds" />
+            <input id="aid-dialog-confirmed" type="hidden" name="confirmed" value="false" />
             <input id="aid-dialog-award-id" type="hidden" name="awardId" />
             <input id="aid-dialog-decision" type="hidden" name="decision" />
             <div class="aid-dialog-icon"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></div>

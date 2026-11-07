@@ -10,7 +10,7 @@ public interface IStudentInformationSystemFinancialAidDecisionService
     Task<IReadOnlyDictionary<string, int?>> GetDecisionsAsync(
         string externalStudentId, CancellationToken cancellationToken = default);
     Task SubmitDecisionAsync(string externalStudentId, string externalAwardId,
-        StudentFinancialAidDecision decision, CancellationToken cancellationToken = default);
+        StudentFinancialAidDecision decision, CancellationToken cancellationToken = default, string? expectedExternalTermId = null);
 }
 
 public enum StudentFinancialAidDecision
