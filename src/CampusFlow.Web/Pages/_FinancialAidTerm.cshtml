@@ -1,13 +1,26 @@
 @model CampusFlow.Web.Pages.FinancialAidModel.AwardTermGroup
 @using CampusFlow.Web.Pages
+@using CampusFlow.StudentInformationSystems
 @{
     var open = ViewData["Open"] as bool? ?? false;
+    var readOnly = ViewData["ReadOnly"] as bool? ?? false;
+    var available = Model.Awards.Where(FinancialAidRules.CanDecide).ToArray();
+    var termIds = Model.Awards.Select(x => x.ExternalTermId).Distinct().ToArray();
 }
-<details class="aid-term" open="@(open ? "open" : null)">
+<details class="aid-term" data-term-code="@Model.TermCode" open="@(open ? "open" : null)">
     <summary>
         <div><strong>@Model.TermName</strong><span>@Model.Awards.Count award@(Model.Awards.Count == 1 ? "" : "s")</span></div>
         <div class="aid-term-total"><strong>@FinancialAidModel.FormatCurrency(Model.TotalAmount)</strong><i class="fa-solid fa-chevron-down"></i></div>
     </summary>
+    @if (!readOnly && available.Length > 0 && termIds.Length == 1)
+    {
+        <div class="aid-term-actions">
+            <span>@available.Length available award@(available.Length == 1 ? "" : "s") in this semester</span>
+            <button type="button" data-aid-accept-all data-external-term-id="@termIds[0]" data-term-code="@Model.TermCode"
+                data-term-name="@Model.TermName" data-award-ids="@string.Join(",", available.Select(x => x.ExternalAwardId))"
+                data-award-count="@available.Length" data-award-amount="@FinancialAidModel.FormatCurrency(available.Sum(x => x.Amount))">Accept all available awards</button>
+        </div>
+    }
     <div class="award-grid">
         @foreach (var award in Model.Awards)
         {
@@ -24,7 +37,11 @@
                         @(award.IsSentToBilling ? "Sent to student accounts" : "Anticipated aid")
                     </span>
                     <div class="award-actions" aria-label="Award decision">
-                        @if (award.Amount <= 0 || award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
+                        @if (readOnly)
+                        {
+                            <span class="decision-recorded">Read-only view</span>
+                        }
+                        else if (award.Amount <= 0 || award.IsLocked || award.IsSentToBilling || award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
                         {
                             <span class="decision-recorded unavailable"><i class="fa-solid fa-ban"></i> Not available</span>
                         }
@@ -34,8 +51,8 @@
                         }
                         else
                         {
-                            <button type="button" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Accept</button>
-                            <button type="button" class="decline" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Decline</button>
+                            <button type="button" data-term-code="@Model.TermCode" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Accept</button>
+                            <button type="button" class="decline" data-term-code="@Model.TermCode" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Decline</button>
                         }
                     </div>
                 </div>

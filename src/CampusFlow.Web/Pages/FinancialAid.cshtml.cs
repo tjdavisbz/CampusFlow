@@ -54,6 +54,11 @@ public class FinancialAidModel : CampusFlowPageModel
     public IReadOnlyList<AwardTermGroup> HistoricalTerms { get; private set; } = [];
     public string? CurrentTermCode { get; private set; }
     public string? CurrentTermName { get; private set; }
+    public string? OpenTermCode { get; private set; }
+    public bool IsReadOnlyView => _currentStudentView.IsImpersonating || HttpContext.User.HasClaim(x =>
+        x.Type == CampusFlow.Students.StudentViewClaimTypes.ExternalStudentId ||
+        x.Type == CampusFlow.Web.Portals.FacultyViewClaimTypes.FacultyId ||
+        x.Type == CampusFlow.AdvisorPortal.SchedulerViewClaimTypes.Email);
     public decimal CurrentTermAwards =>
         Terms.SingleOrDefault(x => x.TermCode == CurrentTermCode)?.TotalAmount ?? 0m;
     [Microsoft.AspNetCore.Mvc.TempData]
@@ -61,7 +66,7 @@ public class FinancialAidModel : CampusFlowPageModel
     [Microsoft.AspNetCore.Mvc.TempData]
     public bool StatusIsError { get; set; }
 
-    public async Task OnGetAsync(string? term = null)
+    public async Task OnGetAsync(string? term = null, string? openTerm = null)
     {
         Theme = _tenantThemeProvider.Get(CurrentTenant.Name);
         if (CurrentUser.Id is null)
@@ -122,6 +127,7 @@ public class FinancialAidModel : CampusFlowPageModel
                     group.Sum(x => x.Amount),
                     group.OrderByDescending(x => x.AwardDate).ThenBy(x => x.Description).ToArray()))
                 .ToArray();
+            OpenTermCode = Terms.Any(x => x.TermCode == openTerm) ? openTerm : CurrentTermCode;
             CurrentAndUpcomingTerms = currentTerm is null
                 ? []
                 : Terms.Where(x => string.CompareOrdinal(x.TermCode, currentTerm.TermCode) >= 0).ToArray();
@@ -145,9 +151,9 @@ public class FinancialAidModel : CampusFlowPageModel
 
     public async Task<Microsoft.AspNetCore.Mvc.IActionResult> OnPostDecisionAsync(
         string awardId,
-        StudentFinancialAidDecision decision)
+        StudentFinancialAidDecision decision, string? openTermCode = null)
     {
-        if (CurrentUser.Id is null ||
+        if (CurrentUser.Id is null || IsReadOnlyView ||
             decision is not (StudentFinancialAidDecision.Accept or StudentFinancialAidDecision.Decline))
         {
             return Forbid();
@@ -161,13 +167,19 @@ public class FinancialAidModel : CampusFlowPageModel
         {
             StatusIsError = true;
             StatusMessage = "Your financial aid decision could not be submitted.";
-            return RedirectToPage();
+            return RedirectToPage(new { openTerm = SafeOpenTerm(openTermCode) });
         }
 
         try
         {
+            var lookup = _awardLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+            var award = lookup is null ? null : (await lookup.GetAwardsAsync(profile.ExternalStudentId, HttpContext.RequestAborted))
+                .SingleOrDefault(x => x.ExternalAwardId == awardId);
+            if (award is null || !FinancialAidRules.CanDecide(award))
+                throw new InvalidOperationException("The award is no longer available for a decision.");
+            openTermCode = award.TermCode;
             await service.SubmitDecisionAsync(profile.ExternalStudentId, awardId, decision,
-                HttpContext.RequestAborted);
+                HttpContext.RequestAborted, award.ExternalTermId);
             StatusMessage = decision == StudentFinancialAidDecision.Accept
                 ? "Your award was accepted successfully."
                 : "Your award was declined successfully.";
@@ -175,13 +187,43 @@ public class FinancialAidModel : CampusFlowPageModel
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
             StatusIsError = true;
-            StatusMessage = "Elements could not record your decision. Nothing was changed; please try again.";
+            StatusMessage = "Your decision could not be confirmed. Refresh and check the award before trying again.";
             _logger.LogWarning(exception,
                 "Unable to submit financial aid decision for award {AwardId} and user {UserId}.",
                 awardId, CurrentUser.Id);
         }
 
-        return RedirectToPage();
+        return RedirectToPage(new { openTerm = SafeOpenTerm(openTermCode) });
+    }
+
+    private static string? SafeOpenTerm(string? value) => value is { Length: > 0 and <= 32 } &&
+        value.All(x => char.IsAsciiLetterOrDigit(x) || x is '-' or '_') ? value : null;
+
+    public async Task<Microsoft.AspNetCore.Mvc.IActionResult> OnPostAcceptAllAsync(
+        string externalTermId, string awardIds, bool confirmed = false, string? openTermCode = null)
+    {
+        if (CurrentUser.Id is null || IsReadOnlyView || !confirmed) return Forbid();
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
+        if (profile is null) return Forbid();
+        var lookup = _awardLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+        var service = _decisionServices.SingleOrDefault(x => x.Provider == profile.Provider);
+        if (lookup is null || service is null) return BadRequest();
+        try
+        {
+            var result = await FinancialAidBatch.AcceptAsync(profile.ExternalStudentId, externalTermId, awardIds, lookup, service, HttpContext.RequestAborted);
+            StatusIsError = result.Unconfirmed;
+            StatusMessage = result.Unconfirmed
+                ? $"Confirmed acceptance of {result.Confirmed} of {result.Total} awards. The next decision could not be confirmed, so processing stopped. Refresh and check the awards before trying again."
+                : $"All {result.Confirmed} available awards in this semester were accepted successfully.";
+        }
+        catch (InvalidOperationException exception) { StatusIsError = true; StatusMessage = exception.Message; }
+        catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            StatusIsError = true;
+            StatusMessage = "The awards could not be checked. Refresh and review them before trying again.";
+            _logger.LogWarning(exception, "Unable to prepare the student's semester award decisions.");
+        }
+        return RedirectToPage(new { openTerm = SafeOpenTerm(openTermCode) });
     }
 
     public sealed record AwardTermGroup(

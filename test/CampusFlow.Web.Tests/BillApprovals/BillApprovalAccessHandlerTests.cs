@@ -39,6 +39,8 @@ public class BillApprovalAccessHandlerTests
     private readonly IPayflowGateway _gateway=Substitute.For<IPayflowGateway>();
     private readonly IStudentInformationSystemBillingLookup _billing=Substitute.For<IStudentInformationSystemBillingLookup>();
     private readonly BillApprovalTermConfiguration _term;
+    private readonly IStudentInformationSystemFinancialAidLookup _aid=Substitute.For<IStudentInformationSystemFinancialAidLookup>();
+    private readonly IStudentInformationSystemFinancialAidDecisionService _aidDecisions=Substitute.For<IStudentInformationSystemFinancialAidDecisionService>();
     private readonly IStudentInformationSystemPaymentPlanLookup _planLookup=Substitute.For<IStudentInformationSystemPaymentPlanLookup>();
     private readonly IRepository<AgreementTemplate,Guid> _agreements=Substitute.For<IRepository<AgreementTemplate,Guid>>();
     private readonly IRepository<PaymentPlanPolicy,Guid> _policies=Substitute.For<IRepository<PaymentPlanPolicy,Guid>>();
@@ -57,7 +59,9 @@ public class BillApprovalAccessHandlerTests
         schedule.GetScheduleAsync("10",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentCourseScheduleItem>());
         _billing.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
         _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentBillingTransaction>());
-        var aid=Substitute.For<IStudentInformationSystemFinancialAidLookup>();aid.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
+        var aid=_aid;aid.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
+        _aidDecisions.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
+        _aidDecisions.GetDecisionsAsync("10",Arg.Any<CancellationToken>()).Returns(new Dictionary<string,int?>());
         aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentFinancialAidAward>());
         var clock=Substitute.For<IClock>();clock.Now.Returns(new DateTime(2026,11,5));
         _term=new(Guid.NewGuid(),owner,"269","B27S","Spring 2027",new(2026,12,1),new(2027,2,1),false,Guid.NewGuid(),Guid.NewGuid());
@@ -73,8 +77,28 @@ public class BillApprovalAccessHandlerTests
             terms,_approvals,Substitute.For<IRepository<BillApprovalArtifact,Guid>>(),Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
             Substitute.For<IBillApprovalPdfGenerator>(),Substitute.For<IGuidGenerator>(),clock,Substitute.For<IRepository<PayflowPayment,Guid>>(),
             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
-            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>(), Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>())
+            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>(), Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>(),new[]{_aidDecisions})
         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
+    }
+
+    [Fact]
+    public async Task Bill_rows_totals_and_review_fingerprint_use_the_same_aid_policy_and_live_decisions()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        StudentFinancialAidAward A(string id,string type,string status,decimal amount,bool loan,int? decision=null)=>
+            new(StudentInformationSystemProvider.ThesisElements,id,"269","B27S","Spring 2027",new DateTime(2027,1,26),type,status,type,amount,false,decision,null,loan);
+        var rows=new[]{A("1","TEG","Guarantee",300,false),A("2","Loan","Guarantee",100,true),A("3","Gift","Awarded",200,false),A("4","FWS","Guarantee",999,false),A("5","TEG","Estimated",888,false),A("6","Private loan","Guarantee",777,true)};
+        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows);
+        _aidDecisions.GetDecisionsAsync("10",Arg.Any<CancellationToken>()).Returns(new Dictionary<string,int?>{{"1",null},{"2",1},{"3",null},{"4",1},{"5",1},{"6",null}});
+        await _model.OnGetAsync("B27S");Assert.False(_model.IsUnavailable);Assert.Equal(600,_model.PendingAidTotal);Assert.Equal(new[]{"1","3","2"},_model.Aid.Select(x=>x.ExternalAwardId));var fingerprint=_model.CurrentReviewVersion;
+        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows.Select(x=>x.ExternalAwardId=="4"?x with{Amount=50000}:x).ToArray());
+        await _model.OnGetAsync("B27S");Assert.Equal(fingerprint,_model.CurrentReviewVersion);Assert.Equal(600,_model.PendingAidTotal);
+    }
+    [Fact]
+    public async Task Missing_live_aid_decision_stops_bill_review_instead_of_using_a_stale_loan_state()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});_aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",null,"Loan","Guarantee","Loan",100,false,1,null,true)});
+        await _model.OnGetAsync("B27S");Assert.True(_model.IsUnavailable);Assert.Empty(_gateway.ReceivedCalls());
     }
 
     [Fact]

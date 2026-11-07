@@ -76,6 +76,13 @@ public sealed class ThesisElementsFinancialAidDecisionServiceTests
         else await service.SubmitDecisionAsync("456","123",StudentFinancialAidDecision.Accept);
         Assert.Equal(1,handler.Writes);Assert.Equal(2,handler.Reads);
     }
+    [Theory] [InlineData("lock")] [InlineData("sentToBilling")] [InlineData("awardStatus")]
+    public void Live_noneditable_awards_are_rejected_even_if_the_replica_was_stale(string field)
+    {var award=Award();if(field=="lock")award[field]=true;else if(field=="sentToBilling")award[field]="Yes";else award[field]="Cancelled";Assert.Throws<InvalidOperationException>(()=>ThesisElementsFinancialAidDecisionService.BuildDecisionBody(award,StudentFinancialAidDecision.Accept));}
+    [Fact] public async Task An_award_moved_to_another_term_is_not_updated()
+    {
+        var handler=new AwardHandler(false);var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{["StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl"]="https://example.invalid",["StudentInformationSystems:Providers:ThesisElements:Api:TenantHost"]="test.invalid",["StudentInformationSystems:Providers:ThesisElements:Api:Module"]="FinancialAid"}).Build();var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:FinancialAid:ApiToken","test");var service=new ThesisElementsFinancialAidDecisionService(config,cache,new HttpClient(handler));await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SubmitDecisionAsync("456","123",StudentFinancialAidDecision.Accept,default,"268"));Assert.Equal(0,handler.Writes);
+    }
     private sealed class AwardHandler(bool corrupt):HttpMessageHandler
     {
         public int Writes;public int Reads;private readonly JsonObject _award=Award();

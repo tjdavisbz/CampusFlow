@@ -69,7 +69,7 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
     }
 
     public async Task SubmitDecisionAsync(string externalStudentId, string externalAwardId,
-        StudentFinancialAidDecision decision, CancellationToken cancellationToken = default)
+        StudentFinancialAidDecision decision, CancellationToken cancellationToken = default, string? expectedExternalTermId = null)
     {
         if (!int.TryParse(externalStudentId, out var studentUid) || studentUid <= 0 || !int.TryParse(externalAwardId, out var awardId) || awardId <= 0)
         {
@@ -80,6 +80,9 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
             throw new ArgumentOutOfRangeException(nameof(decision));
         var token = await GetAccessTokenAsync(cancellationToken);
         var award = await GetStudentAwardAsync(studentUid, awardId, token, cancellationToken);
+        if (expectedExternalTermId is not null &&
+            (!int.TryParse(expectedExternalTermId, out var expectedTerm) || expectedTerm <= 0 || award["termCalendarId"]?.GetValue<int>() != expectedTerm))
+            throw new InvalidOperationException("This award no longer belongs to the reviewed semester.");
         if (HasRecordedDecision(award["studentAccepted"]))
         {
             throw new InvalidOperationException("This award already has a recorded decision.");
@@ -112,10 +115,15 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
     internal static JsonObject BuildDecisionBody(JsonObject award, StudentFinancialAidDecision decision)
     {
         if (award["amount"] is not JsonValue amountValue ||
-            !amountValue.TryGetValue<decimal>(out var amount) || amount == 0m)
+            !amountValue.TryGetValue<decimal>(out var amount) || amount <= 0m)
         {
-            throw new InvalidOperationException("A zero-dollar award cannot be accepted or declined in the portal.");
+            throw new InvalidOperationException("Only positive awards can be accepted or declined in the portal.");
         }
+        var billed = award["sentToBilling"]?.ToString().Trim();
+        if (award["lock"]?.GetValue<bool>() == true ||
+            string.Equals(billed, "Yes", StringComparison.OrdinalIgnoreCase) || string.Equals(billed, "True", StringComparison.OrdinalIgnoreCase) || billed == "1" ||
+            award["awardStatus"]?.GetValue<string>()?.Contains("Cancel", StringComparison.OrdinalIgnoreCase) == true)
+            throw new InvalidOperationException("This award must be reviewed by the Financial Aid Office.");
         if (!award.ContainsKey("distributionDate"))
         {
             throw new InvalidOperationException("Elements did not return the award distribution date; the decision was not sent.");
