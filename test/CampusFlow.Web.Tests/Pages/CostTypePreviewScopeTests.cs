@@ -9,6 +9,14 @@ using Xunit;
 namespace CampusFlow.Pages;
 public class CostTypePreviewScopeTests
 {
+    [Fact]
+    public async Task Invalid_schedule_input_never_reaches_the_service()
+    {
+        var service=Substitute.For<ICostTypeAppService>();var page=new CostTypesModel(service);
+        page.ModelState.AddModelError("Enabled","Invalid value");
+        Assert.IsType<BadRequestResult>(await page.OnPostAutomationAsync(new()));
+        await service.DidNotReceiveWithAnyArgs().SetAutomaticRunsAsync(default!);
+    }
     [Theory] [InlineData(null)] [InlineData(0)] [InlineData(-1)]
     public async Task Invalid_UID_cannot_fall_back_to_previewing_all_students(int? uid)
     {

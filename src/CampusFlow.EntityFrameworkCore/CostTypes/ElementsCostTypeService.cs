@@ -15,7 +15,7 @@ using Volo.Abp.DependencyInjection;
 
 namespace CampusFlow.CostTypes;
 
-// Manual validation runs are restricted to the verified non-production Elements tenant.
+// Cost-type runs are restricted to the verified non-production Elements tenant.
 [ExposeServices(typeof(ICostTypeElements))]
 public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDependency
 {
@@ -53,25 +53,25 @@ public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDepen
             throw new InvalidOperationException("Cost-type runs require the Nelson non-production Elements replica.");
     }
 
-    public async Task<List<CostTypeChoice>> GetChoicesAsync()
+    public async Task<List<CostTypeChoice>> GetChoicesAsync(CancellationToken cancellationToken = default)
     {
         await using var connection=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
-        await connection.OpenAsync();
+        await connection.OpenAsync(cancellationToken);
         await using var command=new SqlCommand("SELECT CostTypeID,CostType,Description FROM dbo.CostType WHERE ActiveFlag=1 ORDER BY CostType,CostTypeID",connection);
-        await using var reader=await command.ExecuteReaderAsync(); var result=new List<CostTypeChoice>();
-        while(await reader.ReadAsync()) result.Add(new(reader.GetInt32(0),reader.GetString(1).TrimEnd(),reader.IsDBNull(2)?"":reader.GetString(2).TrimEnd()));
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken); var result=new List<CostTypeChoice>();
+        while(await reader.ReadAsync(cancellationToken)) result.Add(new(reader.GetInt32(0),reader.GetString(1).TrimEnd(),reader.IsDBNull(2)?"":reader.GetString(2).TrimEnd()));
         return result;
     }
-    public async Task<List<CostTypePreviewRow>> PreviewAsync(List<CostTypeRule> rules,int? studentUid)
+    public async Task<List<CostTypePreviewRow>> PreviewAsync(List<CostTypeRule> rules,int? studentUid,CancellationToken cancellationToken = default)
     {
         await using var connection=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
-        await connection.OpenAsync();
+        await connection.OpenAsync(cancellationToken);
         await using var command=new SqlCommand(PreviewSql,connection) { CommandTimeout=120 };
         command.Parameters.Add("@Rules",System.Data.SqlDbType.NVarChar,-1).Value=JsonSerializer.Serialize(rules);
         command.Parameters.Add("@StudentUid",System.Data.SqlDbType.Int).Value=(object?)studentUid??DBNull.Value;
-        await using var reader=await command.ExecuteReaderAsync();var rows=new List<CostTypePreviewRow>();
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken);var rows=new List<CostTypePreviewRow>();
         string? Text(int i)=>reader.IsDBNull(i)?null:reader.GetString(i);
-        while(await reader.ReadAsync()) rows.Add(new(reader.GetInt32(0),reader.GetString(1),reader.GetString(2),
+        while(await reader.ReadAsync(cancellationToken)) rows.Add(new(reader.GetInt32(0),reader.GetString(1),reader.GetString(2),
             reader.GetInt32(3),reader.GetInt32(4),reader.GetString(5),Text(6),Text(7),Text(8),
             reader.GetInt32(9),reader.GetString(10),reader.IsDBNull(11)?null:reader.GetInt32(11),
             reader.IsDBNull(12)?null:reader.GetInt32(12),Text(13),reader.GetString(14)));
@@ -110,38 +110,38 @@ public sealed class ElementsCostTypeService : ICostTypeElements, ITransientDepen
           WHERE ActiveFlag=1 AND CostType=M.CostType AND CostTypeID=M.CostTypeId) C
         ORDER BY R.TextTerm,R.Name,R.StudentUID;
         """;
-    private async Task<JsonObject> GetStatusAsync(CostTypePreviewRow row)
+    private async Task<JsonObject> GetStatusAsync(CostTypePreviewRow row,CancellationToken cancellationToken)
     {
-        EnsureRunEnabled();var token=await GetTokenAsync(default);
+        EnsureRunEnabled();var token=await GetTokenAsync(cancellationToken);
         using var request=Request(HttpMethod.Get,$"/api/academic/register/student-status/{row.TermId}/{row.StudentUid}",token);
-        using var response=await _client.SendAsync(request);
-        var root=await ReadAsync(response,default);
+        using var response=await _client.SendAsync(request,cancellationToken);
+        var root=await ReadAsync(response,cancellationToken);
         var data=root["data"]?.AsObject() ?? throw new InvalidOperationException("Missing student status.");
         if(ReadInt(data,"studentStatusID")!=row.StatusId || ReadInt(data,"termCalendarID")!=row.TermId)
             throw new InvalidOperationException("Elements returned a different student-term status.");
         return BuildPayload(data);
     }
-    public async Task<string> FingerprintAsync(CostTypePreviewRow row)
+    public async Task<string> FingerprintAsync(CostTypePreviewRow row,CancellationToken cancellationToken = default)
     {
-        var status=await GetStatusAsync(row);
+        var status=await GetStatusAsync(row,cancellationToken);
         if(ReadInt(status,"costTypeID")!=row.CurrentId) throw new InvalidOperationException("Elements changed since the reporting replica. Preview again after it refreshes.");
         return Fingerprint(status);
     }
-    public async Task ApplyAsync(CostTypeCandidate candidate)
+    public async Task ApplyAsync(CostTypeCandidate candidate,CancellationToken cancellationToken = default)
     {
         EnsureRunEnabled();var row=candidate.Row;
         if(row.Action!="Would change" || row.ProposedId is null || row.ProposedId<0)
             throw new InvalidOperationException("No validated cost-type change.");
-        var choices=await GetChoicesAsync();
+        var choices=await GetChoicesAsync(cancellationToken);
         if(choices.Count(x=>x.Id==row.ProposedId && x.Label==row.ProposedLabel?.TrimEnd())!=1)
             throw new InvalidOperationException("Cost type changed since preview.");
-        var status=await GetStatusAsync(row);
+        var status=await GetStatusAsync(row,cancellationToken);
         status=PrepareChange(candidate,status);
-        var token=await GetTokenAsync(default);
+        var token=await GetTokenAsync(cancellationToken);
         using var request=Request(HttpMethod.Put,"/api/academic/register/student-status",token);
         request.Content=new StringContent(status.ToJsonString(),Encoding.UTF8,"application/json");
-        using var response=await _client.SendAsync(request);await ReadAsync(response,default);
-        var after=await GetStatusAsync(row);
+        using var response=await _client.SendAsync(request,cancellationToken);await ReadAsync(response,cancellationToken);
+        var after=await GetStatusAsync(row,cancellationToken);
         if(!JsonNode.DeepEquals(status,after)) throw new InvalidOperationException("Update returned a different status. Verify in Elements.");
     }
     public static JsonObject PrepareChange(CostTypeCandidate candidate,JsonObject status)

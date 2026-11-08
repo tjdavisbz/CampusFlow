@@ -4,6 +4,7 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const script = fs.readFileSync(path.join(__dirname, '../../src/CampusFlow.Web/Pages/Admin/StudentBilling/CostTypes.js'), 'utf8');
 const fixture = `<div id="cost-types"><input name="__RequestVerificationToken" value="test-token" type="hidden" />
+<p id="cost-auto-status"></p><p id="cost-auto-last"></p><div id="cost-auto-review-section" hidden><ul id="cost-auto-reviews"></ul><input id="cost-auto-reviewed" type="checkbox" /></div><button id="cost-auto-toggle" disabled></button><button id="cost-auto-refresh"></button>
 <button id="cost-save">Save rules</button><button id="cost-add">Add</button><input id="cost-reason" /><input id="cost-search" />
 <input id="cost-student" type="number" min="1" max="2147483647" /><button id="cost-preview">Preview</button><button id="cost-run" disabled>Run now</button>
 <p id="cost-message"></p><p id="cost-run-note"></p><p id="cost-summary"></p><p id="cost-limit"></p>
@@ -13,13 +14,19 @@ const fixture = `<div id="cost-types"><input name="__RequestVerificationToken" v
     const browser=await chromium.launch({headless:true,...(process.env.CHAPEL_TEST_BROWSER?{executablePath:process.env.CHAPEL_TEST_BROWSER}:{})});let passed=0;
     async function scenario(name,options,run){
         const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-        const state={calls:[],setup:{revision:options.unsaved?'':'v1',canRun:!options.disabled,rules:[{priority:1,campus:'MAIN',attendance:'Distance Education',degreeMatch:'ANY',degree:null,costType:'DE',costTypeId:4,enabled:true}],choices:[{id:4,label:'DE',description:'Distance Education'}]},rows:[{name:'Test account',studentId:'100',studentUid:8313,term:'Spring 2027',campus:'MAIN',attendance:'Distance Education',degree:null,currentLabel:'AC',currentId:26,proposedLabel:'DE',proposedId:4,action:options.correct?'Already correct':'Would change'}]};
+        const state={calls:[],setup:{automatic:{enabled:!!options.autoEnabled,reviewRuns:options.needsReview?[{id:'review-run',state:'Needs review',created:new Date().toISOString()}]:[],lastOutcome:'Automatic updates have not run.',nextRunAtUtc:options.autoEnabled?new Date(Date.now()+900000).toISOString():null},revision:options.unsaved?'':'v1',canRun:!options.disabled,rules:[{priority:1,campus:'MAIN',attendance:'Distance Education',degreeMatch:'ANY',degree:null,costType:'DE',costTypeId:4,enabled:true}],choices:[{id:4,label:'DE',description:'Distance Education'}]},rows:[{name:'Test account',studentId:'100',studentUid:8313,term:'Spring 2027',campus:'MAIN',attendance:'Distance Education',degree:null,currentLabel:'AC',currentId:26,proposedLabel:'DE',proposedId:4,action:options.correct?'Already correct':'Would change'}]};
         await page.route('http://cost.test/**',route=>{
             const req=route.request(),url=new URL(req.url()),handler=url.searchParams.get('handler');
             if(req.isNavigationRequest())return route.fulfill({contentType:'text/html',body:fixture});
-            state.calls.push({handler,uid:url.searchParams.get('studentUid'),body:req.postData()});
+            state.calls.push({handler,method:req.method(),uid:url.searchParams.get('studentUid'),body:req.postData()});
             assert.equal(req.headers().requestverificationtoken,'test-token');
-            if(handler==='Setup')return route.fulfill({json:state.setup});
+            if(handler==='Setup')return options.failedSetup?route.fulfill({status:503,json:{message:'Elements unavailable'}}):route.fulfill({json:state.setup});
+            if(handler==='Automation'){
+                if(req.method()==='POST'){
+                    const input=JSON.parse(req.postData());state.setup.automatic={...state.setup.automatic,enabled:input.enabled,reviewRuns:[],nextRunAtUtc:input.enabled?new Date(Date.now()+900000).toISOString():null};
+                }
+                return route.fulfill({json:state.setup.automatic});
+            }
             if(handler==='History')return route.fulfill({json:[]});
             if(handler==='Save'&&options.forbiddenSave)return route.fulfill({status:403,contentType:'text/plain',body:'Student impersonation is read-only. Exit student view before making changes.'});
             if(handler==='Save'){state.setup={...JSON.parse(req.postData()),revision:'v2'};return route.fulfill({json:state.setup});}
@@ -28,10 +35,41 @@ const fixture = `<div id="cost-types"><input name="__RequestVerificationToken" v
             return route.fulfill({status:404,body:''});
         });
         await page.goto('http://cost.test/admin');if(options.readOnly)await page.locator('#cost-types').evaluate(x=>x.dataset.readOnly='true');await page.addScriptTag({content:script});
-        await page.waitForFunction(()=>document.querySelector('#cost-history')&&document.querySelector('#cost-rules tr')&&document.querySelector('#cost-run-note').textContent!=='Working…');
+        if(options.failedSetup)await page.waitForFunction(()=>document.querySelector('#cost-message').textContent==='Elements unavailable');
+        else await page.waitForFunction(()=>document.querySelector('#cost-history')&&document.querySelector('#cost-rules tr')&&document.querySelector('#cost-run-note').textContent!=='Working…');
         try{await run(page,state);assert.deepEqual(errors,[]);passed++;console.log(`PASS ${name}`);}finally{await page.close();}
     }
     try{
+        await scenario('automation can be turned off even when Elements prevents loading the rules',{autoEnabled:true,failedSetup:true},async(page,s)=>{
+            assert.equal(await page.locator('#cost-auto-toggle').isDisabled(),false);
+            await page.locator('#cost-auto-toggle').click();await page.waitForFunction(()=>document.querySelector('#cost-auto-status').textContent.startsWith('Off'));
+            assert.deepEqual(JSON.parse(s.calls.find(x=>x.handler==='Automation'&&x.method==='POST').body),{enabled:false,revision:'',reviewedRunIds:[]});
+            assert.equal(s.calls.filter(x=>x.handler==='Run'||x.handler==='Preview'||x.handler==='Save').length,0);
+        });
+        await scenario('automatic enable is explicit, saved, unscoped by the manual UID and does not immediately apply',{},async(page,s)=>{
+            assert.match(await page.locator('#cost-auto-status').innerText(),/Off/);
+            await page.locator('#cost-student').fill('8313');
+            page.once('dialog',d=>d.dismiss());await page.locator('#cost-auto-toggle').click();assert.equal(s.calls.filter(x=>x.handler==='Automation'&&x.method==='POST').length,0);
+            page.once('dialog',d=>d.accept());await page.locator('#cost-auto-toggle').click();
+            await page.waitForFunction(()=>document.querySelector('#cost-auto-status').textContent.startsWith('On'));
+            const call=s.calls.find(x=>x.handler==='Automation'&&x.method==='POST');assert.equal(call.uid,null);assert.deepEqual(JSON.parse(call.body),{enabled:true,revision:'v1',reviewedRunIds:[]});
+            assert.equal(s.calls.filter(x=>x.handler==='Run'||x.handler==='Preview').length,0);
+        });
+        await scenario('turning automation off works with unsaved rule edits and preserves them',{autoEnabled:true},async(page,s)=>{
+            const attendance=page.locator('[aria-label="attendance, rule 1"]');await attendance.fill('Changed attendance');await attendance.blur();
+            assert.equal(await page.locator('#cost-auto-toggle').isDisabled(),false);
+            await page.locator('#cost-auto-toggle').click();await page.waitForFunction(()=>document.querySelector('#cost-auto-status').textContent.startsWith('Off'));
+            assert.equal(await attendance.inputValue(),'Changed attendance');assert.equal(await page.locator('#cost-preview').isDisabled(),true);
+            assert.equal(JSON.parse(s.calls.find(x=>x.handler==='Automation'&&x.method==='POST').body).enabled,false);
+        });
+        await scenario('unconfirmed history requires explicit review before automatic enable',{needsReview:true},async(page,s)=>{
+            assert.equal(await page.locator('#cost-auto-toggle').isDisabled(),true);await page.locator('#cost-auto-reviewed').check();
+            page.once('dialog',d=>d.accept());await page.locator('#cost-auto-toggle').click();await page.waitForFunction(()=>document.querySelector('#cost-auto-status').textContent.startsWith('On'));
+            assert.deepEqual(JSON.parse(s.calls.find(x=>x.handler==='Automation'&&x.method==='POST').body).reviewedRunIds,['review-run']);
+        });
+        await scenario('read-only views cannot toggle automation',{readOnly:true,autoEnabled:true},async(page,s)=>{
+            assert.equal(await page.locator('#cost-auto-toggle').isDisabled(),true);assert.equal(s.calls.filter(x=>x.handler==='Automation'&&x.method==='POST').length,0);
+        });
         await scenario('unsaved rules explain the disabled run; saving and previewing never auto-apply', {unsaved:true},async(page,s)=>{
             assert.match(await page.locator('#cost-run-note').innerText(),/Step 1/);assert.equal(await page.locator('#cost-preview').isDisabled(),true);
             await page.locator('#cost-reason').fill('Review nonprod rules');await page.locator('#cost-save').click();

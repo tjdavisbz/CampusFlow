@@ -12,7 +12,7 @@ using Volo.Abp.Uow;
 namespace CampusFlow.CostTypes;
 [Authorize(CampusFlowPermissions.Admin.CostTypes)]
 public class CostTypeAppService(IRepository<CostTypeConfiguration,Guid> configurations,
-    IRepository<CostTypeRun,Guid> runs, ICostTypeElements elements, IUnitOfWorkManager uow) : CampusFlowAppService, ICostTypeAppService
+    IRepository<CostTypeRun,Guid> runs, ICostTypeElements elements, IUnitOfWorkManager uow,CostTypeRunExecutor? executor=null) : CampusFlowAppService, ICostTypeAppService
 {
     private Guid Tenant() => CurrentTenant.Id ?? throw new UserFriendlyException("Select a university first.");
     private Task<CostTypeConfiguration?> ConfigurationAsync() { var tenant=Tenant(); return configurations.FindAsync(x=>x.TenantId==tenant); }
@@ -26,7 +26,7 @@ public class CostTypeAppService(IRepository<CostTypeConfiguration,Guid> configur
         var recent=await AsyncExecuter.ToListAsync(query.Where(x=>x.TenantId==tenant && x.State!="Preview")
             .OrderByDescending(x=>x.CreationTime).Take(10));
         return recent.Select(x=>new CostTypeHistoryDto(x.Id,x.CreationTime,x.State,
-            JsonSerializer.Deserialize<List<CostTypeResultDto>>(x.ResultsJson)??[])).ToList();
+            JsonSerializer.Deserialize<List<CostTypeResultDto>>(x.ResultsJson)??[],x.IsAutomatic,x.Summary,x.IsReviewed)).ToList();
     }
     public async Task<CostTypeSetupDto> GetAsync()
     {
@@ -45,8 +45,8 @@ public class CostTypeAppService(IRepository<CostTypeConfiguration,Guid> configur
             if(matches.Count==1) { rule.CostTypeId=matches[0].Id;rule.CostType=matches[0].Label; }
         }
         bool canRun; try { elements.EnsureRunEnabled(); canRun=true; } catch(InvalidOperationException) { canRun=false; }
-        return new() { Revision=c?.ConcurrencyStamp??"",Rules=rules,CanRun=canRun,
-            Choices=choices.Select(x=>new CostTypeChoiceDto(x.Id,x.Label,x.Description)).ToList() };
+        return new() { Revision=c?.RulesRevision??"",Rules=rules,CanRun=canRun,
+            Choices=choices.Select(x=>new CostTypeChoiceDto(x.Id,x.Label,x.Description)).ToList(),Automatic=await AutomaticAsync(c) };
     }
     public async Task<CostTypeSetupDto> SaveAsync(CostTypeSetupDto input)
     {
@@ -71,7 +71,7 @@ public class CostTypeAppService(IRepository<CostTypeConfiguration,Guid> configur
             }
         }
         var c=await ConfigurationAsync();
-        if((c?.ConcurrencyStamp??"")!=input.Revision || c?.RunningRunId is not null)
+        if((c?.RulesRevision??"")!=input.Revision || c?.RunningRunId is not null)
             throw new UserFriendlyException("Rules changed or a run is in progress. Reload before saving.");
         var json=JsonSerializer.Serialize(input.Rules.OrderBy(x=>x.Priority).Select(Map));
         if(c is null) await configurations.InsertAsync(new CostTypeConfiguration(GuidGenerator.Create(),tenant,json,input.ChangeReason),true);
@@ -92,7 +92,7 @@ public class CostTypeAppService(IRepository<CostTypeConfiguration,Guid> configur
         if(enabled && changes.Count is >0 and <=100)
         {
             foreach(var row in changes) candidates.Add(new(row,await elements.FingerprintAsync(row)));
-            var run=new CostTypeRun(GuidGenerator.Create(),Tenant(),c.ConcurrencyStamp,c.RulesJson,JsonSerializer.Serialize(candidates),studentUid);
+            var run=new CostTypeRun(GuidGenerator.Create(),Tenant(),c.RulesRevision,c.RulesJson,JsonSerializer.Serialize(candidates),studentUid);
             await runs.InsertAsync(run,true); id=run.Id;
             message=$"{changes.Count} changes ready. Preview expires in 15 minutes. Unmapped and invalid rows will be skipped.";
         }
@@ -109,40 +109,50 @@ public class CostTypeAppService(IRepository<CostTypeConfiguration,Guid> configur
         {
             var run=await runs.GetAsync(runId); var c=await ConfigurationAsync() ?? throw new UserFriendlyException("Rules are missing.");
             if(run.TenantId!=tenant || run.CreatorId!=CurrentUser.Id || run.State!="Preview" ||
-               Clock.Now-run.CreationTime>TimeSpan.FromMinutes(15) || run.RuleRevision!=c.ConcurrencyStamp || c.RunningRunId is not null)
+               Clock.Now-run.CreationTime>TimeSpan.FromMinutes(15) || run.RuleRevision!=c.RulesRevision || c.RunningRunId is not null)
                 throw new UserFriendlyException("This preview expired, changed, or has already been used. Create a new preview.");
             candidates=JsonSerializer.Deserialize<List<CostTypeCandidate>>(run.CandidatesJson)!; rules=Rules(c); studentUid=run.StudentUid;
             run.Start(); c.SetRun(run.Id); await runs.UpdateAsync(run,true); await configurations.UpdateAsync(c,true); await claim.CompleteAsync();
         }
-        var results=new List<CostTypeResultDto>(); var state="Completed";
-        try
+        return await (executor ?? new CostTypeRunExecutor(configurations,runs,elements,uow))
+            .ExecuteAsync(runId,tenant,candidates,rules,studentUid,false);
+    }
+    private async Task<CostTypeAutomaticSettingsDto> AutomaticAsync(CostTypeConfiguration? c)
+    {
+        if(c is null)return new();
+        var state=CostTypeAutomationState.Read(c);
+        var blockers=await CostTypeRunExecutor.BlockingRunsAsync(runs,Tenant());
+        return new() {Enabled=state.Enabled,NextRunAtUtc=state.NextRunAtUtc,LastStartedAtUtc=state.LastStartedAtUtc,
+            LastFinishedAtUtc=state.LastFinishedAtUtc,LastRunId=state.LastRunId,RunningRunId=c.RunningRunId,
+            LastOutcome=state.LastOutcome,ReviewRuns=blockers.Select(x=>new CostTypeReviewRunDto(x.Id,x.CreationTime,x.State)).ToList()};
+    }
+    [DisableAuditing]
+    public async Task<CostTypeAutomaticSettingsDto> GetAutomaticRunsAsync() => await AutomaticAsync(await ConfigurationAsync());
+    [UnitOfWork(IsDisabled=true)]
+    public async Task<CostTypeAutomaticSettingsDto> SetAutomaticRunsAsync(CostTypeAutomaticUpdateDto input)
+    {
+        var tenant=Tenant();var actor=CurrentUser.Id ?? throw new UserFriendlyException("Sign in normally to change the automatic schedule.");
+        using(var change=uow.Begin(requiresNew:true,isTransactional:true))
         {
-            var fresh=await elements.PreviewAsync(rules,studentUid);
-            foreach(var candidate in candidates)
+            var c=await ConfigurationAsync() ?? throw new UserFriendlyException("Review and save the rules before enabling automatic updates.");
+            if(input.Enabled)
             {
-                var row=candidate.Row;
-                var current=fresh.SingleOrDefault(x=>x.StatusId==row.StatusId && x.StudentUid==row.StudentUid && x.TermId==row.TermId);
-                var outcome="Skipped: source record changed; preview again.";
-                if(current==row)
-                {
-                    try { await elements.ApplyAsync(candidate); outcome="Verified updated"; }
-                    catch(Exception) { outcome="Unconfirmed: verify in Elements before retrying."; state="Needs review"; }
-                }
-                results.Add(new(row.StudentUid,row.TermId,outcome));
-                using var progress=uow.Begin(requiresNew:true,isTransactional:true);
-                var run=await runs.GetAsync(runId); run.Record(JsonSerializer.Serialize(results)); await runs.UpdateAsync(run,true); await progress.CompleteAsync();
-                if(state=="Needs review") break; // No automatic retries after an uncertain write.
+                elements.EnsureRunEnabled();
+                if(c.RulesRevision!=input.Revision)throw new UserFriendlyException("Saved rules changed. Reload and review them before enabling automatic updates.");
+                if(c.RunningRunId is not null)throw new UserFriendlyException("A run is still in progress or interrupted. Check it before enabling automatic updates.");
+                if(!Rules(c).Any(x=>x.Enabled && x.CostTypeId is not null))throw new UserFriendlyException("Save at least one mapped, enabled rule first.");
+                var blockers=await CostTypeRunExecutor.BlockingRunsAsync(runs,tenant);
+                if(blockers.Any(x=>x.State=="Running"))throw new UserFriendlyException("An unfinished run still needs administrator review. It cannot be retried automatically.");
+                var reviewed=input.ReviewedRunIds?.ToHashSet() ?? [];
+                if(blockers.Count>0 && !reviewed.SetEquals(blockers.Select(x=>x.Id)))
+                    throw new UserFriendlyException("Check the listed runs in Elements and confirm that no request is still in progress before enabling automatic updates.");
+                foreach(var run in blockers){run.Review(actor,Clock.Now.ToUniversalTime());await runs.UpdateAsync(run,true);}
             }
+            // Turning off is always local: it does not depend on Elements availability or discard unsaved rule edits.
+            var schedule=CostTypeAutomationState.Read(c);schedule.Configure(input.Enabled,actor,Clock.Now.ToUniversalTime());schedule.Save(c);
+            await configurations.UpdateAsync(c,true);await change.CompleteAsync();
         }
-        catch { state="Needs review"; throw; }
-        finally
-        {
-            using var finish=uow.Begin(requiresNew:true,isTransactional:true);
-            if(results.Any(x=>x.Outcome!="Verified updated") && state=="Completed") state="Completed with skips";
-            var run=await runs.GetAsync(runId);run.Finish(state);run.Record(JsonSerializer.Serialize(results));await runs.UpdateAsync(run,true);
-            var c=await ConfigurationAsync();if(c?.RunningRunId==runId) { c.SetRun(null);await configurations.UpdateAsync(c,true); }
-            await finish.CompleteAsync();
-        }
-        return results;
+        using var view=uow.Begin(requiresNew:true,isTransactional:false);
+        var result=await AutomaticAsync(await ConfigurationAsync());await view.CompleteAsync();return result;
     }
 }
