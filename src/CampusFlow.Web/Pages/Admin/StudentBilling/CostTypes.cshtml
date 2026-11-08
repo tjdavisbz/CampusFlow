@@ -7,10 +7,26 @@
 <h1>Cost type rules</h1>
 @if (Model.IsReadOnlyView)
 {
-    <div class="alert alert-warning" role="alert">You are in a read-only portal view. Exit that view using the banner at the top, then return here to save rules, create a preview or run updates.</div>
+    <div class="alert alert-warning" role="alert">You are in a read-only portal view. Exit that view using the banner at the top, then return here to save rules, change the automatic schedule, create a preview or run updates.</div>
 }
 <p>Choose a cost type using term campus, attendance and primary degree. Rules run in priority order; the first match wins.</p>
-<div class="alert alert-info">Automatic runs are off. Save your rules, preview the proposed changes, then use Run now. Unmapped rules can be saved for review. Records without a valid match are skipped.</div>
+<p>Unmapped rules can be saved for review. Records without a valid match are skipped.</p>
+<section class="card my-3" aria-labelledby="cost-auto-heading"><div class="card-body">
+<h2 id="cost-auto-heading">Automatic updates</h2>
+<p>Run the saved rules every 15 minutes for student records in the current and future term scope. Each run applies up to 100 changes and may affect billing. The Student UID field below affects manual previews only.</p>
+<p id="cost-auto-status" role="status" aria-live="polite">Loading automatic schedule…</p>
+<p id="cost-auto-last"></p>
+<div id="cost-auto-review-section" hidden>
+<p>Check these interrupted or unconfirmed runs in Elements before enabling automatic updates. A running request must finish first.</p>
+<ul id="cost-auto-reviews"></ul>
+<label><input id="cost-auto-reviewed" type="checkbox" class="form-check-input" /> I checked the listed runs in Elements and confirmed that no update request is still in progress.</label>
+</div>
+<div class="d-flex flex-wrap gap-2 my-2">
+<button id="cost-auto-toggle" class="btn btn-outline-primary" type="button" disabled>Turn on automatic updates</button>
+<button id="cost-auto-refresh" class="btn btn-outline-secondary" type="button" disabled>Refresh schedule status</button>
+</div>
+<p class="mb-0">Turning off stops new automatic updates. An update already sent to Elements is allowed to finish verification. Manual and automatic runs cannot overlap; an unconfirmed update pauses automation until it is reviewed.</p>
+</div></section>
 <div id="cost-message" role="status" aria-live="polite"></div>
 <div class="d-flex gap-2 flex-wrap my-3">
 <button id="cost-save" type="button" class="btn btn-primary">Save rules</button>

@@ -17,6 +17,13 @@ public class CostTypesModel(ICostTypeAppService service) : CampusFlowPageModel
         claim.Type == CampusFlow.AdvisorPortal.SchedulerViewClaimTypes.Email) == true;
     public void OnGet() { }
     public async Task<JsonResult> OnGetHistoryAsync() => new(await service.GetHistoryAsync());
+    public async Task<JsonResult> OnGetAutomationAsync() => new(await service.GetAutomaticRunsAsync());
+    public async Task<IActionResult> OnPostAutomationAsync([FromBody] CostTypeAutomaticUpdateDto input)
+    {
+        if(IsReadOnlyView)return Forbid();
+        if(!ModelState.IsValid)return BadRequest();
+        return new JsonResult(await service.SetAutomaticRunsAsync(input));
+    }
     public async Task<JsonResult> OnGetSetupAsync() => new(await service.GetAsync());
     public async Task<JsonResult> OnPostSaveAsync([FromBody] CostTypeSetupDto input) => new(await service.SaveAsync(input));
     public async Task<JsonResult> OnPostPreviewAsync(int? studentUid)

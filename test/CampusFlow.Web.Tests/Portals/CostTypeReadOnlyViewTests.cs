@@ -20,7 +20,7 @@ using Xunit;
 namespace CampusFlow.Portals;
 public class CostTypeReadOnlyViewTests
 {
-    [Theory] [InlineData("Save")] [InlineData("Preview")] [InlineData("Run")]
+    [Theory] [InlineData("Save")] [InlineData("Preview")] [InlineData("Run")] [InlineData("Automation")]
     public async Task Student_view_keeps_cost_type_writes_blocked(string handler)
     {
         var (context,session,permissions)=Request("POST","/Admin/StudentBilling/CostTypes");

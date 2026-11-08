@@ -9,5 +9,7 @@ public class CostTypeDependencyTests : CampusFlowEntityFrameworkCoreTestBase
     {
         GetRequiredService<ICostTypeElements>().ShouldNotBeNull();
         GetRequiredService<ICostTypeAppService>().ShouldNotBeNull();
+        GetRequiredService<CostTypeRunExecutor>().ShouldNotBeNull();
+        GetRequiredService<CostTypeAutomationRunner>().ShouldNotBeNull();
     }
 }

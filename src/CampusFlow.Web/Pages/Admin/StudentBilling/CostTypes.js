@@ -2,7 +2,7 @@
     'use strict';
     const root=document.getElementById('cost-types'), el=n=>document.getElementById('cost-'+n);
     let readOnly=root.dataset.readOnly==='true';
-    let setup=null,preview=null,dirty=false,busy=false;
+    let setup=null,preview=null,dirty=false,busy=false,automatic=null,reviewKey="";
     function message(text){el('message').textContent=text;}
     function validStudentScope(){
         if(el('student').validity.badInput)return false;
@@ -28,10 +28,16 @@
         el('run-note').textContent=reason;
         root.querySelectorAll('#cost-rules input,#cost-rules select').forEach(x=>x.disabled=readOnly||busy);
         el('student').disabled=readOnly||busy;
+        const reviews=automatic?.reviewRuns??[],running=reviews.some(x=>x.state==='Running');
+        el('auto-toggle').disabled=readOnly||busy||!automatic||(!automatic.enabled&&
+            (!setup||dirty||!setup.revision||!setup.canRun||!!automatic.runningRunId||running||(reviews.length>0&&!el('auto-reviewed').checked)));
+        el('auto-refresh').disabled=busy;
+        el('auto-reviewed').disabled=readOnly||busy||running;
+
     }
     async function request(handler,body,params={}){
         const url=new URL(location.href);url.search=new URLSearchParams({handler,...params});
-        const r=await fetch(url,{method:['Setup','History'].includes(handler)?'GET':'POST',headers:{'Content-Type':'application/json',RequestVerificationToken:root.querySelector('[name="__RequestVerificationToken"]').value},body:body===undefined?undefined:JSON.stringify(body)});
+        const r=await fetch(url,{method:body===undefined&&['Setup','History','Automation'].includes(handler)?'GET':'POST',headers:{'Content-Type':'application/json',RequestVerificationToken:root.querySelector('[name="__RequestVerificationToken"]').value},body:body===undefined?undefined:JSON.stringify(body)});
         const text=await r.text();
         let data;try{data=JSON.parse(text);}catch{
             if(r.status===403&&text.includes('impersonation is read-only.')) {
@@ -47,9 +53,34 @@
     function cell(tr,text){const td=document.createElement('td');td.textContent=text??'';tr.append(td);return td;}
     async function history(){
         const rows=await request('History');el('history').replaceChildren();
-        for(const r of rows){const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent=`${new Date(r.created).toLocaleString()} — ${r.state} (${r.id})`;details.append(summary);
+        for(const r of rows){const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent=`${new Date(r.created).toLocaleString()} — ${r.automatic?'Automatic':'Manual'} — ${r.state}${r.reviewed?' (reviewed)':''} (${r.id})`;details.append(summary);if(r.summary){const note=document.createElement('p');note.textContent=r.summary;details.append(note);}
             for(const x of r.results){const p=document.createElement('p');p.textContent=`Student UID ${x.studentUid}, term ${x.termId}: ${x.outcome}`;details.append(p);}el('history').append(details);}
     }
+    function renderAutomatic(){
+        if(!automatic)return;
+        const date=x=>x?new Date(x).toLocaleString():'—';
+        el('auto-status').textContent=automatic.enabled?`On — every 15 minutes. Next check: ${date(automatic.nextRunAtUtc)}.`:'Off — no new automatic updates will start.';
+        if(automatic.runningRunId)el('auto-status').textContent+=' A run is in progress or awaiting review; another run cannot overlap it.';
+        el('auto-last').textContent=`${automatic.lastOutcome||'Automatic updates have not run.'}${automatic.lastStartedAtUtc?' Last started: '+date(automatic.lastStartedAtUtc)+'.':''}${automatic.lastFinishedAtUtc?' Last finished: '+date(automatic.lastFinishedAtUtc)+'.':''}`;
+        el('auto-toggle').textContent=automatic.enabled?'Turn off automatic updates':'Turn on automatic updates';
+        const reviews=automatic.reviewRuns??[],key=reviews.map(x=>`${x.id}:${x.state}`).join(',');
+        if(key!==reviewKey){el('auto-reviewed').checked=false;reviewKey=key;}
+        el('auto-review-section').hidden=automatic.enabled||reviews.length===0;
+        el('auto-reviews').replaceChildren();
+        for(const run of reviews){const li=document.createElement('li');li.textContent=`${date(run.created)} — ${run.state} (${run.id})`;el('auto-reviews').append(li);}
+    }
+    async function refreshAutomatic(){automatic=await request('Automation');renderAutomatic();controls();}
+    el('auto-reviewed').onchange=controls;
+    el('auto-refresh').onclick=()=>work(refreshAutomatic);
+    el('auto-toggle').onclick=()=>{
+        if(!automatic)return;const enabled=!automatic.enabled;
+        if(enabled&&!confirm('Run the saved cost-type rules automatically every 15 minutes for all records in the current and future term scope? This may affect billing. The first check starts in about 15 minutes.'))return;
+        work(async()=>{
+            automatic=await request('Automation',{enabled,revision:setup?.revision??'',reviewedRunIds:el('auto-reviewed').checked?(automatic.reviewRuns??[]).map(x=>x.id):[]});
+            renderAutomatic();message(enabled?'Automatic updates enabled. The first check is scheduled in about 15 minutes.':'Automatic updates turned off. Any update already sent to Elements will finish verification.');
+            await history();
+        });
+    };
     function renderRules(){
         const target=el('rules');target.replaceChildren();const search=el('search').value.toLowerCase();
         for(const r of setup.rules){
@@ -80,9 +111,10 @@
     el('search').oninput=()=>setup&&renderRules();el('filter').onchange=renderPreview;
     el('student').oninput=()=>{resetPreview();message('Student scope changed. Click Preview to find accounts for this scope.');controls();};
     el('add').onclick=()=>{setup.rules.push({priority:Math.max(...setup.rules.map(x=>x.priority),0)+1,campus:null,attendance:'',degreeMatch:'ANY',degree:null,costType:'',costTypeId:null,enabled:true});el('search').value='';changed();renderRules();};
-    el('save').onclick=()=>work(async()=>{setup.changeReason=el('reason').value;setup=await request('Save',setup);dirty=false;resetPreview();renderRules();message('Rules saved. Preview before running. Unmapped rules are retained for review and cannot be applied.');});
+    el('save').onclick=()=>work(async()=>{setup.changeReason=el('reason').value;setup=await request('Save',setup);automatic=setup.automatic??automatic;dirty=false;resetPreview();renderRules();renderAutomatic();message('Rules saved. Preview before running. Unmapped rules are retained for review and cannot be applied.');});
     el('preview').onclick=()=>work(async()=>{resetPreview();el('results').replaceChildren();const uid=el('student').value;preview=await request('Preview',undefined,uid?{studentUid:uid}:{});const hasChanges=preview.rows.some(x=>x.action==='Would change');if(!hasChanges&&el('filter').value==='Would change')el('filter').value='All';renderPreview();message(hasChanges?'Preview complete. Review the proposed changes below.':'No changes are ready. The preview shows the accounts and explains whether they are already correct or need a rule mapping.');});
     el('run').onclick=()=>{if(!preview?.runId)return;const id=preview.runId;const count=preview.rows.filter(x=>x.action==='Would change').length;if(!confirm(`Apply ${count} reviewed cost-type changes in this environment?`))return;
-        work(async()=>{preview.runId=null;preview.message='This preview has been used. Create a fresh preview before another run.';const results=await request('Run',undefined,{runId:id});el('results').replaceChildren();for(const r of results){const li=document.createElement('li');li.textContent=`Student UID ${r.studentUid}, term ${r.termId}: ${r.outcome}`;el('results').append(li);}await history();message('Run finished. Review the results; create a fresh preview before another run.');});};
-    work(async()=>{setup=await request('Setup');renderRules();await history();message(readOnly?'Read-only view: exit student or faculty view before saving, previewing or running.':setup.revision?'Rules loaded. Preview before running.':'These baseline rules have not been saved. Enter a change reason and choose Save rules before previewing. Unmapped rules can be saved for review but will not run.');});
+        work(async()=>{preview.runId=null;preview.message='This preview has been used. Create a fresh preview before another run.';const results=await request('Run',undefined,{runId:id});el('results').replaceChildren();for(const r of results){const li=document.createElement('li');li.textContent=`Student UID ${r.studentUid}, term ${r.termId}: ${r.outcome}`;el('results').append(li);}await history();await refreshAutomatic();message('Run finished. Review the results; create a fresh preview before another run.');});};
+    work(async()=>{try{await refreshAutomatic();}catch{el('auto-status').textContent='Schedule status could not be loaded. Use Refresh schedule status to try again.';}setup=await request('Setup');automatic=setup.automatic??automatic??{enabled:false,lastOutcome:'Automatic updates have not run.',reviewRuns:[]};renderRules();renderAutomatic();await history();message(readOnly?'Read-only view: exit student or faculty view before saving, previewing or running.':setup.revision?'Rules loaded. Preview before running.':'These baseline rules have not been saved. Enter a change reason and choose Save rules before previewing. Unmapped rules can be saved for review but will not run.');});
+    setInterval(()=>{if(automatic&&!busy&&!document.hidden)refreshAutomatic().catch(()=>{el('auto-status').textContent='Schedule status could not be refreshed. Refresh or reload before changing it.';});},30000);
 })();
