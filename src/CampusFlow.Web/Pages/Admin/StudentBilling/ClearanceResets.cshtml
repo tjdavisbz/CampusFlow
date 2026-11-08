@@ -1,0 +1,48 @@
+@page
+@model CampusFlow.Web.Pages.Admin.StudentBilling.ClearanceResetsModel
+@{ViewData["Title"]="Automatic clearance resets";}
+@section scripts {<script src="~/Pages/Admin/StudentBilling/ClearanceResets.js" asp-append-version="true"></script>}
+<main id="clearance-resets" data-read-only="@Model.IsReadOnlyView.ToString().ToLowerInvariant()" class="container py-4">
+@Html.AntiForgeryToken()
+<h1>Automatic clearance resets</h1>
+<p>Keep Elements clearance consistent with each student’s courses for Spring 2027 and later.</p>
+@if(Model.IsReadOnlyView){<div class="alert alert-warning" role="alert">Exit the current student, faculty or scheduler view before changing this schedule.</div>}
+<section class="card my-3" aria-labelledby="clearance-purpose"><div class="card-body">
+<h2 id="clearance-purpose">What this job does</h2>
+<p>Every 15 minutes, checks student records for Spring 2027 and all later terms. If a student has no Nelson courses in that term and the term’s status is <strong>Cleared</strong>, changes it to <strong>Not Cleared</strong>.</p>
+<p>Transfer courses do not count, including records categorized as Transfer. Any Nelson course in the term, including an unofficial course, prevents the reset. Earlier terms are outside this job’s scope.</p>
+<p>The checks use the chronological term sequence and recheck live course and clearance information before each update. Each run handles up to 100 candidates; remaining candidates wait for a later run.</p>
+<p class="mb-0">This changes the student’s Elements clearance and can affect billing clearance. Review the recent results below after enabling it.</p>
+</div></section>
+<section class="card my-3" aria-labelledby="clearance-schedule"><div class="card-body">
+<h2 id="clearance-schedule">Automatic schedule</h2>
+<p id="clearance-status" role="status" aria-live="polite">Loading schedule…</p>
+<p id="clearance-last"></p>
+<p id="clearance-note"></p>
+<div id="clearance-review" hidden>
+<p>Check the listed unconfirmed resets in Elements and confirm no update is still in progress before enabling again. A running or interrupted request requires administrator reconciliation.</p>
+<ul id="clearance-review-runs"></ul>
+<label><input id="clearance-reviewed" type="checkbox" class="form-check-input" /> I checked these attempts in Elements and confirmed no update request is still in progress.</label>
+</div>
+<div class="d-flex flex-wrap gap-2 my-3">
+<button id="clearance-toggle" type="button" class="btn btn-primary" disabled>Turn on automatic resets</button>
+<button id="clearance-refresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
+</div>
+<p class="mb-0">The first check is scheduled about 15 minutes after enabling. Turning off stops the next automatic student update; an update already in progress finishes verification. An unconfirmed update pauses the schedule for review.</p>
+</div></section>
+<p id="clearance-message" role="status" aria-live="polite"></p>
+<section class="card my-3" aria-labelledby="clearance-manual"><div class="card-body">
+<h2 id="clearance-manual">Preview and run now</h2>
+<p>Preview to find eligible student-term records, review the list, then choose Run now to confirm those resets. Manual runs work while the automatic schedule is off. Previews expire after 15 minutes.</p>
+<div class="d-flex flex-wrap align-items-end gap-2 my-3">
+<label>Student UID (optional)<input id="clearance-student" type="number" min="1" max="2147483647" step="1" class="form-control" aria-describedby="clearance-student-help" /></label>
+<button id="clearance-preview" type="button" class="btn btn-outline-primary" disabled>Preview</button>
+<button id="clearance-run" type="button" class="btn btn-primary" disabled>Run now</button>
+</div>
+<p id="clearance-student-help">Use the Elements UID, not the longer Student ID. Leave blank to preview all eligible records.</p>
+<p id="clearance-preview-message" role="status" aria-live="polite">Preview the affected records before running.</p>
+<div class="table-responsive"><table class="table"><thead><tr><th>Student</th><th>Student ID</th><th>Student UID</th><th>Term</th><th>Proposed change</th></tr></thead><tbody id="clearance-preview-rows"></tbody></table></div>
+<ul id="clearance-results"></ul>
+</div></section>
+<h2>Recent runs</h2><div id="clearance-history"><p>No runs loaded.</p></div>
+</main>

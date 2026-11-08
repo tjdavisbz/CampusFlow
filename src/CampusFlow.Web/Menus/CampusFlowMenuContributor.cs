@@ -252,6 +252,8 @@ public class CampusFlowMenuContributor : IMenuContributor
                     "Reset Bill Approval", "~/Admin/StudentBilling/ResetIndividualBillApproval",
                     icon: "fa fa-arrow-rotate-left", order: 4));
             if (canManageBillApproval)
+                studentBilling.AddItem(new ApplicationMenuItem("CampusFlow.ClearanceResets", "Automatic clearance resets", "~/Admin/StudentBilling/ClearanceResets", icon: "fa fa-arrow-rotate-left", order: 6));
+            if (canManageBillApproval)
                 studentBilling.AddItem(new ApplicationMenuItem("CampusFlow.BillApprovalDelivery", "Bill approval delivery", "~/Admin/StudentBilling/BillApprovalDelivery", icon: "fa fa-envelope", order: 5));
             if (studentBilling.Items.Count > 0)
                 admin.AddItem(studentBilling);

@@ -136,6 +136,7 @@ public class CampusFlowWebModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         context.Services.AddHostedService<CampusFlow.Web.CostTypes.CostTypeAutomationWorker>();
+        context.Services.AddHostedService<CampusFlow.Web.ClearanceResets.ClearanceResetWorker>();
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
