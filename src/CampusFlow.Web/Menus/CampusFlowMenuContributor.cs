@@ -216,11 +216,12 @@ public class CampusFlowMenuContributor : IMenuContributor
         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
         var canManageAdvisorRouting = canManageRegistration;
         var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
+        var canReconcileAwardCodes = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ReconcileAwardCodes);
         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
         var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
-        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canImpersonateScheduler || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageCostTypes || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
+        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canImpersonateScheduler || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageCostTypes || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel || canReconcileAwardCodes))
         {
             var admin = new ApplicationMenuItem(
                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
@@ -271,6 +272,12 @@ public class CampusFlowMenuContributor : IMenuContributor
                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
                     "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 2));
             }
+            if (canReconcileAwardCodes)
+                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.FinancialAidAdmin,
+                    "Financial Aid", icon: "fa fa-graduation-cap", order: 6)
+                    .AddItem(new ApplicationMenuItem(CampusFlowMenus.ReconcileAwardCodes,
+                        "Reconcile Award Codes", "~/Admin/FinancialAid/ReconcileAwardCodes",
+                        icon: "fa fa-list-check", order: 1)));
             if (canManageHousing)
                 admin.AddItem(new ApplicationMenuItem("CampusFlow.HousingAdmin", "Housing", icon: "fa fa-building", order: 6)
                     .AddItem(new ApplicationMenuItem("CampusFlow.HousingAssignments", "Assignments", "~/Admin/Housing/Assignments", icon: "fa fa-bed"))
