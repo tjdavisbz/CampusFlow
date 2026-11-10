@@ -95,6 +95,33 @@ public class BillApprovalAccessHandlerTests
         await _model.OnGetAsync("B27S");Assert.Equal(fingerprint,_model.CurrentReviewVersion);Assert.Equal(600,_model.PendingAidTotal);
     }
     [Fact]
+    public async Task Pending_loans_use_live_decisions_and_selected_term_without_changing_bill_totals_or_fingerprint()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        StudentFinancialAidAward Loan(string id,string term="269") =>
+            new(StudentInformationSystemProvider.ThesisElements,id,term,"B27S","Spring 2027",null,"Loan","Awarded","Loan "+id,500,false,null,null,true);
+        var rows=new[]{Loan("pending"),Loan("accepted"),Loan("declined"),Loan("other-term","268"),Loan("gift") with {IsLoan=false},Loan("cancelled") with {AwardStatus="Cancelled"},Loan("billed") with {IsSentToBilling=true}};
+        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows);
+        var decisions=new Dictionary<string,int?>{{"pending",null},{"accepted",1},{"declined",0},{"gift",null},{"cancelled",null},{"billed",null}};
+        _aidDecisions.GetDecisionsAsync("10",Arg.Any<CancellationToken>()).Returns(decisions);
+        await _model.OnGetAsync("B27S");
+        Assert.False(_model.IsUnavailable);
+        Assert.Equal("pending",Assert.Single(_model.PendingLoans).ExternalAwardId);
+        Assert.Equal(1000,_model.PendingAidTotal);Assert.Equal(-1000,_model.RemainingBalance);
+        var fingerprint=_model.CurrentReviewVersion;
+        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows.Select(x=>x.ExternalAwardId=="pending"?x with {Amount=9000}:x).ToArray());
+        await _model.OnGetAsync("B27S");
+        Assert.Equal(9000,Assert.Single(_model.PendingLoans).Amount);
+        Assert.Equal(1000,_model.PendingAidTotal);Assert.Equal(fingerprint,_model.CurrentReviewVersion);
+        decisions["pending"]=1;
+        await _model.OnGetAsync("B27S");
+        Assert.Empty(_model.PendingLoans);Assert.Equal(10000,_model.PendingAidTotal);
+        Assert.NotEqual(fingerprint,_model.CurrentReviewVersion);
+        Assert.DoesNotContain(_aidDecisions.ReceivedCalls(),x=>x.GetMethodInfo().Name=="SubmitDecisionAsync");
+        Assert.Empty(_gateway.ReceivedCalls());
+    }
+
+    [Fact]
     public async Task Missing_live_aid_decision_stops_bill_review_instead_of_using_a_stale_loan_state()
     {
         _term.ConfigureTestAccess(true,new[]{"100"});_aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",null,"Loan","Guarantee","Loan",100,false,1,null,true)});

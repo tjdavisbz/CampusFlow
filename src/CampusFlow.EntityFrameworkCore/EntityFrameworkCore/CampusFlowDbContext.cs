@@ -1,4 +1,5 @@
 using CampusFlow.CostTypes;
+using CampusFlow.ClearanceResets;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
@@ -34,6 +35,8 @@ public class CampusFlowDbContext :
     ITenantManagementDbContext,
     IIdentityDbContext
 {
+    public DbSet<ClearanceResetConfiguration> ClearanceResetConfigurations { get; set; }
+    public DbSet<ClearanceResetRun> ClearanceResetRuns { get; set; }
     public DbSet<BibliuConfiguration> BibliuConfigurations { get; set; }
     public DbSet<StudentProfile> StudentProfiles { get; set; }
     public DbSet<StaffStudentLink> StaffStudentLinks { get; set; }
@@ -438,6 +441,21 @@ public class CampusFlowDbContext :
             b.HasIndex(x => new { x.TenantId, x.PeriodId }).IsUnique().HasFilter("\"IsDeleted\" = false");
         });
 
+        builder.Entity<ClearanceResetConfiguration>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "ClearanceResetConfigurations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.HasIndex(x=>x.TenantId).IsUnique().HasFilter("\"IsDeleted\" = false");
+        });
+        builder.Entity<ClearanceResetRun>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "ClearanceResetRuns", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x=>x.State).IsRequired().HasMaxLength(40);
+            b.Property(x=>x.Summary).IsRequired().HasMaxLength(500);
+            b.Property(x=>x.ResultsJson).IsRequired();b.Property(x=>x.AttemptsJson).IsRequired();
+            b.HasIndex(x=>new{x.TenantId,x.CreationTime});
+        });
         builder.Entity<CostTypeConfiguration>(b =>
         {
             b.ToTable(CampusFlowConsts.DbTablePrefix + "CostTypeConfigurations", CampusFlowConsts.DbSchema);

@@ -31,5 +31,29 @@ public class FinancialAidRulesTests
     {Assert.False(FinancialAidRules.CanDecide(Award() with {IsLocked=true}));Assert.False(FinancialAidRules.CanDecide(Award() with {StudentAccepted=0}));Assert.False(FinancialAidRules.CanDecide(Award() with {StudentAccepted=1}));Assert.True(FinancialAidRules.CanDecide(Award()));}
     [Fact] public void Other_providers_keep_their_existing_pending_aid_behavior()
     {var provider=Array.Find(Enum.GetValues<StudentInformationSystemProvider>(),x=>x!=StudentInformationSystemProvider.ThesisElements);Assert.True(FinancialAidRules.IncludeInBillApproval(Award() with {Provider=provider,IsLoan=null}));}
+    [Theory]
+    [InlineData(true,null,100,false,"Awarded",true)]
+    [InlineData(true,1,100,false,"Awarded",false)]
+    [InlineData(true,0,100,false,"Awarded",false)]
+    [InlineData(false,null,100,false,"Awarded",false)]
+    [InlineData(null,null,100,false,"Awarded",false)]
+    [InlineData(true,null,0,false,"Awarded",false)]
+    [InlineData(true,null,-100,false,"Awarded",false)]
+    [InlineData(true,null,100,true,"Awarded",false)]
+    [InlineData(true,null,100,false,"Cancelled",false)]
+    public void Pending_loan_notice_excludes_accepted_declined_unknown_nonloan_billed_and_cancelled_awards(
+        bool? loan,int? decision,int amount,bool billed,string status,bool expected)
+    {
+        var award=Award() with {IsLoan=loan,StudentAccepted=decision,Amount=amount,IsSentToBilling=billed,AwardStatus=status};
+        Assert.Equal(expected,FinancialAidRules.IsLoanAwaitingAcceptance(award));
+        if(expected)Assert.False(FinancialAidRules.IncludeInBillApproval(award));
+    }
+    [Fact]
+    public void A_locked_pending_loan_can_be_explained_without_offering_an_acceptance_action()
+    {
+        var award=Award() with {IsLoan=true,IsLocked=true};
+        Assert.True(FinancialAidRules.IsLoanAwaitingAcceptance(award));
+        Assert.False(FinancialAidRules.CanDecide(award));
+    }
     static StudentFinancialAidAward Award()=>new(StudentInformationSystemProvider.ThesisElements,"1","269","B27C","Spring 2027",DateTime.Today,"Grant","Guarantee","Grant",100,false,null,null,false);
 }

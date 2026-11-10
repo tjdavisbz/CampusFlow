@@ -8,6 +8,8 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
+using CampusFlow.ClearanceResets;
+using NSubstitute;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 namespace CampusFlow.EntityFrameworkCore.Tests.BillApprovals;
@@ -33,14 +35,14 @@ public class BillClearanceServiceTests
         "uDefCurr1":123.45,"uDefCurr2":null,"uDefCurr3":0,"uDefDate1":"2026-11-05T00:00:00",
         "uDefDate2":null,"uDefDate3":null,"uDefDate4":null,"uDefBit1":true,"uDefBit2":false,"uDefBit3":true}
         """)!.AsObject();
-    private static ThesisElementsBillClearanceService Service(Handler handler,bool enabled=true,bool production=false,string? authUrl=null)
+    private static ThesisElementsBillClearanceService Service(Handler handler,bool enabled=true,bool production=false,string? authUrl=null,IClearanceResetProtection? protection=null)
     {
         var p="StudentInformationSystems:Providers:ThesisElements:Api:";
         var configuration=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
         { ["App:EnvironmentLabel"]="NON-PRODUCTION",["BillApproval:ClearedStatus:Enabled"]=enabled.ToString(),
           [p+"BaseUrl"]=authUrl??(production?"https://app-elm-prod-usc-integrationapi.azurewebsites.net":"https://app-elm-nonprod-usc-integrationapi.azurewebsites.net"),
           [p+"RegistrationBaseUrl"]="https://np-usc-gateway.thesiscloud.com",[p+"TenantHost"]="el-np-nel.thesiscloud.com",[p+"Username"]="fake",[p+"Password"]="fake" }).Build();
-        return new(configuration,new HttpClient(handler),(student,term,ct)=>{Assert.Equal(10,student);Assert.Equal(269,term);return Task.FromResult(123);});
+        return new(configuration,new HttpClient(handler),(student,term,ct)=>{Assert.Equal(10,student);Assert.Equal(269,term);return Task.FromResult(123);},protection);
     }
     [Theory]
     [InlineData("http://app-elm-nonprod-usc-integrationapi.azurewebsites.net")]
@@ -64,4 +66,16 @@ public class BillClearanceServiceTests
     {var handler=new Handler();handler.Current.Remove("uDefDate1");await Assert.ThrowsAsync<InvalidOperationException>(()=>Service(handler).MarkClearedAsync("10","269"));Assert.Null(handler.Patch);}
     [Theory][InlineData(false,false)][InlineData(true,true)] public async Task Disabled_and_cross_environment_settings_do_not_make_requests(bool enabled,bool production)
     {var handler=new Handler();await Assert.ThrowsAsync<InvalidOperationException>(()=>Service(handler,enabled,production).MarkClearedAsync("10","269"));Assert.Equal(0,handler.Requests);}
+    [Fact]public async Task Approval_clearance_uses_the_same_student_term_lock_as_resets()
+    {
+        var handler=new Handler();var protection=Substitute.For<IClearanceResetProtection>();
+        await Service(handler,protection:protection).MarkClearedAsync("10","269");
+        await protection.Received(1).AcquireAsync(10,269,Arg.Any<CancellationToken>());Assert.Equal(6045,handler.Patch!["uDefLookup2"]!.GetValue<int>());
+    }
+    [Fact]public async Task Normal_completion_waits_for_a_short_reset_instead_of_losing_its_clearance_write()
+    {
+        var handler=new Handler();var protection=Substitute.For<IClearanceResetProtection>();var calls=0;
+        protection.AcquireAsync(10,269,Arg.Any<CancellationToken>()).Returns(_=>++calls==1?Task.FromException<IAsyncDisposable>(new ClearanceUpdateBusyException()):Task.FromResult<IAsyncDisposable>(null!));
+        await Service(handler,protection:protection).MarkClearedAsync("10","269");Assert.Equal(2,calls);Assert.NotNull(handler.Patch);
+    }
 }

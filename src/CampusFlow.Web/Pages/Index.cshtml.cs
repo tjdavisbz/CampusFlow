@@ -487,7 +487,7 @@ public class IndexModel : CampusFlowPageModel
             if (HousingRequired)
                 Steps.Add(HasHousingAssignment
                     ? new("Housing", "Your housing assignment is recorded.", "complete", housingUrl, "View housing")
-                    : new("Housing", "Contact Student Services for a housing assignment before approving your bill.", "action", housingUrl, "View housing"));
+                    : new("Housing", "Contact reslife@nelson.edu for a housing assignment before approving your bill.", "action", housingUrl, "View housing"));
 
             if (MealPlanEligible)
             Steps.Add(!HasHousingAssignment
