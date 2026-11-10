@@ -169,8 +169,20 @@
         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
         if (!confirm(`Apply ${actionable.length} assignment/rate/capacity change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
-        state = await request('Apply', {periodId:state.periodId, revision:state.revision,
-            rateRevision, confirmed:true});
+        try {
+            state = await request('Apply', {periodId:state.periodId, revision:state.revision,
+                rateRevision, confirmed:true});
+        } catch (error) {
+            // Read the saved draft, never Refresh from Elements: a failed/uncertain apply
+            // must not discard the assignments staff already entered.
+            try {
+                const saved = await request('Draft', undefined, {periodId:state.periodId});
+                if (saved?.id === state.id && JSON.stringify(saved.rooms) === JSON.stringify(state.rooms)) state = saved;
+                else state.applyStatus = 'Needs review';
+            } catch { state.applyStatus = 'Needs review'; }
+            render();
+            throw error;
+        }
         dirty = false; selected.clear(); render();
         message(`Room assignments and CampusFlow housing charges were applied to ${root.dataset.environment} Elements and verified.`);
     });

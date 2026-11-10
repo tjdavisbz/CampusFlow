@@ -29,7 +29,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         _logger = logger;
     }
 
-    [BindProperty(SupportsGet = true)] public string Query { get; set; } = string.Empty;
+    [BindProperty(SupportsGet = true)] public string? Query { get; set; }
     [BindProperty(SupportsGet = true)] public string? Student { get; set; }
     [BindProperty(SupportsGet = true)] public int? Term { get; set; }
     [BindProperty(SupportsGet = true)] public int? HousingStatus { get; set; }
@@ -76,7 +76,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         CanRemove = (await AuthorizationService.AuthorizeAsync(User, CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded;
         // Assignment and removal are separate forms. Only validate the submitted assignment input.
-        foreach (var key in ModelState.Keys.Where(x => x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
+        foreach (var key in ModelState.Keys.Where(x => x == nameof(Query) || x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
             ModelState.Remove(key);
         Context = await _service.GetContextAsync(Input.ExternalStudentId, Input.TermCalendarId);
         Student = Context.Student.ExternalStudentId;

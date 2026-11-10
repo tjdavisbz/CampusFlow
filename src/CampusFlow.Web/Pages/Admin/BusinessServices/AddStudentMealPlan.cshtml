@@ -19,6 +19,8 @@
     }
     <header class="meal-admin-hero"><div><span>Business Services</span><h1>Manage Student Meal Plans</h1><p>Review a student's meal-plan assignments, assign an available plan or remove an individual assignment in Elements.</p></div><i class="fa-solid fa-utensils"></i></header>
 
+    <div asp-validation-summary="All" class="meal-validation" role="alert"></div>
+
     <section class="meal-card">
         <div class="section-heading"><span>Step 1</span><h2>Find a student</h2><p>Search by name, student ID, Elements ID, or email address.</p></div>
         <form method="get" asp-fragment="student-results" class="student-search"><input asp-for="Query" placeholder="Name, ID, or email" autocomplete="off" /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Search</button></form>
@@ -86,7 +88,7 @@
     {
         var selectedHousing = Model.Context.HousingStatuses.SingleOrDefault(x => x.Id == Model.HousingStatus);
         <section class="meal-card confirmation" id="confirm"><div class="warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div><span class="eyebrow">Step 4 · Confirmation required</span><h2>Apply this housing and meal-plan selection?</h2><p>This will set <strong>@selectedHousing?.Name</strong> and assign <strong>@Model.Preview.Name</strong> to <strong>@Model.Context.Student.Name</strong> (Student ID @Model.Context.Student.StudentId) in Elements.</p>
-            <form method="post" asp-page-handler="Assign"><input asp-for="Input.ExternalStudentId" type="hidden" value="@Model.Context.Student.ExternalStudentId" /><input asp-for="Input.TermCalendarId" type="hidden" value="@Model.Term" /><input asp-for="Input.HousingStatusId" type="hidden" value="@Model.HousingStatus" /><input asp-for="Input.MealPlanId" type="hidden" value="@Model.Preview.MealPlanId" /><label class="confirm-check"><input asp-for="Input.Confirmed" /><span>I have verified the student, term, housing status, meal plan, and applicable dates.</span></label><span asp-validation-for="Input.Confirmed" class="validation-message"></span><div class="confirm-actions"><a asp-route-query="@Model.Query" asp-route-student="@Model.Context.Student.ExternalStudentId" asp-route-term="@Model.Term" asp-route-housingStatus="@Model.HousingStatus">Cancel</a><button type="submit"><i class="fa-solid fa-utensils"></i> Apply selection</button></div></form>
+            <form method="post" asp-page-handler="Assign"><input asp-for="Input.ExternalStudentId" type="hidden" value="@Model.Context.Student.ExternalStudentId" /><input asp-for="Input.TermCalendarId" type="hidden" value="@Model.Term" /><input asp-for="Input.HousingStatusId" type="hidden" value="@Model.HousingStatus" /><input asp-for="Input.MealPlanId" type="hidden" value="@Model.Preview.MealPlanId" /><label class="confirm-check"><input asp-for="Input.Confirmed" required aria-required="true" /><span>I have verified the student, term, housing status, meal plan, and applicable dates.</span></label><span asp-validation-for="Input.Confirmed" class="validation-message"></span><div class="confirm-actions"><a asp-route-query="@Model.Query" asp-route-student="@Model.Context.Student.ExternalStudentId" asp-route-term="@Model.Term" asp-route-housingStatus="@Model.HousingStatus">Cancel</a><button type="submit"><i class="fa-solid fa-utensils"></i> Apply selection</button></div></form>
         </div></section>
     }
 </main>

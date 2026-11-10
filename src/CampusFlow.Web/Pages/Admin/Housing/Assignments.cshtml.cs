@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using CampusFlow.Housing;
 using CampusFlow.Permissions;
+using Volo.Abp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -27,7 +28,14 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
     public async Task<JsonResult> OnGetPreviewAsync(int periodId) => new(await workspace.PreviewAsync(periodId));
     public async Task<JsonResult> OnGetRateRevisionAsync(int periodId) => new(await workspace.GetRateRevisionAsync(periodId));
     public async Task<JsonResult> OnPostSaveAsync([FromBody] HousingWorkspaceState input) => new(await workspace.SaveAsync(input));
-    public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input) => new(await workspace.ApplyAssignmentsAsync(input));
+    public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input)
+    {
+        try { return new(await workspace.ApplyAssignmentsAsync(input)); }
+        catch (UserFriendlyException error)
+        {
+            return new(new { error = new { message = error.Message } }) { StatusCode = 409 };
+        }
+    }
     public async Task<JsonResult> OnPostRefreshAsync([FromBody] RefreshInput input)
     {
         if (!input.Confirmed) throw new InvalidOperationException("Confirm replacing the draft before refreshing.");
