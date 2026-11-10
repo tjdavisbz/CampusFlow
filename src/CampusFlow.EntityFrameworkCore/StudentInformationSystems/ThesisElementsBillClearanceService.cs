@@ -17,12 +17,13 @@ public sealed class ThesisElementsBillClearanceService : IStudentInformationSyst
     private const string Prefix="StudentInformationSystems:Providers:ThesisElements:Api:";
     private static readonly HttpClient SharedClient=new(){Timeout=TimeSpan.FromSeconds(90)};
     private readonly IConfiguration _configuration;private readonly HttpClient _client;
+    private readonly CampusFlow.ClearanceResets.IClearanceResetProtection? _protection;
     private readonly Func<int,int,CancellationToken,Task<int>> _statusId;
     public StudentInformationSystemProvider Provider=>StudentInformationSystemProvider.ThesisElements;
-    public ThesisElementsBillClearanceService(IConfiguration configuration)
-    { _configuration=configuration;_client=SharedClient;_statusId=FindStatusAsync; }
-    internal ThesisElementsBillClearanceService(IConfiguration configuration,HttpClient client,Func<int,int,CancellationToken,Task<int>> statusId)
-    { _configuration=configuration;_client=client;_statusId=statusId; }
+    public ThesisElementsBillClearanceService(IConfiguration configuration,CampusFlow.ClearanceResets.IClearanceResetProtection protection)
+    { _configuration=configuration;_client=SharedClient;_statusId=FindStatusAsync;_protection=protection; }
+    internal ThesisElementsBillClearanceService(IConfiguration configuration,HttpClient client,Func<int,int,CancellationToken,Task<int>> statusId,CampusFlow.ClearanceResets.IClearanceResetProtection? protection=null)
+    { _configuration=configuration;_client=client;_statusId=statusId;_protection=protection; }
     public async Task MarkClearedAsync(string externalStudentId,string externalTermId,CancellationToken cancellationToken=default)
     {
         if(!_configuration.GetValue<bool>("BillApproval:ClearedStatus:Enabled"))throw new InvalidOperationException("Cleared-status updates are not enabled.");
@@ -36,6 +37,7 @@ public sealed class ThesisElementsBillClearanceService : IStudentInformationSyst
             string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"],"Staging",StringComparison.OrdinalIgnoreCase);
         if(nonprod&&(root.Host!="np-usc-gateway.thesiscloud.com"||authRoot.Host!="app-elm-nonprod-usc-integrationapi.azurewebsites.net"||Setting("TenantHost")!="el-np-nel.thesiscloud.com"))
             throw new InvalidOperationException("Non-production clearance cannot target production Elements.");
+        await using var lease=await AcquireForCompletionAsync(student,term,cancellationToken);
         var statusId=await _statusId(student,term,cancellationToken);
         using var auth=new HttpRequestMessage(HttpMethod.Get,new Uri(authRoot,"api/Login/Authenticate"));
         auth.Headers.Add("TenantHost",Setting("TenantHost"));
@@ -67,15 +69,34 @@ public sealed class ThesisElementsBillClearanceService : IStudentInformationSyst
         foreach(var property in update)
             if(!JsonNode.DeepEquals(verified[property.Key],property.Value))throw new InvalidOperationException("The updated status could not be verified without other field changes.");
     }
+    private async Task<IAsyncDisposable?> AcquireForCompletionAsync(int student,int term,CancellationToken ct)
+    {
+        if(_protection is null)return null; // Isolated HTTP tests use the internal constructor.
+        for(var attempt=0;;attempt++)
+        {
+            try{return await _protection.AcquireAsync(student,term,ct);}
+            catch(CampusFlow.ClearanceResets.ClearanceUpdateBusyException) when(attempt<30)
+            {await Task.Delay(500,ct);}
+        }
+    }
     internal static JsonObject BuildUpdate(JsonObject current,int statusId,string property,int clearedId)
     {
-        if(current["studentStatusID"]?.GetValue<int>()!=statusId||property is not ("uDefLookup1" or "uDefLookup2" or "uDefLookup3")||clearedId<=0)
+        if(clearedId<=0)throw new InvalidOperationException("A positive Cleared mapping is required.");
+        return BuildStatusUpdate(current,statusId,property,clearedId);
+    }
+    internal static JsonObject BuildBlankUpdate(JsonObject current,int statusId,string property,int blankId)
+    {
+        if(blankId!=0)throw new InvalidOperationException("The verified blank option is required.");
+        return BuildStatusUpdate(current,statusId,property,blankId);
+    }
+    private static JsonObject BuildStatusUpdate(JsonObject current,int statusId,string property,int? value)
+    {
+        if(current["studentStatusID"]?.GetValue<int>()!=statusId||property is not ("uDefLookup1" or "uDefLookup2" or "uDefLookup3"))
             throw new InvalidOperationException("Status identity or mapping does not match the approved term.");
         string[] fields=["studentStatusID","uDefLookup1","uDefLookup2","uDefLookup3","uDefFreeForm1","uDefFreeForm2","uDefFreeForm3",
             "uDefCurr1","uDefCurr2","uDefCurr3","uDefDate1","uDefDate2","uDefDate3","uDefDate4","uDefBit1","uDefBit2","uDefBit3"];
-        var result=new JsonObject();
-        foreach(var name in fields){if(!current.ContainsKey(name))throw new InvalidOperationException("Elements omitted an existing status field; no update was made.");result[name]=current[name]?.DeepClone();}
-        result[property]=clearedId;return result;
+        var result=new JsonObject();foreach(var name in fields){if(!current.ContainsKey(name))throw new InvalidOperationException("Elements omitted an existing status field; no update was made.");result[name]=current[name]?.DeepClone();}
+        result[property]=value;return result;
     }
     private async Task<int> FindStatusAsync(int student,int term,CancellationToken cancellationToken)
     {

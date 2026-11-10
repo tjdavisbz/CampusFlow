@@ -23,8 +23,7 @@ public class BillApprovalCompletionLookup(IRepository<BillApproval, Guid> approv
         var approval = await approvals.FindAsync(x => x.TenantId == tenant.Id &&
             x.StudentProfileId == profile.Id && x.ExternalTermId == externalTermId, cancellationToken: cancellationToken);
         // A local draft/reset supersedes historical approval for this term.
-        if (approval is not null) return approval.AcceptedAt.HasValue && approval.Status is
-            BillApprovalStatus.Approved or BillApprovalStatus.DocumentPending or BillApprovalStatus.Completed;
+        if (approval is not null) return BillApprovalAcceptanceRules.IsApproved(approval.AcceptedAt,approval.Status);
         if (profile.Provider != StudentInformationSystemProvider.ThesisElements || externalTermId == "0") return false;
         return await legacy.AnyAsync(x => x.TenantId == tenant.Id && x.ExternalStudentId == profile.ExternalStudentId &&
             x.ExternalTermId == externalTermId && x.SourceApproved && x.AcceptTime != null, cancellationToken: cancellationToken);

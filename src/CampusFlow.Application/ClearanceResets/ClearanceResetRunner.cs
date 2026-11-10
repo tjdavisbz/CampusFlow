@@ -26,7 +26,9 @@ public class ClearanceResetRunner(IRepository<ClearanceResetConfiguration,Guid> 
         {
             using var claim=units.Begin(requiresNew:true,isTransactional:true);
             var config=await configurations.FindAsync(x=>x.TenantId==owner);if(config is null)return false;
-            var state=config.Schedule();if(!state.IsDue(Now)||config.RunningRunId.HasValue)return false;
+            var state=config.Schedule();
+            if(state.Enabled&&state.PolicyVersion!=2){state.Pause("Policy changed: review a fresh preview before enabling the revised reset rule.");config.Save(state);await configurations.UpdateAsync(config,true);await claim.CompleteAsync();return false;}
+            if(!state.IsDue(Now)||config.RunningRunId.HasValue)return false;
             elements.EnsureRunEnabled();
             if((await Blockers(runs,owner)).Count>0)
             {state.Pause("Paused: a previous clearance reset needs administrator review.");config.Save(state);await configurations.UpdateAsync(config,true);await claim.CompleteAsync();return false;}
@@ -69,7 +71,7 @@ public class ClearanceResetRunner(IRepository<ClearanceResetConfiguration,Guid> 
         {
             using var finish=units.Begin(requiresNew:true,isTransactional:true);var run=await runs.GetAsync(runId);
             if(run.TenantId!=owner)throw new InvalidOperationException("Run tenant mismatch.");
-            if(summary.Length==0)summary=$"{outcome}: {results.Count(x=>x.Outcome=="Verified Not Cleared")} verified resets; {results.Count(x=>x.Outcome!="Verified Not Cleared")} skipped or unconfirmed.";
+            if(summary.Length==0)summary=$"{outcome}: {results.Count(x=>x.Outcome=="Verified blank")} verified resets; {results.Count(x=>x.Outcome!="Verified blank")} skipped or unconfirmed.";
             if(more>0)summary+=$" Up to {more} additional candidates remain for a later cycle.";
             run.RecordResults(results);run.Finish(outcome,summary);await runs.UpdateAsync(run,true);
             var c=await configurations.FindAsync(x=>x.TenantId==owner);

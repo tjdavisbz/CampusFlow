@@ -23,13 +23,14 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
     private readonly Func<Mapping,CancellationToken,Task<List<ClearanceResetCandidate>>> _find;
     private readonly Func<ClearanceResetCandidate,Mapping,CancellationToken,Task<bool>> _eligible;
     private string? _token;
-    internal sealed record Mapping(string Property,int LookupNumber,int Cleared,int NotCleared);
-    public ElementsClearanceResetService(IConfiguration configuration)
-    {_configuration=configuration;_http=SharedClient;_find=FindAsync;_eligible=EligibleAsync;}
+    private readonly IClearanceResetProtection _protection;
+    internal sealed record Mapping(string Property,int LookupNumber,int Cleared,int Blank);
+    public ElementsClearanceResetService(IConfiguration configuration,IClearanceResetProtection protection)
+    {_configuration=configuration;_http=SharedClient;_find=FindAsync;_eligible=EligibleAsync;_protection=protection;}
     internal ElementsClearanceResetService(IConfiguration configuration,HttpClient http,
         Func<Mapping,CancellationToken,Task<List<ClearanceResetCandidate>>> find,
-        Func<ClearanceResetCandidate,Mapping,CancellationToken,Task<bool>> eligible)
-    {_configuration=configuration;_http=http;_find=find;_eligible=eligible;}
+        Func<ClearanceResetCandidate,Mapping,CancellationToken,Task<bool>> eligible,IClearanceResetProtection protection)
+    {_configuration=configuration;_http=http;_find=find;_eligible=eligible;_protection=protection;}
     private string Setting(string name)=>_configuration[Prefix+name]??throw new InvalidOperationException("Missing Elements configuration.");
     public void EnsureRunEnabled()
     {
@@ -63,34 +64,35 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
     {using var req=await Request(HttpMethod.Get,path,ct);using var resp=await _http.SendAsync(req,ct);resp.EnsureSuccessStatusCode();var body=JsonNode.Parse(await resp.Content.ReadAsStringAsync(ct));if(body?["isSuccess"]?.GetValue<bool>()!=true||body["data"] is not JsonNode data)throw new InvalidOperationException("Elements returned incomplete data; no reset was sent.");return data;}
     internal static Mapping ResolveMapping(JsonObject choices)
     {
-        var cleared=new List<(int Number,int Id)>();var notCleared=new List<(int Number,int Id)>();
+        var cleared=new List<(int Number,int Id)>();
         for(int n=1;n<=3;n++)foreach(var item in choices[$"statusLookup{n}"]?.AsArray()??new JsonArray())
         {
             var label=item?["displayText"]?.GetValue<string>()?.Trim();
             if(string.Equals(label,"Cleared",StringComparison.OrdinalIgnoreCase))cleared.Add((n,item!["uniqueId"]!.GetValue<int>()));
-            if(string.Equals(label,"Not Cleared",StringComparison.OrdinalIgnoreCase))notCleared.Add((n,item!["uniqueId"]!.GetValue<int>()));
         }
-        if(cleared.Count!=1||notCleared.Count!=1||cleared[0].Number!=notCleared[0].Number||cleared[0].Id<=0||notCleared[0].Id<=0||cleared[0].Id==notCleared[0].Id)throw new InvalidOperationException("Cleared / Not Cleared lookup is missing or ambiguous.");
-        return new("uDefLookup"+cleared[0].Number,cleared[0].Number,cleared[0].Id,notCleared[0].Id);
+        if(cleared.Count!=1||cleared[0].Id<=0)throw new InvalidOperationException("Cleared lookup is missing or ambiguous.");
+        var blanks=(choices[$"statusLookup{cleared[0].Number}"]?.AsArray()??new JsonArray()).Where(x=>
+            x?["uniqueId"]?.GetValue<int>()==0 && string.IsNullOrWhiteSpace(x["displayText"]?.GetValue<string>())).ToArray();
+        if(blanks.Length!=1)throw new InvalidOperationException("The blank clearance option is missing or ambiguous.");
+        return new("uDefLookup"+cleared[0].Number,cleared[0].Number,cleared[0].Id,0);
     }
     private async Task<Mapping> MappingAsync(CancellationToken ct)=>ResolveMapping((await Read("api/financial-aid/student-status/user-defined-select-items",ct)).AsObject());
     public async Task<List<ClearanceResetCandidate>> FindCandidatesAsync(CancellationToken ct=default)
-    {EnsureEnvironment();return await _find(await MappingAsync(ct),ct);}
+    {EnsureEnvironment();var candidates=await _find(await MappingAsync(ct),ct);var protectedKeys=await _protection.ProtectedAsync(candidates,ct);return candidates.Where(x=>!protectedKeys.Contains((x.StudentUid,x.TermId))).ToList();}
     public async Task<ClearanceResetResult> ResetIfEligibleAsync(ClearanceResetCandidate candidate,Func<ClearanceResetAttempt,Task<bool>> recordBeforeWrite,CancellationToken ct=default)
     {
-        EnsureRunEnabled();var map=await MappingAsync(ct);var route="api/financial-aid/student-status/user-defined/"+candidate.StatusId;
+        EnsureRunEnabled();await using var lease=await _protection.AcquireAsync(candidate.StudentUid,candidate.TermId,ct);var map=await MappingAsync(ct);var route="api/financial-aid/student-status/user-defined/"+candidate.StatusId;
         ClearanceResetResult Result(string outcome)=>new(candidate.StudentUid,candidate.TermId,candidate.Term,outcome);
-        if(!await _eligible(candidate,map,ct))return Result("Skipped: term, clearance or Nelson course records changed.");
+        if(await _protection.IsProtectedAsync(candidate,ct))return Result("Skipped: approved bill or manual clearance exception.");
+        if(!await _eligible(candidate,map,ct))return Result("Skipped: term or clearance records changed.");
         var before=(await Read(route,ct)).AsObject();
         if(before["studentStatusID"]?.GetValue<int>()!=candidate.StatusId)throw new InvalidOperationException("Student term status identity mismatch.");
         if(before[map.Property]?.GetValue<int>()!=map.Cleared)return Result("Skipped: no longer Cleared.");
-        // Transcript and unofficial APIs are separate: neither response alone proves zero courses.
-        foreach(var path in new[]{"api/academic/register/transcripts/"+candidate.StudentUid,"api/academic/maintenance/unofficial/"+candidate.StudentUid+"/Unofficial"})
-            if(HasNelsonCourse((await Read(path,ct)).AsArray(),candidate))return Result("Skipped: a live Nelson course exists for this term.");
         var current=(await Read(route,ct)).AsObject();if(!JsonNode.DeepEquals(before,current))return Result("Skipped: term fields changed during verification.");
         if(!await _eligible(candidate,map,ct))return Result("Skipped: source records changed during verification.");
-        var desired=ThesisElementsBillClearanceService.BuildUpdate(current,candidate.StatusId,map.Property,map.NotCleared);
+        var desired=ThesisElementsBillClearanceService.BuildBlankUpdate(current,candidate.StatusId,map.Property,map.Blank);
         if(!await recordBeforeWrite(new(candidate,before.ToJsonString(),desired.ToJsonString())))return Result("Skipped: automatic resets were turned off.");
+        if(await _protection.IsProtectedAsync(candidate,ct))return Result("Skipped: approval or manual exception changed before dispatch.");
         using var patch=await Request(HttpMethod.Patch,"api/financial-aid/student-status/user-defined",ct);patch.Content=new StringContent(desired.ToJsonString(),Encoding.UTF8,"application/json");
         try
         {
@@ -99,26 +101,16 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
             var after=(await Read(route,ct)).AsObject();foreach(var field in desired)if(!JsonNode.DeepEquals(after[field.Key],field.Value))throw new InvalidOperationException("Reset readback differs from the requested fields.");
         }
         catch(Exception ex){throw new ClearanceResetUnconfirmedException(ex);}
-        return Result("Verified Not Cleared");
-    }
-    internal static bool HasNelsonCourse(JsonArray rows,ClearanceResetCandidate c)
-    {
-        foreach(var row in rows)
-        {
-            if(row is not JsonObject obj||obj["studentUID"]?.GetValue<int>()!=c.StudentUid||obj["termCalendarID"] is null||obj["collegeID"] is null||obj["categoryID"] is null)throw new InvalidOperationException("Course response identity or classification is incomplete.");
-            if(obj["termCalendarID"]!.GetValue<int>()==c.TermId&&obj["collegeID"]!.GetValue<int>()==0&&obj["categoryID"]!.GetValue<int>()!=c.TransferCategoryId)return true;
-        }
-        return false;
+        return Result("Verified blank");
     }
     private async Task<SqlConnection> Open(CancellationToken ct)
     {var c=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));try{await c.OpenAsync(ct);return c;}catch{await c.DisposeAsync();throw;}}
-    private static async Task<(string Boundary,int Transfer)> Scope(SqlConnection c,CancellationToken ct)
+    private static async Task<string> Scope(SqlConnection c,CancellationToken ct)
     {
         async Task<T> Unique<T>(string sql)
         {await using var q=new SqlCommand(sql,c){CommandTimeout=30};await using var r=await q.ExecuteReaderAsync(ct);if(!await r.ReadAsync(ct)||r.IsDBNull(0))throw new InvalidOperationException("Clearance reset scope is missing.");var value=(T)r.GetValue(0);if(await r.ReadAsync(ct))throw new InvalidOperationException("Clearance reset scope is ambiguous.");return value;}
         var boundary=(await Unique<string>("SELECT Term FROM dbo.TermCalendar WHERE LTRIM(RTRIM(TextTerm))='Spring 2027'")).Trim();
-        var transfer=await Unique<int>("SELECT UniqueID FROM dbo.Glossary_AcadCrsType WHERE LTRIM(RTRIM(DisplayText))='Transfer'");
-        if(boundary.Length==0||transfer<=0)throw new InvalidOperationException("Invalid clearance reset scope.");return (boundary,transfer);
+        if(boundary.Length==0)throw new InvalidOperationException("Invalid clearance reset scope.");return boundary;
     }
     internal const string CandidateSql="""
         SELECT S.StudentUID,S.TermCalendarID,S.StudentStatusID,T.TextTerm,T.Term,ST.StudentID,ST.LastName+', '+ST.FirstName
@@ -127,22 +119,36 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
         JOIN dbo.TermCalendar T ON T.TermCalendarID=S.TermCalendarID
         JOIN dbo.CAMS_StudentStatusUserDefined_View U ON U.StudentStatusID=S.StudentStatusID
         WHERE T.Term >= @Boundary
-          AND CASE @Lookup WHEN 1 THEN U.UDefLookup1 WHEN 2 THEN U.UDefLookup2 WHEN 3 THEN U.uDefLookup3 END=@Cleared
+          AND (@RequireCleared=0 OR CASE @Lookup WHEN 1 THEN U.UDefLookup1 WHEN 2 THEN U.UDefLookup2 WHEN 3 THEN U.uDefLookup3 END=@Cleared)
           AND NOT EXISTS(SELECT 1 FROM dbo.StudentStatus D WHERE D.StudentUID=S.StudentUID AND D.TermCalendarID=S.TermCalendarID AND D.StudentStatusID<>S.StudentStatusID)
           AND (SELECT COUNT(*) FROM dbo.CAMS_StudentStatusUserDefined_View D WHERE D.StudentStatusID=S.StudentStatusID)=1
-          AND NOT EXISTS(SELECT 1 FROM dbo.SRAcademic A WHERE A.StudentUID=S.StudentUID AND A.TermCalendarID=S.TermCalendarID
-            AND (A.CollegeID IS NULL OR (A.CollegeID=0 AND (A.CategoryID IS NULL OR A.CategoryID<>@Transfer))))
           AND (@Student IS NULL OR (S.StudentUID=@Student AND S.TermCalendarID=@Term AND S.StudentStatusID=@Status))
         ORDER BY T.Term,S.StudentUID,S.StudentStatusID;
         """;
-    private static SqlCommand Command(SqlConnection c,Mapping m,(string Boundary,int Transfer) scope,ClearanceResetCandidate? candidate)
+    private static SqlCommand Command(SqlConnection c,Mapping m,string scope,ClearanceResetCandidate? candidate,bool requireCleared=true)
     {
-        var q=new SqlCommand(CandidateSql,c){CommandTimeout=120};q.Parameters.Add("@Boundary",SqlDbType.VarChar,30).Value=scope.Boundary;q.Parameters.Add("@Transfer",SqlDbType.Int).Value=scope.Transfer;
+        var q=new SqlCommand(CandidateSql,c){CommandTimeout=120};q.Parameters.Add("@Boundary",SqlDbType.VarChar,30).Value=scope;q.Parameters.Add("@RequireCleared",SqlDbType.Bit).Value=requireCleared;
         q.Parameters.Add("@Lookup",SqlDbType.Int).Value=m.LookupNumber;q.Parameters.Add("@Cleared",SqlDbType.Int).Value=m.Cleared;
         q.Parameters.Add("@Student",SqlDbType.Int).Value=(object?)candidate?.StudentUid??DBNull.Value;q.Parameters.Add("@Term",SqlDbType.Int).Value=(object?)candidate?.TermId??DBNull.Value;q.Parameters.Add("@Status",SqlDbType.Int).Value=(object?)candidate?.StatusId??DBNull.Value;return q;
     }
     private async Task<List<ClearanceResetCandidate>> FindAsync(Mapping m,CancellationToken ct)
-    {await using var c=await Open(ct);var scope=await Scope(c,ct);await using var q=Command(c,m,scope,null);await using var reader=await q.ExecuteReaderAsync(ct);var list=new List<ClearanceResetCandidate>();while(await reader.ReadAsync(ct))list.Add(new(reader.GetInt32(0),reader.GetInt32(1),reader.GetInt32(2),reader.GetString(3).Trim(),reader.GetString(4).Trim(),scope.Transfer,reader.GetString(5).Trim(),reader.GetString(6).Trim()));return list;}
+    {await using var c=await Open(ct);var scope=await Scope(c,ct);await using var q=Command(c,m,scope,null);await using var reader=await q.ExecuteReaderAsync(ct);var list=new List<ClearanceResetCandidate>();while(await reader.ReadAsync(ct))list.Add(new(reader.GetInt32(0),reader.GetInt32(1),reader.GetInt32(2),reader.GetString(3).Trim(),reader.GetString(4).Trim(),0,reader.GetString(5).Trim(),reader.GetString(6).Trim()));return list;}
+    public async Task<List<ClearanceResetTerm>> GetTermsAsync(CancellationToken ct=default)
+    {
+        EnsureEnvironment();await using var c=await Open(ct);var boundary=await Scope(c,ct);
+        await using var q=new SqlCommand("SELECT TermCalendarID,TextTerm FROM dbo.TermCalendar WHERE Term>=@Boundary ORDER BY Term,TermCalendarID",c){CommandTimeout=30};q.Parameters.Add("@Boundary",SqlDbType.VarChar,30).Value=boundary;
+        await using var reader=await q.ExecuteReaderAsync(ct);var terms=new List<ClearanceResetTerm>();while(await reader.ReadAsync(ct))terms.Add(new(reader.GetInt32(0),reader.GetString(1).Trim()));return terms;
+    }
+    public async Task<ClearanceResetCandidate> GetTargetAsync(int studentUid,int termId,CancellationToken ct=default)
+    {
+        EnsureEnvironment();if(studentUid<=0||termId<=0)throw new ArgumentException("A student and term are required.");
+        await using var c=await Open(ct);var scope=await Scope(c,ct);var filter=new ClearanceResetCandidate(studentUid,termId,0,"","",0);
+        var sql=CandidateSql.Replace(" AND S.StudentStatusID=@Status","");
+        await using var q=Command(c,new Mapping("uDefLookup2",2,1,0),scope,filter,false);q.CommandText=sql;
+        await using var reader=await q.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))throw new InvalidOperationException("No unique Spring 2027-or-later student term status was found.");
+        var result=new ClearanceResetCandidate(reader.GetInt32(0),reader.GetInt32(1),reader.GetInt32(2),reader.GetString(3).Trim(),reader.GetString(4).Trim(),0,reader.GetString(5).Trim(),reader.GetString(6).Trim());
+        if(await reader.ReadAsync(ct))throw new InvalidOperationException("The student term status is ambiguous.");return result;
+    }
     private async Task<bool> EligibleAsync(ClearanceResetCandidate candidate,Mapping m,CancellationToken ct)
-    {await using var c=await Open(ct);var scope=await Scope(c,ct);if(candidate.TransferCategoryId!=scope.Transfer)return false;await using var q=Command(c,m,scope,candidate);await using var reader=await q.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))return false;var matches=reader.GetString(4).Trim()==candidate.TermSequence&&reader.GetString(3).Trim()==candidate.Term;return matches&&!await reader.ReadAsync(ct);}
+    {await using var c=await Open(ct);var scope=await Scope(c,ct);await using var q=Command(c,m,scope,candidate);await using var reader=await q.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))return false;var matches=reader.GetString(4).Trim()==candidate.TermSequence&&reader.GetString(3).Trim()==candidate.Term;return matches&&!await reader.ReadAsync(ct);}
 }

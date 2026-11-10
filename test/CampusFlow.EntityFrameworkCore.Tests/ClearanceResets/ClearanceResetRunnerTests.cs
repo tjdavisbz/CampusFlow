@@ -20,6 +20,7 @@ namespace CampusFlow.EntityFrameworkCore.Tests.ClearanceResets;
 [Collection(CampusFlowTestConsts.CollectionDefinitionName)]
 public class ClearanceResetRunnerTests:CampusFlowEntityFrameworkCoreTestBase
 {
+    private readonly IClearanceResetProtection _protection=Substitute.For<IClearanceResetProtection>();
     private readonly IClearanceResetElements _elements=Substitute.For<IClearanceResetElements>();private readonly IClock _clock=Substitute.For<IClock>();
     private static readonly DateTime Now=new(2026,11,7,20,0,0,DateTimeKind.Utc);
     private IRepository<ClearanceResetConfiguration,Guid> Configs=>GetRequiredService<IRepository<ClearanceResetConfiguration,Guid>>();
@@ -29,13 +30,13 @@ public class ClearanceResetRunnerTests:CampusFlowEntityFrameworkCoreTestBase
     private async Task<Guid> Configure(bool enabled=true,DateTime? when=null)
     {var id=Guid.NewGuid();await WithUnitOfWorkAsync(async()=>{var c=new ClearanceResetConfiguration(id,Tenant.Id!.Value);var s=c.Schedule();s.Configure(enabled,Guid.NewGuid(),when??Now.AddMinutes(-15));c.Save(s);await Configs.InsertAsync(c,true);});return id;}
     private ClearanceResetAppService Service(Guid? actor)
-    {var lazy=Substitute.For<IAbpLazyServiceProvider>();var user=Substitute.For<ICurrentUser>();user.Id.Returns(actor);_clock.Now.Returns(Now);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Tenant);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<IClock>().Returns(_clock);lazy.LazyGetRequiredService<IGuidGenerator>().Returns(GetRequiredService<IGuidGenerator>());lazy.LazyGetRequiredService<IAsyncQueryableExecuter>().Returns(GetRequiredService<IAsyncQueryableExecuter>());return new(Configs,Runs,_elements,Units,Runner()){LazyServiceProvider=lazy};}
+    {var lazy=Substitute.For<IAbpLazyServiceProvider>();var user=Substitute.For<ICurrentUser>();user.Id.Returns(actor);_clock.Now.Returns(Now);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Tenant);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<IClock>().Returns(_clock);lazy.LazyGetRequiredService<IGuidGenerator>().Returns(GetRequiredService<IGuidGenerator>());lazy.LazyGetRequiredService<IAsyncQueryableExecuter>().Returns(GetRequiredService<IAsyncQueryableExecuter>());return new(Configs,Runs,_elements,Units,Runner(),_protection){LazyServiceProvider=lazy};}
     private static ClearanceResetCandidate Row(int id=10)=>new(id,269,id+1000,"Spring 2027","B27C",1100);
     private void Candidates(int count=1)
     {
         _elements.FindCandidatesAsync(Arg.Any<CancellationToken>()).Returns(Enumerable.Range(1,count).Select(x=>Row(x)).ToList());
         _elements.ResetIfEligibleAsync(Arg.Any<ClearanceResetCandidate>(),Arg.Any<Func<ClearanceResetAttempt,Task<bool>>>(),Arg.Any<CancellationToken>()).Returns(async call=>
-        {var c=call.Arg<ClearanceResetCandidate>();var allowed=await call.Arg<Func<ClearanceResetAttempt,Task<bool>>>()(new(c,"{before}","{desired}"));return new ClearanceResetResult(c.StudentUid,c.TermId,c.Term,allowed?"Verified Not Cleared":"Skipped: off");});
+        {var c=call.Arg<ClearanceResetCandidate>();var allowed=await call.Arg<Func<ClearanceResetAttempt,Task<bool>>>()(new(c,"{before}","{desired}"));return new ClearanceResetResult(c.StudentUid,c.TermId,c.Term,allowed?"Verified blank":"Skipped: off");});
     }
     private async Task Check(Action<ClearanceResetConfiguration,List<ClearanceResetRun>> action)=>await WithUnitOfWorkAsync(async()=>action(Assert.Single(await Configs.GetListAsync()),await Runs.GetListAsync()));
     [Fact]public async Task New_or_disabled_schedules_do_not_contact_Elements()
@@ -43,7 +44,7 @@ public class ClearanceResetRunnerTests:CampusFlowEntityFrameworkCoreTestBase
     [Fact]public async Task Enabling_persists_and_waits_fifteen_minutes_without_applying()
     {using var t=Tenant.Change(Guid.NewGuid());var result=await Service(Guid.NewGuid()).SetAsync(new(){Enabled=true});Assert.True(result.Enabled);Assert.Equal(Now.AddMinutes(15),result.NextRunAtUtc);Assert.False(await Runner().RunIfDueAsync());await Check((c,r)=>Assert.Empty(r));}
     [Fact]public async Task Due_run_persists_attempts_before_writes_and_audited_results()
-    {using var t=Tenant.Change(Guid.NewGuid());await Configure();Candidates();var runner=Runner();Assert.True(await runner.RunIfDueAsync());Assert.False(await runner.RunIfDueAsync());await Check((c,r)=>{var run=Assert.Single(r);Assert.Equal("Completed",run.State);Assert.Contains("before",run.AttemptsJson);Assert.Contains("Verified Not Cleared",run.ResultsJson);Assert.Null(c.RunningRunId);Assert.Equal(Now.AddMinutes(15),c.Schedule().NextRunAtUtc);});}
+    {using var t=Tenant.Change(Guid.NewGuid());await Configure();Candidates();var runner=Runner();Assert.True(await runner.RunIfDueAsync());Assert.False(await runner.RunIfDueAsync());await Check((c,r)=>{var run=Assert.Single(r);Assert.Equal("Completed",run.State);Assert.Contains("before",run.AttemptsJson);Assert.Contains("Verified blank",run.ResultsJson);Assert.Null(c.RunningRunId);Assert.Equal(Now.AddMinutes(15),c.Schedule().NextRunAtUtc);});}
     [Fact]public async Task No_change_cycle_never_calls_the_mutation_boundary()
     {using var t=Tenant.Change(Guid.NewGuid());await Configure();Candidates(0);await Runner().RunIfDueAsync();await _elements.DidNotReceiveWithAnyArgs().ResetIfEligibleAsync(default!,default!,default);await Check((c,r)=>Assert.Equal("[]",Assert.Single(r).AttemptsJson));}
     [Fact]public async Task One_cycle_handles_at_most_one_hundred_candidates()
@@ -51,7 +52,7 @@ public class ClearanceResetRunnerTests:CampusFlowEntityFrameworkCoreTestBase
     [Fact]public async Task Unconfirmed_update_pauses_and_cannot_be_automatically_retried()
     {using var t=Tenant.Change(Guid.NewGuid());await Configure();Candidates(2);_elements.ResetIfEligibleAsync(Arg.Any<ClearanceResetCandidate>(),Arg.Any<Func<ClearanceResetAttempt,Task<bool>>>(),Arg.Any<CancellationToken>()).Returns(Task.FromException<ClearanceResetResult>(new ClearanceResetUnconfirmedException(new Exception("unknown"))));var runner=Runner();await runner.RunIfDueAsync();Assert.False(await runner.RunIfDueAsync());await Check((c,r)=>{Assert.False(c.Schedule().Enabled);Assert.Equal("Needs review",Assert.Single(r).State);});}
     [Fact]public async Task Turning_off_during_a_cycle_stops_the_next_student()
-    {using var t=Tenant.Change(Guid.NewGuid());await Configure();Candidates(2);_elements.ResetIfEligibleAsync(Arg.Any<ClearanceResetCandidate>(),Arg.Any<Func<ClearanceResetAttempt,Task<bool>>>(),Arg.Any<CancellationToken>()).Returns(async call=>{await Service(Guid.NewGuid()).SetAsync(new(){Enabled=false});var c=call.Arg<ClearanceResetCandidate>();return new ClearanceResetResult(c.StudentUid,c.TermId,c.Term,"Verified Not Cleared");});await Runner().RunIfDueAsync();await _elements.Received(1).ResetIfEligibleAsync(Arg.Any<ClearanceResetCandidate>(),Arg.Any<Func<ClearanceResetAttempt,Task<bool>>>(),Arg.Any<CancellationToken>());await Check((c,r)=>{Assert.Equal("Stopped",Assert.Single(r).State);Assert.False(c.Schedule().Enabled);});}
+    {using var t=Tenant.Change(Guid.NewGuid());await Configure();Candidates(2);_elements.ResetIfEligibleAsync(Arg.Any<ClearanceResetCandidate>(),Arg.Any<Func<ClearanceResetAttempt,Task<bool>>>(),Arg.Any<CancellationToken>()).Returns(async call=>{await Service(Guid.NewGuid()).SetAsync(new(){Enabled=false});var c=call.Arg<ClearanceResetCandidate>();return new ClearanceResetResult(c.StudentUid,c.TermId,c.Term,"Verified blank");});await Runner().RunIfDueAsync();await _elements.Received(1).ResetIfEligibleAsync(Arg.Any<ClearanceResetCandidate>(),Arg.Any<Func<ClearanceResetAttempt,Task<bool>>>(),Arg.Any<CancellationToken>());await Check((c,r)=>{Assert.Equal("Stopped",Assert.Single(r).State);Assert.False(c.Schedule().Enabled);});}
     [Fact]public async Task Turning_off_is_available_when_Elements_is_disabled()
     {using var t=Tenant.Change(Guid.NewGuid());await Configure();_elements.When(x=>x.EnsureRunEnabled()).Do(_=>throw new InvalidOperationException("Disabled"));var result=await Service(Guid.NewGuid()).SetAsync(new(){Enabled=false});Assert.False(result.Enabled);}
     [Fact]public async Task Unconfirmed_history_requires_exact_explicit_review_and_keeps_its_original_outcome()
@@ -69,7 +70,7 @@ public class ClearanceResetRunnerTests:CampusFlowEntityFrameworkCoreTestBase
     [Fact]public async Task Manual_preview_is_read_only_for_Elements_and_does_not_enable_the_schedule()
     {using var t=Tenant.Change(Guid.NewGuid());Candidates(2);var p=await Preview(Service(Guid.NewGuid()));Assert.NotNull(p.RunId);Assert.Equal(2,p.Rows.Count);await _elements.DidNotReceiveWithAnyArgs().ResetIfEligibleAsync(default!,default!,default);await WithUnitOfWorkAsync(async()=>{Assert.Empty(await Configs.GetListAsync());Assert.Equal("Preview",Assert.Single(await Runs.GetListAsync()).State);});}
     [Fact]public async Task Reviewed_manual_run_works_with_automation_off_and_is_single_use()
-    {using var t=Tenant.Change(Guid.NewGuid());Candidates();var service=Service(Guid.NewGuid());var p=await Preview(service);var results=await service.RunAsync(new(){RunId=p.RunId!.Value});Assert.Equal("Verified Not Cleared",Assert.Single(results).Outcome);await Assert.ThrowsAsync<UserFriendlyException>(()=>service.RunAsync(new(){RunId=p.RunId.Value}));await Check((c,r)=>{Assert.False(c.Schedule().Enabled);Assert.Null(c.RunningRunId);Assert.False(Assert.Single(r).Automatic);Assert.Equal("Completed",r[0].State);});}
+    {using var t=Tenant.Change(Guid.NewGuid());Candidates();var service=Service(Guid.NewGuid());var p=await Preview(service);var results=await service.RunAsync(new(){RunId=p.RunId!.Value});Assert.Equal("Verified blank",Assert.Single(results).Outcome);await Assert.ThrowsAsync<UserFriendlyException>(()=>service.RunAsync(new(){RunId=p.RunId.Value}));await Check((c,r)=>{Assert.False(c.Schedule().Enabled);Assert.Null(c.RunningRunId);Assert.False(Assert.Single(r).Automatic);Assert.Equal("Completed",r[0].State);});}
     [Fact]public async Task Another_staff_member_cannot_run_the_preview()
     {using var t=Tenant.Change(Guid.NewGuid());Candidates();var p=await Preview(Service(Guid.NewGuid()));await Assert.ThrowsAsync<UserFriendlyException>(()=>Service(Guid.NewGuid()).RunAsync(new(){RunId=p.RunId!.Value}));await _elements.DidNotReceiveWithAnyArgs().ResetIfEligibleAsync(default!,default!,default);}
     [Fact]public async Task Expired_previews_never_write()
@@ -83,4 +84,49 @@ public class ClearanceResetRunnerTests:CampusFlowEntityFrameworkCoreTestBase
     [Fact]public async Task Preview_remains_read_only_when_execution_is_disabled()
     {using var t=Tenant.Change(Guid.NewGuid());Candidates();_elements.When(x=>x.EnsureRunEnabled()).Do(_=>throw new InvalidOperationException("Disabled"));var p=await Preview(Service(Guid.NewGuid()));Assert.Null(p.RunId);Assert.Single(p.Rows);await _elements.DidNotReceiveWithAnyArgs().ResetIfEligibleAsync(default!,default!,default);}
 
+    [Fact]public async Task Manual_exception_add_and_remove_are_audited_without_any_Elements_reset_or_bill_approval()
+    {
+        using var tenant=Tenant.Change(Guid.NewGuid());var actor=Guid.NewGuid();var target=Row(10);
+        _elements.GetTargetAsync(10,269,Arg.Any<CancellationToken>()).Returns(target);
+        var service=Service(actor);var review=await service.PreviewExceptionAsync(10,269);Assert.Equal(target.StatusId,review.StatusId);
+        var added=await service.SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=review.StatusId,Reason="Business Services manual review",Confirmed=true});
+        Assert.Equal("Spring 2027",Assert.Single(added.ManualExceptions).Term);Assert.False(added.Enabled);
+        await WithUnitOfWorkAsync(async()=>{var c=Assert.Single(await Configs.GetListAsync());Assert.Equal(actor,Assert.Single(c.Exceptions()).CreatedBy);var run=Assert.Single(await Runs.GetListAsync());Assert.Equal("Exception added",run.State);Assert.Equal(actor,run.GetProperty<Guid>("ExceptionChangedBy"));});
+        var removed=await service.SetExceptionAsync(new(){StudentUid=10,TermId=269,Reason="Manual clearance no longer applies",Confirmed=true,Remove=true});Assert.Empty(removed.ManualExceptions);
+        await WithUnitOfWorkAsync(async()=>Assert.Equal(2,(await Runs.GetListAsync()).Count));
+        await _elements.DidNotReceiveWithAnyArgs().ResetIfEligibleAsync(default!,default!,default);
+        await _protection.Received(2).AcquireAsync(10,269,Arg.Any<CancellationToken>());
+    }
+    [Theory][InlineData(false,"A sufficiently detailed reason")][InlineData(true,"")][InlineData(true,"short")]
+    public async Task Exceptions_require_confirmation_and_a_meaningful_reason(bool confirmed,string reason)
+    {using var t=Tenant.Change(Guid.NewGuid());await Assert.ThrowsAsync<UserFriendlyException>(()=>Service(Guid.NewGuid()).SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=1010,Confirmed=confirmed,Reason=reason}));await _protection.DidNotReceiveWithAnyArgs().AcquireAsync(default,default,default);}
+    [Fact]public async Task Changed_target_or_duplicate_exception_does_not_overwrite_the_original_reason()
+    {
+        using var t=Tenant.Change(Guid.NewGuid());_elements.GetTargetAsync(10,269,Arg.Any<CancellationToken>()).Returns(Row(10));var service=Service(Guid.NewGuid());
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>service.SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=999,Reason="Reviewed manual clearance",Confirmed=true}));
+        await service.SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=1010,Reason="Original reviewed clearance",Confirmed=true});
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>service.SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=1010,Reason="Replacement should not overwrite",Confirmed=true}));
+        await WithUnitOfWorkAsync(async()=>Assert.Equal("Original reviewed clearance",Assert.Single(Assert.Single(await Configs.GetListAsync()).Exceptions()).Reason));
+    }
+    [Fact]public async Task Exceptions_are_tenant_scoped_and_a_running_claim_blocks_changes()
+    {
+        var owner=Guid.NewGuid();using var t=Tenant.Change(owner);await Configure();_elements.GetTargetAsync(10,269,Arg.Any<CancellationToken>()).Returns(Row(10));
+        await WithUnitOfWorkAsync(async()=>{var c=Assert.Single(await Configs.GetListAsync());c.SetRun(Guid.NewGuid());await Configs.UpdateAsync(c,true);});
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>Service(Guid.NewGuid()).SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=1010,Reason="Reviewed manual clearance",Confirmed=true}));
+        using var other=Tenant.Change(Guid.NewGuid());Assert.Empty((await WithUnitOfWorkAsync(()=>Service(Guid.NewGuid()).GetAsync())).ManualExceptions);
+    }
+    [Fact]public async Task A_preview_from_the_previous_policy_cannot_be_executed()
+    {
+        using var t=Tenant.Change(Guid.NewGuid());var actor=Guid.NewGuid();var id=Guid.NewGuid();
+        await WithUnitOfWorkAsync(async()=>{var run=new ClearanceResetRun(id,Tenant.Id!.Value);run.MakePreview([Row()],actor,Now);run.ExtraProperties.Remove("ClearancePolicyVersion");await Runs.InsertAsync(run,true);});
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>Service(actor).RunAsync(new(){RunId=id}));await _elements.DidNotReceiveWithAnyArgs().ResetIfEligibleAsync(default!,default!,default);
+    }
+    [Fact]public async Task Full_exception_reason_is_kept_when_the_history_summary_is_bounded()
+    {
+        using var t=Tenant.Change(Guid.NewGuid());_elements.GetTargetAsync(10,269,Arg.Any<CancellationToken>()).Returns(Row(10));var reason=new string('R',1000);
+        await Service(Guid.NewGuid()).SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=1010,Reason=reason,Confirmed=true});
+        await WithUnitOfWorkAsync(async()=>{Assert.Equal(reason,Assert.Single(Assert.Single(await Configs.GetListAsync()).Exceptions()).Reason);var audit=Assert.Single(await Runs.GetListAsync());Assert.True(audit.Summary.Length<=500);Assert.Equal(reason,audit.GetProperty<string>("ExceptionReason"));});
+    }
+    [Fact]public async Task Oversized_exception_reason_fails_before_lock_or_write()
+    {using var t=Tenant.Change(Guid.NewGuid());await Assert.ThrowsAsync<UserFriendlyException>(()=>Service(Guid.NewGuid()).SetExceptionAsync(new(){StudentUid=10,TermId=269,StatusId=1010,Reason=new string('R',1001),Confirmed=true}));await _protection.DidNotReceiveWithAnyArgs().AcquireAsync(default,default,default);}
 }

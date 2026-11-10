@@ -7,6 +7,10 @@ public static class FinancialAidRules
         !award.IsSentToBilling && !award.IsLocked && award.StudentAccepted is null &&
         !award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase);
 
+    public static bool IsLoanAwaitingAcceptance(StudentFinancialAidAward award) =>
+        award.IsLoan is true && award.StudentAccepted is null && award.Amount > 0 &&
+        !award.IsSentToBilling && !award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase);
+
     public static bool IncludeInBillApproval(StudentFinancialAidAward award)
     {
         if (award.Amount <= 0 || award.IsSentToBilling || award.StudentAccepted == 0 ||

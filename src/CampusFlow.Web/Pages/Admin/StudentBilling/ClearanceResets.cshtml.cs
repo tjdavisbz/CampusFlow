@@ -16,6 +16,11 @@ public class ClearanceResetsModel(IClearanceResetAppService service):CampusFlowP
     {if(IsReadOnlyView)return Forbid();if(!ModelState.IsValid||studentUid is <=0)return BadRequest();return new JsonResult(await service.PreviewAsync(studentUid));}
     public async Task<IActionResult> OnPostRunAsync([FromBody]ClearanceResetRunRequestDto input)
     {if(IsReadOnlyView)return Forbid();if(!ModelState.IsValid)return BadRequest();return new JsonResult(await service.RunAsync(input));}
+    public async Task<JsonResult> OnPostExceptionTermsAsync()=>new(await service.GetExceptionTermsAsync());
+    public async Task<IActionResult> OnPostExceptionPreviewAsync(int studentUid,int termId)
+    {if(IsReadOnlyView)return Forbid();if(!ModelState.IsValid||studentUid<=0||termId<=0)return BadRequest();return new JsonResult(await service.PreviewExceptionAsync(studentUid,termId));}
+    public async Task<IActionResult> OnPostExceptionAsync([FromBody]ManualClearanceExceptionInput input)
+    {if(IsReadOnlyView)return Forbid();if(!ModelState.IsValid)return BadRequest();return new JsonResult(await service.SetExceptionAsync(input));}
     public async Task<JsonResult> OnGetStatusAsync()=>new(await service.GetAsync());
     public async Task<IActionResult> OnPostScheduleAsync([FromBody]ClearanceResetUpdateDto input)
     {if(IsReadOnlyView)return Forbid();if(!ModelState.IsValid)return BadRequest();return new JsonResult(await service.SetAsync(input));}

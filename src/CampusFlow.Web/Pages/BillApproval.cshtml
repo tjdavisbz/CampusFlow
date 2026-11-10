@@ -8,7 +8,8 @@
     PageLayout.Content.Title = "Bill Approval";
     PageLayout.Content.BreadCrumb.ShowCurrent = false;
     PageLayout.Content.ShowToolbar = false;
-    PageLayout.Content.MenuItemName = CampusFlowMenus.BillApproval;
+    // Bill approval is reached from the dashboard; Billing is its existing Student menu entry.
+    PageLayout.Content.MenuItemName = CampusFlowMenus.Billing;
 }
 
 @section styles {
@@ -99,6 +100,19 @@
                     <details open><summary><span><i class="fa-solid fa-graduation-cap"></i>Expected financial aid</span><strong>-@BillApprovalModel.Currency(Model.PendingAidTotal)</strong></summary>
                         <div class="review-list">@foreach (var award in Model.Aid.Where(x => x.Amount > 0 && !x.IsSentToBilling && x.StudentAccepted != 0 && !x.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))) { <article><div><strong>@award.Description</strong><span>@award.AwardStatus · Anticipated</span></div><b>-@BillApprovalModel.Currency(award.Amount)</b></article> }</div>
                     </details>
+                    @if (Model.PendingLoans.Count > 0)
+                    {
+                        <aside class="pending-loan-notice" role="status" aria-labelledby="pending-loans-title">
+                            <h3 id="pending-loans-title">Loans awaiting acceptance</h3>
+                            <p>These loans are not included in expected financial aid and do not reduce the balance shown here.</p>
+                            <ul>@foreach (var loan in Model.PendingLoans)
+                            {
+                                <li><span>@loan.Description</span><strong>@BillApprovalModel.Currency(loan.Amount)</strong></li>
+                            }</ul>
+                            <a asp-page="/FinancialAid" asp-route-term="@Model.ExternalTermId" asp-route-openTerm="@Model.TermCode">Review financial aid</a>
+                            <p>Contact Financial Aid if you need help reviewing or accepting an award.</p>
+                        </aside>
+                    }
                     <button class="primary next" type="button" data-next="@(Model.RemainingBalance > 0 ? "payment" : "agreement")">@(Model.RemainingBalance > 0 ? "Continue to payment choice" : "Review agreement") <i class="fa-solid fa-arrow-right"></i></button>
                 </section>
 

@@ -143,6 +143,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public string? BookstoreUrl { get; private set; }
     public IReadOnlyList<StudentBillingTransaction> Charges { get; private set; } = [];
     public IReadOnlyList<StudentFinancialAidAward> Aid { get; private set; } = [];
+    public IReadOnlyList<StudentFinancialAidAward> PendingLoans { get; private set; } = [];
     public StudentPaymentPlan? PaymentPlan { get; private set; }
     public AgreementTemplate? Agreement { get; private set; }
     public bool IsAlreadyAccepted { get; private set; }
@@ -262,7 +263,7 @@ public class BillApprovalModel : CampusFlowPageModel
             if (housing is { HousingRequired: true, HasHousingAssignment: false })
             {
                 IsUnavailable = true;
-                UnavailableReason = "A housing assignment is required before bill approval. Contact Student Services.";
+                UnavailableReason = "A housing assignment is required before bill approval. Contact reslife@nelson.edu.";
                 return;
             }
 
@@ -299,6 +300,8 @@ public class BillApprovalModel : CampusFlowPageModel
                     throw new InvalidOperationException("Financial aid decisions could not be verified.");
                 termAid = termAid.Select(x => x with { StudentAccepted = decisions[x.ExternalAwardId] }).ToArray();
             }
+            PendingLoans = termAid.Where(FinancialAidRules.IsLoanAwaitingAcceptance)
+                .OrderBy(x => x.Description).ThenBy(x => x.ExternalAwardId).ToArray();
             Aid = termAid.Where(IsEligibleAid).OrderByDescending(x => x.Amount).ToArray();
             var paymentPlanLookup = _paymentPlanLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             if (RemainingBalance > 0 && paymentPlanLookup is not null && !string.IsNullOrWhiteSpace(ExternalTermId))
