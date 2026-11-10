@@ -8,6 +8,7 @@ namespace CampusFlow.StudentInformationSystems;
 public interface IElementsHousingReader
 {
     Task<StudentHousingEligibility> GetStudentEligibilityAsync(int studentUid, int termCalendarId, CancellationToken cancellationToken = default);
+    Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId, CancellationToken cancellationToken = default);
     Task<List<HousingPeriodOption>> GetPeriodsAsync(CancellationToken cancellationToken = default);
     Task<List<HousingWorkspaceRoom>> GetRoomsAsync(int periodId, CancellationToken cancellationToken = default);
     Task<HousingPricingContext> GetPricingAsync(int periodId, CancellationToken cancellationToken = default);

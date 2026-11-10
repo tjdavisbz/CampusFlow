@@ -8,3 +8,6 @@
 .pending-loan-notice li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;padding:.4rem 0;font-size:.9rem}
 .pending-loan-notice li span{overflow-wrap:anywhere}
 .pending-loan-notice a{display:inline-block;font-weight:700;color:var(--tenant-primary)}
+
+.celebrating-lion{display:block;width:min(100%,380px);height:auto;margin:1.25rem auto;border-radius:.75rem}
+.final-button{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.45;padding:1rem 1.5rem}

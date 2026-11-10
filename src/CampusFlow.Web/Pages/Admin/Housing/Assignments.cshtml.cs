@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using CampusFlow.Housing;
 using CampusFlow.Permissions;
+using Volo.Abp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -22,12 +23,20 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
          string.IsNullOrWhiteSpace(configuration["App:EnvironmentLabel"]));
     public void OnGet() { }
     public async Task<JsonResult> OnGetPeriodsAsync() => new(await workspace.GetPeriodsAsync());
+    public async Task<JsonResult> OnGetSetupAsync(int periodId) => new(await workspace.GetPeriodSetupAsync(periodId));
     public async Task<JsonResult> OnGetDraftAsync(int periodId) => new(await workspace.GetAsync(periodId));
     public async Task<JsonResult> OnGetStudentsAsync(string query, int periodId) => new(await workspace.SearchStudentsAsync(query, periodId));
     public async Task<JsonResult> OnGetPreviewAsync(int periodId) => new(await workspace.PreviewAsync(periodId));
     public async Task<JsonResult> OnGetRateRevisionAsync(int periodId) => new(await workspace.GetRateRevisionAsync(periodId));
     public async Task<JsonResult> OnPostSaveAsync([FromBody] HousingWorkspaceState input) => new(await workspace.SaveAsync(input));
-    public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input) => new(await workspace.ApplyAssignmentsAsync(input));
+    public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input)
+    {
+        try { return new(await workspace.ApplyAssignmentsAsync(input)); }
+        catch (UserFriendlyException error)
+        {
+            return new(new { error = new { message = error.Message } }) { StatusCode = 409 };
+        }
+    }
     public async Task<JsonResult> OnPostRefreshAsync([FromBody] RefreshInput input)
     {
         if (!input.Confirmed) throw new InvalidOperationException("Confirm replacing the draft before refreshing.");

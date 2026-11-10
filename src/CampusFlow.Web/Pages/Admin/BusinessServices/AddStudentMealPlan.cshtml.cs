@@ -29,7 +29,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         _logger = logger;
     }
 
-    [BindProperty(SupportsGet = true)] public string Query { get; set; } = string.Empty;
+    [BindProperty(SupportsGet = true)] public string? Query { get; set; }
     [BindProperty(SupportsGet = true)] public string? Student { get; set; }
     [BindProperty(SupportsGet = true)] public int? Term { get; set; }
     [BindProperty(SupportsGet = true)] public int? HousingStatus { get; set; }
@@ -76,7 +76,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         CanRemove = (await AuthorizationService.AuthorizeAsync(User, CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded;
         // Assignment and removal are separate forms. Only validate the submitted assignment input.
-        foreach (var key in ModelState.Keys.Where(x => x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
+        foreach (var key in ModelState.Keys.Where(x => x == nameof(Query) || x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
             ModelState.Remove(key);
         Context = await _service.GetContextAsync(Input.ExternalStudentId, Input.TermCalendarId);
         Student = Context.Student.ExternalStudentId;
@@ -110,7 +110,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         if(!(await AuthorizationService.AuthorizeAsync(User,CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded)return Forbid();
         if(!RemoveInput.Confirmed || RemoveInput.TermCalendarId<=0 || RemoveInput.AssignmentId<=0 || RemoveInput.MealPlanId<=0 || string.IsNullOrWhiteSpace(RemoveInput.ExternalStudentId))return BadRequest();
         await _service.RemoveAsync(RemoveInput);
-        Alerts.Success("The meal-plan assignment was removed from Elements. Elements may retain its charge. Review billing separately; no refund or housing-status change was requested.");
+        Alerts.Success("The meal-plan assignment was removed from Elements. Elements may retain the meal-plan charge and any sales tax. Review billing separately; no refund or housing-status change was requested.");
         return RedirectToPage(new{student=RemoveInput.ExternalStudentId,term=RemoveInput.TermCalendarId});
     }
 

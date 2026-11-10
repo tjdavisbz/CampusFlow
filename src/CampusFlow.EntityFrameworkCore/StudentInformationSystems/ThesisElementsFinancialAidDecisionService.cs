@@ -129,6 +129,13 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
             throw new InvalidOperationException("Elements did not return the award distribution date; the decision was not sent.");
         }
 
+        var body = BuildPreservingBody(award);
+        body["studentAccepted"] = (int)decision;
+        return body;
+    }
+
+    internal static JsonObject BuildPreservingBody(JsonObject award)
+    {
         var body = new JsonObject();
         foreach (var propertyName in RequestProperties)
         {
@@ -143,7 +150,6 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
         foreach (var name in RequestProperties)
             if (!award.ContainsKey(name))
                 throw new InvalidOperationException($"Elements did not return award field '{name}'; no decision was sent.");
-        body["studentAccepted"] = (int)decision;
         return body;
     }
 

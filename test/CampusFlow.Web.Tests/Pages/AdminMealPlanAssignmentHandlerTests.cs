@@ -9,7 +9,7 @@ public class AdminMealPlanAssignmentHandlerTests
         var page=new AddStudentMealPlanModel(service,Substitute.For<ITenantThemeProvider>(),NullLogger<AddStudentMealPlanModel>.Instance){LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()},Input=new(){ExternalStudentId="123",TermCalendarId=269,HousingStatusId=10,MealPlanId=20,Confirmed=true}};return(page,service);
     }
     [Fact] public async Task Errors_from_the_other_form_do_not_silently_block_a_valid_assignment()
-    {var(p,s)=Setup();p.ModelState.AddModelError("RemoveInput.ExternalStudentId","The removal input is required.");Assert.IsType<RedirectToPageResult>(await p.OnPostAssignAsync());await s.Received(1).AssignAsync(Arg.Is<AssignStudentMealPlanInput>(x=>x.ExternalStudentId=="123"&&x.TermCalendarId==269&&x.MealPlanId==20));Assert.True(p.CanRemove);}
+    {var(p,s)=Setup();p.ModelState.AddModelError("RemoveInput.ExternalStudentId","The removal input is required.");p.ModelState.AddModelError("Query","The Query field is required.");Assert.IsType<RedirectToPageResult>(await p.OnPostAssignAsync());await s.Received(1).AssignAsync(Arg.Is<AssignStudentMealPlanInput>(x=>x.ExternalStudentId=="123"&&x.TermCalendarId==269&&x.MealPlanId==20));Assert.True(p.CanRemove);}
     [Theory] [InlineData("Input.MealPlanId")] [InlineData("Input.TermCalendarId")]
     public async Task Active_form_validation_still_blocks_invalid_input(string key)
     {var(p,s)=Setup();p.ModelState.AddModelError(key,"Invalid assignment input");Assert.IsType<PageResult>(await p.OnPostAssignAsync());await s.DidNotReceiveWithAnyArgs().AssignAsync(default!);Assert.True(p.CanRemove);}

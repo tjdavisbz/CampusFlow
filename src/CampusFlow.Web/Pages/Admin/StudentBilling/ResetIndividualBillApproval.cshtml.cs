@@ -70,7 +70,6 @@ public class ResetIndividualBillApprovalModel : CampusFlowPageModel
     public class ResetInputModel
     {
         [Required] public Guid ApprovalId { get; set; }
-        [Range(typeof(bool), "true", "true", ErrorMessage = "Confirmation is required.")]
         public bool Confirmed { get; set; }
     }
 }

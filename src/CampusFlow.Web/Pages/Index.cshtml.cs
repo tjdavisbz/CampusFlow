@@ -400,6 +400,7 @@ public class IndexModel : CampusFlowPageModel
             journey.HousingRequired = mealPlan.HousingRequired;
             journey.HasHousingAssignment = mealPlan.HasHousingAssignment;
             journey.MealPlanEligible = mealPlan.MealPlanEligible;
+            journey.MealPlanUnavailableReason = mealPlan.UnavailableReason;
             journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
             journey.MealPlanRequired = journey.MealPlanEnabled;
             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
@@ -417,6 +418,12 @@ public class IndexModel : CampusFlowPageModel
             journey.BillApprovalEnabled = billTerm?.IsOpenForStudent(Clock.Now, profile.StudentId) == true;
             journey.BillApprovalAvailability = billTerm?.Availability(Clock.Now, profile.StudentId) ?? "unavailable";
             journey.BillApproved = await _completion.IsApprovedAsync(profile, term.ExternalTermId, HttpContext.RequestAborted);
+            if (journey.BillApproved)
+            {
+                var accepted = await _billApprovals.FindAsync(x => x.TenantId == CurrentTenant.Id &&
+                    x.StudentProfileId == profile.Id && x.ExternalTermId == term.ExternalTermId);
+                journey.RegistrationComplete = accepted is null || BillApprovalStudentCompletion.RegistrationComplete(accepted);
+            }
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
@@ -442,10 +449,12 @@ public class IndexModel : CampusFlowPageModel
         public bool HousingRequired { get; set; }
         public bool HasHousingAssignment { get; set; }
         public bool MealPlanEligible { get; set; }
+        public string? MealPlanUnavailableReason { get; set; }
         public bool MealPlanEnabled { get; set; }
         public bool MealPlanRequired { get; set; }
         public bool MealPlanSelected { get; set; }
         public bool BillApproved { get; set; }
+        public bool RegistrationComplete { get; set; }
         public bool BillApprovalEnabled { get; set; }
         public string BillApprovalAvailability { get; set; } = "unavailable";
         public bool HasUnavailableData { get; set; }
@@ -465,7 +474,7 @@ public class IndexModel : CampusFlowPageModel
                 Steps.Add(new("Course selection", "Course selection is locked after bill approval.", "complete", null, "Complete"));
                 if (HousingRequired) Steps.Add(new("Housing", "Housing review is complete for this term.", "complete", null, "Complete"));
                 if (MealPlanEligible) Steps.Add(new("Meal plan", "Meal plan selection is locked after bill approval.", "complete", null, "Complete"));
-                Steps.Add(new("Bill approval", "Your bill has been reviewed and approved.", "complete", billUrl, "View agreement"));
+                Steps.Add(new("Bill approval", RegistrationComplete ? BillApprovalStudentCompletion.CompleteMessage : BillApprovalStudentCompletion.PendingMessage, "complete", billUrl, "View agreement"));
                 return;
             }
             Steps.Add(BillApprovalAccessRules.HasBlockingPreviousBalance(PreviousBalance)
@@ -493,7 +502,9 @@ public class IndexModel : CampusFlowPageModel
             Steps.Add(!HasHousingAssignment
                 ? new("Meal plan", "A housing assignment is required before choosing a meal plan.", "disabled", null, "Housing required")
                 : !BillApprovalEnabled || !MealPlanEnabled
-                ? UnavailableBillStep("Meal plan")
+                ? MealPlanUnavailableReason is { Length: > 0 } reason
+                    ? new("Meal plan", reason, "disabled", null, "Unavailable")
+                    : UnavailableBillStep("Meal plan")
                 : !MealPlanRequired
                 ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", housingUrl, "View options")
                 : MealPlanSelected
@@ -503,7 +514,7 @@ public class IndexModel : CampusFlowPageModel
             Steps.Add(!BillApprovalEnabled
                 ? UnavailableBillStep("Bill approval")
                 : BillApproved
-                ? new("Bill approval", "Your bill has been reviewed and approved.", "complete", billUrl, "View agreement")
+                ? new("Bill approval", RegistrationComplete ? BillApprovalStudentCompletion.CompleteMessage : BillApprovalStudentCompletion.PendingMessage, "complete", billUrl, "View agreement")
                 : BillApprovalAccessRules.HasBlockingPreviousBalance(PreviousBalance)
                 ? new("Bill approval", "Your previous balance needs attention before bill approval.", "disabled", null, "Balance required")
                 : HousingRequired && !HasHousingAssignment

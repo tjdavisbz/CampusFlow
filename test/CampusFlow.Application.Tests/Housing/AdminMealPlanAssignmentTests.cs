@@ -17,4 +17,14 @@ public class AdminMealPlanAssignmentTests
     {var(a,p,r)=Setup();r.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(new[]{new StudentMealPlanAssignment(40,20,269,"Plan",100)});await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(Input()));await p.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);await p.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default,default);}
     [Fact] public async Task An_unconfirmed_POST_is_not_automatically_retried()
     {var(a,p,r)=Setup();r.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentMealPlanAssignment>());p.AssignAsync("123",20,Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Unknown result")));var e=await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(Input()));Assert.Contains("may already have succeeded",e.Message);await p.Received(1).AssignAsync("123",20,Arg.Any<CancellationToken>());}
+    [Fact] public async Task An_unknown_selected_term_cannot_expose_or_assign_other_terms_plans()
+    {
+        var(a,p,r)=Setup();var current=await p.GetContextAsync("123",269);
+        p.GetContextAsync("123",999,Arg.Any<CancellationToken>()).Returns(current with {SelectedTermCalendarId=999});
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>a.GetContextAsync("123",999));
+        var input=Input();input.TermCalendarId=999;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(input));
+        await p.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default,default);
+        await p.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
+    }
 }

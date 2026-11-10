@@ -53,6 +53,56 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         return result;
     }
 
+    public async Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId,
+        CancellationToken cancellationToken = default)
+    {
+        if (periodId <= 0) throw new ArgumentOutOfRangeException(nameof(periodId));
+        await using var connection = Connection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand("""
+            SELECT HousingPeriodName FROM StudentLife.HousingPeriods
+            WHERE HousingPeriodID=@PeriodId AND IsDeleted=0;
+
+            SELECT p.PropertyName, r.RoomName,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM StudentLife.HousingPeriodProperties hp
+                    JOIN StudentLife.HousingPeriodRooms hr
+                        ON hr.HousingPeriodPropertyID=hp.HousingPeriodPropertyID
+                        AND hr.HousingPeriodID=hp.HousingPeriodID AND hr.IsDeleted=0
+                    WHERE hp.HousingPeriodID=@PeriodId AND hp.IsDeleted=0
+                        AND hp.OriginalPropertyID=p.PropertyID AND hr.OriginalRoomID=r.RoomID
+                ) THEN 1 ELSE 0 END AS InPeriod
+            FROM StudentLife.Properties p
+            JOIN StudentLife.Rooms r ON r.PropertyID=p.PropertyID
+            WHERE p.IsActive=1 AND r.IsActive=1
+                AND LTRIM(RTRIM(p.PropertyName)) IN ('Commuter','Commuter Dorm')
+            ORDER BY p.PropertyName, r.RoomName, r.RoomID;
+
+            SELECT COUNT(*) FROM StudentLife.HousingPeriodRooms r
+            JOIN StudentLife.HousingPeriodProperties p
+                ON p.HousingPeriodPropertyID=r.HousingPeriodPropertyID
+                AND p.HousingPeriodID=r.HousingPeriodID AND p.IsDeleted=0
+            WHERE r.HousingPeriodID=@PeriodId AND r.IsDeleted=0
+                AND LTRIM(RTRIM(p.PropertyName)) IN ('Commuter','Commuter Dorm');
+            """, connection) { CommandTimeout = 60 };
+        command.Parameters.Add("@PeriodId", SqlDbType.Int).Value = periodId;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            throw new InvalidOperationException("The housing period is no longer available.");
+        var result = new HousingPeriodSetup { PeriodId=periodId, PeriodName=reader.GetString(0) };
+        await reader.NextResultAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.MasterCommuterRoomCount++;
+            if (reader.GetInt32(2)==0) result.MissingCommuterRooms.Add(reader.GetString(0)+" / "+reader.GetString(1));
+        }
+        await reader.NextResultAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            throw new InvalidOperationException("The period room count could not be checked.");
+        result.PeriodCommuterRoomCount=reader.GetInt32(0);
+        return result;
+    }
+
     public async Task<List<HousingPeriodOption>> GetPeriodsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = Connection();

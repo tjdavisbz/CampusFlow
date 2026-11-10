@@ -65,9 +65,6 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         var selectionTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == termId)
             ?? throw new UserFriendlyException("The meal plan term is unavailable.");
         var configs = await _configurations.GetListAsync(x => x.IsActive);
-        var catalogByName = context.Catalog.Where(x => x.StartDate <= selectionTerm.EndDate && x.EndDate >= selectionTerm.StartDate)
-            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.StartDate).First(), StringComparer.OrdinalIgnoreCase);
 
         var result = new MealPlanSelectionDto
         {
@@ -103,7 +100,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
                 .OrderBy(x => x.SortOrder)
                 .Select(x =>
                 {
-                    catalogByName.TryGetValue(x.ExternalMealPlanName, out var external);
+                    var external = x.IsNoPlanOption ? null : MealPlanCatalogRules.Resolve(x, context.Catalog, selectionTerm);
                     if (!x.IsNoPlanOption && external is null) return null;
                     return new MealPlanOptionDto
                     {
@@ -118,6 +115,20 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
                 .Cast<MealPlanOptionDto>()
                 .ToList();
         }
+        result.UnavailableReason = result.IsLockedByBillApproval
+            ? "Your bill is approved for this term. Contact Student Billing to request changes."
+            : !result.MealPlanEligible
+            ? (eligibility.IsAmericanIndianCollege ? "Your housing includes your meal plan; a separate selection is not required."
+                : "A separate meal plan is not available for your student record.")
+            : !result.HasHousingAssignment
+            ? "A housing assignment is required before choosing a meal plan. Contact Residence Life."
+            : !result.IsSelectionOpen
+            ? (term.Availability(_clock.Now, profile.StudentId) == "closed"
+                ? "The meal-plan selection window for this term has closed. Contact Student Billing."
+                : "Meal plan selection opens with bill approval for this term. Contact Student Billing if you need access.")
+            : !result.Options.Values.Any(x => x.Count > 0)
+            ? "Meal plans are not yet available for your assigned housing in this term. Contact Student Billing."
+            : null;
         return result;
     }
 
@@ -131,7 +142,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         if (view.IsLockedByBillApproval)
             throw new UserFriendlyException("Your bill is approved for this term. Contact Student Billing to request changes.");
         if (!view.IsSelectionOpen || !view.MealPlanEligible || !view.HasHousingAssignment)
-            throw new UserFriendlyException("Meal plan selection is not available for your student record and term.");
+            throw new UserFriendlyException(view.UnavailableReason ?? "Meal plan selection is not available for your student record and term.");
         if (input.HousingChoice != view.AssignedHousingChoice)
             throw new UserFriendlyException("Your meal plan options must match your assigned housing.");
         var option = view.Options[input.HousingChoice].SingleOrDefault(x => x.ExternalMealPlanId == input.ExternalMealPlanId);
