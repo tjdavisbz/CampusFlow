@@ -1,0 +1,90 @@
+diff --git a/src/CampusFlow.Web/ClearanceResets/ClearanceResetWorker.cs b/src/CampusFlow.Web/ClearanceResets/ClearanceResetWorker.cs
+index 0b31357..ae41afb 100644
+--- a/src/CampusFlow.Web/ClearanceResets/ClearanceResetWorker.cs
++++ b/src/CampusFlow.Web/ClearanceResets/ClearanceResetWorker.cs
+@@ -14,14 +14,21 @@ public sealed class ClearanceResetWorker(IServiceScopeFactory scopes,ILogger<Cle
+         using var timer=new PeriodicTimer(TimeSpan.FromMinutes(1));
+         do
+         {
+-            try
+-            {
+-                await using var scope=scopes.CreateAsyncScope();var tenant=scope.ServiceProvider.GetRequiredService<ICurrentTenant>();var store=scope.ServiceProvider.GetRequiredService<ITenantStore>();
+-                TenantConfiguration? nelson;using(tenant.Change(null))nelson=await store.FindAsync("nelson");
+-                if(nelson is not null)using(tenant.Change(nelson.Id))await scope.ServiceProvider.GetRequiredService<ClearanceResetRunner>().RunIfDueAsync(stoppingToken);
+-            }
++            try { await CheckOnceAsync(stoppingToken); }
+             catch(OperationCanceledException)when(stoppingToken.IsCancellationRequested){break;}
+             catch(Exception ex){logger.LogWarning(ex,"Clearance reset check did not complete; inspect its run history.");}
+         }while(await timer.WaitForNextTickAsync(stoppingToken));
+     }
++    internal async Task CheckOnceAsync(CancellationToken cancellationToken)
++    {
++        await using var scope=scopes.CreateAsyncScope();
++        var tenant=scope.ServiceProvider.GetRequiredService<ICurrentTenant>();
++        var store=scope.ServiceProvider.GetRequiredService<ITenantStore>();
++        var normalizer=scope.ServiceProvider.GetRequiredService<ITenantNormalizer>();
++        TenantConfiguration? nelson;
++        using(tenant.Change(null))nelson=await store.FindAsync(normalizer.NormalizeName("nelson") ?? throw new InvalidOperationException("The Nelson tenant name could not be normalized."));
++        if(nelson is not null)
++            using(tenant.Change(nelson.Id))
++                await scope.ServiceProvider.GetRequiredService<ClearanceResetRunner>().RunIfDueAsync(cancellationToken);
++    }
+ }
+diff --git a/src/CampusFlow.Web/CostTypes/CostTypeAutomationWorker.cs b/src/CampusFlow.Web/CostTypes/CostTypeAutomationWorker.cs
+index 5b14bdd..f00358e 100644
+--- a/src/CampusFlow.Web/CostTypes/CostTypeAutomationWorker.cs
++++ b/src/CampusFlow.Web/CostTypes/CostTypeAutomationWorker.cs
+@@ -27,7 +27,8 @@ public sealed class CostTypeAutomationWorker(IServiceScopeFactory scopes,ILogger
+         var current=scope.ServiceProvider.GetRequiredService<ICurrentTenant>();
+         var store=scope.ServiceProvider.GetRequiredService<ITenantStore>();
+         TenantConfiguration? nelson;
+-        using(current.Change(null)) nelson=await store.FindAsync("nelson");
++        var normalizer=scope.ServiceProvider.GetRequiredService<ITenantNormalizer>();
++        using(current.Change(null)) nelson=await store.FindAsync(normalizer.NormalizeName("nelson") ?? throw new InvalidOperationException("The Nelson tenant name could not be normalized."));
+         if(nelson is null)return;
+         // The Elements integration is Nelson-only. Never apply another tenant's rules to its students.
+         using(current.Change(nelson.Id))
+diff --git a/test/CampusFlow.Web.Tests/Pages/AutomaticJobTenantLookupTests.cs b/test/CampusFlow.Web.Tests/Pages/AutomaticJobTenantLookupTests.cs
+new file mode 100644
+index 0000000..caa6a5c
+--- /dev/null
++++ b/test/CampusFlow.Web.Tests/Pages/AutomaticJobTenantLookupTests.cs
+@@ -0,0 +1,38 @@
++using System;
++using System.Threading;
++using System.Threading.Tasks;
++using CampusFlow.CostTypes;
++using CampusFlow.ClearanceResets;
++using CampusFlow.Web.CostTypes;
++using CampusFlow.Web.ClearanceResets;
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.Logging.Abstractions;
++using NSubstitute;
++using Volo.Abp.MultiTenancy;
++using Volo.Abp.TenantManagement;
++using Xunit;
++
++namespace CampusFlow.Pages;
++public class AutomaticJobTenantLookupTests
++{
++    [Theory]
++    [InlineData(false,false)]
++    [InlineData(false,true)]
++    [InlineData(true,false)]
++    [InlineData(true,true)]
++    public async Task Workers_use_the_framework_normalized_tenant_lookup(bool clearance,bool found)
++    {
++        var id=Guid.NewGuid();var tenant=Substitute.For<ICurrentTenant>();var store=Substitute.For<ITenantStore>();
++        store.FindAsync("NELSON").Returns(Task.FromResult<TenantConfiguration?>(found?new(id,"nelson"):null));
++        var services=new ServiceCollection();services.AddSingleton(tenant);services.AddSingleton(store);services.AddSingleton<ITenantNormalizer>(new UpperInvariantTenantNormalizer());
++        // No active tenant means the real runner returns before using its collaborators.
++        // No database, Elements API, schedule or student is touched by this test.
++        services.AddSingleton(new CostTypeAutomationRunner(null!,null!,null!,null!,tenant,null!,null!,null!));
++        services.AddSingleton(new ClearanceResetRunner(null!,null!,null!,null!,tenant,null!,null!));
++        await using var provider=services.BuildServiceProvider();var scopes=provider.GetRequiredService<IServiceScopeFactory>();
++        if(clearance)await new ClearanceResetWorker(scopes,NullLogger<ClearanceResetWorker>.Instance).CheckOnceAsync(CancellationToken.None);
++        else await new CostTypeAutomationWorker(scopes,NullLogger<CostTypeAutomationWorker>.Instance).CheckOnceAsync(CancellationToken.None);
++        await store.Received(1).FindAsync("NELSON");await store.DidNotReceive().FindAsync("nelson");
++        if(found)tenant.Received(1).Change(id);else tenant.DidNotReceive().Change(id);
++    }
++}

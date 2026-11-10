@@ -1,0 +1,10 @@
+{
+  "environment": "nonprod",
+  "readOnly": true,
+  "studentIdentifiersPrinted": false,
+  "canWrite": false,
+  "termCount": 50,
+  "springTermPresent": true,
+  "previewCount": 0,
+  "moreThanOneBatch": false
+}

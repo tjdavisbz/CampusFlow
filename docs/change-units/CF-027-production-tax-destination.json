@@ -1,0 +1,13 @@
+{
+  "environment": "production",
+  "verifiedAtUtc": "2026-11-10T05:31:54.439642Z",
+  "batchMasterId": 2147370553,
+  "transactionDocumentId": 261,
+  "batchCreated": true,
+  "moduleId": 2,
+  "campusId": 0,
+  "termBased": true,
+  "status": "Open",
+  "studentDataAccessed": false,
+  "applicationSettingsChanged": false
+}

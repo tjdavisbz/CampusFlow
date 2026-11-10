@@ -1,0 +1,90 @@
+{
+  "environment": "production",
+  "readOnly": true,
+  "studentIdentifiersPrinted": false,
+  "drafts": [
+    {
+      "period": 1,
+      "periodName": "Fall 2026",
+      "baselineAssignments": 923,
+      "savedDraftAssignments": 923,
+      "savedRoomCount": 540,
+      "liveAssignments": 923,
+      "liveRoomCount": 540,
+      "draftAssignmentsAlreadyMatchLive": 923,
+      "draftStudentsNotAssignedLive": 0,
+      "draftBaselineAssignmentPairsEqualLive": true,
+      "commuterRooms": 1,
+      "commuterDraftAssignments": 112,
+      "extraPropertyNames": [],
+      "snapshotHash": "ae0e557399bdaeb775a288073fdf9ae79b473f5be508495290a36720dde27e48",
+      "lastModified": "2026-11-04T22:10:08.974189",
+      "pricingTerm": 268,
+      "pricingError": null,
+      "preflightChecks": []
+    },
+    {
+      "period": 2,
+      "periodName": "Spring 2027",
+      "baselineAssignments": 0,
+      "savedDraftAssignments": 113,
+      "savedRoomCount": 531,
+      "liveAssignments": 0,
+      "liveRoomCount": 531,
+      "draftAssignmentsAlreadyMatchLive": 0,
+      "draftStudentsNotAssignedLive": 113,
+      "draftBaselineAssignmentPairsEqualLive": true,
+      "commuterRooms": 20,
+      "commuterDraftAssignments": 113,
+      "extraPropertyNames": [],
+      "snapshotHash": "aadce5f7df6ec49a1a1302bab047112aa16f4a265e93537b1bb1967f9ffe900a",
+      "lastModified": "2026-11-09T01:53:53.873409",
+      "pricingTerm": 269,
+      "pricingError": null,
+      "preflightChecks": [
+        {
+          "stage": "all-student-preflight",
+          "studentsChecked": 113,
+          "verified": 113,
+          "conflicts": 0,
+          "failures": [],
+          "elapsedSeconds": 81.2238427
+        },
+        {
+          "stage": "gate",
+          "ok": true,
+          "elapsedSeconds": 7.82e-05
+        },
+        {
+          "stage": "billing-check",
+          "ok": true,
+          "elapsedSeconds": 0.158489
+        },
+        {
+          "stage": "assigned-room-get",
+          "ok": true,
+          "elapsedSeconds": 1.8009288
+        },
+        {
+          "stage": "room-property-check",
+          "ok": true,
+          "elapsedSeconds": 5.3129815
+        }
+      ]
+    }
+  ],
+  "existingSamples": [
+    {
+      "period": 1,
+      "commuter": false,
+      "apiStillReportsAnAssignment": true,
+      "matchesReplicaRoom": true
+    },
+    {
+      "period": 1,
+      "commuter": true,
+      "apiStillReportsAnAssignment": true,
+      "matchesReplicaRoom": false
+    }
+  ]
+}

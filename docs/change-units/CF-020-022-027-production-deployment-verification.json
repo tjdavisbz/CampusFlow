@@ -1,0 +1,204 @@
+{
+  "environment": "production",
+  "units": [
+    "CF-020",
+    "CF-022",
+    "CF-023",
+    "CF-024",
+    "CF-025",
+    "CF-026",
+    "CF-027"
+  ],
+  "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "branch": "codex/cf-020-022-027-production-release",
+  "unitSourceCommits": {
+    "CF-020": "b1a5dc4c0147e27759ec9b206916af712065aab2",
+    "CF-022": "36194cd2f5e5cf85c157cae82a8a6faadc08d962",
+    "CF-023": "732bb76fbba0070b369f322a542d86a99d4dedfd",
+    "CF-024": "37be7a8e7cbdf46597b1aea4ae302fce1e25ad3d",
+    "CF-025": "30286c0e59d115035031482d24f139932d456b4d",
+    "CF-026": "9bfe49d40d8c53d05af4e4bfbc619b1001b3c0c9",
+    "CF-027": "ca9dab02a39e7a1ee53eb9d283b20df700255fb6"
+  },
+  "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+  "deploymentCompletedAtUtc": "2026-11-10T05:33:22.5521364Z",
+  "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+  "verified": true,
+  "matchedFiles": [
+    "CampusFlow.Application.Contracts.dll",
+    "CampusFlow.Application.dll",
+    "CampusFlow.Domain.Shared.dll",
+    "CampusFlow.Domain.dll",
+    "CampusFlow.EntityFrameworkCore.dll",
+    "CampusFlow.HttpApi.dll",
+    "CampusFlow.Web.dll",
+    "Pages/Admin/BusinessServices/AddStudentMealPlan.css",
+    "Pages/Admin/FinancialAid/ReconcileAwardCodes.css",
+    "Pages/Admin/Housing/Assignments.js",
+    "Pages/BillApproval.css",
+    "wwwroot/images/tenants/nelson/judah-celebrating.jpg",
+    "CampusFlow.Web.staticwebassets.endpoints.json"
+  ],
+  "preservedFiles": [
+    "Pages/Admin/Chapel/Attendance.css",
+    "Pages/Admin/Chapel/Attendance.js",
+    "wwwroot/global-styles.css",
+    "Pages/Advisor/Advisor.css",
+    "Pages/DegreeAudit.css",
+    "Pages/DegreeAudit.js",
+    "Pages/Admin/AdminConfiguration.css",
+    "CampusFlow.Web.runtimeconfig.json",
+    "Azure.Identity.dll",
+    "Azure.Core.dll",
+    "Azure.Communication.Email.dll",
+    "CampusFlow.Web.deps.json",
+    "Pages/BillApproval.js",
+    "Pages/Billing.css",
+    "Pages/FinancialAid.js",
+    "Pages/FinancialAid.css",
+    "Pages/Admin/StudentBilling/CostTypes.js",
+    "Pages/Admin/StudentBilling/ClearanceResets.js",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.br",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.gz",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.br",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.gz",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-v4compatibility.woff2"
+  ],
+  "fontsAndEarlierStaticRoutesPreserved": true,
+  "staticEndpointMerge": {
+    "existingEntriesPreserved": 5816,
+    "newImageEntries": 2,
+    "finalEntries": 5818
+  },
+  "connectionsCertificatesPhysicalConfigurationPreserved": true,
+  "onlyReviewedSettingsChanged": {
+    "MealPlanTax__Enabled": "true",
+    "MealPlanTax__EnableNonProductionWrites": "false",
+    "MealPlanTax__EnableProductionWrites": "true",
+    "MealPlanTax__BatchMasterId": "2147370553",
+    "MealPlanTax__TransactionDocumentId": "261",
+    "AwardCodeMaintenance__Enabled": "true",
+    "AwardCodeMaintenance__EnableNonProductionWrites": "false",
+    "AwardCodeMaintenance__EnableProductionWrites": "true"
+  },
+  "otherEnvironmentPreserved": true,
+  "unrelatedRootRuntimeFilesPreserved": 283,
+  "healthAndPublicAssets": {
+    "/health-status": {
+      "status": 200,
+      "contentType": "application/json"
+    },
+    "/": {
+      "status": 302,
+      "expectedMicrosoftLoginChallenge": true
+    },
+    "/Pages/Admin/BusinessServices/AddStudentMealPlan.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/FinancialAid/ReconcileAwardCodes.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/Housing/Assignments.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/BillApproval.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/images/tenants/nelson/judah-celebrating.jpg": {
+      "status": 200,
+      "contentType": "image/jpeg"
+    },
+    "/Pages/Admin/Chapel/Attendance.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/Chapel/Attendance.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Advisor/Advisor.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/DegreeAudit.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/DegreeAudit.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Admin/AdminConfiguration.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/BillApproval.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Billing.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/FinancialAid.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/FinancialAid.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/StudentBilling/CostTypes.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Admin/StudentBilling/ClearanceResets.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    }
+  },
+  "anonymousProtectedRouteChallenges": {
+    "/Admin/FinancialAid/ReconcileAwardCodes": 302,
+    "/Admin/Housing/Assignments": 302,
+    "/Admin/BusinessServices/AddStudentMealPlan": 302,
+    "/Admin/StudentBilling/CostTypes": 302,
+    "/Admin/StudentBilling/ClearanceResets": 302,
+    "/Admin/StudentBilling/ResetIndividualBillApproval": 302,
+    "/BillApproval": 302,
+    "/FinancialAid": 302,
+    "/Account/MicrosoftLogin": 302
+  },
+  "tests": {
+    "domain": 304,
+    "application": 86,
+    "entityframeworkcore": 304,
+    "web": 323
+  },
+  "testTotal": 1017,
+  "browserScenarios": 19,
+  "automaticClearanceResetsEnabled": false,
+  "productionCostTypeExistingScheduleWillResume": true,
+  "authenticatedStaffAcceptancePerformed": false,
+  "productionStudentDataWritesManuallyPerformedByDeployment": false,
+  "schemaMigrationApplied": true,
+  "schemaMigrationVerification": "CF-027-production-migration-verification.json",
+  "taxDestinationVerification": "CF-027-production-tax-destination.json",
+  "financialAidReadOnlyPreviewVerified": true,
+  "financialAidApplyCapabilityEnabled": true,
+  "fontBrowserVerified": {
+    "environment": "production",
+    "iconsVerified": 4,
+    "fontsLoaded": true
+  },
+  "costTypeRulesAndEnabledPreferencePreserved": true,
+  "productionDraftPreserved113": true
+}

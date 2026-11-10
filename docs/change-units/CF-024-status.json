@@ -1,0 +1,88 @@
+{
+  "unit": "CF-024",
+  "scope": "Updated items 12–17: dorm dropdown; final approval/completion/dashboard copy; legacy Judah image; refund-table PDF layout; bookstore legal name and legacy allowance amount. Vendor course matching remains outside this source change.",
+  "branch": "codex/cf-024-bill-finish-experience",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf024-bill-finish-experience/CampusFlow",
+  "sourceBase": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+  "commit": "37be7a8e7cbdf46597b1aea4ae302fce1e25ad3d",
+  "pushed": true,
+  "state": "committed-deployed-nonprod-and-production-awaiting-staff-acceptance",
+  "updatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "sourceFiles": {
+    "src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs": "f2493230ba62fc418ead8d71524db57449eedf3f90605306aabcb916767141a1",
+    "src/CampusFlow.Web/BillApprovals/BillApprovalCompletionOperations.cs": "815062de02facc556745b574a0b97e413f61bbdc7cd09c7a0745ab6d78222a23",
+    "src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs": "69a70ef9142a85f5ac33295cad8b57299e6ad97715ccd7976db2b0e1c1899cca",
+    "src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs": "0caeee774f605e231ef64e298ff6ad187f0f87cc94c862e5fa1e24f00f62566e",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml": "a2a64447628795c64e0fda39325ccdb32eca36b5acb2ec7360560f4ba7270732",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js": "5395d948c2c47cf12c6e81f4ab22c08b32ac0997a70725bc0c805ca48e4b87c9",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml": "9651d14a85db83e15a332d52768b67b8624850e000280e85678e45d0ee0483db",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml.cs": "dba30f2cd6fa666b742c677168129da935c9b942a270ec0ad9e814819c3a728f",
+    "src/CampusFlow.Web/Pages/BillApproval.css": "973c99e53704c94faecc5e484ebf8e86ca65bfad5b2f6487c193248099cc54fa",
+    "src/CampusFlow.Web/Pages/Index.cshtml.cs": "b7b9af6e797a9d1fda8eb754688646efa3efb920bfced64718f4021e162839a7",
+    "src/CampusFlow.Web/wwwroot/images/tenants/nelson/judah-celebrating.jpg": "e52d774dbc75fae857b125c8132ee4e1644d239d6c56c5ae7b241b2fed6f6e78",
+    "test/CampusFlow.Web.Tests/BillApprovals/BillApprovalNotificationTests.cs": "f062eef0a8b1c8cc1067b844a8ee56f1ef7ba3563687642ca13b7732e90f33cb",
+    "test/CampusFlow.Web.Tests/BillApprovals/BillFinishExperienceTests.cs": "e12a9fe1c4652099c581427ebd28b4b2b745330106236210022e37125e252166",
+    "test/browser/bill-finish-experience.cjs": "7667304e63eade83dd576fae85b1d6daba91a9def4336a6abb2095f5809b29a1"
+  },
+  "sourcePatch": "CF-024.patch",
+  "sourcePatchSha256": "27bac04e6a3990ca15ed105940ad1d5830e2d90594a8aaa0f829caf614a66549",
+  "tests": {
+    "web": 301
+  },
+  "browserScenarios": 5,
+  "releasePublishSucceeded": true,
+  "combinedBatchVerification": "CF-020-022-027-batch-verification.json",
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "deploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+    "completedAtUtc": "2026-11-10T05:24:36.3649737Z",
+    "verifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+    "verification": "CF-020-022-027-nonprod-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "completedAtUtc": "2026-11-10T05:33:22.5521364Z",
+    "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+    "verification": "CF-020-022-027-production-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "runtimeDependenciesChanged": false,
+  "studentDataChanged": false,
+  "settingsChanged": false,
+  "messagesSent": false,
+  "legacyVoucherRule": {
+    "source": "eStudent/Custom/cusCreatePDF.asp:74–79 and 1725",
+    "calculation": "max(500, -acceptedBill.RemainingBalance)",
+    "existingExportRule": "BibliuRules.VoucherAmount(balance, 0)",
+    "onlyActualPurchasesCharged": true,
+    "allowanceIsNotCashRefund": true,
+    "recipientBccAttachmentAndIdempotencyRulesPreserved": true
+  },
+  "pdfVerification": {
+    "syntheticTwoPagePdfRenderedAndInspected": true,
+    "refundPercentagesAndDatesStayInTheSameRow": true,
+    "historicalSignedPdfsUnchanged": true,
+    "historicalPdfRegenerationPerformed": false,
+    "syntheticPdfSha256": "f9fbbe2da7568ae145153b0df7758de66e63aaacb15759745b16ef7da5402b71"
+  },
+  "registrationCopy": "Registration complete wording requires persisted verified clearance for native approvals; pending registration remains distinct. Valid legacy approvals retain their completed state.",
+  "combinedBuilds": {
+    "production": {
+      "testTotal": 1017,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    },
+    "nonprod": {
+      "testTotal": 1011,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    }
+  }
+}

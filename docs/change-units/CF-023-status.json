@@ -1,0 +1,84 @@
+{
+  "unit": "CF-023",
+  "scope": "Updated item 5 and review R1/R2: preserve the saved 113-assignment production housing draft, reject stale deleted-room conflicts safely, retain draft/error state on failed Apply, and repair unrelated required-search validation on admin meal assignment.",
+  "branch": "codex/cf-023-housing-meal-reliability",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf023-housing-meal-reliability/CampusFlow",
+  "sourceBase": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+  "commit": "732bb76fbba0070b369f322a542d86a99d4dedfd",
+  "pushed": true,
+  "state": "committed-deployed-nonprod-and-production-awaiting-staff-acceptance",
+  "updatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "sourceFiles": {
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs": "8eaea90f3d4a620a889346eaaa936d72de81a2e699eb6150d972601435f74725",
+    "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml": "d073e8a639a1b148dce9740d698d077d1550e10149d611168cc5b8b71253bbe4",
+    "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs": "e006f99af580b96a139c6e121d4aad638bc481a4bc4eaf3b279b91067fdb5b1d",
+    "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.css": "29661b22d56ca39685a09bceb14269c02692d226a506f7e0be6c27ac1fff618b",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs": "db461132c1a125c1acbf8fdf7c039c0a9e1addb3971448409188f0924661542d",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js": "23049f4ab82f90583d1484674a9f6d1629306a12b11f90282046b92faf1a88f6",
+    "test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs": "981d1747a3b48482461eac5e0b8f635b6a80a168ec93c45ebb8d5ca5e3e3de7a",
+    "test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingAssignmentReadbackTests.cs": "a50173c796c7a620bd8bfe0d746e62168159374e7c0c8efdc4afa009d0185931",
+    "test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs": "6b03036949cf276586af43a764d70d62d0d5cf968ebad30e6b59c40e81fe20ad",
+    "test/CampusFlow.Web.Tests/Pages/HousingApplyFailurePageTests.cs": "a4de4713958b698f025b740ea9881e3f730d9b5214323d3eae001ddcda1b4271",
+    "test/browser/housing-draft-preservation.cjs": "f460836aa40e76ef9c206c77a68c8b4167bcfa0326f667bf762a047b85bdab1c"
+  },
+  "sourcePatch": "CF-023.patch",
+  "sourcePatchSha256": "1f46db2d9bf503b9da97c834c31bf365195ec203d5d6bce47a40fdf339922cec",
+  "tests": {
+    "application": 68,
+    "entityframeworkcore": 252,
+    "web": 292
+  },
+  "testTotal": 612,
+  "browserScenarios": 6,
+  "releasePublishSucceeded": true,
+  "verification": "CF-023-verification.json",
+  "privateRecoveryCopy": {
+    "path": "/Users/tjdavis/Documents/Projects/CampusFlow/artifacts/cf023-draft-backup/production-spring-2027-before.json",
+    "sha256": "4050848dcf87eb307ed0583941c07ecd0c98441b32ba3fe919c7782140e07ff2",
+    "mode": "0600",
+    "ignoredByGit": true,
+    "uniqueAssignments": 113,
+    "containsStudentData": true,
+    "mustNotCommit": true
+  },
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "deploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+    "completedAtUtc": "2026-11-10T05:24:36.3649737Z",
+    "verifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+    "verification": "CF-020-022-027-nonprod-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "completedAtUtc": "2026-11-10T05:33:22.5521364Z",
+    "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+    "verification": "CF-020-022-027-production-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "runtimeDependenciesChanged": false,
+  "permissionsChanged": false,
+  "studentDataChanged": false,
+  "heldCF020Included": true,
+  "combinedBatchVerification": "CF-020-022-027-batch-verification.json",
+  "combinedBuilds": {
+    "production": {
+      "testTotal": 1017,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    },
+    "nonprod": {
+      "testTotal": 1011,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    }
+  },
+  "productionDraftAssignmentsPreserved": 113,
+  "productionDraftAppliedByDeployment": false
+}

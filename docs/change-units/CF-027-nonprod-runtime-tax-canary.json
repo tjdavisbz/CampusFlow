@@ -1,0 +1,18 @@
+{
+  "environment": "nonprod",
+  "verifiedAtUtc": "2026-11-10T05:31:08.703575Z",
+  "syntheticStudentVerified": true,
+  "actualTaxPostVerified": true,
+  "baseAmount": 2475,
+  "taxAmount": 204.19,
+  "taxPostCount": 1,
+  "successfulPostReplyDeliberatelyLost": true,
+  "repeatReviewsDidNotDuplicate": true,
+  "testAssignmentRemoved": true,
+  "testChargesRemoved": 2,
+  "originalChargesPreserved": true,
+  "liveApplicationMigrationApplied": true,
+  "actualPostgresAuditStoreVerified": true,
+  "applicationSettingsChanged": false,
+  "productionAccessed": false
+}

@@ -1,0 +1,71 @@
+{
+  "unit": "CF-022",
+  "scope": "Updated outstanding item 18: repair bill-approval reset confirmation; preserve server confirmation, authorization and reset behavior.",
+  "branch": "codex/cf-022-bill-reset-confirmation",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf018-approval-reset-revision/CampusFlow",
+  "sourceBase": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+  "commit": "36194cd2f5e5cf85c157cae82a8a6faadc08d962",
+  "pushed": true,
+  "state": "committed-deployed-nonprod-and-production-awaiting-staff-acceptance",
+  "updatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "sourceFiles": {
+    "src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml": "2123fbcf4bb7cdbb5b9b6ade90eadcc23c8436096d84cfcc22aed3474242149b",
+    "src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml.cs": "28e8fc5a62c8261bc85957d59fbc6a87898dda5fc4fe4351cfe16c7356ed1134",
+    "test/CampusFlow.Web.Tests/Pages/BillApprovalResetConfirmationTests.cs": "b3e33068de1eed7cf9d4df78ef09ccf51d75466a062513cd228d291e299a1112",
+    "test/browser/reset-bill-approval-confirmation.cjs": "bcb828cbc448afaae0c5da9dd02ba1c18647b74db4180ec5f9a6ded4379ee666"
+  },
+  "sourcePatch": "CF-022.patch",
+  "sourcePatchSha256": "d65dd0edcf30c664e4124469eafc38fefd01d845b23c5386ad6cff7f6aba865f",
+  "tests": {
+    "web": 294,
+    "focused": 5
+  },
+  "browserScenarios": 4,
+  "releasePublishSucceeded": true,
+  "reproduction": {
+    "checked": true,
+    "valid": false,
+    "errors": [
+      "Confirmation is required."
+    ]
+  },
+  "verification": "CF-022-verification.json",
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "deploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+    "completedAtUtc": "2026-11-10T05:24:36.3649737Z",
+    "verifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+    "verification": "CF-020-022-027-nonprod-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "completedAtUtc": "2026-11-10T05:33:22.5521364Z",
+    "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+    "verification": "CF-020-022-027-production-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "runtimeDependenciesChanged": false,
+  "permissionsChanged": false,
+  "studentDataChanged": false,
+  "heldCF020Included": false,
+  "combinedBatchVerification": "CF-020-022-027-batch-verification.json",
+  "combinedBuilds": {
+    "production": {
+      "testTotal": 1017,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    },
+    "nonprod": {
+      "testTotal": 1011,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    }
+  }
+}

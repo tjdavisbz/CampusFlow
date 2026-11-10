@@ -1,0 +1,21 @@
+{
+  "environment": "nonprod",
+  "springMealPlanIds": [
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+  ],
+  "taxBatchId": 2147370696,
+  "taxDocumentId": 261,
+  "productionAccessed": false,
+  "applicationSettingsChanged": false,
+  "testCatalogOnly": true,
+  "verifiedAtUtc": "2026-11-10T05:04:42.523247+00:00",
+  "catalogSource": "Cloned only nonprod Fall 2026 template definitions into Spring 2027 test fixtures; no production records or lookup IDs copied.",
+  "taxBatchCampusId": 0
+}

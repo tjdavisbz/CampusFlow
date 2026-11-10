@@ -1,0 +1,34 @@
+{
+  "environment": "nonprod",
+  "readOnly": true,
+  "studentIdentifiersPrinted": false,
+  "administrativeRemovalFlag": true,
+  "checks": [
+    {
+      "test": "reported-billing-tester",
+      "statusCount": 1,
+      "canRemove": true,
+      "selectedTerm": 269,
+      "termAssignments": 0,
+      "allAssignments": 0,
+      "availablePlans": 0,
+      "planNames": [],
+      "assignedPlanNames": [],
+      "housingStatusOptions": 2,
+      "contextLoaded": true
+    },
+    {
+      "test": "reported-nonprod-meal-test",
+      "statusCount": 1,
+      "canRemove": true,
+      "selectedTerm": 269,
+      "termAssignments": 0,
+      "allAssignments": 0,
+      "availablePlans": 0,
+      "planNames": [],
+      "assignedPlanNames": [],
+      "housingStatusOptions": 2,
+      "contextLoaded": true
+    }
+  ]
+}

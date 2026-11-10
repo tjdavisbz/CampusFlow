@@ -1,0 +1,36 @@
+{
+  "applied": {
+    "environment": "production",
+    "mode": "apply",
+    "verifiedAtUtc": "2026-11-10T05:32:07.732826Z",
+    "tenant": "nelson",
+    "role": "admin",
+    "permissions": [
+      "CampusFlow.Admin.FinancialAid",
+      "CampusFlow.Admin.FinancialAid.ReconcileAwardCodes"
+    ],
+    "addedGrants": 2,
+    "otherPermissionGrantsPreserved": 186,
+    "individualUserGrantsChanged": false,
+    "roleMembershipChanged": false,
+    "studentDataChanged": false,
+    "cacheRefreshByPlannedDeployment": true
+  },
+  "verified": {
+    "environment": "production",
+    "mode": "verify",
+    "verifiedAtUtc": "2026-11-10T05:37:11.677861Z",
+    "tenant": "nelson",
+    "role": "admin",
+    "permissions": [
+      "CampusFlow.Admin.FinancialAid",
+      "CampusFlow.Admin.FinancialAid.ReconcileAwardCodes"
+    ],
+    "addedGrants": 0,
+    "otherPermissionGrantsPreserved": 188,
+    "individualUserGrantsChanged": false,
+    "roleMembershipChanged": false,
+    "studentDataChanged": false,
+    "cacheRefreshByPlannedDeployment": true
+  }
+}

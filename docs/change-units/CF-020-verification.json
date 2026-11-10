@@ -1,0 +1,157 @@
+{
+  "unit": "CF-020",
+  "verifiedAtUtc": "2026-11-08T04:08:23.955064+00:00",
+  "tests": {
+    "domain": 270,
+    "application": 72,
+    "web": 280,
+    "entityframeworkcore": 191
+  },
+  "testTotal": 813,
+  "browserScenarios": 4,
+  "browserWidths": [
+    320,
+    390,
+    768,
+    1440
+  ],
+  "liveReadOnly": {
+    "nonprod": {
+      "readOnly": true,
+      "selectedTerm": {
+        "TermCalendarId": 269,
+        "Name": "Spring 2027",
+        "StartDate": "2027-01-11T00:00:00",
+        "EndDate": "2027-04-30T00:00:00"
+      },
+      "setup": {
+        "PeriodId": 1,
+        "PeriodName": "Fall 2026 Prod",
+        "MasterCommuterRoomCount": 0,
+        "PeriodCommuterRoomCount": 0,
+        "MissingCommuterRooms": []
+      },
+      "mealPlanResolution": [
+        {
+          "name": "12 Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        },
+        {
+          "name": "20 Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        },
+        {
+          "name": "Unlimited Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        },
+        {
+          "name": "40 Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        },
+        {
+          "name": "60 Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        },
+        {
+          "name": "15 Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        },
+        {
+          "name": "120 Meal Plan",
+          "resolvedPlanId": null,
+          "resolvedName": null
+        }
+      ],
+      "resolvedPaidPlans": 0,
+      "studentDataChanged": false,
+      "settingsChanged": false
+    },
+    "production": {
+      "readOnly": true,
+      "selectedTerm": {
+        "TermCalendarId": 269,
+        "Name": "Spring 2027",
+        "StartDate": "2027-01-11T00:00:00",
+        "EndDate": "2027-04-30T00:00:00"
+      },
+      "setup": {
+        "PeriodId": 2,
+        "PeriodName": "Spring 2027",
+        "MasterCommuterRoomCount": 20,
+        "PeriodCommuterRoomCount": 1,
+        "MissingCommuterRooms": [
+          "Commuter / 10",
+          "Commuter / 11",
+          "Commuter / 12",
+          "Commuter / 13",
+          "Commuter / 14",
+          "Commuter / 15",
+          "Commuter / 16",
+          "Commuter / 17",
+          "Commuter / 18",
+          "Commuter / 19",
+          "Commuter / 2",
+          "Commuter / 20",
+          "Commuter / 3",
+          "Commuter / 4",
+          "Commuter / 5",
+          "Commuter / 6",
+          "Commuter / 7",
+          "Commuter / 8",
+          "Commuter / 9"
+        ]
+      },
+      "mealPlanResolution": [
+        {
+          "name": "12 Meal Plan",
+          "resolvedPlanId": 9,
+          "resolvedName": "12 Meal Plan - Spr 27"
+        },
+        {
+          "name": "20 Meal Plan",
+          "resolvedPlanId": 12,
+          "resolvedName": "20 Block Meal Plan - Spr 27"
+        },
+        {
+          "name": "Unlimited Meal Plan",
+          "resolvedPlanId": 15,
+          "resolvedName": "Unlimited Meals - Spr 27"
+        },
+        {
+          "name": "40 Meal Plan",
+          "resolvedPlanId": 13,
+          "resolvedName": "40 Block Meal Plan - Spr 27"
+        },
+        {
+          "name": "60 Meal Plan",
+          "resolvedPlanId": 14,
+          "resolvedName": "60 Block Meal Plan - Spr 27"
+        },
+        {
+          "name": "15 Meal Plan",
+          "resolvedPlanId": 11,
+          "resolvedName": "15 Meal Plan - Spr 27"
+        },
+        {
+          "name": "120 Meal Plan",
+          "resolvedPlanId": 10,
+          "resolvedName": "120 Block - Spr 27"
+        }
+      ],
+      "resolvedPaidPlans": 7,
+      "studentDataChanged": false,
+      "settingsChanged": false
+    }
+  },
+  "nonprodPatchAppliesCleanlyTo": "65f7030aff381831253feac86ad40e55c345f58f",
+  "initialRegressionNote": "One unrelated chapel test failed in the first EF run; its isolated rerun and the subsequent full 191-test suite passed. No chapel source was changed.",
+  "productionWrites": false,
+  "nonprodWrites": false,
+  "deployed": false
+}

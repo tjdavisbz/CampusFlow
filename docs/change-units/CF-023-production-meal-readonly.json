@@ -1,0 +1,30 @@
+{
+  "environment": "production",
+  "readOnly": true,
+  "studentIdentifiersPrinted": false,
+  "administrativeRemovalFlag": true,
+  "checks": [
+    {
+      "test": "reported-billing-tester",
+      "statusCount": 1,
+      "canRemove": true,
+      "selectedTerm": 269,
+      "termAssignments": 0,
+      "allAssignments": 0,
+      "availablePlans": 8,
+      "planNames": [
+        "12 Meal Plan - Spr 27",
+        "120 Block - Spr 27",
+        "15 Meal Plan - Spr 27",
+        "20 Block Meal Plan - Spr 27",
+        "40 Block Meal Plan - Spr 27",
+        "60 Block Meal Plan - Spr 27",
+        "NO MEALS - OFFICE Only - Spr 27",
+        "Unlimited Meals - Spr 27"
+      ],
+      "assignedPlanNames": [],
+      "housingStatusOptions": 2,
+      "contextLoaded": true
+    }
+  ]
+}

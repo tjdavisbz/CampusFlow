@@ -1,0 +1,13 @@
+{
+  "environment": "production",
+  "readOnly": true,
+  "studentIdentifiersPrinted": false,
+  "canWrite": true,
+  "termCount": 50,
+  "springTermPresent": true,
+  "previewCount": 0,
+  "moreThanOneBatch": false,
+  "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "awardWritesPerformed": false,
+  "verifiedAtUtc": "2026-11-10T05:40:00.508444+00:00"
+}

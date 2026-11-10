@@ -1,0 +1,16 @@
+{
+  "unit": "CF-022",
+  "verifiedAtUtc": "2026-11-10T02:21:21.571788+00:00",
+  "before": "Real generated input has data-val-range-min/max True; installed jQuery validation rejects it even when checked.",
+  "after": "Remove boolean Range attribute, require browser checkbox, retain explicit server check. Actual generated input and form binding checked in Chrome.",
+  "tests": {
+    "web": 294,
+    "focused": 5
+  },
+  "browserScenarios": 4,
+  "authAndConfirmationPreserved": true,
+  "releasePublishSucceeded": true,
+  "studentResetPerformed": false,
+  "committed": false,
+  "deployed": false
+}

@@ -1,0 +1,854 @@
+diff --git a/src/CampusFlow.Application.Contracts/Permissions/CampusFlowPermissionDefinitionProvider.cs b/src/CampusFlow.Application.Contracts/Permissions/CampusFlowPermissionDefinitionProvider.cs
+index f81c593..391e787 100644
+--- a/src/CampusFlow.Application.Contracts/Permissions/CampusFlowPermissionDefinitionProvider.cs
++++ b/src/CampusFlow.Application.Contracts/Permissions/CampusFlowPermissionDefinitionProvider.cs
+@@ -38,6 +38,10 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
+             L("Permission:Admin.StudentBilling"), MultiTenancySides.Tenant);
+         studentBilling.AddChild(CampusFlowPermissions.Admin.ResetIndividualBillApproval,
+             L("Permission:Admin.StudentBilling.ResetIndividualBillApproval"), MultiTenancySides.Tenant);
++        var financialAid = admin.AddChild(CampusFlowPermissions.Admin.FinancialAid,
++            new FixedLocalizableString("Access Financial Aid administration"), MultiTenancySides.Tenant);
++        financialAid.AddChild(CampusFlowPermissions.Admin.ReconcileAwardCodes,
++            new FixedLocalizableString("Reconcile financial award codes"), MultiTenancySides.Tenant);
+         var businessServices = admin.AddChild(CampusFlowPermissions.Admin.BusinessServices,
+             L("Permission:Admin.BusinessServices"), MultiTenancySides.Tenant);
+         admin.AddChild(CampusFlowPermissions.Admin.HousingAssignments,
+diff --git a/src/CampusFlow.Domain.Shared/Permissions/CampusFlowPermissions.cs b/src/CampusFlow.Domain.Shared/Permissions/CampusFlowPermissions.cs
+index 8fd22bf..67d46bb 100644
+--- a/src/CampusFlow.Domain.Shared/Permissions/CampusFlowPermissions.cs
++++ b/src/CampusFlow.Domain.Shared/Permissions/CampusFlowPermissions.cs
+@@ -32,6 +32,8 @@ public static class CampusFlowPermissions
+         public const string ResetIndividualBillApproval = StudentBilling + ".ResetIndividualBillApproval";
+         public const string BusinessServices = Default + ".BusinessServices";
+         public const string RemoveStudentMealPlan = BusinessServices + ".RemoveStudentMealPlan";
++        public const string FinancialAid = Default + ".FinancialAid";
++        public const string ReconcileAwardCodes = FinancialAid + ".ReconcileAwardCodes";
+         public const string AddStudentMealPlan = BusinessServices + ".AddStudentMealPlan";
+         public const string BibliuConfiguration = Default + ".BibliuConfiguration";
+         public const string BibliuExport = Default + ".BibliuExport";
+diff --git a/src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowEntityFrameworkCoreModule.cs b/src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowEntityFrameworkCoreModule.cs
+index ce26111..36b4eb5 100644
+--- a/src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowEntityFrameworkCoreModule.cs
++++ b/src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowEntityFrameworkCoreModule.cs
+@@ -92,6 +92,7 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
+         context.Services.AddTransient<IStudentInformationSystemBillingRecalculationService, ThesisElementsBillingRecalculationService>();
+         context.Services.AddTransient<IStudentInformationSystemBillClearanceService, ThesisElementsBillClearanceService>();
+         context.Services.AddTransient<IStudentInformationSystemMealPlanRemovalService, ThesisElementsMealPlanRemovalService>();
++        context.Services.AddTransient<IStudentInformationSystemAwardCodeMaintenance, ThesisElementsAwardCodeMaintenance>();
+         context.Services.AddTransient<CampusFlow.Chapel.IChapelDormLookup, ElementsChapelDormLookup>();
+         context.Services.AddTransient<IStudentPrimaryProgramLookup, ElementsPrimaryProgramLookup>();
+         context.Services.AddMemoryCache();
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidDecisionService.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidDecisionService.cs
+index e04cfb0..fa7ef9a 100644
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidDecisionService.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidDecisionService.cs
+@@ -129,6 +129,13 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
+             throw new InvalidOperationException("Elements did not return the award distribution date; the decision was not sent.");
+         }
+ 
++        var body = BuildPreservingBody(award);
++        body["studentAccepted"] = (int)decision;
++        return body;
++    }
++
++    internal static JsonObject BuildPreservingBody(JsonObject award)
++    {
+         var body = new JsonObject();
+         foreach (var propertyName in RequestProperties)
+         {
+@@ -143,7 +150,6 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
+         foreach (var name in RequestProperties)
+             if (!award.ContainsKey(name))
+                 throw new InvalidOperationException($"Elements did not return award field '{name}'; no decision was sent.");
+-        body["studentAccepted"] = (int)decision;
+         return body;
+     }
+ 
+diff --git a/src/CampusFlow.Web/Menus/CampusFlowMenuContributor.cs b/src/CampusFlow.Web/Menus/CampusFlowMenuContributor.cs
+index ef00f66..554825c 100644
+--- a/src/CampusFlow.Web/Menus/CampusFlowMenuContributor.cs
++++ b/src/CampusFlow.Web/Menus/CampusFlowMenuContributor.cs
+@@ -216,11 +216,12 @@ public class CampusFlowMenuContributor : IMenuContributor
+         var canManageRegistration = await context.IsGrantedAsync(CampusFlowPermissions.Admin.RegistrationRules);
+         var canManageAdvisorRouting = canManageRegistration;
+         var canResetBillApproval = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ResetIndividualBillApproval);
++        var canReconcileAwardCodes = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ReconcileAwardCodes);
+         var canAddStudentMealPlan = await context.IsGrantedAsync(CampusFlowPermissions.Admin.AddStudentMealPlan);
+         var canManageBibliu = await context.IsGrantedAsync(CampusFlowPermissions.Admin.BibliuConfiguration);
+         var canManageHousing = await context.IsGrantedAsync(CampusFlowPermissions.Admin.HousingAssignments);
+         var canManageChapel = await context.IsGrantedAsync(CampusFlowPermissions.Admin.ChapelAttendance);
+-        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canImpersonateScheduler || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageCostTypes || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel))
++        if (staffAccess && (canImpersonateStudent || canImpersonateFaculty || canImpersonateScheduler || canManagePlans || canManageGlobalConfiguration || canManageBillApproval || canManageCostTypes || canManageRegistration || canManageAdvisorRouting || canResetBillApproval || canAddStudentMealPlan || canManageHousing || canManageBibliu || canManageChapel || canReconcileAwardCodes))
+         {
+             var admin = new ApplicationMenuItem(
+                 CampusFlowMenus.Admin, "Admin", icon: "fa fa-user-shield", order: 3);
+@@ -271,6 +272,12 @@ public class CampusFlowMenuContributor : IMenuContributor
+                 admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.RegistrationRules, "Course Selection",
+                     "~/Admin/CourseSelection", icon: "fa fa-list-check", order: 2));
+             }
++            if (canReconcileAwardCodes)
++                admin.AddItem(new ApplicationMenuItem(CampusFlowMenus.FinancialAidAdmin,
++                    "Financial Aid", icon: "fa fa-graduation-cap", order: 6)
++                    .AddItem(new ApplicationMenuItem(CampusFlowMenus.ReconcileAwardCodes,
++                        "Reconcile Award Codes", "~/Admin/FinancialAid/ReconcileAwardCodes",
++                        icon: "fa fa-list-check", order: 1)));
+             if (canManageHousing)
+                 admin.AddItem(new ApplicationMenuItem("CampusFlow.HousingAdmin", "Housing", icon: "fa fa-building", order: 6)
+                     .AddItem(new ApplicationMenuItem("CampusFlow.HousingAssignments", "Assignments", "~/Admin/Housing/Assignments", icon: "fa fa-bed"))
+diff --git a/src/CampusFlow.Web/Menus/CampusFlowMenus.cs b/src/CampusFlow.Web/Menus/CampusFlowMenus.cs
+index 8894728..102acdc 100644
+--- a/src/CampusFlow.Web/Menus/CampusFlowMenus.cs
++++ b/src/CampusFlow.Web/Menus/CampusFlowMenus.cs
+@@ -33,5 +33,7 @@ public class CampusFlowMenus
+     public const string StudentBillingAdmin = Prefix + ".Admin.StudentBilling";
+     public const string ResetIndividualBillApproval = StudentBillingAdmin + ".ResetIndividualBillApproval";
+     public const string BusinessServicesAdmin = Prefix + ".Admin.BusinessServices";
++    public const string FinancialAidAdmin = Prefix + ".Admin.FinancialAid";
++    public const string ReconcileAwardCodes = FinancialAidAdmin + ".ReconcileAwardCodes";
+     public const string AddStudentMealPlan = BusinessServicesAdmin + ".AddStudentMealPlan";
+ }
+diff --git a/src/CampusFlow.Application.Contracts/FinancialAid/IReconcileAwardCodesAppService.cs b/src/CampusFlow.Application.Contracts/FinancialAid/IReconcileAwardCodesAppService.cs
+new file mode 100644
+index 0000000..e2b8b5c
+--- /dev/null
++++ b/src/CampusFlow.Application.Contracts/FinancialAid/IReconcileAwardCodesAppService.cs
+@@ -0,0 +1,16 @@
++using System.Collections.Generic;
++using System.Threading.Tasks;
++using CampusFlow.StudentInformationSystems;
++using Volo.Abp.Application.Services;
++
++namespace CampusFlow.FinancialAid;
++
++public interface IReconcileAwardCodesAppService : IApplicationService
++{
++    Task<bool> CanApplyAsync();
++    Task<IReadOnlyList<string>> GetTermsAsync();
++    Task<IReadOnlyList<AwardCodeMismatch>> PreviewAsync(string term);
++    Task<ReconcileAwardCodesResult> ApplyAsync(string term, string previewAwardIds);
++}
++
++public record ReconcileAwardCodesResult(int Updated, string? Error);
+diff --git a/src/CampusFlow.Application/FinancialAid/ReconcileAwardCodesAppService.cs b/src/CampusFlow.Application/FinancialAid/ReconcileAwardCodesAppService.cs
+new file mode 100644
+index 0000000..6fc2216
+--- /dev/null
++++ b/src/CampusFlow.Application/FinancialAid/ReconcileAwardCodesAppService.cs
+@@ -0,0 +1,80 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Threading.Tasks;
++using CampusFlow.Permissions;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.AspNetCore.Authorization;
++using Microsoft.Extensions.Logging;
++using Volo.Abp;
++using Volo.Abp.Auditing;
++
++namespace CampusFlow.FinancialAid;
++
++[Authorize(CampusFlowPermissions.Admin.ReconcileAwardCodes)]
++public class ReconcileAwardCodesAppService : CampusFlowAppService, IReconcileAwardCodesAppService
++{
++    public const int BatchSize = 100;
++    private readonly IStudentInformationSystemAwardCodeMaintenance _maintenance;
++    private readonly ILogger<ReconcileAwardCodesAppService> _logger;
++    private readonly Volo.Abp.MultiTenancy.ICurrentTenant _tenant;
++
++    public ReconcileAwardCodesAppService(IEnumerable<IStudentInformationSystemAwardCodeMaintenance> maintenance,
++        ILogger<ReconcileAwardCodesAppService> logger, Volo.Abp.MultiTenancy.ICurrentTenant tenant)
++    {
++        _maintenance = maintenance.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
++        _logger = logger;
++        _tenant = tenant;
++    }
++
++    public Task<IReadOnlyList<string>> GetTermsAsync() { RequireNelson(); return _maintenance.GetTermsAsync(); }
++    public Task<bool> CanApplyAsync() { RequireNelson(); return Task.FromResult(_maintenance.CanWrite); }
++
++    public async Task<IReadOnlyList<AwardCodeMismatch>> PreviewAsync(string term)
++    {
++        RequireNelson();
++        if (string.IsNullOrWhiteSpace(term)) return [];
++        return await _maintenance.GetMismatchesAsync(term.Trim(), BatchSize + 1);
++    }
++
++    [Audited]
++    public async Task<ReconcileAwardCodesResult> ApplyAsync(string term, string previewAwardIds)
++    {
++        RequireNelson();
++        if (!_maintenance.CanWrite)
++            throw new UserFriendlyException("Award-code updates are not enabled for this portal and Elements API environment.");
++        if (string.IsNullOrWhiteSpace(term) || string.IsNullOrWhiteSpace(previewAwardIds))
++            throw new UserFriendlyException("Preview the awards for a term before applying changes.");
++        var preview = await PreviewAsync(term);
++        if (preview.Count == 0) throw new UserFriendlyException("No mismatched awards remain for this term.");
++        var ids = string.Join(',', preview.Take(BatchSize).Select(x => x.AwardId));
++        if (!string.Equals(ids, previewAwardIds, StringComparison.Ordinal))
++            throw new UserFriendlyException("The award list changed. Preview it again before applying changes.");
++
++        var updated = 0;
++        foreach (var award in preview.Take(BatchSize))
++        {
++            try
++            {
++                await _maintenance.UpdateAsync(award);
++                updated++;
++                _logger.LogWarning("Award code reconciliation updated award {AwardId} for term {Term} by {ActorId}.",
++                    award.AwardId, term, CurrentUser.Id);
++            }
++            catch (Exception exception)
++            {
++                _logger.LogError(exception,
++                    "Award code reconciliation stopped at award {AwardId} for term {Term}; {Updated} completed.",
++                    award.AwardId, term, updated);
++                return new ReconcileAwardCodesResult(updated,
++                    $"Stopped after {updated} update(s). Award {award.AwardId} failed; the remaining awards were not changed.");
++            }
++        }
++        return new ReconcileAwardCodesResult(updated, null);
++    }
++    private void RequireNelson()
++    {
++        if (!_tenant.Id.HasValue || !string.Equals(_tenant.Name,"nelson",StringComparison.OrdinalIgnoreCase))
++            throw new UserFriendlyException("Select Nelson University before previewing award codes.");
++    }
++}
+diff --git a/src/CampusFlow.Domain.Shared/StudentInformationSystems/AwardCodeMismatch.cs b/src/CampusFlow.Domain.Shared/StudentInformationSystems/AwardCodeMismatch.cs
+new file mode 100644
+index 0000000..619f91c
+--- /dev/null
++++ b/src/CampusFlow.Domain.Shared/StudentInformationSystems/AwardCodeMismatch.cs
+@@ -0,0 +1,5 @@
++namespace CampusFlow.StudentInformationSystems;
++
++public record AwardCodeMismatch(int AwardId, int StudentUid, string StudentId, string StudentName,
++    string Term, string Description, int? CurrentCodeId, int? ReferenceCodeId,
++    bool CurrentShowOnBill, bool ReferenceShowOnBill, int TermCalendarId = 0);
+diff --git a/src/CampusFlow.Domain/StudentInformationSystems/IStudentInformationSystemAwardCodeMaintenance.cs b/src/CampusFlow.Domain/StudentInformationSystems/IStudentInformationSystemAwardCodeMaintenance.cs
+new file mode 100644
+index 0000000..7c5346a
+--- /dev/null
++++ b/src/CampusFlow.Domain/StudentInformationSystems/IStudentInformationSystemAwardCodeMaintenance.cs
+@@ -0,0 +1,15 @@
++using System.Collections.Generic;
++using System.Threading;
++using System.Threading.Tasks;
++
++namespace CampusFlow.StudentInformationSystems;
++
++public interface IStudentInformationSystemAwardCodeMaintenance
++{
++    StudentInformationSystemProvider Provider { get; }
++    bool CanWrite { get; }
++    Task<IReadOnlyList<string>> GetTermsAsync(CancellationToken cancellationToken = default);
++    Task<IReadOnlyList<AwardCodeMismatch>> GetMismatchesAsync(string term, int take,
++        CancellationToken cancellationToken = default);
++    Task UpdateAsync(AwardCodeMismatch expected, CancellationToken cancellationToken = default);
++}
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsAwardCodeMaintenance.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsAwardCodeMaintenance.cs
+new file mode 100644
+index 0000000..b89e38a
+--- /dev/null
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsAwardCodeMaintenance.cs
+@@ -0,0 +1,209 @@
++using System;
++using System.Collections.Generic;
++using System.Data;
++using System.Linq;
++using System.Net.Http;
++using System.Net.Http.Headers;
++using System.Text;
++using System.Text.Json.Nodes;
++using System.Threading;
++using System.Threading.Tasks;
++using Microsoft.Data.SqlClient;
++using Microsoft.Extensions.Caching.Memory;
++using Microsoft.Extensions.Configuration;
++
++namespace CampusFlow.StudentInformationSystems;
++
++public sealed class ThesisElementsAwardCodeMaintenance : IStudentInformationSystemAwardCodeMaintenance
++{
++    private const string ConnectionName = "ThesisElementsReadOnly";
++    private readonly IConfiguration _configuration;
++    private readonly IMemoryCache _cache;
++    private static readonly HttpClient SharedClient = new();
++    private readonly HttpClient _client;
++    private readonly Func<string,int,CancellationToken,Task<IReadOnlyList<AwardCodeMismatch>>> _preview;
++    private const string ApiPath="StudentInformationSystems:Providers:ThesisElements:Api:";
++
++    public ThesisElementsAwardCodeMaintenance(IConfiguration configuration, IMemoryCache cache)
++        :this(configuration,cache,SharedClient) { }
++    internal ThesisElementsAwardCodeMaintenance(IConfiguration configuration, IMemoryCache cache,HttpClient client,
++        Func<string,int,CancellationToken,Task<IReadOnlyList<AwardCodeMismatch>>>? preview=null)
++    {_configuration=configuration;_cache=cache;_client=client;_preview=preview??GetMismatchesAsync;}
++
++    public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
++    public bool CanWrite
++    {
++        get
++        {
++            try { EnsureWriteEnabled();return true; }
++            catch(InvalidOperationException){return false;}
++        }
++    }
++    private void EnsureWriteEnabled()
++    {
++        _=GetConnectionString();
++        var np=string.Equals(_configuration["App:EnvironmentLabel"],"NON-PRODUCTION",StringComparison.OrdinalIgnoreCase);
++        if(!_configuration.GetValue<bool>("AwardCodeMaintenance:Enabled") ||
++            !_configuration.GetValue<bool>(np?"AwardCodeMaintenance:EnableNonProductionWrites":"AwardCodeMaintenance:EnableProductionWrites") ||
++            _configuration.GetValue<bool>(np?"AwardCodeMaintenance:EnableProductionWrites":"AwardCodeMaintenance:EnableNonProductionWrites") ||
++            !Host(_configuration[ApiPath+"BaseUrl"],np?"app-elm-nonprod-usc-integrationapi.azurewebsites.net":"app-elm-prod-usc-integrationapi.azurewebsites.net") ||
++            _configuration[ApiPath+"TenantHost"]!=(np?"el-np-nel.thesiscloud.com":"el-nel.thesiscloud.com"))
++            throw new InvalidOperationException("Award-code writes require explicitly enabled matching Elements environments.");
++    }
++    private static bool Host(string? value,string host)=>Uri.TryCreate(value,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&uri.Host==host&&uri.IsDefaultPort&&uri.AbsolutePath=="/"&&uri.Query==""&&uri.Fragment==""&&uri.UserInfo=="";
++
++    public async Task<IReadOnlyList<string>> GetTermsAsync(CancellationToken cancellationToken = default)
++    {
++        const string sql = "SELECT TOP (50) LTRIM(RTRIM(TextTerm)) FROM dbo.TermCalendar " +
++                           "WHERE TextTerm IS NOT NULL ORDER BY TermCalendarID DESC";
++        await using var connection = new SqlConnection(GetConnectionString());
++        await connection.OpenAsync(cancellationToken);
++        await using var command = new SqlCommand(sql, connection);
++        var terms = new List<string>();
++        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
++        while (await reader.ReadAsync(cancellationToken))
++        {
++            var term = reader.GetString(0);
++            if (!terms.Contains(term, StringComparer.OrdinalIgnoreCase)) terms.Add(term);
++        }
++        return terms;
++    }
++
++    public async Task<IReadOnlyList<AwardCodeMismatch>> GetMismatchesAsync(string term, int take,
++        CancellationToken cancellationToken = default)
++    {
++        if (string.IsNullOrWhiteSpace(term) || take is < 1 or > 101)
++            throw new ArgumentOutOfRangeException(nameof(take));
++        const string sql = """
++            SELECT TOP (@Take) f.FinancialAwardID, f.StudentUID, s.StudentID,
++                   LTRIM(RTRIM(s.FirstName)) + ' ' + LTRIM(RTRIM(s.LastName)),
++                   tc.TextTerm, f.[Description], f.Code1ID, fr.Code1ID,
++                   f.ShowOnBillingStatement, fr.ShowOnBillStatement, f.TermCalendarID
++            FROM dbo.FinancialAward f
++            JOIN dbo.FinancialAwardRef fr ON fr.AwardTypeID = f.TransTypeID
++            JOIN dbo.TermCalendar tc ON tc.TermCalendarID = f.TermCalendarID
++            JOIN dbo.Student s ON s.StudentUID = f.StudentUID
++            WHERE tc.TextTerm = @Term
++              AND (ISNULL(f.Code1ID, 0) <> ISNULL(fr.Code1ID, 0)
++                   OR COALESCE(f.ShowOnBillingStatement, '') <> COALESCE(fr.ShowOnBillStatement, ''))
++            ORDER BY f.FinancialAwardID
++            """;
++        await using var connection = new SqlConnection(GetConnectionString());
++        await connection.OpenAsync(cancellationToken);
++        await using var command = new SqlCommand(sql, connection);
++        command.Parameters.Add("@Take", SqlDbType.Int).Value = take;
++        command.Parameters.Add("@Term", SqlDbType.VarChar, 50).Value = term.Trim();
++        var rows = new List<AwardCodeMismatch>();
++        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
++        while (await reader.ReadAsync(cancellationToken))
++            rows.Add(new AwardCodeMismatch(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2).Trim(),
++                reader.GetString(3).Trim(), reader.GetString(4).Trim(),
++                reader.IsDBNull(5) ? "Award" : reader.GetString(5).Trim(),
++                reader.IsDBNull(6) ? null : reader.GetInt32(6),
++                reader.IsDBNull(7) ? null : reader.GetInt32(7),
++                !reader.IsDBNull(8) && IsYes(reader.GetValue(8)),
++                !reader.IsDBNull(9) && IsYes(reader.GetValue(9)),reader.GetInt32(10)));
++        return rows;
++    }
++
++    public async Task UpdateAsync(AwardCodeMismatch expected,CancellationToken cancellationToken=default)
++    {
++        EnsureWriteEnabled();
++        if(expected.AwardId<=0||expected.StudentUid<=0||expected.TermCalendarId<=0)throw new InvalidOperationException("Preview one valid award and term before applying changes.");
++        var rows=await _preview(expected.Term,101,cancellationToken);
++        if(rows.SingleOrDefault(x=>x.AwardId==expected.AwardId)!=expected)
++            throw new InvalidOperationException("The award or its reference values changed. Preview again before applying.");
++        var token=await Token(cancellationToken);var award=await ReadAward(expected,token,cancellationToken);
++        var body=BuildReconciliationBody(award,expected);
++        if(AlreadyCorrect(award,expected))return; // An earlier unknown PUT may already have succeeded.
++        // Check again immediately before the full-field PUT. The vendor endpoint has no ETag contract.
++        var fresh=await ReadAward(expected,token,cancellationToken);
++        if(!JsonNode.DeepEquals(award,fresh))throw new InvalidOperationException("The live award changed during review. No update was sent.");
++        using var request=Request(HttpMethod.Put,$"/api/financial-aid/maintenance/awards/financial-awards/{expected.AwardId}",token);
++        request.Content=new StringContent(body.ToJsonString(),Encoding.UTF8,"application/json");
++        using var response=await _client.SendAsync(request,cancellationToken);var result=await response.Content.ReadAsStringAsync(cancellationToken);
++        if(!response.IsSuccessStatusCode||JsonNode.Parse(result)?["isSuccess"]?.GetValue<bool>()!=true)
++            throw new InvalidOperationException("The award update result is unconfirmed. Check Elements before retrying.");
++        var after=await ReadAward(expected,token,cancellationToken);VerifyBody(body,after);
++    }
++    internal static JsonObject BuildReconciliationBody(JsonObject award,AwardCodeMismatch expected)
++    {
++        if(award["financialAwardId"]?.GetValue<int>()!=expected.AwardId || award["studentUid"]?.GetValue<int>()!=expected.StudentUid ||
++            award["termCalendarId"]?.GetValue<int>()!=expected.TermCalendarId)
++            throw new InvalidOperationException("The live award does not match the reviewed student and term.");
++        if(award["lock"]?.GetValue<bool>()==true)throw new InvalidOperationException("The award is locked and requires Financial Aid review.");
++        var body=ThesisElementsFinancialAidDecisionService.BuildPreservingBody(award);
++        if(!AlreadyCorrect(award,expected)&&((NullableInt(award["code1Id"])??0)!=(expected.CurrentCodeId??0) || YesNo(award["showOnBillingStatement"])!=expected.CurrentShowOnBill))
++            throw new InvalidOperationException("The current award code or billing flag changed since preview.");
++        body["code1Id"]=expected.ReferenceCodeId??0;
++        body["studentAccepted"]=Decision(award["studentAccepted"]);
++        body["showOnBillingStatement"]=expected.ReferenceShowOnBill?"Yes":"No";
++        return body;
++    }
++    private static int? Decision(JsonNode? value)
++    {
++        if(value is null)return null;
++        if(value is JsonValue j && j.TryGetValue<bool>(out var b))return b?1:0;
++        if(value is JsonValue v && v.TryGetValue<int>(out var n) && n is 0 or 1)return n;
++        throw new InvalidOperationException("Elements returned an unrecognized award acceptance value.");
++    }
++    private static int? NullableInt(JsonNode? value)=>value is null?null:value.GetValue<int>();
++    private static bool YesNo(JsonNode? value)=>value is not null && IsYes(value.ToString());
++    private static bool AlreadyCorrect(JsonObject award,AwardCodeMismatch expected)=>(NullableInt(award["code1Id"])??0)==(expected.ReferenceCodeId??0) && YesNo(award["showOnBillingStatement"])==expected.ReferenceShowOnBill;
++    private static void VerifyBody(JsonObject body,JsonObject after)
++    {
++        foreach(var property in body)
++        {
++            var readName=property.Key=="transDate"?"distributionDate":property.Key;
++            var equal=property.Key switch { "showOnBillingStatement"=>YesNo(property.Value)==YesNo(after[readName]), "studentAccepted"=>Decision(property.Value)==Decision(after[readName]), _=>JsonNode.DeepEquals(property.Value,after[readName]) };
++            if(!after.ContainsKey(readName)||!equal)throw new InvalidOperationException($"Elements did not preserve award field {readName}. Stop and review this award before further updates.");
++        }
++    }
++    private async Task<JsonObject> ReadAward(AwardCodeMismatch expected,string token,CancellationToken ct)
++    {
++        using var request=Request(HttpMethod.Get,$"/api/financial-aid/maintenance/awards/financial-awards/{expected.StudentUid}",token);
++        using var response=await _client.SendAsync(request,ct);var root=JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
++        if(!response.IsSuccessStatusCode||root?["isSuccess"]?.GetValue<bool>()!=true||root["data"]?["getFinancialAwardDetails"] is not JsonArray rows || rows.Any(x=>x is not JsonObject))
++            throw new InvalidOperationException("Elements did not return a valid award list.");
++        var matches=rows.OfType<JsonObject>().Where(x=>x["financialAwardId"]?.GetValue<int>()==expected.AwardId&&x["studentUid"]?.GetValue<int>()==expected.StudentUid&&x["termCalendarId"]?.GetValue<int>()==expected.TermCalendarId).ToList();
++        if(matches.Count!=1)throw new InvalidOperationException("The selected award is missing, ambiguous or belongs to another term.");return matches[0];
++    }
++    private async Task<string> Token(CancellationToken ct)
++    {
++        EnsureWriteEnabled();var key="AwardCodeMaintenance:"+Setting("TenantHost");
++        if(_cache.TryGetValue(key,out string? cached)&&!string.IsNullOrWhiteSpace(cached))return cached;
++        using var request=new HttpRequestMessage(HttpMethod.Get,Setting("BaseUrl").TrimEnd('/')+"/api/Login/Authenticate");
++        request.Headers.Add("TenantHost",Setting("TenantHost"));request.Headers.Authorization=new AuthenticationHeaderValue("Basic",Convert.ToBase64String(Encoding.UTF8.GetBytes(Setting("Username")+":"+Setting("Password"))));
++        using var response=await _client.SendAsync(request,ct);if(!response.IsSuccessStatusCode)throw new InvalidOperationException("Award maintenance authentication failed.");
++        var token=JsonNode.Parse(await response.Content.ReadAsStringAsync(ct))?["data"]?["token"]?.GetValue<string>();
++        if(string.IsNullOrWhiteSpace(token))throw new InvalidOperationException("Elements returned no award-maintenance token.");_cache.Set(key,token,TimeSpan.FromMinutes(10));return token;
++    }
++    private string Setting(string name)=>_configuration[ApiPath+name]??throw new InvalidOperationException("An award-maintenance API setting is missing.");
++    private HttpRequestMessage Request(HttpMethod method,string path,string token)
++    {
++        EnsureWriteEnabled();var request=new HttpRequestMessage(method,Setting("BaseUrl").TrimEnd('/')+path);
++        request.Headers.Add("TenantHost",Setting("TenantHost"));request.Headers.Add("Module","FinancialAid");request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",token);return request;
++    }
++
++    internal static bool IsYes(object value) =>
++        string.Equals(Convert.ToString(value)?.Trim(), "Yes", StringComparison.OrdinalIgnoreCase) ||
++        string.Equals(Convert.ToString(value)?.Trim(), "True", StringComparison.OrdinalIgnoreCase) ||
++        string.Equals(Convert.ToString(value)?.Trim(), "1", StringComparison.OrdinalIgnoreCase);
++
++    private string GetConnectionString()
++    {
++        var nonprod=string.Equals(_configuration["App:EnvironmentLabel"],"NON-PRODUCTION",StringComparison.OrdinalIgnoreCase);
++        var production=string.IsNullOrWhiteSpace(_configuration["App:EnvironmentLabel"]) || string.Equals(_configuration["App:EnvironmentLabel"],"PRODUCTION",StringComparison.OrdinalIgnoreCase);
++        if(!nonprod && (!production || _configuration["ASPNETCORE_ENVIRONMENT"]!="Production"))
++            throw new InvalidOperationException("The Elements environment could not be verified.");
++        var builder=new SqlConnectionStringBuilder(_configuration.GetConnectionString(ConnectionName)
++            ?? throw new InvalidOperationException("The Elements read-only connection is missing."));
++        var expectedHost=nonprod?"sql-elm-nonprod-usc-replica.database.windows.net":"sql-elm-prod-usc-replica.database.windows.net";
++        if (!(string.Equals(builder.DataSource,expectedHost,StringComparison.OrdinalIgnoreCase) ||
++              string.Equals(builder.DataSource,"tcp:"+expectedHost+",1433",StringComparison.OrdinalIgnoreCase)) ||
++            !string.Equals(builder.InitialCatalog,nonprod?"EL-NP-NEL-DB":"EL-NEL-DB",StringComparison.OrdinalIgnoreCase))
++            throw new InvalidOperationException("Award preview requires the matching Elements replica.");
++        builder.ApplicationIntent=ApplicationIntent.ReadOnly;
++        return builder.ConnectionString;
++    }
++}
+diff --git a/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml b/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml
+new file mode 100644
+index 0000000..5c7b743
+--- /dev/null
++++ b/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml
+@@ -0,0 +1,49 @@
++@page "/Admin/FinancialAid/ReconcileAwardCodes"
++@model CampusFlow.Web.Pages.Admin.FinancialAid.ReconcileAwardCodesModel
++@using CampusFlow.Web.Menus
++@using Volo.Abp.AspNetCore.Mvc.UI.Layout
++@inject IPageLayout PageLayout
++@{
++    PageLayout.Content.Title = "Reconcile Award Codes";
++    PageLayout.Content.MenuItemName = CampusFlowMenus.ReconcileAwardCodes;
++}
++@section styles {
++    <link rel="stylesheet" href="~/Pages/Admin/FinancialAid/ReconcileAwardCodes.css" asp-append-version="true" />
++    <style>:root{--tenant-primary:@Model.Theme.PrimaryColor;--tenant-primary-dark:@Model.Theme.PrimaryDarkColor;--tenant-accent:@Model.Theme.AccentColor}</style>
++}
++<main class="award-shell">
++    <header class="award-hero"><span>Financial Aid · Update Routines</span><h1>Reconcile award codes</h1><p>Review awards whose code or billing-statement setting differs from the award reference. Preview differences before copying the reference code and billing-statement setting. Updates preserve other award fields and verify the result in Elements.</p></header>
++    <section class="award-card">
++        <h2>Choose a term</h2>
++        <form method="get" class="award-filter"><label for="term">Academic term</label><select id="term" asp-for="Term" required><option value="">Choose a term</option>@foreach(var term in Model.Terms){<option value="@term">@term</option>}</select><button type="submit">Preview differences</button></form>
++    </section>
++    @if (!string.IsNullOrWhiteSpace(Model.Term))
++    {
++        <section class="award-card">
++            <h2>Preview for @Model.Term</h2>
++            @if (Model.Awards.Count == 0)
++            {
++                <p>No mismatched awards were found for this term.</p>
++            }
++            else
++            {
++                <p>@Model.VisibleAwards.Count award(s) in this batch. @if(Model.HasMore){<text>More awards remain; preview again after this batch.</text>}</p>
++                <div class="award-table-wrap"><table><thead><tr><th>Student</th><th>Award</th><th>Code</th><th>Reference code</th><th>Show on bill</th><th>Reference setting</th></tr></thead><tbody>
++                @foreach(var award in Model.VisibleAwards){<tr><td>@award.StudentName<br /><small>@award.StudentId</small></td><td>@award.Description<br /><small>ID @award.AwardId</small></td><td>@(award.CurrentCodeId?.ToString() ?? "Blank")</td><td>@(award.ReferenceCodeId?.ToString() ?? "Blank")</td><td>@(award.CurrentShowOnBill ? "Yes" : "No")</td><td>@(award.ReferenceShowOnBill ? "Yes" : "No")</td></tr>}
++                </tbody></table></div>
++                @if (!Model.CanApply)
++                {
++                    <p class="award-notice">Updates are not enabled for this environment. Preview remains read-only.</p>
++                }
++                else
++                {
++                <form method="post" asp-page-handler="Apply" class="award-confirm">
++                    <input asp-for="Input.Term" type="hidden" value="@Model.Term" /><input asp-for="Input.PreviewAwardIds" type="hidden" value="@Model.PreviewIds" />
++                    <label><input asp-for="Input.Confirmed" required aria-required="true" /> I reviewed this batch and intend to copy the reference code and billing-statement setting to these awards.</label>
++                    <span asp-validation-for="Input.Confirmed"></span><button type="submit">Update @Model.VisibleAwards.Count award(s)</button>
++                </form>
++                }
++            }
++        </section>
++    }
++</main>
+diff --git a/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml.cs b/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml.cs
+new file mode 100644
+index 0000000..5e97a39
+--- /dev/null
++++ b/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml.cs
+@@ -0,0 +1,70 @@
++using System;
++using System.Collections.Generic;
++using System.ComponentModel.DataAnnotations;
++using System.Linq;
++using System.Threading.Tasks;
++using CampusFlow.Branding;
++using CampusFlow.FinancialAid;
++using CampusFlow.Permissions;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.AspNetCore.Authorization;
++using Microsoft.AspNetCore.Mvc;
++
++namespace CampusFlow.Web.Pages.Admin.FinancialAid;
++
++[Authorize(CampusFlowPermissions.Admin.ReconcileAwardCodes)]
++[ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
++public class ReconcileAwardCodesModel : CampusFlowPageModel
++{
++    private readonly IReconcileAwardCodesAppService _service;
++    private readonly ITenantThemeProvider _themeProvider;
++
++    public ReconcileAwardCodesModel(IReconcileAwardCodesAppService service, ITenantThemeProvider themeProvider)
++    {
++        _service = service;
++        _themeProvider = themeProvider;
++    }
++
++    [BindProperty(SupportsGet = true)] public string? Term { get; set; }
++    [BindProperty] public ApplyInputModel Input { get; set; } = new();
++    public TenantTheme Theme { get; private set; } = null!;
++    public IReadOnlyList<string> Terms { get; private set; } = [];
++    public IReadOnlyList<AwardCodeMismatch> Awards { get; private set; } = [];
++    public bool HasMore => Awards.Count > ReconcileAwardCodesAppService.BatchSize;
++    public bool CanApply { get; private set; }
++    public IReadOnlyList<AwardCodeMismatch> VisibleAwards => Awards.Take(ReconcileAwardCodesAppService.BatchSize).ToList();
++    public string PreviewIds => string.Join(',', VisibleAwards.Select(x => x.AwardId));
++
++    public async Task OnGetAsync() => await LoadAsync();
++
++    public async Task<IActionResult> OnPostApplyAsync()
++    {
++        Term = Input.Term;
++        if (!Input.Confirmed)
++            ModelState.AddModelError("Input.Confirmed", "Confirm that you intend to update these awards.");
++        if (!ModelState.IsValid)
++        {
++            await LoadAsync();
++            return Page();
++        }
++        var result = await _service.ApplyAsync(Input.Term, Input.PreviewAwardIds);
++        if (result.Error is not null) Alerts.Warning(result.Error);
++        else Alerts.Success($"Updated {result.Updated} financial award(s) for {Input.Term}.");
++        return RedirectToPage(new { term = Input.Term });
++    }
++
++    private async Task LoadAsync()
++    {
++        Theme = _themeProvider.Get(CurrentTenant.Name);
++        CanApply = await _service.CanApplyAsync();
++        Terms = await _service.GetTermsAsync();
++        if (!string.IsNullOrWhiteSpace(Term)) Awards = await _service.PreviewAsync(Term);
++    }
++
++    public class ApplyInputModel
++    {
++        [Required] public string Term { get; set; } = string.Empty;
++        [Required] public string PreviewAwardIds { get; set; } = string.Empty;
++        public bool Confirmed { get; set; }
++    }
++}
+diff --git a/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.css b/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.css
+new file mode 100644
+index 0000000..3d9be8c
+--- /dev/null
++++ b/src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.css
+@@ -0,0 +1 @@
++.award-shell{max-width:1200px;margin:2rem auto;padding:0 1rem}.award-hero{background:var(--tenant-primary);color:white;border-radius:18px;padding:2rem;margin-bottom:1.5rem}.award-hero span{font-size:.85rem;text-transform:uppercase;letter-spacing:.08em}.award-hero h1{margin:.5rem 0}.award-hero p{max-width:70ch;margin:0}.award-card{background:white;border:1px solid #dde2ea;border-radius:16px;padding:1.5rem;margin-bottom:1.5rem}.award-card h2{margin-top:0}.award-filter{display:flex;align-items:end;gap:1rem;flex-wrap:wrap}.award-filter label{font-weight:600}.award-filter select{min-width:220px;padding:.6rem;border:1px solid #b9c2d0;border-radius:8px}.award-filter button,.award-confirm button{background:var(--tenant-primary);color:white;border:0;border-radius:8px;padding:.7rem 1rem;font-weight:600}.award-table-wrap{overflow-x:auto}.award-card table{width:100%;border-collapse:collapse}.award-card th,.award-card td{text-align:left;padding:.8rem;border-bottom:1px solid #e5e9ef}.award-card th{background:#f6f8fb}.award-card small{color:#64748b}.award-confirm{margin-top:1.5rem;display:flex;flex-direction:column;align-items:start;gap:.9rem}.award-confirm label{display:flex;gap:.5rem;align-items:start}.award-confirm input{margin-top:.3rem}
+diff --git a/test/CampusFlow.Application.Tests/FinancialAid/ReconcileAwardCodesAppServiceTests.cs b/test/CampusFlow.Application.Tests/FinancialAid/ReconcileAwardCodesAppServiceTests.cs
+new file mode 100644
+index 0000000..208fe9c
+--- /dev/null
++++ b/test/CampusFlow.Application.Tests/FinancialAid/ReconcileAwardCodesAppServiceTests.cs
+@@ -0,0 +1,76 @@
++using System;
++using System.Collections.Generic;
++using System.Threading;
++using System.Threading.Tasks;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.Extensions.Logging.Abstractions;
++using Shouldly;
++using Volo.Abp;
++using Xunit;
++using NSubstitute;
++using Volo.Abp.MultiTenancy;
++
++namespace CampusFlow.FinancialAid;
++
++public class ReconcileAwardCodesAppServiceTests
++{
++    [Fact]
++    public async Task DisabledEnvironmentNeverReachesAwardWrite()
++    {
++        var fake = new FakeMaintenance { CanWrite = false };
++        var service = Create(fake);
++
++        await Should.ThrowAsync<UserFriendlyException>(() => service.ApplyAsync("Fall 2026", "41"));
++
++        fake.Updates.ShouldBe(0);
++        fake.Reads.ShouldBe(0);
++    }
++
++    [Fact]
++    public async Task ChangedPreviewNeverReachesAwardWrite()
++    {
++        var fake = new FakeMaintenance { CanWrite = true };
++        var service = Create(fake);
++
++        await Should.ThrowAsync<UserFriendlyException>(() => service.ApplyAsync("Fall 2026", "42"));
++
++        fake.Updates.ShouldBe(0);
++        fake.Reads.ShouldBe(1);
++    }
++
++    private static ReconcileAwardCodesAppService Create(FakeMaintenance fake,string name="nelson")
++    {
++        var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());tenant.Name.Returns(name);
++        return new([fake], NullLogger<ReconcileAwardCodesAppService>.Instance,tenant);
++    }
++    [Fact]public async Task Another_tenant_cannot_preview_Nelson_awards()
++    {
++        var fake=new FakeMaintenance();var service=Create(fake,"another-university");
++        await Should.ThrowAsync<UserFriendlyException>(()=>service.PreviewAsync("Spring 2027"));fake.Reads.ShouldBe(0);
++    }
++
++    private sealed class FakeMaintenance : IStudentInformationSystemAwardCodeMaintenance
++    {
++        public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
++        public bool CanWrite { get; set; }
++        public int Reads { get; private set; }
++        public int Updates { get; private set; }
++
++        public Task<IReadOnlyList<string>> GetTermsAsync(CancellationToken cancellationToken = default) =>
++            Task.FromResult<IReadOnlyList<string>>(["Fall 2026"]);
++
++        public Task<IReadOnlyList<AwardCodeMismatch>> GetMismatchesAsync(string term, int take,
++            CancellationToken cancellationToken = default)
++        {
++            Reads++;
++            return Task.FromResult<IReadOnlyList<AwardCodeMismatch>>(
++                [new(41, 7, "S7", "Student", term, "Award", 1, 2, false, true)]);
++        }
++
++        public Task UpdateAsync(AwardCodeMismatch expected, CancellationToken cancellationToken = default)
++        {
++            Updates++;
++            return Task.CompletedTask;
++        }
++    }
++}
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/AwardCodeWriteTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/AwardCodeWriteTests.cs
+new file mode 100644
+index 0000000..4cb63d7
+--- /dev/null
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/AwardCodeWriteTests.cs
+@@ -0,0 +1,101 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Net;
++using System.Net.Http;
++using System.Text;
++using System.Text.Json.Nodes;
++using System.Threading;
++using System.Threading.Tasks;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.Extensions.Caching.Memory;
++using Microsoft.Extensions.Configuration;
++using Xunit;
++
++namespace CampusFlow.EntityFrameworkCore.Tests.StudentInformationSystems;
++
++public sealed class AwardCodeWriteTests
++{
++    private const string Api = "StudentInformationSystems:Providers:ThesisElements:Api:";
++    private static AwardCodeMismatch Expected() => new(123,456,"Test","Test Student","Spring 2027","UNSUB ADD",3,7,true,false,269);
++    private static JsonObject Award() => ThesisElementsFinancialAidDecisionServiceTests.Award();
++    private static IConfiguration Config(string? changed=null,string? value=null)
++    {
++        var values=new Dictionary<string,string?> {
++            ["App:EnvironmentLabel"]="NON-PRODUCTION",
++            ["ConnectionStrings:ThesisElementsReadOnly"]="Server=sql-elm-nonprod-usc-replica.database.windows.net;Database=EL-NP-NEL-DB",
++            ["AwardCodeMaintenance:Enabled"]="true",["AwardCodeMaintenance:EnableNonProductionWrites"]="true",
++            [Api+"BaseUrl"]="https://app-elm-nonprod-usc-integrationapi.azurewebsites.net",
++            [Api+"TenantHost"]="el-np-nel.thesiscloud.com" };
++        if(changed!=null)values[changed]=value;
++        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
++    }
++    private static ThesisElementsAwardCodeMaintenance Service(Handler handler,AwardCodeMismatch? preview=null,IConfiguration? config=null)
++    {
++        var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("AwardCodeMaintenance:el-np-nel.thesiscloud.com","test");
++        return new(config??Config(),cache,new HttpClient(handler),(_,_,_)=>Task.FromResult<IReadOnlyList<AwardCodeMismatch>>([preview??Expected()]));
++    }
++    [Theory]
++    [InlineData(false)] [InlineData(true)]
++    public void Only_code_and_billing_flag_change_and_the_input_is_untouched(bool nullDate)
++    {
++        var award=Award();if(nullDate){award["distributionDate"]=null;award["codaei"]=false;}
++        var original=award.DeepClone();var body=ThesisElementsAwardCodeMaintenance.BuildReconciliationBody(award,Expected());
++        Assert.Equal(7,body["code1Id"]!.GetValue<int>());Assert.Equal("No",body["showOnBillingStatement"]!.GetValue<string>());
++        foreach(var field in award.Where(x=>x.Key is not ("financialAwardId" or "code1Id" or "showOnBillingStatement")))
++            Assert.True(JsonNode.DeepEquals(field.Value,body[field.Key=="distributionDate"?"transDate":field.Key]),field.Key);
++        Assert.True(JsonNode.DeepEquals(original,award));
++    }
++    [Theory] [InlineData("distributionDate")] [InlineData("codaei")] [InlineData("studentAccepted")] [InlineData("amount")]
++    public void Missing_protected_fields_stop_before_writing(string field)
++    {var a=Award();a.Remove(field);Assert.Throws<InvalidOperationException>(()=>ThesisElementsAwardCodeMaintenance.BuildReconciliationBody(a,Expected()));}
++    [Theory] [InlineData("financialAwardId")] [InlineData("studentUid")] [InlineData("termCalendarId")]
++    public void Wrong_identity_is_rejected(string field)
++    {var a=Award();a[field]=999;Assert.Throws<InvalidOperationException>(()=>ThesisElementsAwardCodeMaintenance.BuildReconciliationBody(a,Expected()));}
++    [Theory] [InlineData(true,1)] [InlineData(false,0)]
++    public void Existing_acceptance_uses_the_write_contract_without_changing_its_meaning(bool accepted,int expected)
++    {var a=Award();a["studentAccepted"]=accepted;Assert.Equal(expected,ThesisElementsAwardCodeMaintenance.BuildReconciliationBody(a,Expected())["studentAccepted"]!.GetValue<int>());}
++    [Fact] public void Empty_reference_code_uses_the_Elements_zero_option()
++    {var a=Award();Assert.Equal(0,ThesisElementsAwardCodeMaintenance.BuildReconciliationBody(a,Expected() with{ReferenceCodeId=null})["code1Id"]!.GetValue<int>());}
++    [Fact] public void Locked_awards_are_rejected()
++    {var a=Award();a["lock"]=true;Assert.Throws<InvalidOperationException>(()=>ThesisElementsAwardCodeMaintenance.BuildReconciliationBody(a,Expected()));}
++    [Fact] public async Task Successful_write_is_read_back_with_every_protected_field_intact()
++    {var h=new Handler();await Service(h).UpdateAsync(Expected());Assert.Equal(1,h.Writes);Assert.Equal(3,h.Reads);}
++    [Theory] [InlineData("distributionDate")] [InlineData("codaei")] [InlineData("amount")] [InlineData("studentAccepted")]
++    public async Task Any_protected_readback_change_stops_the_batch(string field)
++    {var h=new Handler{Corrupt=field};await Assert.ThrowsAsync<InvalidOperationException>(()=>Service(h).UpdateAsync(Expected()));Assert.Equal(1,h.Writes);}
++    [Fact] public async Task A_live_edit_between_preview_and_put_is_not_overwritten()
++    {var h=new Handler{ChangeBetweenReads=true};await Assert.ThrowsAsync<InvalidOperationException>(()=>Service(h).UpdateAsync(Expected()));Assert.Equal(0,h.Writes);}
++    [Fact] public async Task Changed_reference_values_require_another_preview()
++    {var h=new Handler();await Assert.ThrowsAsync<InvalidOperationException>(()=>Service(h,Expected() with{ReferenceCodeId=8}).UpdateAsync(Expected()));Assert.Equal(0,h.Reads);Assert.Equal(0,h.Writes);}
++    [Fact] public async Task Lost_reply_is_not_resent_and_existing_success_is_recognized()
++    {var h=new Handler{LoseReply=true};var s=Service(h);await Assert.ThrowsAsync<HttpRequestException>(()=>s.UpdateAsync(Expected()));await s.UpdateAsync(Expected());Assert.Equal(1,h.Writes);}
++    [Theory]
++    [InlineData("AwardCodeMaintenance:Enabled","false")]
++    [InlineData("AwardCodeMaintenance:EnableProductionWrites","true")]
++    [InlineData(Api+"BaseUrl","https://app-elm-prod-usc-integrationapi.azurewebsites.net")]
++    [InlineData(Api+"TenantHost","el-nel.thesiscloud.com")]
++    [InlineData("ConnectionStrings:ThesisElementsReadOnly","Server=sql-elm-prod-usc-replica.database.windows.net;Database=EL-NEL-DB")]
++    public async Task Disabled_or_mixed_environments_cannot_make_requests(string key,string value)
++    {var h=new Handler();var s=Service(h,config:Config(key,value));Assert.False(s.CanWrite);await Assert.ThrowsAsync<InvalidOperationException>(()=>s.UpdateAsync(Expected()));Assert.Equal(0,h.Reads);Assert.Equal(0,h.Writes);}
++    private sealed class Handler:HttpMessageHandler
++    {
++        public int Reads,Writes; public string? Corrupt;public bool LoseReply,ChangeBetweenReads;
++        private readonly JsonObject _award=Award();
++        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
++        {
++            Assert.Equal("FinancialAid",request.Headers.GetValues("Module").Single());
++            if(request.Method==HttpMethod.Put)
++            {
++                Writes++;var body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(token))!.AsObject();
++                foreach(var field in body)_award[field.Key=="transDate"?"distributionDate":field.Key]=field.Value?.DeepClone();
++                if(Corrupt=="studentAccepted")_award[Corrupt]=true;else if(Corrupt!=null)_award[Corrupt]=null;
++                if(LoseReply)throw new HttpRequestException("Synthetic lost response");
++                return Response(new JsonObject{["isSuccess"]=true});
++            }
++            Reads++;if(ChangeBetweenReads&&Reads==2)_award["amount"]=900m;
++            return Response(new JsonObject{["isSuccess"]=true,["data"]=new JsonObject{["getFinancialAwardDetails"]=new JsonArray(_award.DeepClone())}});
++        }
++        private static HttpResponseMessage Response(JsonNode node)=>new(HttpStatusCode.OK){Content=new StringContent(node.ToJsonString(),Encoding.UTF8,"application/json")};
++    }
++}
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/ThesisElementsAwardCodeMaintenanceTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/ThesisElementsAwardCodeMaintenanceTests.cs
+new file mode 100644
+index 0000000..22f9339
+--- /dev/null
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/ThesisElementsAwardCodeMaintenanceTests.cs
+@@ -0,0 +1,29 @@
++using Microsoft.Extensions.Configuration;
++using CampusFlow.StudentInformationSystems;
++using Shouldly;
++using Xunit;
++
++namespace CampusFlow.EntityFrameworkCore.Tests.StudentInformationSystems;
++
++public class ThesisElementsAwardCodeMaintenanceTests
++{
++    [Theory]
++    [InlineData("Yes", true)]
++    [InlineData("No", false)]
++    [InlineData(" yes ", true)]
++    [InlineData("", false)]
++    public void ElementsYesNoFieldsAreReadCorrectly(string value, bool expected)
++    {
++        ThesisElementsAwardCodeMaintenance.IsYes(value).ShouldBe(expected);
++    }
++
++    [Fact]
++    public async System.Threading.Tasks.Task Legacy_enable_flags_cannot_enable_unverified_award_updates()
++    {
++        var settings=new System.Collections.Generic.Dictionary<string,string?>{["AwardCodeMaintenance:Enabled"]="true",["AwardCodeMaintenance:ExpectedApiBaseUrl"]="https://app-elm-prod-usc-integrationapi.azurewebsites.net",["StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl"]="https://app-elm-prod-usc-integrationapi.azurewebsites.net"};
++        var service=new ThesisElementsAwardCodeMaintenance(new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(settings).Build(),new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
++        service.CanWrite.ShouldBeFalse();
++        await Should.ThrowAsync<System.InvalidOperationException>(()=>service.UpdateAsync(new(1,1,"100","Test Student","Spring 2027","Test award",1,2,false,true)));
++        await Should.ThrowAsync<System.InvalidOperationException>(()=>service.GetTermsAsync());
++    }
++}
+diff --git a/test/CampusFlow.Web.Tests/Pages/FinancialAidAdminPreviewTests.cs b/test/CampusFlow.Web.Tests/Pages/FinancialAidAdminPreviewTests.cs
+new file mode 100644
+index 0000000..dc93183
+--- /dev/null
++++ b/test/CampusFlow.Web.Tests/Pages/FinancialAidAdminPreviewTests.cs
+@@ -0,0 +1,22 @@
++using System.Net;
++using System.Threading.Tasks;
++using CampusFlow.FinancialAid;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.AspNetCore.Authorization;
++using Microsoft.Extensions.DependencyInjection;
++using Xunit;
++namespace CampusFlow.Pages;
++public class FinancialAidAdminPreviewTests:CampusFlowWebTestBase
++{
++    [Fact]public async Task Sessions_without_the_award_permission_cannot_open_administrative_preview()
++    {
++        var response=await Client.GetAsync("/Admin/FinancialAid/ReconcileAwardCodes");
++        Assert.Equal(HttpStatusCode.Forbidden,response.StatusCode);
++    }
++    [Fact]public async Task Restored_service_resolves_with_registered_permission_and_read_only_adapter()
++    {
++        Assert.NotNull(GetRequiredService<IReconcileAwardCodesAppService>());
++        Assert.False(GetRequiredService<IStudentInformationSystemAwardCodeMaintenance>().CanWrite);
++        Assert.NotNull(await GetRequiredService<IAuthorizationPolicyProvider>().GetPolicyAsync(CampusFlow.Permissions.CampusFlowPermissions.Admin.ReconcileAwardCodes));
++    }
++}

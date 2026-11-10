@@ -1,0 +1,59 @@
+{
+  "unit": "CF-023",
+  "verifiedAtUtc": "2026-11-10T02:46:48.130616+00:00",
+  "tests": {
+    "application": 68,
+    "entityframeworkcore": 252,
+    "web": 292
+  },
+  "testTotal": 612,
+  "browserScenarios": 6,
+  "releasePublishSucceeded": true,
+  "productionReadOnly": "CF-023-production-readonly.json",
+  "savedDraftFinalSnapshot": "CF-023-production-final-snapshot.json",
+  "draftBackupVerification": "CF-023-draft-backup-verification.json",
+  "savedAssignments": 113,
+  "uniqueStudents": 113,
+  "savedAssignmentsUnchanged": true,
+  "savedDraftSnapshotSha256": "aadce5f7df6ec49a1a1302bab047112aa16f4a265e93537b1bb1967f9ffe900a",
+  "allStudentReadOnlyPreflight": {
+    "stage": "all-student-preflight",
+    "studentsChecked": 113,
+    "verified": 113,
+    "conflicts": 0,
+    "failures": [],
+    "elapsedSeconds": 81.2238427
+  },
+  "combinedPatchChecks": "CF-023-combined-patch-checks.json",
+  "existingAssignmentSamples": [
+    {
+      "period": 1,
+      "commuter": false,
+      "apiStillReportsAnAssignment": true,
+      "matchesReplicaRoom": true
+    },
+    {
+      "period": 1,
+      "commuter": true,
+      "apiStillReportsAnAssignment": true,
+      "matchesReplicaRoom": false
+    }
+  ],
+  "existingCommuterApiReplicaRoomDiscrepancy": "Existing Fall commuter API room differs from replica; still treated as assigned/conflicting. Not silently considered empty.",
+  "liveWrites": false,
+  "actualHousingApplyPerformed": false,
+  "actualMealAssignmentOrRemovalPerformed": false,
+  "settingsChanged": false,
+  "permissionsChanged": false,
+  "schemaMigrationRequired": false,
+  "CF020HeldSourceUnchanged": true,
+  "limitations": [
+    "Read-only production validation is not a completed write/readback acceptance test.",
+    "Nonprod Spring 2027 meal catalog is empty; catalog setup remains outside this code change.",
+    "Selected-term meal-plan alias correction remains held CF-020.",
+    "Existing Spring test students inspected had no meal assignment; no removal control is expected for an absent assignment.",
+    "Combined CF-022/023 patches apply cleanly to both release bases; combined runtime release checks remain before deployment."
+  ],
+  "committed": false,
+  "deployed": false
+}

@@ -1,0 +1,126 @@
+{
+  "unit": "CF-027",
+  "scope": "Updated item 10: separate 8.25% meal-plan sales-tax debit during writable, unapproved Spring 2027+ bill review; per-assignment durable attempt and exact-reference readback before bill totals; no historical approved-bill repair.",
+  "branch": "codex/cf-027-meal-plan-sales-tax",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf027-meal-plan-sales-tax/CampusFlow",
+  "sourceBase": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+  "commit": "ca9dab02a39e7a1ee53eb9d283b20df700255fb6",
+  "pushed": true,
+  "state": "committed-deployed-nonprod-and-production-awaiting-staff-acceptance",
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "deploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+    "completedAtUtc": "2026-11-10T05:24:36.3649737Z",
+    "verifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+    "verification": "CF-020-022-027-nonprod-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "completedAtUtc": "2026-11-10T05:33:22.5521364Z",
+    "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+    "verification": "CF-020-022-027-production-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "newTaxTests": 47,
+  "schemaMigrationRequired": true,
+  "migrationId": "20261110041612_AddMealPlanTaxCharges",
+  "migrationSql": "CF-027-migration.sql",
+  "migrationApplied": true,
+  "migrationScope": "Create AppMealPlanTaxCharges and one unique tenant/assignment index, plus EF migration history; no existing-table/data changes.",
+  "taxRate": 0.0825,
+  "taxBasis": "Live assigned plan catalog base amount; selected term and assignment identity confirmed through Elements and matching replica.",
+  "rounding": "Two decimals, MidpointRounding.AwayFromZero",
+  "cutoff": "TermCalendar.Term sequence at Spring 2027 or later",
+  "taxDocumentReadOnlyVerified": {
+    "nonprod": {
+      "id": 261,
+      "code": "TAX",
+      "description": "Texas State Sales Tax"
+    },
+    "production": {
+      "id": 261,
+      "code": "TAX",
+      "description": "Texas State Sales Tax"
+    }
+  },
+  "requiredDeploymentSetup": [],
+  "settingNames": [
+    "MealPlanTax:Enabled",
+    "MealPlanTax:EnableNonProductionWrites",
+    "MealPlanTax:EnableProductionWrites",
+    "MealPlanTax:BatchMasterId",
+    "MealPlanTax:TransactionDocumentId"
+  ],
+  "billingBehavior": [
+    "Runs after successful recalculation and before reading the bill; direct approval/payment reloads enforce confirmation.",
+    "Approved and read-only impersonated views do not create tax charges.",
+    "One durable attempt and reference per Elements meal-plan assignment; no automatic resend after an unknown write.",
+    "Live/API and replica confirmation are required before approval can continue.",
+    "Existing posted/unrecognized tax is preserved; conflicting/manual tax requires Billing review.",
+    "Removing a meal-plan assignment does not automatically reverse its base or tax charge; the staff notice says so.",
+    "No existing charge is updated/deleted by the new gateway."
+  ],
+  "liveTaxPostPerformed": true,
+  "studentDataChanged": true,
+  "settingsChanged": true,
+  "messagesSent": false,
+  "runtimeDependenciesChanged": false,
+  "permissionsChanged": false,
+  "migrationSqlSha256": "452bdad4dbe58c931a92a596beecba752499aac8cff08155acca07d9942cc33d",
+  "sourceFiles": {
+    "src/CampusFlow.Application/MealPlanTaxes/MealPlanTaxCoordinator.cs": "7abc7ce581a72ce1292cbc9769a7f67300381e119d30e3f72763e033d8f0e12f",
+    "src/CampusFlow.Domain/MealPlanTaxes/MealPlanTaxCharge.cs": "c180b122cdac64cd0c9ff3c7a6cdfa52a252cfffcbda24e2cdef497299963d68",
+    "src/CampusFlow.Domain/MealPlanTaxes/MealPlanTaxContracts.cs": "a5ca30cd40dd5f1534d52561c7cb05e1ce479e4d86552c44ecf505d69f846b51",
+    "src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowDbContext.cs": "209d35c4f3fb58c0810a7f98decc1d564be343521dae92eb29492351109be581",
+    "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/ElementsMealPlanTaxGateway.cs": "5b2352b5bea91ba8e1ee3cc3a260c5e5286b3e4d0a5ec9fa7521cee454093ae7",
+    "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/ElementsMealPlanTaxReadModel.cs": "5c91c6cf7027538bbeb441031a09ea4ff5665158e5616daa00732720cca0c955",
+    "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/MealPlanTaxChargeStore.cs": "2dfef44df617708d008454c6eb63f093a4b43a5de80d8b1fefafb9ed9798e351",
+    "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/MealPlanTaxEnvironment.cs": "0d0a177aa1d7a90995a18892ae2bef9eca34fc5f80186c7512c6165501473df9",
+    "src/CampusFlow.EntityFrameworkCore/Migrations/20261110041612_AddMealPlanTaxCharges.Designer.cs": "b7b6d3a531e1c694fbbf108f24e95c4a1067372596544e5f83d3bd4e39bc701f",
+    "src/CampusFlow.EntityFrameworkCore/Migrations/20261110041612_AddMealPlanTaxCharges.cs": "974d313017556d47c7ddbee8596064cd448a3263bdd594faa3f4da616168723f",
+    "src/CampusFlow.EntityFrameworkCore/Migrations/CampusFlowDbContextModelSnapshot.cs": "75e3a8d1885ab6a2c30a5f365a5bd9426d2d80db56e4d170f1b26e3b4fe05e4a",
+    "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs": "e4b561116520d3dcd6049b8b635a9ce2839ceee82c514f8a3ab30c29f47444f6",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml.cs": "63cc162a05dbcb70249a82e7d2511a4b3055462a0f3bc779286750b802aa119f",
+    "test/CampusFlow.Application.Tests/MealPlanTaxes/MealPlanTaxCoordinatorTests.cs": "a0ca52ec74701da1dd2e7b641b09717c8172ab8d8d5425e22809023ebbe12f7d",
+    "test/CampusFlow.Domain.Tests/MealPlanTaxes/MealPlanTaxRulesTests.cs": "b43db47511398ea9ef1ddd0fec202806c1283671ccd6a7a4f5dae1375e187384",
+    "test/CampusFlow.EntityFrameworkCore.Tests/MealPlanTaxes/MealPlanTaxChargeStoreTests.cs": "c3078329dc210174ff075f6a3275dc5404540d77ba49223f416f48a20a7096a9",
+    "test/CampusFlow.EntityFrameworkCore.Tests/MealPlanTaxes/MealPlanTaxGatewayTests.cs": "d0d1bda187ebb8c813481f34afadd71f791c64a02b065b5a3343a6c878d934a9",
+    "test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs": "6f04df59d1f9e0a19f0002d2bd49655418fc8f1930b6ad18e524256b32fd9941",
+    "test/CampusFlow.Web.Tests/BillApprovals/MealPlanTaxDependencyTests.cs": "a29fb1529423978f75f36d50c5b6b99e0252c9462b99161a28ac2eab35296e04"
+  },
+  "sourcePatch": "CF-027.patch",
+  "sourcePatchSha256": "4bf595232e7f5bd4f200bc051d6ddb9831a6348d87ab4d23887f97963cb116ac",
+  "updatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "combinedBatchVerification": "CF-020-022-027-batch-verification.json",
+  "combinedBuilds": {
+    "production": {
+      "testTotal": 1017,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    },
+    "nonprod": {
+      "testTotal": 1011,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    }
+  },
+  "notes": "CF-027-notes.md",
+  "liveTaxPostEnvironment": "nonprod synthetic test only; test charges removed",
+  "studentDataChangeScope": "Synthetic nonprod assignment/base charge/tax charge created and removed; all baseline charges preserved.",
+  "nonprodWriteCanary": "CF-027-nonprod-tax-canary.json",
+  "nonprodSetup": "CF-020-027-nonprod-test-setup.json",
+  "productionTaxEnabled": true,
+  "nonprodTaxEnabled": true,
+  "actualPostgresAuditStoreVerified": true,
+  "nonprodRuntimeCanary": "CF-027-nonprod-runtime-tax-canary.json",
+  "productionTaxPostManuallyPerformed": false,
+  "remainingAcceptance": [
+    "First legitimate signed-in production bill review with a paid meal plan; no production test approval/charge was fabricated."
+  ]
+}

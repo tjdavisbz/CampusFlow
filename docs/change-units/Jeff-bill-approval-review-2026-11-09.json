@@ -1,0 +1,445 @@
+{
+  "reviewedAtUtc": "2026-11-10T01:03:10.036845+00:00",
+  "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-4.pdf",
+  "sourceSha256": "0f793de652650b00ee9f35e8c4e864c5f9d6d386448171f9b785c2383f154da9",
+  "pageCount": 23,
+  "numberingNote": "19 populated outstanding items; item 20 blank. Pending-loan/menu/contact are now items 2/3/4 (formerly 3/4/5); the old commuter setup question is replaced by a concrete housing Apply report at item 5. Review/resolved sections use their own numbering.",
+  "repositoryAndDeploymentEvidence": {
+    "productionRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "nonprodRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "currentEnvironmentRegister": "environment-status.json",
+    "currentProductionVerification": "CF-020-022-027-production-deployment-verification.json",
+    "heldCF020": false
+  },
+  "outstanding": [
+    {
+      "item": 1,
+      "topic": "Cleared carryover and additional user-defined fields",
+      "state": "core-deployed-extension-needs-policy",
+      "changeUnits": [
+        "CF-018"
+      ],
+      "assessment": "Revision 2 is live in both portals: Spring 2027+ Cleared -> blank using valid same-student/same-term current or legacy approval and manual-exception protection, regardless of courses. Automation remains off. Earlier terms and the four other fields are not included. This repairs qualifying values; it does not change Elements automatic record-creation behavior.",
+      "nextStep": "Retest the deployed core. Scope older-term corrections and other-field carryover cleanup separately; do not clear legitimate historical/manual values.",
+      "pdfPages": [
+        1,
+        2
+      ],
+      "decision": "Which earliest term, or newly created old-term records only? Which approval history is reliable for those terms? For each other field, define one-time versus repeated cleanup and how legitimate staff values are protected."
+    },
+    {
+      "item": 2,
+      "topic": "Pending-loan notice",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-021"
+      ],
+      "assessment": "Selected-term unaccepted-loan notice is deployed in both portals; these loans remain excluded from bill totals.",
+      "nextStep": "Retest current deployed page; no duplicate feature build.",
+      "pdfPages": [
+        2
+      ],
+      "decision": null
+    },
+    {
+      "item": 3,
+      "topic": "Keep Student/Billing navigation open",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-021"
+      ],
+      "assessment": "The bill page uses the existing Billing menu context, keeping the Student/Billing navigation active.",
+      "nextStep": "Retest current deployed page.",
+      "pdfPages": [
+        2
+      ],
+      "decision": null
+    },
+    {
+      "item": 4,
+      "topic": "Housing tile ResLife contact",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-021"
+      ],
+      "assessment": "The requested reslife@nelson.edu message is deployed in both portals.",
+      "nextStep": "Retest current deployed page.",
+      "pdfPages": [
+        3
+      ],
+      "decision": null
+    },
+    {
+      "item": 5,
+      "topic": "Housing Apply error after saving 113 commuter assignments",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-006",
+        "CF-023"
+      ],
+      "assessment": "Production fix is live. All 113 saved Spring assignments and the private recovery copy remain unchanged; all 113 passed read-only preflight. The deployment did not Apply them to Elements.",
+      "nextStep": "Jeff should Apply the saved draft and verify assignments/charges in Elements. Do not Refresh or recreate the saved draft.",
+      "pdfPages": [
+        3,
+        4
+      ],
+      "decision": null
+    },
+    {
+      "item": 6,
+      "topic": "Missing admin Financial Aid menu",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-025"
+      ],
+      "assessment": "Admin > Financial Aid > Reconcile Award Codes is live, with Preview and confirmed Apply. The safe adapter preserves protected award fields and verifies the result. Apply capability is enabled in both; production access is granted to existing administrators only.",
+      "nextStep": "Retest with an authorized administrator. Additional staff access remains an explicit access-management decision; no individual grants were copied from nonprod.",
+      "pdfPages": [
+        4
+      ],
+      "decision": null
+    },
+    {
+      "item": 7,
+      "topic": "Meal-plan tile unavailable",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-001",
+        "CF-015",
+        "CF-020"
+      ],
+      "assessment": "CF-020 alias/term matching and availability guidance are live. Eight Spring nonprod test entries are configured; real nonprod Spring assignment/removal passed. Production catalog was preserved.",
+      "nextStep": "Retest student selection after actual eligible housing is assigned and selected-term bill approval is open/test-enabled.",
+      "pdfPages": [
+        4,
+        5
+      ],
+      "decision": null
+    },
+    {
+      "item": 8,
+      "topic": "Cost-type Unmapped, term cutoff and automatic updates",
+      "state": "deployed-with-policy-or-vendor-question",
+      "changeUnits": [
+        "CF-005",
+        "CF-008",
+        "CF-017",
+        "CF-026"
+      ],
+      "assessment": "Cost-type automation is working in production. Its first resumed automatic cycle completed with no changes needed; saved rules and enabled preference are unchanged. Nonprod automation remains off. Unmapped records are unchanged; the cutoff still uses term end dates.",
+      "nextStep": "Confirm separately whether Fall 2026 or authorized terms should be frozen; no new freeze policy was introduced.",
+      "pdfPages": [
+        5
+      ],
+      "decision": "Should Fall 2026 or authorized terms be frozen despite their end date? This is a policy change, not current behavior."
+    },
+    {
+      "item": 9,
+      "topic": "Housing batch reconciliation and missing-charge repair",
+      "state": "answer-with-optional-new-repair",
+      "changeUnits": [
+        "CF-006"
+      ],
+      "assessment": "Apply reconciles recognized unposted housing charges for changed assignments; it does not rebuild the entire batch or automatically audit unchanged assignments for missing charges. Refresh reads assignments; it does not recreate billing.",
+      "nextStep": "Explain existing behavior. A previewable missing-charge audit/repair would be separate scoped work.",
+      "pdfPages": [
+        5,
+        6
+      ],
+      "decision": null
+    },
+    {
+      "item": 10,
+      "topic": "Meal-plan sales tax",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-027"
+      ],
+      "assessment": "Separate 8.25% meal-plan tax is enabled in both environments for writable unapproved Spring 2027+ reviews. Each uses its own dedicated batch and verified TAX document. Real nonprod posting, PostgreSQL audit persistence and lost-response deduplication passed; test assignment/charges were removed.",
+      "nextStep": "Retest a legitimate signed-in bill review. No historical approved bill or production test charge was fabricated; meal removal still needs staff review of existing charges/tax.",
+      "pdfPages": [
+        6
+      ],
+      "decision": null
+    },
+    {
+      "item": 11,
+      "topic": "Rent Per Person versus Housing description",
+      "state": "answer-available",
+      "changeUnits": [
+        "CF-006"
+      ],
+      "assessment": "CampusFlow-generated base lines use Housing — [building] ([fee]); intentional-single charges are separate. The screenshot describes a manually added Elements Rent Per Person charge, whose description is passed through to bill review.",
+      "nextStep": "Explain the difference; check Elements billing configuration before promising an Elements-side label change.",
+      "pdfPages": [
+        6
+      ],
+      "decision": null
+    },
+    {
+      "item": 12,
+      "topic": "Housing dorm dropdown",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-024"
+      ],
+      "assessment": "Dorm dropdown is live and combines with text filtering; saves retain the full draft, including hidden dorms.",
+      "nextStep": "Jeff to retest dorm filtering and full-draft Save/Apply.",
+      "pdfPages": [
+        6
+      ],
+      "decision": null
+    },
+    {
+      "item": 13,
+      "topic": "Final approval button wording",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-024"
+      ],
+      "assessment": "Final approval button wording and mobile wrapping are live.",
+      "nextStep": "Jeff to review wording and mobile display.",
+      "pdfPages": [
+        6,
+        7
+      ],
+      "decision": null
+    },
+    {
+      "item": 14,
+      "topic": "Completion congratulations, retry details and bookstore course prefill",
+      "state": "deployed-with-policy-or-vendor-question",
+      "changeUnits": [
+        "CF-004",
+        "CF-024"
+      ],
+      "assessment": "Completion congratulations, legacy Judah image, simpler status refresh and textbook link wording are live. Verified clearance and pending completion are distinguished. Bookstore query parameters match legacy behavior.",
+      "nextStep": "Bookstore/vendor must confirm active term and expected course/offering identifiers for catalog prefill.",
+      "pdfPages": [
+        7,
+        8
+      ],
+      "decision": null
+    },
+    {
+      "item": 15,
+      "topic": "Approved PDF refund-date formatting",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-004",
+        "CF-024"
+      ],
+      "assessment": "Refund date/percentage rows are preserved in newly generated approved PDFs; the rendered sample was inspected. Existing signed PDFs are preserved.",
+      "nextStep": "Jeff to inspect a newly generated PDF; historical signed artifacts were not regenerated.",
+      "pdfPages": [
+        8,
+        9
+      ],
+      "decision": null
+    },
+    {
+      "item": 16,
+      "topic": "Bookstore legal name and voucher amount",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-004",
+        "CF-024"
+      ],
+      "assessment": "Bookstore notifications use legal first/last names and the confirmed legacy allowance rule: the larger of $500 or available credit balance at initial approval. Only actual purchases are charged; the allowance is not cash.",
+      "nextStep": "Retest the next legitimate notification; no production email or bill approval was fabricated by this deployment.",
+      "pdfPages": [
+        9,
+        10
+      ],
+      "decision": null
+    },
+    {
+      "item": 17,
+      "topic": "Dashboard bill-approved wording",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-024"
+      ],
+      "assessment": "Dashboard wording distinguishes bill acceptance from pending clearance/completion and verified completion.",
+      "nextStep": "Jeff to retest approved and pending completion states.",
+      "pdfPages": [
+        10
+      ],
+      "decision": null
+    },
+    {
+      "item": 18,
+      "topic": "Reset approval confirmation checkbox rejected",
+      "state": "deployed-awaiting-staff-retest",
+      "changeUnits": [
+        "CF-022"
+      ],
+      "assessment": "Reset confirmation fix is live. Checked/unchecked browser form cases passed and the existing server confirmation/access checks remain.",
+      "nextStep": "An authorized administrator should retest a deliberate reset; no real student bill was reset by the deployment.",
+      "pdfPages": [
+        10,
+        11
+      ],
+      "decision": null
+    },
+    {
+      "item": 19,
+      "topic": "New-student activation and change password",
+      "state": "separate-identity-security-work",
+      "changeUnits": [],
+      "assessment": "CampusFlow uses Microsoft Entra sign-in and account linking; no dedicated institutional new-student activation flow was found in the current portal account pages. Creating a separate portal password system would conflict with the current identity design.",
+      "nextStep": "Coordinate institutional account provisioning, recovery/activation verification and Microsoft password-reset/change ownership with IT; determine portal links/pages versus backend account provisioning.",
+      "pdfPages": [
+        11
+      ],
+      "decision": "Who owns initial Microsoft account creation and identity verification, and which approved activation/SSPR/change-password process should the portal expose?"
+    }
+  ],
+  "needsReview": [
+    {
+      "item": "R1",
+      "topic": "Admin meal-plan addition/removal",
+      "state": "CF023-form-fix-verified-catalog-and-staff-acceptance-remain",
+      "units": [
+        "CF-006",
+        "CF-015",
+        "CF-023"
+      ],
+      "assessment": "Fixed unrelated required Query field blocking valid assignment and added visible validation summary. Removal flag and authorized context permission are on. Reported NP students have zero assignments and Spring catalog is empty, so removal/catalog controls cannot be verified with those records. No live assignment/remove action performed."
+    },
+    {
+      "item": "R2",
+      "topic": "Housing assignment/charge sync and separate single surcharge",
+      "state": "CF023-housing-preflight-fixed-write-acceptance-pending",
+      "units": [
+        "CF-006",
+        "CF-023"
+      ],
+      "assessment": "Saved 113-assignment Spring production draft preserved and backed up. Full read-only repaired preflight passes, plus 113-student success/partial-failure tests. Separate surcharge design retained. Actual Elements apply/charge write acceptance remains."
+    },
+    {
+      "item": "R3",
+      "topic": "Meal-plan eligibility",
+      "state": "implemented-needs-specific-account-retest",
+      "units": [
+        "CF-001",
+        "CF-015"
+      ],
+      "assessment": "Existing code implements residential/Oaks/assigned-housing eligibility with AIC exclusion. Recheck the actual selected term and student status rather than declaring every reported tile result fixed."
+    },
+    {
+      "item": "R4",
+      "topic": "Residential versus commuter plan choices",
+      "state": "CF020-unheld-prepared-setup-and-retest-remain",
+      "units": [
+        "CF-001",
+        "CF-020"
+      ],
+      "assessment": "Catalog/term alias changes are now included at TJ request. Nonprod Spring catalog setup and actual room/plan selection acceptance remain; no student was assigned a plan by this work."
+    },
+    {
+      "item": "R5",
+      "topic": "Meal-plan prices and tax breakdown",
+      "state": "display-prices-confirmed-CF027-tax-prepared",
+      "units": [
+        "CF-001",
+        "CF-027"
+      ],
+      "assessment": "Seven tax calculations match documented base/tax/total figures. Separate tax posting code prepared; no live posting verified yet."
+    }
+  ],
+  "proposedGroups": [
+    {
+      "name": "Operational blockers first",
+      "items": [
+        5,
+        7,
+        18
+      ],
+      "reviewItems": [
+        "R1",
+        "R2",
+        "R4"
+      ],
+      "scope": "Investigate saved housing draft/partial apply and meal assignment/removal; reproduce reset confirmation failure. Keep housing billing and bill-reset source independently releasable.",
+      "newUnitAssigned": true,
+      "changeUnits": [
+        "CF-022",
+        "CF-023"
+      ],
+      "remaining": "Deploy/write acceptance; item 7 and review R4 catalog alias change remain held CF-020, with nonprod Spring catalog setup pending."
+    },
+    {
+      "name": "Student finish, document and notification experience",
+      "items": [
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "scope": "Dorm selector can remain a small independent housing UI change. Group bill button/success/dashboard/PDF/legal-name work; keep voucher amount and bookstore matching gated by business/vendor decisions.",
+      "newUnitAssigned": false
+    },
+    {
+      "name": "Admin Financial Aid integration",
+      "items": [
+        6
+      ],
+      "scope": "Review the existing separate award-reconciliation release and narrowly integrate needed menu/page/schema/permission dependencies.",
+      "newUnitAssigned": false
+    },
+    {
+      "name": "Clearance policy expansion",
+      "items": [
+        1
+      ],
+      "scope": "Earlier terms and other UDef fields require explicit scope and protections; preserve deployed CF-018 policy until decided.",
+      "newUnitAssigned": false
+    },
+    {
+      "name": "Identity onboarding",
+      "items": [
+        19
+      ],
+      "scope": "Separate account security/IT workflow from billing releases.",
+      "newUnitAssigned": false
+    }
+  ],
+  "staffReportedEvidence": [
+    {
+      "topic": "Bookstore email",
+      "observation": "PDF includes a received StudentBilling bookstore email screenshot; staff receipt reported, provider/managed-identity operation not independently audited in this review."
+    },
+    {
+      "topic": "Approved bill document tracking",
+      "observation": "Jeff reports the PDF was present in billing document tracking; formatting complaint is new acceptance feedback."
+    }
+  ],
+  "resolvedSection": "Retained as historical/resolved unless a specific fresh counterexample is reported; no repeat distribution-date repair or duplicate deployment requested from document text.",
+  "permissionsAndScope": {
+    "documentIsEvidenceNotAuthorization": true,
+    "applicationCodeChanged": false,
+    "liveEnvironmentAccessedThisReview": false,
+    "studentDataChanged": false,
+    "settingsChanged": false,
+    "messagesSent": false,
+    "deployed": false,
+    "CF020HoldUnchanged": false,
+    "implementationFollowUp": "Local code and authorized nonprod canaries completed; production remains read-only. Historical document-review-only fields describe initial review."
+  },
+  "implementationFollowUpAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "preparedBatch": "CF-020-022-027-batch-verification.json",
+  "codingReadiness": {
+    "approvedScopeImplemented": true,
+    "combinedVerificationComplete": true,
+    "realNonprodAwardAndTaxCanariesPassed": true,
+    "deployed": true,
+    "feedbackForUnresolvedScopePrepared": true,
+    "remainingCodingWithoutMorePolicyOrVendorInput": [],
+    "evidence": "CF-020-022-027-batch-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "googleDocUpdatedExternally": false
+}

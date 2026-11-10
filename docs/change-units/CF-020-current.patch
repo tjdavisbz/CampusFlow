@@ -1,0 +1,614 @@
+diff --git a/src/CampusFlow.Application.Contracts/Housing/IHousingWorkspaceAppService.cs b/src/CampusFlow.Application.Contracts/Housing/IHousingWorkspaceAppService.cs
+index 0a23188..137280d 100644
+--- a/src/CampusFlow.Application.Contracts/Housing/IHousingWorkspaceAppService.cs
++++ b/src/CampusFlow.Application.Contracts/Housing/IHousingWorkspaceAppService.cs
+@@ -7,6 +7,7 @@ namespace CampusFlow.Housing;
+ public interface IHousingWorkspaceAppService : IApplicationService
+ {
+     Task<List<HousingPeriodOption>> GetPeriodsAsync();
++    Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId);
+     Task<HousingWorkspaceState?> GetAsync(int periodId);
+     Task<HousingWorkspaceState> RefreshAsync(int periodId, string? revision);
+     Task<HousingWorkspaceState> SaveAsync(HousingWorkspaceState input);
+diff --git a/src/CampusFlow.Application.Contracts/Housing/MealPlanDtos.cs b/src/CampusFlow.Application.Contracts/Housing/MealPlanDtos.cs
+index 951f105..0855753 100644
+--- a/src/CampusFlow.Application.Contracts/Housing/MealPlanDtos.cs
++++ b/src/CampusFlow.Application.Contracts/Housing/MealPlanDtos.cs
+@@ -20,6 +20,7 @@ public sealed class MealPlanSelectionDto
+     public bool MealPlanEligible { get; set; }
+     public HousingChoice AssignedHousingChoice { get; set; }
+     public bool IsSelectionOpen { get; set; }
++    public string? UnavailableReason { get; set; }
+     public bool IsLockedByBillApproval { get; set; }
+     public string StudentName { get; set; } = null!;
+     public string StudentId { get; set; } = null!;
+diff --git a/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs b/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs
+index ac6d919..144a64c 100644
+--- a/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs
++++ b/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs
+@@ -41,7 +41,8 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
+         var student = await _students.FindByExternalStudentIdAsync(externalStudentId)
+             ?? throw new UserFriendlyException("That student could not be found.");
+         var context = await _mealPlans.GetContextAsync(externalStudentId, termCalendarId);
+-        var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId);
++        var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId)
++            ?? throw new UserFriendlyException("Choose an available term before managing meal-plan assignments.");
+         return new AdminMealPlanContextDto
+         {
+             CanRemove=_removal.IsEnabled,
+@@ -62,7 +63,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
+                 Name = x.Name
+             }).ToList(),
+             Options = context.Catalog
+-                .Where(x => selectedTerm is null || (x.StartDate <= selectedTerm.EndDate && x.EndDate >= selectedTerm.StartDate))
++                .Where(x => x.StartDate <= selectedTerm.EndDate && x.EndDate >= selectedTerm.StartDate)
+                 .OrderByDescending(x => x.StartDate)
+                 .ThenBy(x => x.Name)
+                 .Select(x => new AdminMealPlanOptionDto
+diff --git a/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs b/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs
+index 7529d5d..a9f6893 100644
+--- a/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs
++++ b/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs
+@@ -37,6 +37,13 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
+         _unitOfWorkManager = unitOfWorkManager;
+         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
+     }
++    public async Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId)
++    {
++        Tenant();
++        if (periodId <= 0) throw new UserFriendlyException("Choose a housing period.");
++        try { return await _elements.GetPeriodSetupAsync(periodId); }
++        catch (InvalidOperationException exception) { throw new UserFriendlyException(exception.Message); }
++    }
+     private Guid Tenant() => CurrentTenant.Id ?? throw new UserFriendlyException("Select a university before managing housing.");
+     private async Task<HousingAssignmentDraft?> Find(int periodId)
+     {
+diff --git a/src/CampusFlow.Application/Housing/MealPlanAppService.cs b/src/CampusFlow.Application/Housing/MealPlanAppService.cs
+index 1331ce0..7b32caa 100644
+--- a/src/CampusFlow.Application/Housing/MealPlanAppService.cs
++++ b/src/CampusFlow.Application/Housing/MealPlanAppService.cs
+@@ -65,9 +65,6 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
+         var selectionTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == termId)
+             ?? throw new UserFriendlyException("The meal plan term is unavailable.");
+         var configs = await _configurations.GetListAsync(x => x.IsActive);
+-        var catalogByName = context.Catalog.Where(x => x.StartDate <= selectionTerm.EndDate && x.EndDate >= selectionTerm.StartDate)
+-            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+-            .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.StartDate).First(), StringComparer.OrdinalIgnoreCase);
+ 
+         var result = new MealPlanSelectionDto
+         {
+@@ -103,7 +100,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
+                 .OrderBy(x => x.SortOrder)
+                 .Select(x =>
+                 {
+-                    catalogByName.TryGetValue(x.ExternalMealPlanName, out var external);
++                    var external = x.IsNoPlanOption ? null : MealPlanCatalogRules.Resolve(x, context.Catalog, selectionTerm);
+                     if (!x.IsNoPlanOption && external is null) return null;
+                     return new MealPlanOptionDto
+                     {
+@@ -118,6 +115,20 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
+                 .Cast<MealPlanOptionDto>()
+                 .ToList();
+         }
++        result.UnavailableReason = result.IsLockedByBillApproval
++            ? "Your bill is approved for this term. Contact Student Billing to request changes."
++            : !result.MealPlanEligible
++            ? (eligibility.IsAmericanIndianCollege ? "Your housing includes your meal plan; a separate selection is not required."
++                : "A separate meal plan is not available for your student record.")
++            : !result.HasHousingAssignment
++            ? "A housing assignment is required before choosing a meal plan. Contact Residence Life."
++            : !result.IsSelectionOpen
++            ? (term.Availability(_clock.Now, profile.StudentId) == "closed"
++                ? "The meal-plan selection window for this term has closed. Contact Student Billing."
++                : "Meal plan selection opens with bill approval for this term. Contact Student Billing if you need access.")
++            : !result.Options.Values.Any(x => x.Count > 0)
++            ? "Meal plans are not yet available for your assigned housing in this term. Contact Student Billing."
++            : null;
+         return result;
+     }
+ 
+@@ -131,7 +142,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
+         if (view.IsLockedByBillApproval)
+             throw new UserFriendlyException("Your bill is approved for this term. Contact Student Billing to request changes.");
+         if (!view.IsSelectionOpen || !view.MealPlanEligible || !view.HasHousingAssignment)
+-            throw new UserFriendlyException("Meal plan selection is not available for your student record and term.");
++            throw new UserFriendlyException(view.UnavailableReason ?? "Meal plan selection is not available for your student record and term.");
+         if (input.HousingChoice != view.AssignedHousingChoice)
+             throw new UserFriendlyException("Your meal plan options must match your assigned housing.");
+         var option = view.Options[input.HousingChoice].SingleOrDefault(x => x.ExternalMealPlanId == input.ExternalMealPlanId);
+diff --git a/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs b/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs
+index 727598d..712fe9e 100644
+--- a/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs
++++ b/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs
+@@ -9,6 +9,15 @@ public class HousingPeriodOption
+     public string Name { get; set; } = "";
+ }
+ 
++public class HousingPeriodSetup
++{
++    public int PeriodId { get; set; }
++    public string PeriodName { get; set; } = "";
++    public int MasterCommuterRoomCount { get; set; }
++    public int PeriodCommuterRoomCount { get; set; }
++    public List<string> MissingCommuterRooms { get; set; } = [];
++}
++
+ public class HousingStudentOption
+ {
+     public int StudentUid { get; set; }
+diff --git a/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingReader.cs b/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingReader.cs
+index e088d43..5d968b7 100644
+--- a/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingReader.cs
++++ b/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingReader.cs
+@@ -8,6 +8,7 @@ namespace CampusFlow.StudentInformationSystems;
+ public interface IElementsHousingReader
+ {
+     Task<StudentHousingEligibility> GetStudentEligibilityAsync(int studentUid, int termCalendarId, CancellationToken cancellationToken = default);
++    Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId, CancellationToken cancellationToken = default);
+     Task<List<HousingPeriodOption>> GetPeriodsAsync(CancellationToken cancellationToken = default);
+     Task<List<HousingWorkspaceRoom>> GetRoomsAsync(int periodId, CancellationToken cancellationToken = default);
+     Task<HousingPricingContext> GetPricingAsync(int periodId, CancellationToken cancellationToken = default);
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingReader.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingReader.cs
+index 3fc8bf3..e188d3d 100644
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingReader.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingReader.cs
+@@ -53,6 +53,56 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
+         return result;
+     }
+ 
++    public async Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId,
++        CancellationToken cancellationToken = default)
++    {
++        if (periodId <= 0) throw new ArgumentOutOfRangeException(nameof(periodId));
++        await using var connection = Connection();
++        await connection.OpenAsync(cancellationToken);
++        await using var command = new SqlCommand("""
++            SELECT HousingPeriodName FROM StudentLife.HousingPeriods
++            WHERE HousingPeriodID=@PeriodId AND IsDeleted=0;
++
++            SELECT p.PropertyName, r.RoomName,
++                CASE WHEN EXISTS (
++                    SELECT 1 FROM StudentLife.HousingPeriodProperties hp
++                    JOIN StudentLife.HousingPeriodRooms hr
++                        ON hr.HousingPeriodPropertyID=hp.HousingPeriodPropertyID
++                        AND hr.HousingPeriodID=hp.HousingPeriodID AND hr.IsDeleted=0
++                    WHERE hp.HousingPeriodID=@PeriodId AND hp.IsDeleted=0
++                        AND hp.OriginalPropertyID=p.PropertyID AND hr.OriginalRoomID=r.RoomID
++                ) THEN 1 ELSE 0 END AS InPeriod
++            FROM StudentLife.Properties p
++            JOIN StudentLife.Rooms r ON r.PropertyID=p.PropertyID
++            WHERE p.IsActive=1 AND r.IsActive=1
++                AND LTRIM(RTRIM(p.PropertyName)) IN ('Commuter','Commuter Dorm')
++            ORDER BY p.PropertyName, r.RoomName, r.RoomID;
++
++            SELECT COUNT(*) FROM StudentLife.HousingPeriodRooms r
++            JOIN StudentLife.HousingPeriodProperties p
++                ON p.HousingPeriodPropertyID=r.HousingPeriodPropertyID
++                AND p.HousingPeriodID=r.HousingPeriodID AND p.IsDeleted=0
++            WHERE r.HousingPeriodID=@PeriodId AND r.IsDeleted=0
++                AND LTRIM(RTRIM(p.PropertyName)) IN ('Commuter','Commuter Dorm');
++            """, connection) { CommandTimeout = 60 };
++        command.Parameters.Add("@PeriodId", SqlDbType.Int).Value = periodId;
++        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
++        if (!await reader.ReadAsync(cancellationToken))
++            throw new InvalidOperationException("The housing period is no longer available.");
++        var result = new HousingPeriodSetup { PeriodId=periodId, PeriodName=reader.GetString(0) };
++        await reader.NextResultAsync(cancellationToken);
++        while (await reader.ReadAsync(cancellationToken))
++        {
++            result.MasterCommuterRoomCount++;
++            if (reader.GetInt32(2)==0) result.MissingCommuterRooms.Add(reader.GetString(0)+" / "+reader.GetString(1));
++        }
++        await reader.NextResultAsync(cancellationToken);
++        if (!await reader.ReadAsync(cancellationToken))
++            throw new InvalidOperationException("The period room count could not be checked.");
++        result.PeriodCommuterRoomCount=reader.GetInt32(0);
++        return result;
++    }
++
+     public async Task<List<HousingPeriodOption>> GetPeriodsAsync(CancellationToken cancellationToken = default)
+     {
+         await using var connection = Connection();
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml
+index 4363852..bf421bf 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml
+@@ -27,12 +27,21 @@
+         }
+     </div>
+     <p id="housing-summary"></p>
++    <section id="housing-setup" class="alert alert-info" aria-live="polite" hidden>
++        <strong>Commuter room setup for this period</strong>
++        <p id="housing-setup-counts"></p>
++        <div id="housing-setup-missing" hidden>
++            <p>These rooms exist under Properties in Elements but are not included in this housing period:</p>
++            <ul id="housing-setup-rooms"></ul>
++            <p>Update the housing period’s property setup in Elements, then refresh CampusFlow. Refresh reads the period’s rooms; it does not add master rooms. Review existing assignments before reinitializing a housing period.</p>
++        </div>
++    </section>
+     <section id="housing-capacity-warning" class="housing-capacity-warning" role="alert" hidden>
+         <strong id="housing-capacity-title"></strong>
+         <p>These assignments came from Elements. You can review and save the draft, but New assignments cannot exceed capacity. An unrelated existing violation does not block fixing another room. Capacity edits must accommodate the occupants remaining in that room.</p>
+         <ul id="housing-capacity-list"></ul>
+     </section>
+-    <p>Elements supports 1–10 students per room. For larger commuter groups, set up multiple rooms under Commuter or Commuter Dorm in Elements, then refresh this period. Commuter rooms create no CampusFlow housing charge and do not use intentional-single rates.</p>
++    <p>Elements supports 1–10 students per room. For larger commuter groups, set up multiple rooms under Commuter or Commuter Dorm in Elements and include them in the selected housing period, then refresh this period. Commuter rooms create no CampusFlow housing charge and do not use intentional-single rates.</p>
+     <p>CampusFlow uses the amounts saved in <a href="~/Admin/Housing/Fees">Housing Fee Setup</a>, not the Elements room rate. Save a fee schedule for this term before applying assignments. Intentional-single charges appear as separate lines. Refreshed assignments start with the Standard rate choice.</p>
+     <div class="housing-toolbar">
+         <label>Filter assignments <input id="housing-filter" class="form-control" type="search" placeholder="Building, room, student, rate, or notes" /></label>
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs
+index 5171653..cd938c4 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs
+@@ -22,6 +22,7 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
+          string.IsNullOrWhiteSpace(configuration["App:EnvironmentLabel"]));
+     public void OnGet() { }
+     public async Task<JsonResult> OnGetPeriodsAsync() => new(await workspace.GetPeriodsAsync());
++    public async Task<JsonResult> OnGetSetupAsync(int periodId) => new(await workspace.GetPeriodSetupAsync(periodId));
+     public async Task<JsonResult> OnGetDraftAsync(int periodId) => new(await workspace.GetAsync(periodId));
+     public async Task<JsonResult> OnGetStudentsAsync(string query, int periodId) => new(await workspace.SearchStudentsAsync(query, periodId));
+     public async Task<JsonResult> OnGetPreviewAsync(int periodId) => new(await workspace.PreviewAsync(periodId));
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
+index 8bc80dd..486db44 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
+@@ -139,15 +139,31 @@
+         });
+         controls();
+     }
++    async function showSetup(periodId) {
++        el('setup').hidden = !periodId;
++        el('setup-missing').hidden = true;
++        el('setup-rooms').replaceChildren();
++        if (!periodId) return;
++        el('setup-counts').textContent = 'Checking commuter rooms…';
++        try {
++            const setup = await request('Setup', undefined, {periodId});
++            el('setup-counts').textContent = `${setup.periodName}: ${setup.periodCommuterRoomCount} commuter rooms in this period; ${setup.masterCommuterRoomCount} active commuter rooms under Properties in Elements.`;
++            const missing = setup.missingCommuterRooms || [];
++            el('setup-missing').hidden = !missing.length;
++            missing.forEach(name => { const item = document.createElement('li'); item.textContent = name; el('setup-rooms').append(item); });
++        } catch {
++            el('setup-counts').textContent = 'Commuter room setup could not be checked. Reload the period to try again. No assignments were changed.';
++        }
++    }
+     el('period').onchange = () => run(async () => {
+         if (dirty && !confirm('Discard unsaved edits and open the selected period?')) { el('period').value = loadedPeriod; return; }
+         const next = el('period').value;
+-        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); }
++        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next); }
+         catch (e) { el('period').value = loadedPeriod; throw e; }
+     });
+     el('refresh').onclick = () => run(async () => {
+         if (!confirm('Refresh from Elements will replace this CampusFlow draft. Any changes not applied—including saved draft assignments, rate choices, notes, and unsaved edits—will be lost. Rate choices and intentional-single flags from the last successful Apply will be kept. This action will not change Elements. Continue?')) return;
+-        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.');
++        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.'); await showSetup(el('period').value);
+     });
+     async function save() { state = await request('Save', state); dirty = false; render(); message('Draft saved in CampusFlow. Elements is unchanged.'); }
+     el('save').onclick = () => run(save);
+diff --git a/src/CampusFlow.Web/Pages/Housing.cshtml b/src/CampusFlow.Web/Pages/Housing.cshtml
+index f2bf89f..41b525a 100644
+--- a/src/CampusFlow.Web/Pages/Housing.cshtml
++++ b/src/CampusFlow.Web/Pages/Housing.cshtml
+@@ -47,7 +47,7 @@
+ 
+     @if (Model.IsUnavailable || Model.Selection is null)
+     {
+-        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Meal plan selection is unavailable</h2><p>@(Model.Selection is { IsLockedByBillApproval: true } ? "Your bill is approved for this term. Contact Student Billing to request changes." : Model.Selection is { MealPlanEligible: false, HousingRequired: true } ? "Your housing includes your meal plan; a separate selection is not required." : Model.Selection is { HasHousingAssignment: false, HousingRequired: true } ? "A housing assignment is required before you can select a meal plan or approve your bill. Contact Student Services." : "Meal plan selection is not currently open for your record and term.")</p></div></section>
++        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Meal plan selection is unavailable</h2><p>@(Model.Selection?.UnavailableReason ?? (Model.Selection is { IsLockedByBillApproval: true } ? "Your bill is approved for this term. Contact Student Billing to request changes." : Model.Selection is { MealPlanEligible: false, HousingRequired: true } ? "Your housing includes your meal plan; a separate selection is not required." : Model.Selection is { HasHousingAssignment: false, HousingRequired: true } ? "A housing assignment is required before you can select a meal plan or approve your bill. Contact Student Services." : "Meal plan selection is not currently open for your record and term."))</p></div></section>
+     }
+     else
+     {
+diff --git a/src/CampusFlow.Web/Pages/Index.cshtml.cs b/src/CampusFlow.Web/Pages/Index.cshtml.cs
+index e5642e1..538e311 100644
+--- a/src/CampusFlow.Web/Pages/Index.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/Index.cshtml.cs
+@@ -400,6 +400,7 @@ public class IndexModel : CampusFlowPageModel
+             journey.HousingRequired = mealPlan.HousingRequired;
+             journey.HasHousingAssignment = mealPlan.HasHousingAssignment;
+             journey.MealPlanEligible = mealPlan.MealPlanEligible;
++            journey.MealPlanUnavailableReason = mealPlan.UnavailableReason;
+             journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
+             journey.MealPlanRequired = journey.MealPlanEnabled;
+             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
+@@ -442,6 +443,7 @@ public class IndexModel : CampusFlowPageModel
+         public bool HousingRequired { get; set; }
+         public bool HasHousingAssignment { get; set; }
+         public bool MealPlanEligible { get; set; }
++        public string? MealPlanUnavailableReason { get; set; }
+         public bool MealPlanEnabled { get; set; }
+         public bool MealPlanRequired { get; set; }
+         public bool MealPlanSelected { get; set; }
+@@ -493,7 +495,9 @@ public class IndexModel : CampusFlowPageModel
+             Steps.Add(!HasHousingAssignment
+                 ? new("Meal plan", "A housing assignment is required before choosing a meal plan.", "disabled", null, "Housing required")
+                 : !BillApprovalEnabled || !MealPlanEnabled
+-                ? UnavailableBillStep("Meal plan")
++                ? MealPlanUnavailableReason is { Length: > 0 } reason
++                    ? new("Meal plan", reason, "disabled", null, "Unavailable")
++                    : UnavailableBillStep("Meal plan")
+                 : !MealPlanRequired
+                 ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", housingUrl, "View options")
+                 : MealPlanSelected
+diff --git a/test/CampusFlow.Application.Tests/Housing/AdminMealPlanAssignmentTests.cs b/test/CampusFlow.Application.Tests/Housing/AdminMealPlanAssignmentTests.cs
+index 31dbfca..c2c08e6 100644
+--- a/test/CampusFlow.Application.Tests/Housing/AdminMealPlanAssignmentTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/AdminMealPlanAssignmentTests.cs
+@@ -17,4 +17,14 @@ public class AdminMealPlanAssignmentTests
+     {var(a,p,r)=Setup();r.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(new[]{new StudentMealPlanAssignment(40,20,269,"Plan",100)});await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(Input()));await p.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);await p.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default,default);}
+     [Fact] public async Task An_unconfirmed_POST_is_not_automatically_retried()
+     {var(a,p,r)=Setup();r.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentMealPlanAssignment>());p.AssignAsync("123",20,Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Unknown result")));var e=await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(Input()));Assert.Contains("may already have succeeded",e.Message);await p.Received(1).AssignAsync("123",20,Arg.Any<CancellationToken>());}
++    [Fact] public async Task An_unknown_selected_term_cannot_expose_or_assign_other_terms_plans()
++    {
++        var(a,p,r)=Setup();var current=await p.GetContextAsync("123",269);
++        p.GetContextAsync("123",999,Arg.Any<CancellationToken>()).Returns(current with {SelectedTermCalendarId=999});
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>a.GetContextAsync("123",999));
++        var input=Input();input.TermCalendarId=999;
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(input));
++        await p.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default,default);
++        await p.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
++    }
+ }
+diff --git a/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs b/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
+index bddde0e..a912c9a 100644
+--- a/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
+@@ -46,6 +46,16 @@ public class HousingApplyTests
+         _writer=new(()=>HousingApplyProgress.Read(_draft));
+         _service=new(drafts,_rates,_reader,_writer,_billing,config,Substitute.For<IUnitOfWorkManager>(),[students]){LazyServiceProvider=lazy};
+     }
++    [Fact] public async Task Period_setup_is_read_only_and_does_not_require_or_change_a_draft()
++    {
++        var setup=new HousingPeriodSetup {PeriodId=2,PeriodName="Spring 2027",MasterCommuterRoomCount=20,PeriodCommuterRoomCount=1,MissingCommuterRooms=["Commuter / 2"]};
++        _reader.GetPeriodSetupAsync(2,Arg.Any<CancellationToken>()).Returns(setup);
++        var before=_draft.RoomsJson;
++        Assert.Same(setup,await _service.GetPeriodSetupAsync(2));
++        Assert.Equal(before,_draft.RoomsJson);
++        Assert.Empty(_billing.ReceivedCalls());
++        await _reader.DidNotReceiveWithAnyArgs().GetRoomsAsync(default,default);
++    }
+     private void Desired(Action<List<HousingWorkspaceRoom>> change)
+     {var rooms=JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.BaselineJson)!;change(rooms);_draft.Save(JsonSerializer.Serialize(rooms));}
+     private ApplyHousingDraftInput Input(bool fees=true)=>new(){PeriodId=1,Revision=_draft.ConcurrencyStamp,RateRevision=fees?_schedule.ConcurrencyStamp:"",Confirmed=true};
+diff --git a/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs b/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs
+index ae1c395..36f0c9b 100644
+--- a/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs
+@@ -141,4 +141,43 @@ public class MealPlanSelectionTests
+         await _sis.DidNotReceiveWithAnyArgs().GetContextAsync(default!, default);
+         await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default);
+     }
++    [Fact]
++    public async Task Actual_Spring_Elements_names_resolve_and_keep_commuter_choices_separate()
++    {
++        Eligibility("Graduate", "Teeter Hall");
++        var context = await _sis.GetContextAsync("10",270);
++        _sis.GetContextAsync("10",270,Arg.Any<CancellationToken>()).Returns(context with
++        {
++            Catalog = new[] {
++                new StudentMealPlanCatalogItem(9,"12 Meal Plan - Spr 27","Dining",2475,new(2027,1,1),new(2027,5,1)),
++                new StudentMealPlanCatalogItem(10,"20 Block Meal Plan - Spr 27","Dining",315,new(2027,1,1),new(2027,5,1)) }
++        });
++        var view=await _service.GetAsync("270");
++        Assert.Equal(9,Assert.Single(view.Options[HousingChoice.OnCampus]).ExternalMealPlanId);
++        Assert.Empty(view.Options[HousingChoice.Commuter]);
++        Assert.Null(view.UnavailableReason);
++    }
++    [Fact]
++    public async Task Missing_term_catalog_explains_the_setup_problem_and_does_not_offer_a_previous_term_plan()
++    {
++        Eligibility("Graduate", "Teeter Hall");
++        var context=await _sis.GetContextAsync("10",270);
++        _sis.GetContextAsync("10",270,Arg.Any<CancellationToken>()).Returns(context with {Catalog=Array.Empty<StudentMealPlanCatalogItem>()});
++        var view=await _service.GetAsync("270");
++        Assert.All(view.Options.Values,x=>Assert.Empty(x));
++        Assert.Contains("not yet available",view.UnavailableReason);
++        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!,default);
++    }
++    [Fact]
++    public async Task Closed_access_explains_that_the_selection_window_has_closed()
++    {
++        Eligibility("Graduate", "Teeter Hall");_clock.Now.Returns(new DateTime(2027,3,1));
++        Assert.Contains("window for this term has closed",(await _service.GetAsync("270")).UnavailableReason);
++    }
++    [Fact]
++    public async Task Future_access_explains_that_selection_uses_the_bill_approval_window()
++    {
++        Eligibility("Graduate", "Teeter Hall");_clock.Now.Returns(new DateTime(2026,10,1));
++        Assert.Contains("opens with bill approval",(await _service.GetAsync("270")).UnavailableReason);
++    }
+ }
+diff --git a/test/CampusFlow.Web.Tests/BillApprovals/HousingJourneyTests.cs b/test/CampusFlow.Web.Tests/BillApprovals/HousingJourneyTests.cs
+index 5dbf70c..2d8feb7 100644
+--- a/test/CampusFlow.Web.Tests/BillApprovals/HousingJourneyTests.cs
++++ b/test/CampusFlow.Web.Tests/BillApprovals/HousingJourneyTests.cs
+@@ -29,4 +29,16 @@ public class HousingJourneyTests
+         Assert.Equal(billBlocked, bill.Url is null);
+         if (housingRequired) Assert.Contains("term=270", journey.Steps.Single(x => x.Title == "Housing").Url);
+     }
++    [Theory]
++    [InlineData("Meal plans are not yet available for your assigned housing in this term.")]
++    [InlineData("Meal plan selection opens with bill approval for this term.")]
++    public void Meal_step_explains_its_own_blocker_without_unlocking_selection(string reason)
++    {
++        var journey=new IndexModel.RegistrationJourneyViewModel {
++            Term=new(StudentInformationSystemProvider.ThesisElements,"269","B27C","Spring 2027",new(2027,1,11),new(2027,4,30)),
++            HousingRequired=true,HasHousingAssignment=true,MealPlanEligible=true,BillApprovalEnabled=true,
++            MealPlanEnabled=false,MealPlanUnavailableReason=reason};
++        journey.BuildSteps();var step=journey.Steps.Single(x=>x.Title=="Meal plan");
++        Assert.Equal(reason,step.Description);Assert.Null(step.Url);
++    }
+ }
+diff --git a/src/CampusFlow.Domain/Housing/MealPlanCatalogRules.cs b/src/CampusFlow.Domain/Housing/MealPlanCatalogRules.cs
+new file mode 100644
+index 0000000..3345572
+--- /dev/null
++++ b/src/CampusFlow.Domain/Housing/MealPlanCatalogRules.cs
+@@ -0,0 +1,52 @@
++using System;
++using System.Collections.Generic;
++using System.Globalization;
++using System.Linq;
++using CampusFlow.StudentInformationSystems;
++
++namespace CampusFlow.Housing;
++
++public static class MealPlanCatalogRules
++{
++    // These are the reviewed Elements names for the existing portal choices.
++    // Match complete names, never numeric prefixes (12 is not 120) or partial text.
++    private static string[] Names(string name) => name.Trim().ToUpperInvariant() switch
++    {
++        "120 MEAL PLAN" => ["120 Meal Plan", "120 Block", "120 Block Meal Plan"],
++        "20 MEAL PLAN" => ["20 Meal Plan", "20 Block Meal Plan"],
++        "40 MEAL PLAN" => ["40 Meal Plan", "40 Block Meal Plan"],
++        "60 MEAL PLAN" => ["60 Meal Plan", "60 Block Meal Plan"],
++        "UNLIMITED MEAL PLAN" => ["Unlimited Meal Plan", "Unlimited Meals"],
++        _ => [name.Trim()]
++    };
++
++    public static StudentMealPlanCatalogItem? Resolve(MealPlanConfiguration configuration,
++        IEnumerable<StudentMealPlanCatalogItem> catalog, StudentMealPlanTerm term)
++    {
++        var names = Names(configuration.ExternalMealPlanName);
++        var matches = catalog.Where(x => x.StartDate <= term.EndDate && x.EndDate >= term.StartDate)
++            .Where(x => !configuration.ExternalMealPlanId.HasValue || x.MealPlanId == configuration.ExternalMealPlanId)
++            .Where(x => names.Contains(WithoutTermSuffix(x.Name, term), StringComparer.OrdinalIgnoreCase))
++            .ToArray();
++        // Multiple candidates require catalog review; never silently select a newer or cheaper plan.
++        return matches.Length == 1 ? matches[0] : null;
++    }
++
++    private static string WithoutTermSuffix(string name, StudentMealPlanTerm term)
++    {
++        name = name.Trim();
++        var parts = term.Name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
++        if (parts.Length != 2 || !int.TryParse(parts[1], out var year) || year != term.StartDate.Year)
++            return name;
++        var shortSeason = parts[0].ToUpperInvariant() switch
++        {
++            "SPRING" => "Spr", "SUMMER" => "Sum", "FALL" => "Fall", "WINTER" => "Win", _ => null
++        };
++        if (shortSeason is null) return name;
++        var shortYear = (year % 100).ToString("D2", CultureInfo.InvariantCulture);
++        foreach (var suffix in new[] { $" - {parts[0]} {year}", $" - {parts[0]} {shortYear}", $" - {shortSeason} {shortYear}" })
++            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
++                return name[..^suffix.Length].Trim();
++        return name;
++    }
++}
+diff --git a/test/CampusFlow.Domain.Tests/Housing/MealPlanCatalogRulesTests.cs b/test/CampusFlow.Domain.Tests/Housing/MealPlanCatalogRulesTests.cs
+new file mode 100644
+index 0000000..cab6b10
+--- /dev/null
++++ b/test/CampusFlow.Domain.Tests/Housing/MealPlanCatalogRulesTests.cs
+@@ -0,0 +1,59 @@
++using System;
++using CampusFlow.Housing;
++using CampusFlow.StudentInformationSystems;
++using Xunit;
++
++namespace CampusFlow.Domain.Tests.Housing;
++
++public class MealPlanCatalogRulesTests
++{
++    private static readonly StudentMealPlanTerm Spring = new(269, "Spring 2027", new(2027,1,11), new(2027,4,30));
++    private static MealPlanConfiguration Config(string name, int? id=null) =>
++        new(Guid.NewGuid(),null,id,name,name,"Dining","[1,2,3]","[]",100,10);
++    private static StudentMealPlanCatalogItem Plan(string name, int id=10) =>
++        new(id,name,"Dining",100,Spring.StartDate,Spring.EndDate);
++
++    [Theory]
++    [InlineData("12 Meal Plan","12 Meal Plan - Spr 27")]
++    [InlineData("15 Meal Plan","15 Meal Plan - Spr 27")]
++    [InlineData("120 Meal Plan","120 Block - Spr 27")]
++    [InlineData("Unlimited Meal Plan","Unlimited Meals - Spr 27")]
++    [InlineData("20 Meal Plan","20 Block Meal Plan - Spr 27")]
++    [InlineData("40 Meal Plan","40 Block Meal Plan - Spr 27")]
++    [InlineData("60 Meal Plan","60 Block Meal Plan - Spr 27")]
++    [InlineData("120 Meal Plan","120 Block")]
++    [InlineData("Unlimited Meal Plan","Unlimited Meals")]
++    [InlineData("20 Meal Plan","20 Block Meal Plan")]
++    [InlineData("40 Meal Plan","40 Block Meal Plan")]
++    [InlineData("60 Meal Plan","60 Block Meal Plan")]
++    [InlineData("12 Meal Plan"," 12 meal plan - Spring 2027 ")]
++    public void Reviewed_names_resolve_to_the_actual_selected_term_id(string name,string externalName) =>
++        Assert.Equal(10,MealPlanCatalogRules.Resolve(Config(name),[Plan(externalName)],Spring)?.MealPlanId);
++
++    [Theory]
++    [InlineData("12 Meal Plan","120 Block - Spr 27")]
++    [InlineData("20 Meal Plan","120 Block - Spr 27")]
++    [InlineData("20 Meal Plan","20 Block Meal Plan - Spr 26")]
++    [InlineData("20 Meal Plan","20 Block Meal Plan - Fall 27")]
++    [InlineData("20 Meal Plan","20 Block Meal Plan - Spr 28")]
++    [InlineData("20 Meal Plan","Special 20 Block Meal Plan")]
++    [InlineData("None","NO MEALS - OFFICE ONLY")]
++    public void Partial_names_wrong_term_suffixes_and_office_exemptions_are_not_substituted(string name,string externalName) =>
++        Assert.Null(MealPlanCatalogRules.Resolve(Config(name),[Plan(externalName)],Spring));
++
++    [Fact]
++    public void Matching_names_outside_the_selected_term_cannot_be_used() =>
++        Assert.Null(MealPlanCatalogRules.Resolve(Config("12 Meal Plan"),
++            [Plan("12 Meal Plan") with {StartDate=new(2026,8,24),EndDate=new(2026,12,11)}],Spring));
++    [Fact]
++    public void Ambiguous_active_candidates_require_review_instead_of_silent_selection() =>
++        Assert.Null(MealPlanCatalogRules.Resolve(Config("20 Meal Plan"),
++            [Plan("20 Meal Plan"),Plan("20 Block Meal Plan - Spr 27",11)],Spring));
++    [Fact]
++    public void An_explicit_mapping_is_never_replaced_by_a_different_plan_id()
++    {
++        Assert.Null(MealPlanCatalogRules.Resolve(Config("20 Meal Plan",99),[Plan("20 Block Meal Plan - Spr 27")],Spring));
++        Assert.Equal(11,MealPlanCatalogRules.Resolve(Config("20 Meal Plan",11),
++            [Plan("20 Meal Plan"),Plan("20 Block Meal Plan - Spr 27",11)],Spring)?.MealPlanId);
++    }
++}
+diff --git a/test/browser/housing-setup.cjs b/test/browser/housing-setup.cjs
+new file mode 100644
+index 0000000..99235b9
+--- /dev/null
++++ b/test/browser/housing-setup.cjs
+@@ -0,0 +1,44 @@
++const fs=require('fs'),path=require('path'),assert=require('node:assert/strict');
++const {chromium}=require(process.env.CAMPUSFLOW_PLAYWRIGHT_PATH||'playwright');
++const root=path.resolve(__dirname,'../..');
++// Exercise the real workspace markup/script with read-only fixture responses.
++const html=fs.readFileSync(path.join(root,'src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml'),'utf8')
++ .split('\n').filter(x=>!x.trim().startsWith('@')&&!['{','}'].includes(x.trim())).join('\n')
++ .replace('@Model.EnvironmentName','NON-PRODUCTION')
++ .replace('<div id="housing-workspace"', '<input name="__RequestVerificationToken" value="test"><div id="housing-workspace"');
++const script=fs.readFileSync(path.join(root,'src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js'),'utf8');
++const css=fs.readFileSync(path.join(root,'src/CampusFlow.Web/Pages/Admin/Housing/Assignments.css'),'utf8');
++(async()=>{const browser=await chromium.launch({headless:true,...(process.env.CHAPEL_TEST_BROWSER?{executablePath:process.env.CHAPEL_TEST_BROWSER}:{})});
++try{for(const width of [320,390,768,1440]){
++ const page=await browser.newPage({viewport:{width,height:900}}),calls=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
++ await page.route('http://housing.test/**',async route=>{
++  const req=route.request(),url=new URL(req.url()),handler=url.searchParams.get('handler');
++  if(!handler)return route.fulfill({contentType:'text/html',body:'<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>'+css+'</style>'+html});
++  calls.push({handler,method:req.method()});let body;
++  if(handler==='Periods')body=[{id:1,name:'Spring 2027'},{id:2,name:'Summer 2027'},{id:3,name:'Unavailable'}];
++  else if(handler==='Draft')body=null;
++  else if(handler==='Setup'){
++   const period=Number(url.searchParams.get('periodId'));
++   if(period===3)return route.fulfill({status:503,contentType:'application/json',body:'{"error":{"message":"Unavailable"}}'});
++   body={periodId:period,periodName:period===1?'Spring 2027':'Summer 2027',masterCommuterRoomCount:20,periodCommuterRoomCount:period===1?1:20,missingCommuterRooms:period===1?['Commuter / 2','<img src=x onerror=alert(1)>']:[]};
++  }else throw Error('Unexpected handler '+handler);
++  return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
++ });
++ await page.goto('http://housing.test/Admin/Housing/Assignments');
++ // Keep the token inside the same root as the production form.
++ await page.evaluate(()=>document.getElementById('housing-workspace').append(document.querySelector('[name="__RequestVerificationToken"]')));
++ await page.addScriptTag({content:script});await page.waitForFunction(()=>document.getElementById('housing-period').options.length===4&&!document.getElementById('housing-period').disabled);
++ await page.selectOption('#housing-period','1');await page.waitForFunction(()=>document.getElementById('housing-setup-rooms').children.length===2);
++ assert.match(await page.locator('#housing-setup-counts').textContent(),/1 commuter rooms.*20 active/);
++ assert.equal(await page.locator('#housing-setup-missing').isVisible(),true);
++ assert.equal(await page.locator('#housing-setup-rooms img').count(),0);
++ assert.match(await page.locator('#housing-setup-missing').textContent(),/does not add master rooms/);
++ await page.selectOption('#housing-period','2');await page.waitForFunction(()=>document.getElementById('housing-setup-counts').textContent.includes('Summer'));
++ assert.equal(await page.locator('#housing-setup-missing').isVisible(),false);
++ assert.equal(await page.locator('#housing-setup-rooms li').count(),0);
++ await page.selectOption('#housing-period','3');await page.waitForFunction(()=>document.getElementById('housing-setup-counts').textContent.includes('could not be checked'));
++ assert.equal(await page.locator('#housing-refresh').isDisabled(),false);
++ await page.selectOption('#housing-period','');assert.equal(await page.locator('#housing-setup').isVisible(),false);
++ assert.ok(calls.length>0&&calls.every(x=>x.method==='GET'));assert.deepEqual(errors,[]);
++ console.log('PASS read-only setup gap, period switching, safe text, retry guidance and no writes at '+width+'px');await page.close();
++}}finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});

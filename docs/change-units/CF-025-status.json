@@ -1,0 +1,105 @@
+{
+  "unit": "CF-025",
+  "scope": "Updated item 6: restore authorized Financial Aid menu, award-code/billing-flag preview and confirmed Apply using full-field preservation and exact environment guards.",
+  "branch": "codex/cf-025-financial-aid-admin",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf025-financial-aid-admin/CampusFlow",
+  "sourceBase": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+  "commit": "30286c0e59d115035031482d24f139932d456b4d",
+  "pushed": true,
+  "state": "committed-deployed-nonprod-and-production-awaiting-staff-acceptance",
+  "updatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "sourceFiles": {
+    "src/CampusFlow.Application.Contracts/FinancialAid/IReconcileAwardCodesAppService.cs": "fbe58a30eca02cfc96c22c95cfe065855b0326fc50f66c5cb9db81d294ec0dbc",
+    "src/CampusFlow.Application.Contracts/Permissions/CampusFlowPermissionDefinitionProvider.cs": "b5c50ebb98b45e2adde0fe67e15f63de2fbe7324706b6d10a454a7623b370707",
+    "src/CampusFlow.Application/FinancialAid/ReconcileAwardCodesAppService.cs": "0b9060455f8a7ae0e78b4ef08fafbc51a24c711b54b7137295afe78432a982cf",
+    "src/CampusFlow.Domain.Shared/Permissions/CampusFlowPermissions.cs": "975f7eb00f8a264665a0cee15bb84404d9c9581497c05fe7b281ec1d1d1c9a21",
+    "src/CampusFlow.Domain.Shared/StudentInformationSystems/AwardCodeMismatch.cs": "c6b1742e0f4e81fa0ad90f507a94243c09580883dbb0e585974a660ece07f065",
+    "src/CampusFlow.Domain/StudentInformationSystems/IStudentInformationSystemAwardCodeMaintenance.cs": "e00d548213086756c00f92ceccac7859bf9e666410a571bbdea5ea26759363fb",
+    "src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowEntityFrameworkCoreModule.cs": "b5368633956eab4e581c1cea53e7b3758dc61479ff6783369d28277772dcd729",
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsAwardCodeMaintenance.cs": "a0fe1b85dca8b84b6e8a0fe4eb83e7e6528adb21e46b331ec9f0bc2fc6957293",
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidDecisionService.cs": "c1e14f19d77bedd7700a901e60e72c8fa4d59fa8ed62b0a59ed10a78ca74c562",
+    "src/CampusFlow.Web/Menus/CampusFlowMenuContributor.cs": "1c75b318932fb7b597a89f30989ee6a11020940089c8f100a58d8b6d5b714e50",
+    "src/CampusFlow.Web/Menus/CampusFlowMenus.cs": "91062222df9a8155547208ef3e538f25c405304b308ff6a9a9382e614ff48d74",
+    "src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml": "c332d7277527ef399e423df0c9a35747862e19c779de1acace5766d212e57f0f",
+    "src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml.cs": "57b7316ab90dd75dd8b4cde22abf6ca9d2e0daa1b148e8c94030a4f483d1534d",
+    "src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.css": "6bb485173994bc23360d7aec7aa727bd9583ae5a64d7dc46f79d80689ed378f6",
+    "test/CampusFlow.Application.Tests/FinancialAid/ReconcileAwardCodesAppServiceTests.cs": "e41f37e998484c73c55d6246badf9bbf1b97f2117a0507fd4a34bd9644647541",
+    "test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/AwardCodeWriteTests.cs": "5a837a6c89803b0648eff0b54632d552d6966bec0710d5e9aadfedb9285a738c",
+    "test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/ThesisElementsAwardCodeMaintenanceTests.cs": "18526a8d325d47941cf9dd111a9ce5c1c33f960b411423ff7faaf5225ed79366",
+    "test/CampusFlow.Web.Tests/Pages/FinancialAidAdminPreviewTests.cs": "747204314dbae05c2c1cb538c8d82deb7f10e386ec048e64a12c41f40726fa19"
+  },
+  "sourcePatch": "CF-025.patch",
+  "sourcePatchSha256": "19589e8fc88a1e6040ee07f5574e49e916a9e43f771212d8875c28c75ce416b4",
+  "tests": {
+    "focusedAwardWriteAndDecisionChecks": 44,
+    "combinedProduction": 1017,
+    "combinedNonprod": 1011
+  },
+  "browserScenarios": 0,
+  "releasePublishSucceeded": true,
+  "combinedBatchVerification": "CF-020-022-027-batch-verification.json",
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "deploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+    "completedAtUtc": "2026-11-10T05:24:36.3649737Z",
+    "verifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+    "verification": "CF-020-022-027-nonprod-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "completedAtUtc": "2026-11-10T05:33:22.5521364Z",
+    "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+    "verification": "CF-020-022-027-production-deployment-verification.json",
+    "signedInStaffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "runtimeDependenciesChanged": false,
+  "studentDataChanged": true,
+  "settingsChanged": true,
+  "messagesSent": false,
+  "readOnlyPreviewVerifiedInBothEnvironments": true,
+  "awardWritesEnabled": true,
+  "originalWriteAdapterExcluded": true,
+  "permissionsDefined": [
+    "CampusFlow.Admin.FinancialAid",
+    "CampusFlow.Admin.FinancialAid.ReconcileAwardCodes"
+  ],
+  "permissionGrantsChanged": true,
+  "originalSourceReference": "9fc928af03ba0e7b1599a6f5d3723daf60db4338",
+  "combinedBuilds": {
+    "production": {
+      "testTotal": 1017,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    },
+    "nonprod": {
+      "testTotal": 1011,
+      "browserScenarios": 19,
+      "releasePublishSucceeded": true
+    }
+  },
+  "awardUpdateImplementation": "Current full-field adapter completed; obsolete adapter remains excluded.",
+  "awardWritesEnabledOnLivePortals": true,
+  "nonprodAwardWriteCanary": "CF-025-nonprod-award-canary.json",
+  "newAwardWriteChecks": 26,
+  "deploymentSettingsRequired": [
+    "AwardCodeMaintenance:Enabled",
+    "AwardCodeMaintenance:EnableNonProductionWrites or EnableProductionWrites for that environment only; opposite false"
+  ],
+  "studentDataChangeScope": "One synthetic nonprod test award created, updated, verified and removed; existing awards preserved. No production mutation.",
+  "previousStandaloneTestCounts": {
+    "application": 69,
+    "entityframeworkcore": 248,
+    "web": 291
+  },
+  "testsScope": "44 current focused checks and complete combined-release suites. Earlier standalone counts are retained separately as historical evidence.",
+  "notes": "Current safe adapter is enabled in both environments. Production adds only existing admin-role grants; no individual grants or memberships changed. No production award update was fabricated.",
+  "productionAccessGrantedToExistingAdministratorRoleOnly": true,
+  "productionAccessVerification": "CF-025-production-access-verification.json"
+}

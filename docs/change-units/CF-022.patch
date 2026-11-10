@@ -1,0 +1,116 @@
+diff --git a/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml b/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml
+index 4be6a56..ef5fc67 100644
+--- a/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml
++++ b/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml
+@@ -55,7 +55,7 @@
+                 <p><strong>@Model.Preview.StudentName</strong> (Student ID @Model.Preview.StudentId) will be able to restart Bill Approval for <strong>@Model.Preview.TermName</strong>. This does not change the student's charges, aid, or registration.</p>
+                 <form method="post" asp-page-handler="Reset">
+                     <input asp-for="ResetInput.ApprovalId" type="hidden" value="@Model.Preview.Id" />
+-                    <label class="confirm-check"><input asp-for="ResetInput.Confirmed" /><span>I have verified the student and term and intend to reset this Bill Approval.</span></label>
++                    <label class="confirm-check"><input asp-for="ResetInput.Confirmed" required aria-required="true" /><span>I have verified the student and term and intend to reset this Bill Approval.</span></label>
+                     <span asp-validation-for="ResetInput.Confirmed" class="validation-message"></span>
+                     <div class="confirmation-actions"><a asp-route-termCode="@Model.TermCode" asp-route-query="@Model.Query">Cancel</a><button type="submit"><i class="fa-solid fa-arrow-rotate-left"></i> Reset Bill Approval</button></div>
+                 </form>
+diff --git a/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml.cs b/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml.cs
+index 8f3bb58..0f8b2a4 100644
+--- a/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml.cs
+@@ -70,7 +70,6 @@ public class ResetIndividualBillApprovalModel : CampusFlowPageModel
+     public class ResetInputModel
+     {
+         [Required] public Guid ApprovalId { get; set; }
+-        [Range(typeof(bool), "true", "true", ErrorMessage = "Confirmation is required.")]
+         public bool Confirmed { get; set; }
+     }
+ }
+diff --git a/test/CampusFlow.Web.Tests/Pages/BillApprovalResetConfirmationTests.cs b/test/CampusFlow.Web.Tests/Pages/BillApprovalResetConfirmationTests.cs
+new file mode 100644
+index 0000000..ddb2daa
+--- /dev/null
++++ b/test/CampusFlow.Web.Tests/Pages/BillApprovalResetConfirmationTests.cs
+@@ -0,0 +1,60 @@
++using System;
++using System.IO;
++using System.Text.Encodings.Web;
++using System.Threading.Tasks;
++using CampusFlow.BillApprovals;
++using CampusFlow.Branding;
++using CampusFlow.Web.Pages.Admin.StudentBilling;
++using Microsoft.AspNetCore.Http;
++using Microsoft.AspNetCore.Mvc;
++using Microsoft.AspNetCore.Mvc.ModelBinding;
++using Microsoft.AspNetCore.Mvc.RazorPages;
++using Microsoft.AspNetCore.Mvc.Rendering;
++using Microsoft.AspNetCore.Mvc.ViewFeatures;
++using NSubstitute;
++using Volo.Abp.AspNetCore.Mvc.UI.Alerts;
++using Volo.Abp.DependencyInjection;
++using Volo.Abp.MultiTenancy;
++using Xunit;
++
++namespace CampusFlow.Pages;
++
++public class BillApprovalResetConfirmationTests
++{
++    [Theory]
++    [InlineData(false, false)]
++    [InlineData(false, true)]
++    [InlineData(true, true)]
++    [InlineData(true, false)]
++    public async Task Only_a_confirmed_well_formed_post_can_reset(bool confirmed, bool valid)
++    {
++        var id=Guid.NewGuid();var service=Substitute.For<IResetBillApprovalAppService>();
++        service.GetAsync(id).Returns(new ResetBillApprovalDto {Id=id,StudentName="Test Student",StudentId="TEST",TermCode="B27C",TermName="Spring 2027"});
++        service.SearchAsync(Arg.Any<string?>(),Arg.Any<string?>()).Returns(new ResetBillApprovalSearchResultDto());
++        var tenant=Substitute.For<ICurrentTenant>();tenant.Name.Returns("nelson");
++        var alerts=Substitute.For<IAlertManager>();alerts.Alerts.Returns(new AlertList());
++        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);lazy.LazyGetService<IAlertManager>().Returns(alerts);lazy.LazyGetRequiredService<IAlertManager>().Returns(alerts);
++        var page=new ResetIndividualBillApprovalModel(service,Substitute.For<ITenantThemeProvider>())
++        {LazyServiceProvider=lazy,PageContext=new PageContext {HttpContext=new DefaultHttpContext()},ResetInput=new(){ApprovalId=id,Confirmed=confirmed}};
++        if(!valid)page.ModelState.AddModelError("ResetInput.Confirmed","Invalid submitted value");
++        var result=await page.OnPostResetAsync();
++        if(confirmed&&valid){Assert.IsType<RedirectToPageResult>(result);await service.Received(1).ResetAsync(id);}
++        else{Assert.IsType<PageResult>(result);await service.DidNotReceiveWithAnyArgs().ResetAsync(default);}
++    }
++}
++
++public class BillApprovalResetRenderedConfirmationTests : CampusFlowWebTestBase
++{
++    [Fact]
++    public void Checkbox_uses_required_confirmation_without_a_numeric_range_validator()
++    {
++        var provider=GetRequiredService<IModelMetadataProvider>();var model=new ResetIndividualBillApprovalModel.ResetInputModel();
++        var data=new ViewDataDictionary<ResetIndividualBillApprovalModel.ResetInputModel>(provider,new ModelStateDictionary()){Model=model};data.TemplateInfo.HtmlFieldPrefix="ResetInput";
++        var context=new ViewContext {ViewData=data,HttpContext=new DefaultHttpContext {RequestServices=ServiceProvider},ClientValidationEnabled=true,FormContext=new FormContext()};
++        var explorer=provider.GetModelExplorerForType(model.GetType(),model).GetExplorerForProperty("Confirmed");
++        var tag=GetRequiredService<IHtmlGenerator>().GenerateCheckBox(context,explorer,"Confirmed",false,new {required="required"});
++        using var writer=new StringWriter();tag.WriteTo(writer,HtmlEncoder.Default);var markup=writer.ToString();
++        if(Environment.GetEnvironmentVariable("CF022_HTML_DIR") is {Length:>0} output){Directory.CreateDirectory(output);File.WriteAllText(Path.Combine(output,"confirmation-checkbox.html"),markup);}
++        Assert.Contains("required=",markup);Assert.Contains("name=\"ResetInput.Confirmed\"",markup);Assert.DoesNotContain("data-val-range",markup);
++    }
++}
+diff --git a/test/browser/reset-bill-approval-confirmation.cjs b/test/browser/reset-bill-approval-confirmation.cjs
+new file mode 100644
+index 0000000..28aaa66
+--- /dev/null
++++ b/test/browser/reset-bill-approval-confirmation.cjs
+@@ -0,0 +1,19 @@
++const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require('playwright');
++const root=path.resolve(__dirname,'../..');
++const checkboxFile=process.env.CF022_CHECKBOX_HTML;
++assert.ok(checkboxFile&&fs.existsSync(checkboxFile),'Run BillApprovalResetRenderedConfirmationTests with CF022_HTML_DIR, then set CF022_CHECKBOX_HTML to confirmation-checkbox.html.');
++(async()=>{
++ const browser=await chromium.launch({headless:true,executablePath:process.env.CHAPEL_TEST_BROWSER||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
++ try{
++  const page=await browser.newPage();const errors=[];page.on('pageerror',x=>errors.push(x.message));
++  await page.setContent(`<form id="reset"><input name="ResetInput.ApprovalId" value="11111111-1111-1111-1111-111111111111" type="hidden">${fs.readFileSync(checkboxFile,'utf8')}<span data-valmsg-for="ResetInput.Confirmed"></span><button type="submit">Reset Bill Approval</button><input name="ResetInput.Confirmed" value="false" type="hidden"></form>`);
++  for(const name of ['jquery/jquery.js','jquery-validation/jquery.validate.js','jquery-validation-unobtrusive/jquery.validate.unobtrusive.js'])await page.addScriptTag({path:path.join(root,'src/CampusFlow.Web/wwwroot/libs',name)});
++  await page.evaluate(()=>{$.validator.unobtrusive.parse(document);window.submissions=[];$('#reset').validate().settings.submitHandler=(form,event)=>{event.preventDefault();window.submissions.push([...new FormData(form)]);return false;};});
++  const input=page.locator('input[type=checkbox]'),button=page.locator('button');
++  assert.equal(await input.getAttribute('required'),'required');await button.click();assert.equal(await page.evaluate(()=>window.submissions.length),0);console.log('PASS unchecked native confirmation blocks submission');
++  await input.check();assert.equal(await page.evaluate(()=>$('#reset').valid()),true);await button.click();assert.equal(await page.evaluate(()=>window.submissions.length),1);console.log('PASS checked confirmation passes actual unobtrusive validation');
++  const posted=await page.evaluate(()=>window.submissions[0].filter(x=>x[0]==='ResetInput.Confirmed').map(x=>x[1]));assert.deepEqual(posted,['true','false']);console.log('PASS checked value precedes the hidden false fallback for server binding');
++  await input.uncheck();assert.equal(await page.evaluate(()=>$('#reset').valid()),false);await button.click();assert.equal(await page.evaluate(()=>window.submissions.length),1);assert.deepEqual(errors,[]);console.log('PASS removing confirmation blocks another reset');
++  console.log('4 reset-confirmation browser scenarios passed.');
++ }finally{await browser.close();}
++})().catch(e=>{console.error(e);process.exit(1)});

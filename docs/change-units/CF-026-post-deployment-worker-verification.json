@@ -1,0 +1,125 @@
+{
+  "verifiedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "production": {
+    "environment": "production",
+    "readOnly": true,
+    "verifiedAtUtc": "2026-11-10T05:34:39.175009Z",
+    "configurations": [
+      {
+        "rulesHash": "0f1cfa58e70325b8e0dc477d91b9ecd65a99babd754726ad8f67e47e11e2d13b",
+        "enabled": true,
+        "hasRunningClaim": false,
+        "lastStartedAtUtc": "2026-11-10T05:33:52.8092226Z",
+        "lastFinishedAtUtc": "2026-11-10T05:34:03.8238388Z",
+        "nextRunAtUtc": "2026-11-10T05:48:52.8092226Z",
+        "lastOutcome": "No changes needed. Unmapped, invalid and duplicate records were not applied."
+      }
+    ],
+    "runs": [
+      {
+        "id": "3a24d61f-aa5c-ce74-ec40-e833a6449584",
+        "state": "Completed",
+        "createdAtUtc": "2026-11-10T05:33:53.212956",
+        "automatic": true,
+        "summary": "No changes needed. Unmapped, invalid and duplicate records were not applied.",
+        "resultCount": 0,
+        "outcomes": {}
+      },
+      {
+        "id": "3a24d58c-821f-feac-6ed0-3ef180d22d3d",
+        "state": "Completed",
+        "createdAtUtc": "2026-11-10T02:53:09.024427",
+        "automatic": false,
+        "summary": "Completed: 2 verified updates, 0 skipped or unconfirmed.",
+        "resultCount": 2,
+        "outcomes": {
+          "Verified updated": 2
+        }
+      },
+      {
+        "id": "3a24d56f-dbe5-252b-61e0-08d89613093b",
+        "state": "Completed",
+        "createdAtUtc": "2026-11-10T02:21:51.473728",
+        "automatic": false,
+        "summary": "Completed: 2 verified updates, 0 skipped or unconfirmed.",
+        "resultCount": 2,
+        "outcomes": {
+          "Verified updated": 2
+        }
+      },
+      {
+        "id": "3a24d364-c3a1-1156-c18f-3cecdc9f674d",
+        "state": "Preview",
+        "createdAtUtc": "2026-11-09T16:50:29.922041",
+        "automatic": false,
+        "summary": null,
+        "resultCount": 0,
+        "outcomes": {}
+      }
+    ],
+    "automaticClearanceEnabled": false,
+    "studentIdentifiersPrinted": false
+  },
+  "nonprod": {
+    "environment": "nonprod",
+    "readOnly": true,
+    "verifiedAtUtc": "2026-11-10T05:37:22.063923Z",
+    "configurations": [
+      {
+        "rulesHash": "f2ee1dade702273e896ab3ee4b3f5db0c30283d045d026209b72ca917109edb3",
+        "enabled": false,
+        "hasRunningClaim": false,
+        "lastStartedAtUtc": null,
+        "lastFinishedAtUtc": null,
+        "nextRunAtUtc": null,
+        "lastOutcome": null
+      }
+    ],
+    "runs": [
+      {
+        "id": "3a24c365-2197-aa46-7fbd-823241a7a97d",
+        "state": "Completed",
+        "createdAtUtc": "2026-11-06T14:16:58.65656",
+        "automatic": false,
+        "summary": null,
+        "resultCount": 9,
+        "outcomes": {
+          "Verified updated": 9
+        }
+      },
+      {
+        "id": "3a24c164-886d-c5a7-b832-965a8ac71f78",
+        "state": "Preview",
+        "createdAtUtc": "2026-11-06T04:57:04.887765",
+        "automatic": false,
+        "summary": null,
+        "resultCount": 0,
+        "outcomes": {}
+      },
+      {
+        "id": "3a24c160-daea-30ce-f970-fe980c47da30",
+        "state": "Preview",
+        "createdAtUtc": "2026-11-06T04:53:03.852225",
+        "automatic": false,
+        "summary": null,
+        "resultCount": 0,
+        "outcomes": {}
+      },
+      {
+        "id": "3a24c160-7b93-8c1e-65b0-83be48cbad2c",
+        "state": "Preview",
+        "createdAtUtc": "2026-11-06T04:52:39.633184",
+        "automatic": false,
+        "summary": null,
+        "resultCount": 0,
+        "outcomes": {}
+      }
+    ],
+    "automaticClearanceEnabled": false,
+    "studentIdentifiersPrinted": false
+  },
+  "rulesAndEnabledPreferencesPreserved": true,
+  "firstProductionAutomaticCycleCompleted": true,
+  "newAutomaticStudentUpdates": 0,
+  "automaticClearanceResetsRemainOff": true
+}

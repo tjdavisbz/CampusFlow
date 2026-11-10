@@ -1,0 +1,1347 @@
+{
+  "updatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "productionRelease": {
+    "deployed": true,
+    "codeDeployed": true,
+    "commit": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "branch": "codex/cf-020-022-027-production-release",
+    "deploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "completedAtUtc": "2026-11-10T05:33:22.5521364Z",
+    "verifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+    "verification": "CF-020-022-027-production-deployment-verification.json",
+    "releaseManifest": "CF-020-022-027-production-release-manifest.json",
+    "tests": {
+      "domain": 304,
+      "application": 86,
+      "entityframeworkcore": 304,
+      "web": 323
+    },
+    "testTotal": 1017,
+    "browserScenarios": 19,
+    "appSettingsHash": "20a5e925c5b5023351d048282a68348475d749857b73ea6031cfc5a8473234f8",
+    "connectionSettingsHash": "cb9694c0b14eba9dc25da25d52409d047e34ec5b6862f3cf32e4e92e2b88c5e3",
+    "packageSha256": "8686a63694d80f30bb53141210b1154b748e59f816dff4a45e0a5c11d465e215",
+    "allEarlierUnitsRetained": true,
+    "excludedHeldUnits": [],
+    "automaticClearanceResetsEnabled": false,
+    "costTypeAutomaticEnabled": true,
+    "costTypeRulesAndEnabledPreferencePreserved": true,
+    "signedInStaffAcceptancePending": true
+  },
+  "nonprodRelease": {
+    "deployed": true,
+    "codeDeployed": true,
+    "commit": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "branch": "codex/cf-020-022-027-nonprod-release",
+    "deploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+    "completedAtUtc": "2026-11-10T05:24:36.3649737Z",
+    "verifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+    "verification": "CF-020-022-027-nonprod-deployment-verification.json",
+    "releaseManifest": "CF-020-022-027-nonprod-release-manifest.json",
+    "tests": {
+      "domain": 304,
+      "application": 91,
+      "entityframeworkcore": 293,
+      "web": 323
+    },
+    "testTotal": 1011,
+    "browserScenarios": 19,
+    "appSettingsHash": "4df8af7a89a2163ead5cdfbced7b2f5859203418dc12a5fcd96df6be65064ca7",
+    "connectionSettingsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "packageSha256": "0661ec57bd849ba7b97f27477918877942b709c74a257904ecf1c4890434e50c",
+    "allEarlierUnitsRetained": true,
+    "excludedHeldUnits": [],
+    "automaticClearanceResetsEnabled": false,
+    "costTypeAutomaticEnabled": false,
+    "costTypeRulesAndEnabledPreferencePreserved": true,
+    "signedInStaffAcceptancePending": true
+  },
+  "units": {
+    "CF-001": {
+      "scope": "Items 4–7: housing eligibility, commuter roommate privacy, assignment-based meal plans, housing prerequisite for bill approval",
+      "source": "`codex/cf-001-housing-meal-plans`, commit `14b432acbb97f39b318face3813fac8976e47739`; baseline `06930e4`; branch pushed",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-002": {
+      "scope": "Items 2, 17, 20, 21: test access, prior-balance gate, locks after approval, closed/completed steps",
+      "source": "`codex/cf-002-bill-approval-controls`, local commit `1def875c8871cfbfaf8ca4e91a9dd42c51533b47`, based on CF-001; not pushed",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-003": {
+      "scope": "Items 11, 12, 18, 19: balance/payment scope, shared selected term, automatic billing recalculation, configured Payment Plan Fee totals",
+      "source": "`codex/cf-003-billing-accuracy`, local commit `1ac6f1a46547f5ed6893586ee950fd19eae2a597`, based on CF-002; not pushed",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Billing refresh HTTP 400 follow-up corrected by CF-016, deployed both environments; signed-in production acceptance pending"
+    },
+    "CF-004": {
+      "scope": "Items 13–16: term Cleared status, approved PDF/document, student/bookstore notifications and retry oversight; follow-up captures signed-in nonprod recipient and fixes live Elements routing",
+      "source": "Original `82b82d4`; readiness follow-up `c7e21ac` on `codex/cf-004-readiness`, not pushed; [follow-up details](CF-004-readiness.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "emailEnabled": true,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "dnsVerified": true,
+        "dnsVerification": "CF-004-production-DNS-verification.json",
+        "productionEmailEnabled": true,
+        "emailVerification": "CF-004-production-email-enablement-verification.json",
+        "setupTestInboxVerified": true,
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Production emails enabled; domain/sender, scoped identity grant, endpoint/recipients, diagnostics and one operator-authenticated test inbox delivery verified. First automatic portal-managed-identity notification remains staff acceptance."
+    },
+    "CF-005": {
+      "scope": "Items 1 and 9: restore cost-type rules, unblock saving unresolved mappings, clarify preview prerequisites; preserve aid distribution date/COD AEI",
+      "source": "`codex/cf-005-term-data-integrity`, local commit `be6b410a5f7c056ee1f18331fd532264a0bc822c`, based on CF-004 `82b82d4`; not pushed; reuses cost-type source `06dc29e`",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-006": {
+      "scope": "Items 3 and 8: period capacity persistence, housing apply/retry tracking, zero-charge commuter rooms, separate single-room charges, individual meal-plan removal",
+      "source": "`codex/cf-006-housing-admin`, local commit `21c8d0c3b6b645b95d804497260fe3f09b45879a`, based on CF-005 `be6b410`; not pushed; [rollout notes](CF-006-rollout.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-007": {
+      "scope": "Chapel dorm rosters/filtering and attendance autosave; semester report deferred",
+      "source": "Nonprod `codex/cf-007-chapel-workspace` / `bd3516a`; production `codex/cf-007-chapel-production` / `fa820be`; [rollout notes](CF-007-rollout.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-008": {
+      "scope": "Existing-enrollment completion, independent bill approval term access; clearer cost-type save/preview/run workflow and read-only-view warning",
+      "source": "`codex/cf-008-bill-approval-enrollment`, local commit `a7a080dba68c7592b0fdfceb19e0fc5d258b053e`, based on CF-007 `bd3516a`; [notes](CF-008-notes.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-009": {
+      "scope": "Direct chapel attendance editing by dorm/date; roster entry point and visible filter context",
+      "source": "Nonprod `codex/cf-009-chapel-dorm-edit` / `4140257`; production `codex/cf-009-chapel-production` / `15aa2a6`; [rollout notes](CF-009-rollout.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-010": {
+      "scope": "Chapel attendance filter alignment, consistent control heights and responsive action row",
+      "source": "Nonprod `codex/cf-010-chapel-filter-layout` / `dd0debb`; production `codex/cf-010-chapel-production` / `990b86c`; [rollout notes](CF-010-rollout.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-011": {
+      "scope": "Updated portal list: course counts/times, primary-major labels, status-hold message, Approved labels, audit print, Scheduler wording",
+      "source": "`codex/cf-011-academic-display`; local source `a5bd695`; not pushed; based on nonprod CF-010 `dd0debb`; [review notes](CF-011-notes.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-012": {
+      "scope": "Updated portal list: primary-program/major/degree scheduler scopes and attendance-group section-code restrictions; checkbox multiselect follow-up",
+      "source": "`codex/cf-012-registration-scopes`; source `1d95dab` (initial `e383a9d`), not pushed; release `e373ed2` on `codex/cf-012-checkboxes-nonprod`; [review notes](CF-012-notes.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-013": {
+      "scope": "Updated portal list: read-only scheduler impersonation with a separate permission",
+      "source": "`codex/cf-013-scheduler-view`; local source `2ed7045`; not pushed; independent CF-010 `dd0debb` base; [review notes](CF-013-notes.md)",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "promotedByThisRelease": false,
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true
+      },
+      "reviewStatus": "Authenticated production workflow acceptance not performed by agent; existing permissions/rules setup still applies"
+    },
+    "CF-014": {
+      "scope": "Bill-approval financial-aid visibility; per-semester confirmed Accept All; retain opened semester",
+      "source": "codex/cf-014-financial-aid",
+      "sourceBase": "017cf3b7bd2f7ddde300ff429e2b1cd6ab837d51",
+      "commit": "0f63736d07517250d7a12377913141fe252d35a1",
+      "state": "deployed-nonprod-production-pending",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "commit": "b5d4cd46605668c9fa5981c97ee8c5364fc1f08c",
+        "branch": "codex/cf-014-016-nonprod",
+        "deploymentId": "5f74cba0-d0a9-4b34-93b3-6eeeff8e7fbc",
+        "completedAtUtc": "2026-11-07T02:40:57.7180081Z",
+        "verifiedAtUtc": "2026-11-07T02:41:36.999184+00:00",
+        "verification": "CF-014-016-nonprod-deployment-verification.json",
+        "time": "November 6, 2026 at 8:40 PM Central",
+        "allSixteenUnitsRetained": true,
+        "tests": {
+          "domain": 241,
+          "application": 71,
+          "web": 276,
+          "entityframeworkcore": 162
+        },
+        "testTotal": 750,
+        "pending": "Signed-in staff acceptance; positive charge generation remains unverified by agent",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "accessConfigured": false,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "commit": "dff97f3317915b797e6b09803ba34590dd10c5cd",
+        "branch": "codex/cf-014-016-production",
+        "deploymentId": "ed2415a8-ef9a-44cc-93e3-2319e0c9cb0f",
+        "completedAtUtc": "2026-11-07T02:45:34.4327221Z",
+        "verifiedAtUtc": "2026-11-07T02:46:03.654737+00:00",
+        "verification": "CF-014-016-production-deployment-verification.json",
+        "time": "November 6, 2026 at 8:45 PM Central",
+        "allSixteenUnitsRetained": true,
+        "tests": {
+          "domain": 241,
+          "application": 66,
+          "web": 276,
+          "entityframeworkcore": 173
+        },
+        "testTotal": 756,
+        "pending": "Signed-in staff acceptance; positive charge generation remains unverified by agent",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "reviewStatus": "Committed and deployed both environments; signed-in acceptance and positive-charge verification remain unperformed by agent",
+      "status": "CF-014-status.json"
+    },
+    "CF-015": {
+      "scope": "Oaks_MAIN housing/meal eligibility; meal add/readback and form feedback; approved removal-role access",
+      "source": "codex/cf-015-housing-meal-followup",
+      "sourceBase": "017cf3b7bd2f7ddde300ff429e2b1cd6ab837d51",
+      "commit": "ae22f4451f8e48ea1306100f600a7ad36d7af799",
+      "state": "deployed-nonprod-production-pending",
+      "nonprod": {
+        "deployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true,
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "codeDeployed": true,
+        "commit": "b5d4cd46605668c9fa5981c97ee8c5364fc1f08c",
+        "branch": "codex/cf-014-016-nonprod",
+        "deploymentId": "5f74cba0-d0a9-4b34-93b3-6eeeff8e7fbc",
+        "completedAtUtc": "2026-11-07T02:40:57.7180081Z",
+        "verifiedAtUtc": "2026-11-07T02:41:36.999184+00:00",
+        "verification": "CF-014-016-nonprod-deployment-verification.json",
+        "time": "November 6, 2026 at 8:40 PM Central",
+        "allSixteenUnitsRetained": true,
+        "tests": {
+          "domain": 241,
+          "application": 71,
+          "web": 276,
+          "entityframeworkcore": 162
+        },
+        "testTotal": 750,
+        "pending": "Signed-in staff acceptance; positive charge generation remains unverified by agent",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "accessConfigured": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "commit": "dff97f3317915b797e6b09803ba34590dd10c5cd",
+        "branch": "codex/cf-014-016-production",
+        "deploymentId": "ed2415a8-ef9a-44cc-93e3-2319e0c9cb0f",
+        "completedAtUtc": "2026-11-07T02:45:34.4327221Z",
+        "verifiedAtUtc": "2026-11-07T02:46:03.654737+00:00",
+        "verification": "CF-014-016-production-deployment-verification.json",
+        "time": "November 6, 2026 at 8:45 PM Central",
+        "allSixteenUnitsRetained": true,
+        "tests": {
+          "domain": 241,
+          "application": 66,
+          "web": 276,
+          "entityframeworkcore": 173
+        },
+        "testTotal": 756,
+        "pending": "Signed-in staff acceptance; positive charge generation remains unverified by agent",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "reviewStatus": "Committed and deployed both environments; signed-in acceptance and positive-charge verification remain unperformed by agent",
+      "status": "CF-015-status.json"
+    },
+    "CF-016": {
+      "scope": "Repair bill refresh: authenticate with Integration API, submit one-student Recalculate job through the same-environment Elements gateway, and require exact successful job completion before bill review",
+      "source": {
+        "branch": "codex/cf-016-bill-refresh",
+        "commit": "54b922b7f3702063b30e66ed002f7cf5f188c484"
+      },
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "commit": "b5d4cd46605668c9fa5981c97ee8c5364fc1f08c",
+        "branch": "codex/cf-014-016-nonprod",
+        "deploymentId": "5f74cba0-d0a9-4b34-93b3-6eeeff8e7fbc",
+        "completedAtUtc": "2026-11-07T02:40:57.7180081Z",
+        "verifiedAtUtc": "2026-11-07T02:41:36.999184+00:00",
+        "verification": "CF-014-016-nonprod-deployment-verification.json",
+        "time": "November 6, 2026 at 8:40 PM Central",
+        "allSixteenUnitsRetained": true,
+        "pending": "Signed-in staff acceptance; positive charge generation remains unverified by agent",
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "tests": {
+          "domain": 241,
+          "application": 71,
+          "web": 276,
+          "entityframeworkcore": 162
+        },
+        "testTotal": 750,
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "pending": "Signed-in staff acceptance; positive charge generation remains unverified by agent",
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "codeDeployed": true,
+        "commit": "dff97f3317915b797e6b09803ba34590dd10c5cd",
+        "branch": "codex/cf-014-016-production",
+        "deploymentId": "ed2415a8-ef9a-44cc-93e3-2319e0c9cb0f",
+        "completedAtUtc": "2026-11-07T02:45:34.4327221Z",
+        "verifiedAtUtc": "2026-11-07T02:46:03.654737+00:00",
+        "verification": "CF-014-016-production-deployment-verification.json",
+        "time": "November 6, 2026 at 8:45 PM Central",
+        "allSixteenUnitsRetained": true,
+        "tests": {
+          "domain": 241,
+          "application": 66,
+          "web": 276,
+          "entityframeworkcore": 173
+        },
+        "testTotal": 756,
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "status": "CF-016-status.json",
+      "reviewStatus": "Committed and deployed both environments; signed-in acceptance and positive-charge verification remain unperformed by agent"
+    },
+    "CF-017": {
+      "scope": "Optional scheduled cost-type rules every 15 minutes with enable/disable controls and automatic run history on the existing cost-type rules page",
+      "source": {
+        "branch": "codex/cf-017-cost-type-scheduling",
+        "base": "dff97f3317915b797e6b09803ba34590dd10c5cd",
+        "commit": "8b41770a41e2d2f62dd8f66904a5b4492264b30f",
+        "nonprodCommit": "d557ecf7091e7a642e72bb32816d8457e936a0f5",
+        "state": "committed-deployed-both-environments"
+      },
+      "nonprod": {
+        "deployed": true,
+        "automaticUpdatesEnabledByAgent": false,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "commit": "d557ecf7091e7a642e72bb32816d8457e936a0f5",
+        "branch": "codex/cf-017-nonprod",
+        "deploymentId": "b6b021e3-9729-4209-909c-42e2be10d1d2",
+        "completedAtUtc": "2026-11-08T02:15:49.677488Z",
+        "verifiedAtUtc": "2026-11-08T02:17:09.245015+00:00",
+        "verification": "CF-017-nonprod-deployment-verification.json",
+        "allSeventeenUnitsRetained": true,
+        "tests": {
+          "domain": 247,
+          "application": 71,
+          "web": 278,
+          "entityframeworkcore": 180
+        },
+        "testTotal": 776,
+        "browserScenarios": 14,
+        "automaticCostTypeUpdatesEnabled": false,
+        "pending": "Signed-in enable/disable acceptance and a controlled nonprod automatic update remain untested.",
+        "appSettingsHash": "5c61886ac338800f0042e9c26ce8f03c569eafec3820a7bfbb76ee3ba6cfdedf",
+        "connectionSettingsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "packageSha256": "ec039f0cb906d530708c40b6c8709b33e0a4ca11296d9642b73113bf6399e2de",
+        "releaseManifest": "CF-017-nonprod-release-manifest.json",
+        "productionEmailPreserved": true,
+        "currentAssetVerification": "CF-019-nonprod-deployment-verification.json",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "automaticUpdatesEnabledByAgent": false,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "commit": "8b41770a41e2d2f62dd8f66904a5b4492264b30f",
+        "branch": "codex/cf-017-cost-type-scheduling",
+        "deploymentId": "e6cfc69f-4c7d-4c63-b89d-e6a52ca1c7cb",
+        "completedAtUtc": "2026-11-08T02:18:48.7183417Z",
+        "verifiedAtUtc": "2026-11-08T02:19:57.433207+00:00",
+        "verification": "CF-017-production-deployment-verification.json",
+        "allSeventeenUnitsRetained": true,
+        "tests": {
+          "domain": 247,
+          "application": 66,
+          "web": 278,
+          "entityframeworkcore": 191
+        },
+        "testTotal": 782,
+        "browserScenarios": 14,
+        "appSettingsHash": "8a0eda3f6e31ffec5490c4901cb9c0f10ac44dd27c1b4d9ac99c2867e22cc241",
+        "connectionSettingsHash": "cb9694c0b14eba9dc25da25d52409d047e34ec5b6862f3cf32e4e92e2b88c5e3",
+        "packageSha256": "69550190cd55d00763f99ff903d4f9645d678d47cadc29efd10bf4dd5d6d0916",
+        "releaseManifest": "CF-017-production-release-manifest.json",
+        "productionEmailPreserved": true,
+        "automaticCostTypeUpdatesEnabled": true,
+        "pending": "Enabled preference preserved; stale next-run timestamp needs separate worker investigation.",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "status": "CF-017-status.json",
+      "reviewStatus": "Code retained in both portals. November 9 read-only check: production enabled, nonprod off; production next-run timestamp stale, no active claim; automatic processing not verified.",
+      "scheduleObservation": "CF-018-021-cost-type-schedule-observation.json"
+    },
+    "CF-018": {
+      "scope": "Spring 2027+ approval-based Cleared → blank reset, audited manual-clearance exceptions, preview/manual run and optional 15-minute schedule; other user-defined fields preserved.",
+      "source": {
+        "branch": "codex/cf-018-cleared-status-reset",
+        "base": "8b41770a41e2d2f62dd8f66904a5b4492264b30f",
+        "commit": "fe669c81963fe34062afd628348f3ae49cf8b1cf",
+        "nonprodCommit": "65f7030aff381831253feac86ad40e55c345f58f"
+      },
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "commit": "0f66983612a81db8f4a2674051b564c2e81c41b7",
+        "branch": "codex/cf-018-021-nonprod-release",
+        "deploymentId": "b8eae7f8-f9fb-40ca-bf1b-3a5bb69f8bb0",
+        "completedAtUtc": "2026-11-10T00:46:42.7241715Z",
+        "verifiedAtUtc": "2026-11-10T00:48:47.763153+00:00",
+        "verification": "CF-018-021-nonprod-deployment-verification.json",
+        "releaseManifest": "CF-018-021-nonprod-release-manifest.json",
+        "tests": {
+          "domain": 270,
+          "application": 71,
+          "web": 289,
+          "entityframeworkcore": 232
+        },
+        "testTotal": 862,
+        "browserScenarios": 22,
+        "appSettingsHash": "5c61886ac338800f0042e9c26ce8f03c569eafec3820a7bfbb76ee3ba6cfdedf",
+        "connectionSettingsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "packageSha256": "a3991ab8bb370afa526ea05c70dc3cefc01827ecea8794c1d8c366eb9a5cb5ce",
+        "allEarlierUnitsRetained": true,
+        "excludedHeldUnits": [
+          "CF-020"
+        ],
+        "automaticClearanceResetsEnabled": false,
+        "costTypeAutomaticEnabled": false,
+        "costTypeRulesAndEnabledPreferencePreserved": true,
+        "signedInStaffAcceptancePending": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "commit": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+        "branch": "codex/cf-018-021-production-release",
+        "deploymentId": "9bf2b1cb-5f67-4df9-b614-49863441579b",
+        "completedAtUtc": "2026-11-10T00:50:13.8741304Z",
+        "verifiedAtUtc": "2026-11-10T00:52:09.818379+00:00",
+        "verification": "CF-018-021-production-deployment-verification.json",
+        "releaseManifest": "CF-018-021-production-release-manifest.json",
+        "tests": {
+          "domain": 270,
+          "application": 66,
+          "web": 289,
+          "entityframeworkcore": 243
+        },
+        "testTotal": 868,
+        "browserScenarios": 22,
+        "appSettingsHash": "8a0eda3f6e31ffec5490c4901cb9c0f10ac44dd27c1b4d9ac99c2867e22cc241",
+        "connectionSettingsHash": "cb9694c0b14eba9dc25da25d52409d047e34ec5b6862f3cf32e4e92e2b88c5e3",
+        "packageSha256": "1ee3faee8ca8e3cd78b2cdd0f05fd02ed29570066ed872a5b3743a29d334422e",
+        "allEarlierUnitsRetained": true,
+        "excludedHeldUnits": [
+          "CF-020"
+        ],
+        "automaticClearanceResetsEnabled": false,
+        "costTypeAutomaticEnabled": true,
+        "costTypeRulesAndEnabledPreferencePreserved": true,
+        "signedInStaffAcceptancePending": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "status": "CF-018-status.json",
+      "reviewStatus": "Deployed and live-verified in both environments; signed-in staff acceptance remains. Automatic clearance resets remain off.",
+      "staffReview": {
+        "state": "staff-tested-revision-requested",
+        "reportedBy": "Jeff Francis via TJ Davis screenshot",
+        "receivedOnLocalDate": "2026-11-08",
+        "timezone": "America/Chicago",
+        "reportedActualUpdates": true,
+        "reportedAffectedRecords": 2,
+        "businessAcceptance": false,
+        "independentlyAuditedByAgent": false,
+        "note": "Original staff feedback remains unaccepted for the original policy. TJ authorized the version-2 revision and audited manual exception; implemented and verified locally, not yet deployed or staff-tested.",
+        "feedback": "CF-018-staff-feedback-2026-11-08.json",
+        "revision2State": "deployed-awaiting-signed-in-staff-acceptance"
+      },
+      "preparedRevision": {
+        "version": 2,
+        "state": "committed-deployed-nonprod-and-production",
+        "branch": "codex/cf-018-approval-reset-revision",
+        "worktree": "/Users/tjdavis/.codex/worktrees/cf018-approval-reset-revision/CampusFlow",
+        "base": "fe669c81963fe34062afd628348f3ae49cf8b1cf",
+        "commit": "1f0a3b0385e093779be3f305285abdcd06129f49",
+        "pushed": false,
+        "sourceFiles": {
+          "src/CampusFlow.Application.Contracts/ClearanceResets/IClearanceResetAppService.cs": "6833441d4c022691726cc74708ba6628520a297c4ee5b95d99712c4053edb927",
+          "src/CampusFlow.Application/ClearanceResets/ClearanceResetAppService.cs": "d382322f8d518bfc12406cc00949bff2f2ed1fcbe30d901966b3ea53ed157111",
+          "src/CampusFlow.Application/ClearanceResets/ClearanceResetRunner.cs": "52698d42eb9a86a31f66af0832605e3cb7fade2adf190c689f66f6ed5f203773",
+          "src/CampusFlow.Domain/BillApprovals/BillApprovalAcceptanceRules.cs": "c8c6f0eacaa9dc682a9984f34fc4fa467f7f275e38bdfc1245df3b4c9d2270f3",
+          "src/CampusFlow.Domain/BillApprovals/IBillApprovalCompletionLookup.cs": "1dc717754e8f06d94cb3ef5293e2923bbf14cd214d4daffd588c70362d4a4fdb",
+          "src/CampusFlow.Domain/ClearanceResets/ClearanceResetModels.cs": "3930f75646a62c12c8e8fb635cf44e8a641ec18d34c716f899587d407d3b3278",
+          "src/CampusFlow.Domain/ClearanceResets/IClearanceResetProtection.cs": "23c013b06be3772cec4e81c890dcc9411e80614803abfa394237c153ea7446a3",
+          "src/CampusFlow.EntityFrameworkCore/ClearanceResets/ClearanceResetProtection.cs": "302942eb6d5f0fa946e4811cec70561f6c82f7c11363b5d07f4a70349817a249",
+          "src/CampusFlow.EntityFrameworkCore/ClearanceResets/ElementsClearanceResetService.cs": "66fb1b7af8baca3143909ead64413bd25241f128cf75e9b8f3c95fe9cae45813",
+          "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsBillClearanceService.cs": "c8891f64ec23455448dad6ed955619006644789298bedd5d8f063e327d255692",
+          "src/CampusFlow.Web/Pages/Admin/StudentBilling/ClearanceResets.cshtml": "c01faaf4730b8d631ca4d4461f145730958ad2c2c76f519db70ca24a93dab03e",
+          "src/CampusFlow.Web/Pages/Admin/StudentBilling/ClearanceResets.cshtml.cs": "bc44a04e99a6770f6240de88fe2a79ecf333da3f50203e5008457b97335f335d",
+          "src/CampusFlow.Web/Pages/Admin/StudentBilling/ClearanceResets.js": "e6e1e711f4cb12cc08d2b85814ab6be0acbdddf20c93db99e56ef422cc627e95",
+          "test/CampusFlow.Domain.Tests/ClearanceResets/ClearanceApprovalRulesTests.cs": "d90f58fb355808783691b915752cb3b9dcb3c7b5f2f5067cf361ee17a9a929fc",
+          "test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/BillClearanceServiceTests.cs": "16df1a07e7021bdcb197f59b843301f2ef5b06d593d612d8d050b309ec507f47",
+          "test/CampusFlow.EntityFrameworkCore.Tests/ClearanceResets/ClearanceResetRunnerTests.cs": "3b7b2c7acbb58d84c83f8c33612fb473cad9c8c87bcdf1d9b17964dc748fb4d3",
+          "test/CampusFlow.EntityFrameworkCore.Tests/ClearanceResets/ElementsClearanceResetTests.cs": "8d2bdf74c4a0428c99478289c98dc42c6477010e4cc4534cec1ddb98110072b2",
+          "test/CampusFlow.Web.Tests/Pages/ClearanceResetPageTests.cs": "cb9c8064e16fb2455249fbede3c62459cee3aaab68ace9eac252ac205f5b377c",
+          "test/browser/clearance-reset-workflow.cjs": "548e94b012955e18ced9b352e9db0861eb47caba52ca1f0389a9c8435e7d2de7"
+        },
+        "verification": "CF-018-revision-verification.json",
+        "sourcePatch": "CF-018-revision.patch",
+        "sourcePatchSha256": "d0f4fe9fe8f427d6575aae035b9f404cafe88ad99dc0b8fe00b344739388e873",
+        "fullRevisedPatch": "CF-018-revised-full.patch",
+        "fullRevisedPatchSha256": "dfa11f9010ff65a742385ff319695c4d137d55c32dc30ecbf9c71ef3bf1197dd",
+        "tests": {
+          "domain": 260,
+          "application": 66,
+          "web": 285,
+          "entityframeworkcore": 243
+        },
+        "testTotal": 854,
+        "browserScenarios": 18,
+        "combinedPreparation": "CF-018-021-combined-preparation.json",
+        "nonprodDeployed": true,
+        "productionDeployed": true,
+        "deploymentVerification": {
+          "nonprod": "CF-018-021-nonprod-deployment-verification.json",
+          "production": "CF-018-021-production-deployment-verification.json"
+        }
+      }
+    },
+    "CF-019": {
+      "scope": "Repair missing nonprod Font Awesome static routes; no application code change",
+      "kind": "static-asset-route-repair",
+      "source": {
+        "applicationCodeChanged": false,
+        "applicationCodeCommit": "65f7030aff381831253feac86ad40e55c345f58f",
+        "branch": null
+      },
+      "nonprod": {
+        "deployed": true,
+        "deploymentId": "6e77a85d-73a2-47f1-9e92-b04461535bdc",
+        "completedAtUtc": "2026-11-08T03:16:48.6169027Z",
+        "verifiedAtUtc": "2026-11-08T03:26:13.405576+00:00",
+        "verification": "CF-019-nonprod-deployment-verification.json",
+        "releaseManifest": "CF-019-nonprod-release-manifest.json",
+        "applicationCodeChanged": false,
+        "allEighteenCodeUnitsRetained": true,
+        "retainedInCurrentRelease": "0f66983612a81db8f4a2674051b564c2e81c41b7",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "fontRoutesVerifiedByCurrentRelease": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "retained": true
+      },
+      "production": {
+        "deployed": false,
+        "promotionRequired": false,
+        "state": "Already correct; no production repair needed",
+        "codeSettingsAndAssetsUnchanged": true,
+        "fontRoutesVerifiedByCurrentRelease": true
+      },
+      "status": "CF-019-status.json",
+      "reviewStatus": "Verified live fonts and ten browser icons; user confirmed signed-in menu; no production promotion needed."
+    },
+    "CF-020": {
+      "scope": "Housing/meal availability: exact Elements catalog aliases and selected-term suffix matching; actionable availability messages; read-only master-versus-period commuter-room setup; reject unavailable admin terms",
+      "source": "`codex/cf-020-current-release`, commit `b1a5dc4c0147e27759ec9b206916af712065aab2`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "reviewStatus": "Code and environment verification complete; signed-in staff/student acceptance remains.",
+      "heldAtUserRequest": false,
+      "sourceFiles": {
+        "src/CampusFlow.Application.Contracts/Housing/IHousingWorkspaceAppService.cs": "1c6e830e8bfb4d0fb420190c965beac4a42012042fb84c95373118832c2a3631",
+        "src/CampusFlow.Application.Contracts/Housing/MealPlanDtos.cs": "0bb3efaf197d0c5ebf6f1eeca392ccedd818bcb5071af5a1272d4725a55be603",
+        "src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs": "160d632479b2ae7b28a0ed7c09d19669ec1eaedd4279a66f262a31877268bb1e",
+        "src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs": "2f519896baf2db11402acdb09298ac18b7863c7057afb8eb044820813af7fe6e",
+        "src/CampusFlow.Application/Housing/MealPlanAppService.cs": "9f38c1ecb819bdf1c6c6fedf02526b2d69823cb4db6551d06b9c76cb7732670f",
+        "src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs": "0cbad89bb6bb4a8c794b29fdb023b33330583bb54fba009878d2349a11a30172",
+        "src/CampusFlow.Domain/Housing/MealPlanCatalogRules.cs": "b157dab9a9e7faf3df699547876dc3df19c838feb3d356683207a89c27c51851",
+        "src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingReader.cs": "e00b85c4482aa724a5d7f356bfab1652d2c1f9091ac75e583c285e8500bb3148",
+        "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingReader.cs": "5d3ffce9a6f5b0a1a2233f84cb675fff066f9f49f601af221719fa0f07c5a7ae",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml": "615b9c1672a8821a5b6d54798d7df9107122fb5ca7bcda2bb1bdf6bbeb63c2e2",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs": "49265edf7d3c179fc84736bfdc19382dfb12ac8c39c674ad297ed551bbfeaf6a",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js": "0e8f6287f9c912f3013cac520feefa8404f0e90c0371f4da8819122eb1225a67",
+        "src/CampusFlow.Web/Pages/Housing.cshtml": "3668d5474198222fc8ab8ae02f05453419e5c9c8a103a2c0757e2ee75ad3678f",
+        "src/CampusFlow.Web/Pages/Index.cshtml.cs": "c933256a05231a8a7bd5a6d1d7e2ab4d53615436dee902848f6771c8d9522ace",
+        "test/CampusFlow.Application.Tests/Housing/AdminMealPlanAssignmentTests.cs": "6eed9f38040570bf6f62557a1836ab4e4f9aa56b2b5f4ebc65526ecfef61b9fd",
+        "test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs": "b31de22cdcac6a19309f4146c45975ea3c9f499b4a9cca3b90a202311bc3ef48",
+        "test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs": "4c6f1f3e637b9ee6371c1c3f5133bbaad1fcbd83c4c0ae9429bc9009083b1485",
+        "test/CampusFlow.Domain.Tests/Housing/MealPlanCatalogRulesTests.cs": "185cdc661b9cb0930d35939794536a9e54211e8d052ce8e10b758acefdb45d07",
+        "test/CampusFlow.Web.Tests/BillApprovals/HousingJourneyTests.cs": "dab061ea5093418e117ec0a6763e7d7a8b218facf157d06c0a9124e073dfdfd1",
+        "test/browser/housing-setup.cjs": "31f7bf040c454fa9524719c79f20a3ff667a49321cbe20fbbd67304cd979e42d"
+      }
+    },
+    "CF-021": {
+      "scope": "Updated bill-approval outstanding items 3–5: pending-loan notice, preserve Student/Billing menu context, ResLife housing contact",
+      "source": {
+        "branch": "codex/cf-021-bill-review-guidance",
+        "base": "8b41770a41e2d2f62dd8f66904a5b4492264b30f",
+        "commit": "5a083b577041e53aec48fb33ed58429ca67eae4a",
+        "worktree": "/Users/tjdavis/.codex/worktrees/cf010-chapel-production/CampusFlow"
+      },
+      "status": "CF-021-status.json",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "commit": "0f66983612a81db8f4a2674051b564c2e81c41b7",
+        "branch": "codex/cf-018-021-nonprod-release",
+        "deploymentId": "b8eae7f8-f9fb-40ca-bf1b-3a5bb69f8bb0",
+        "completedAtUtc": "2026-11-10T00:46:42.7241715Z",
+        "verifiedAtUtc": "2026-11-10T00:48:47.763153+00:00",
+        "verification": "CF-018-021-nonprod-deployment-verification.json",
+        "releaseManifest": "CF-018-021-nonprod-release-manifest.json",
+        "tests": {
+          "domain": 270,
+          "application": 71,
+          "web": 289,
+          "entityframeworkcore": 232
+        },
+        "testTotal": 862,
+        "browserScenarios": 22,
+        "appSettingsHash": "5c61886ac338800f0042e9c26ce8f03c569eafec3820a7bfbb76ee3ba6cfdedf",
+        "connectionSettingsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "packageSha256": "a3991ab8bb370afa526ea05c70dc3cefc01827ecea8794c1d8c366eb9a5cb5ce",
+        "allEarlierUnitsRetained": true,
+        "excludedHeldUnits": [
+          "CF-020"
+        ],
+        "automaticClearanceResetsEnabled": false,
+        "costTypeAutomaticEnabled": false,
+        "costTypeRulesAndEnabledPreferencePreserved": true,
+        "signedInStaffAcceptancePending": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "commit": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+        "branch": "codex/cf-018-021-production-release",
+        "deploymentId": "9bf2b1cb-5f67-4df9-b614-49863441579b",
+        "completedAtUtc": "2026-11-10T00:50:13.8741304Z",
+        "verifiedAtUtc": "2026-11-10T00:52:09.818379+00:00",
+        "verification": "CF-018-021-production-deployment-verification.json",
+        "releaseManifest": "CF-018-021-production-release-manifest.json",
+        "tests": {
+          "domain": 270,
+          "application": 66,
+          "web": 289,
+          "entityframeworkcore": 243
+        },
+        "testTotal": 868,
+        "browserScenarios": 22,
+        "appSettingsHash": "8a0eda3f6e31ffec5490c4901cb9c0f10ac44dd27c1b4d9ac99c2867e22cc241",
+        "connectionSettingsHash": "cb9694c0b14eba9dc25da25d52409d047e34ec5b6862f3cf32e4e92e2b88c5e3",
+        "packageSha256": "1ee3faee8ca8e3cd78b2cdd0f05fd02ed29570066ed872a5b3743a29d334422e",
+        "allEarlierUnitsRetained": true,
+        "excludedHeldUnits": [
+          "CF-020"
+        ],
+        "automaticClearanceResetsEnabled": false,
+        "costTypeAutomaticEnabled": true,
+        "costTypeRulesAndEnabledPreferencePreserved": true,
+        "signedInStaffAcceptancePending": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "retained": true,
+        "promotedByThisRelease": false
+      },
+      "reviewStatus": "Deployed and live-verified in both environments; signed-in student workflow acceptance remains."
+    },
+    "CF-022": {
+      "scope": "Updated outstanding item 18: repair bill-approval reset confirmation; preserve server confirmation, authorization and reset behavior.",
+      "source": "`codex/cf-022-bill-reset-confirmation`, commit `36194cd2f5e5cf85c157cae82a8a6faadc08d962`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "reviewStatus": "Code and environment verification complete; signed-in staff/student acceptance remains.",
+      "sourceFiles": {
+        "src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml": "2123fbcf4bb7cdbb5b9b6ade90eadcc23c8436096d84cfcc22aed3474242149b",
+        "src/CampusFlow.Web/Pages/Admin/StudentBilling/ResetIndividualBillApproval.cshtml.cs": "28e8fc5a62c8261bc85957d59fbc6a87898dda5fc4fe4351cfe16c7356ed1134",
+        "test/CampusFlow.Web.Tests/Pages/BillApprovalResetConfirmationTests.cs": "b3e33068de1eed7cf9d4df78ef09ccf51d75466a062513cd228d291e299a1112",
+        "test/browser/reset-bill-approval-confirmation.cjs": "bcb828cbc448afaae0c5da9dd02ba1c18647b74db4180ec5f9a6ded4379ee666"
+      }
+    },
+    "CF-023": {
+      "scope": "Updated item 5 and review R1/R2: preserve the saved 113-assignment production housing draft, reject stale deleted-room conflicts safely, retain draft/error state on failed Apply, and repair unrelated required-search validation on admin meal assignment.",
+      "source": "`codex/cf-023-housing-meal-reliability`, commit `732bb76fbba0070b369f322a542d86a99d4dedfd`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "reviewStatus": "Code and environment verification complete; signed-in staff/student acceptance remains.",
+      "sourceFiles": {
+        "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs": "8eaea90f3d4a620a889346eaaa936d72de81a2e699eb6150d972601435f74725",
+        "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml": "d073e8a639a1b148dce9740d698d077d1550e10149d611168cc5b8b71253bbe4",
+        "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs": "e006f99af580b96a139c6e121d4aad638bc481a4bc4eaf3b279b91067fdb5b1d",
+        "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.css": "29661b22d56ca39685a09bceb14269c02692d226a506f7e0be6c27ac1fff618b",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs": "db461132c1a125c1acbf8fdf7c039c0a9e1addb3971448409188f0924661542d",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js": "23049f4ab82f90583d1484674a9f6d1629306a12b11f90282046b92faf1a88f6",
+        "test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs": "981d1747a3b48482461eac5e0b8f635b6a80a168ec93c45ebb8d5ca5e3e3de7a",
+        "test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingAssignmentReadbackTests.cs": "a50173c796c7a620bd8bfe0d746e62168159374e7c0c8efdc4afa009d0185931",
+        "test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs": "6b03036949cf276586af43a764d70d62d0d5cf968ebad30e6b59c40e81fe20ad",
+        "test/CampusFlow.Web.Tests/Pages/HousingApplyFailurePageTests.cs": "a4de4713958b698f025b740ea9881e3f730d9b5214323d3eae001ddcda1b4271",
+        "test/browser/housing-draft-preservation.cjs": "f460836aa40e76ef9c206c77a68c8b4167bcfa0326f667bf762a047b85bdab1c"
+      }
+    },
+    "CF-024": {
+      "scope": "Updated items 12–17: dorm dropdown; final approval/completion/dashboard copy; legacy Judah image; refund-table PDF layout; bookstore legal name and legacy allowance amount. Vendor course matching remains outside this source change.",
+      "source": "`codex/cf-024-bill-finish-experience`, commit `37be7a8e7cbdf46597b1aea4ae302fce1e25ad3d`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "reviewStatus": "Code and environment verification complete; signed-in staff/student acceptance remains.",
+      "sourceFiles": {
+        "src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs": "f2493230ba62fc418ead8d71524db57449eedf3f90605306aabcb916767141a1",
+        "src/CampusFlow.Web/BillApprovals/BillApprovalCompletionOperations.cs": "815062de02facc556745b574a0b97e413f61bbdc7cd09c7a0745ab6d78222a23",
+        "src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs": "69a70ef9142a85f5ac33295cad8b57299e6ad97715ccd7976db2b0e1c1899cca",
+        "src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs": "0caeee774f605e231ef64e298ff6ad187f0f87cc94c862e5fa1e24f00f62566e",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml": "a2a64447628795c64e0fda39325ccdb32eca36b5acb2ec7360560f4ba7270732",
+        "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js": "5395d948c2c47cf12c6e81f4ab22c08b32ac0997a70725bc0c805ca48e4b87c9",
+        "src/CampusFlow.Web/Pages/BillApproval.cshtml": "9651d14a85db83e15a332d52768b67b8624850e000280e85678e45d0ee0483db",
+        "src/CampusFlow.Web/Pages/BillApproval.cshtml.cs": "dba30f2cd6fa666b742c677168129da935c9b942a270ec0ad9e814819c3a728f",
+        "src/CampusFlow.Web/Pages/BillApproval.css": "973c99e53704c94faecc5e484ebf8e86ca65bfad5b2f6487c193248099cc54fa",
+        "src/CampusFlow.Web/Pages/Index.cshtml.cs": "b7b9af6e797a9d1fda8eb754688646efa3efb920bfced64718f4021e162839a7",
+        "src/CampusFlow.Web/wwwroot/images/tenants/nelson/judah-celebrating.jpg": "e52d774dbc75fae857b125c8132ee4e1644d239d6c56c5ae7b241b2fed6f6e78",
+        "test/CampusFlow.Web.Tests/BillApprovals/BillApprovalNotificationTests.cs": "f062eef0a8b1c8cc1067b844a8ee56f1ef7ba3563687642ca13b7732e90f33cb",
+        "test/CampusFlow.Web.Tests/BillApprovals/BillFinishExperienceTests.cs": "e12a9fe1c4652099c581427ebd28b4b2b745330106236210022e37125e252166",
+        "test/browser/bill-finish-experience.cjs": "7667304e63eade83dd576fae85b1d6daba91a9def4336a6abb2095f5809b29a1"
+      }
+    },
+    "CF-025": {
+      "scope": "Updated item 6: restore authorized admin Financial Aid menu and read-only award-code preview without importing obsolete award writes.",
+      "source": "`codex/cf-025-financial-aid-admin`, commit `30286c0e59d115035031482d24f139932d456b4d`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true,
+        "access": "Existing administrator role; individual grants and role memberships unchanged"
+      },
+      "reviewStatus": "Code and environment verification complete; signed-in staff/student acceptance remains.",
+      "sourceFiles": {
+        "src/CampusFlow.Application.Contracts/FinancialAid/IReconcileAwardCodesAppService.cs": "fbe58a30eca02cfc96c22c95cfe065855b0326fc50f66c5cb9db81d294ec0dbc",
+        "src/CampusFlow.Application.Contracts/Permissions/CampusFlowPermissionDefinitionProvider.cs": "b5c50ebb98b45e2adde0fe67e15f63de2fbe7324706b6d10a454a7623b370707",
+        "src/CampusFlow.Application/FinancialAid/ReconcileAwardCodesAppService.cs": "0b9060455f8a7ae0e78b4ef08fafbc51a24c711b54b7137295afe78432a982cf",
+        "src/CampusFlow.Domain.Shared/Permissions/CampusFlowPermissions.cs": "975f7eb00f8a264665a0cee15bb84404d9c9581497c05fe7b281ec1d1d1c9a21",
+        "src/CampusFlow.Domain.Shared/StudentInformationSystems/AwardCodeMismatch.cs": "c6b1742e0f4e81fa0ad90f507a94243c09580883dbb0e585974a660ece07f065",
+        "src/CampusFlow.Domain/StudentInformationSystems/IStudentInformationSystemAwardCodeMaintenance.cs": "e00d548213086756c00f92ceccac7859bf9e666410a571bbdea5ea26759363fb",
+        "src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowEntityFrameworkCoreModule.cs": "b5368633956eab4e581c1cea53e7b3758dc61479ff6783369d28277772dcd729",
+        "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsAwardCodeMaintenance.cs": "a0fe1b85dca8b84b6e8a0fe4eb83e7e6528adb21e46b331ec9f0bc2fc6957293",
+        "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidDecisionService.cs": "c1e14f19d77bedd7700a901e60e72c8fa4d59fa8ed62b0a59ed10a78ca74c562",
+        "src/CampusFlow.Web/Menus/CampusFlowMenuContributor.cs": "1c75b318932fb7b597a89f30989ee6a11020940089c8f100a58d8b6d5b714e50",
+        "src/CampusFlow.Web/Menus/CampusFlowMenus.cs": "91062222df9a8155547208ef3e538f25c405304b308ff6a9a9382e614ff48d74",
+        "src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml": "c332d7277527ef399e423df0c9a35747862e19c779de1acace5766d212e57f0f",
+        "src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.cshtml.cs": "57b7316ab90dd75dd8b4cde22abf6ca9d2e0daa1b148e8c94030a4f483d1534d",
+        "src/CampusFlow.Web/Pages/Admin/FinancialAid/ReconcileAwardCodes.css": "6bb485173994bc23360d7aec7aa727bd9583ae5a64d7dc46f79d80689ed378f6",
+        "test/CampusFlow.Application.Tests/FinancialAid/ReconcileAwardCodesAppServiceTests.cs": "e41f37e998484c73c55d6246badf9bbf1b97f2117a0507fd4a34bd9644647541",
+        "test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/AwardCodeWriteTests.cs": "5a837a6c89803b0648eff0b54632d552d6966bec0710d5e9aadfedb9285a738c",
+        "test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/ThesisElementsAwardCodeMaintenanceTests.cs": "18526a8d325d47941cf9dd111a9ce5c1c33f960b411423ff7faaf5225ed79366",
+        "test/CampusFlow.Web.Tests/Pages/FinancialAidAdminPreviewTests.cs": "747204314dbae05c2c1cb538c8d82deb7f10e386ec048e64a12c41f40726fa19"
+      }
+    },
+    "CF-026": {
+      "scope": "Updated item 8: normalize Nelson tenant name in cost-type and clearance-reset workers; preserve intervals, saved preferences and execution guards.",
+      "source": "`codex/cf-026-automatic-job-tenant`, commit `9bfe49d40d8c53d05af4e4bfbc619b1001b3c0c9`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "reviewStatus": "First production automatic cycle completed: no changes needed. Existing rules preserved; both clearance schedules off.",
+      "sourceFiles": {
+        "src/CampusFlow.Web/ClearanceResets/ClearanceResetWorker.cs": "0d0a6eba350848de645a56fabc8628ac5f7fce10e156db4ad8e1fbc965b03acc",
+        "src/CampusFlow.Web/CostTypes/CostTypeAutomationWorker.cs": "c892a482b5f0b189127ba9fc3deeb5d435496b4ec779363901d796bcdf229869",
+        "test/CampusFlow.Web.Tests/Pages/AutomaticJobTenantLookupTests.cs": "fd9f5d62f67a6b3bee259b5e1141984ac93be4891fbd951b1650437410f20517"
+      }
+    },
+    "CF-027": {
+      "scope": "Updated item 10: separate 8.25% meal-plan sales-tax debit during writable, unapproved Spring 2027+ bill review; per-assignment durable attempt and exact-reference readback before bill totals; no historical approved-bill repair.",
+      "source": "`codex/cf-027-meal-plan-sales-tax`, commit `ca9dab02a39e7a1ee53eb9d283b20df700255fb6`; branch pushed",
+      "status": "committed-deployed-both",
+      "nonprod": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+        "currentDeploymentId": "af29f743-5a24-4faa-b009-93603c3cae25",
+        "currentVerifiedAtUtc": "2026-11-10T05:29:53.935262+00:00",
+        "currentVerification": "CF-020-022-027-nonprod-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "production": {
+        "deployed": true,
+        "codeDeployed": true,
+        "currentRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+        "currentDeploymentId": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+        "currentVerifiedAtUtc": "2026-11-10T05:35:08.972017+00:00",
+        "currentVerification": "CF-020-022-027-production-deployment-verification.json",
+        "retained": false,
+        "promotedByThisRelease": true
+      },
+      "reviewStatus": "Tax enabled in both with independent destinations and durable audit migration; real nonprod PostgreSQL/lost-response canary passed. First legitimate production bill review remains acceptance.",
+      "sourceFiles": {
+        "src/CampusFlow.Application/MealPlanTaxes/MealPlanTaxCoordinator.cs": "7abc7ce581a72ce1292cbc9769a7f67300381e119d30e3f72763e033d8f0e12f",
+        "src/CampusFlow.Domain/MealPlanTaxes/MealPlanTaxCharge.cs": "c180b122cdac64cd0c9ff3c7a6cdfa52a252cfffcbda24e2cdef497299963d68",
+        "src/CampusFlow.Domain/MealPlanTaxes/MealPlanTaxContracts.cs": "a5ca30cd40dd5f1534d52561c7cb05e1ce479e4d86552c44ecf505d69f846b51",
+        "src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowDbContext.cs": "209d35c4f3fb58c0810a7f98decc1d564be343521dae92eb29492351109be581",
+        "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/ElementsMealPlanTaxGateway.cs": "5b2352b5bea91ba8e1ee3cc3a260c5e5286b3e4d0a5ec9fa7521cee454093ae7",
+        "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/ElementsMealPlanTaxReadModel.cs": "5c91c6cf7027538bbeb441031a09ea4ff5665158e5616daa00732720cca0c955",
+        "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/MealPlanTaxChargeStore.cs": "2dfef44df617708d008454c6eb63f093a4b43a5de80d8b1fefafb9ed9798e351",
+        "src/CampusFlow.EntityFrameworkCore/MealPlanTaxes/MealPlanTaxEnvironment.cs": "0d0a177aa1d7a90995a18892ae2bef9eca34fc5f80186c7512c6165501473df9",
+        "src/CampusFlow.EntityFrameworkCore/Migrations/20261110041612_AddMealPlanTaxCharges.Designer.cs": "b7b6d3a531e1c694fbbf108f24e95c4a1067372596544e5f83d3bd4e39bc701f",
+        "src/CampusFlow.EntityFrameworkCore/Migrations/20261110041612_AddMealPlanTaxCharges.cs": "974d313017556d47c7ddbee8596064cd448a3263bdd594faa3f4da616168723f",
+        "src/CampusFlow.EntityFrameworkCore/Migrations/CampusFlowDbContextModelSnapshot.cs": "75e3a8d1885ab6a2c30a5f365a5bd9426d2d80db56e4d170f1b26e3b4fe05e4a",
+        "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs": "e4b561116520d3dcd6049b8b635a9ce2839ceee82c514f8a3ab30c29f47444f6",
+        "src/CampusFlow.Web/Pages/BillApproval.cshtml.cs": "63cc162a05dbcb70249a82e7d2511a4b3055462a0f3bc779286750b802aa119f",
+        "test/CampusFlow.Application.Tests/MealPlanTaxes/MealPlanTaxCoordinatorTests.cs": "a0ca52ec74701da1dd2e7b641b09717c8172ab8d8d5425e22809023ebbe12f7d",
+        "test/CampusFlow.Domain.Tests/MealPlanTaxes/MealPlanTaxRulesTests.cs": "b43db47511398ea9ef1ddd0fec202806c1283671ccd6a7a4f5dae1375e187384",
+        "test/CampusFlow.EntityFrameworkCore.Tests/MealPlanTaxes/MealPlanTaxChargeStoreTests.cs": "c3078329dc210174ff075f6a3275dc5404540d77ba49223f416f48a20a7096a9",
+        "test/CampusFlow.EntityFrameworkCore.Tests/MealPlanTaxes/MealPlanTaxGatewayTests.cs": "d0d1bda187ebb8c813481f34afadd71f791c64a02b065b5a3343a6c878d934a9",
+        "test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs": "6f04df59d1f9e0a19f0002d2bd49655418fc8f1930b6ad18e524256b32fd9941",
+        "test/CampusFlow.Web.Tests/BillApprovals/MealPlanTaxDependencyTests.cs": "a29fb1529423978f75f36d50c5b6b99e0252c9462b99161a28ac2eab35296e04"
+      }
+    }
+  },
+  "dataOperationsUpdatedAtUtc": "2026-11-06T23:28:44.924336Z",
+  "dataOperations": {
+    "DATA-001": {
+      "state": "completed-production-verified",
+      "summary": "201 originally blank award distribution dates filled in Fall 2026 and Spring 2027; existing dates preserved",
+      "verifiedAtUtc": "2026-11-06T23:28:44.924336Z",
+      "evidence": "DATA-001-distribution-date-repair.json",
+      "deploymentPerformed": false
+    }
+  },
+  "preparedSourceUpdatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "accessConfigurationUpdatedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "accessChanges": {
+    "CF-015": {
+      "permission": "CampusFlow.Admin.BusinessServices.RemoveStudentMealPlan",
+      "roles": [
+        "admin",
+        "CampusFlow Business Services Manager"
+      ],
+      "environments": [
+        "nonprod",
+        "production"
+      ],
+      "verifiedAtUtc": "2026-11-07T00:10:47.879932+00:00",
+      "evidence": "CF-015-access-verification.json",
+      "codeDeployed": true
+    },
+    "CF-025": {
+      "permissions": [
+        "CampusFlow.Admin.FinancialAid",
+        "CampusFlow.Admin.FinancialAid.ReconcileAwardCodes"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "environments": [
+        "production"
+      ],
+      "verifiedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+      "individualUserGrantsChanged": false,
+      "roleMembershipChanged": false,
+      "evidence": "CF-025-production-access-verification.json"
+    }
+  },
+  "lastLiveVerificationAtUtc": "2026-11-10T05:40:00.508444+00:00",
+  "currentPortalVerification": {
+    "verifiedAtUtc": "2026-11-10T05:40:00.508444+00:00",
+    "nonprodCodeRelease": "0fc5378c8d6a242764a3cf5c03d4055e9d88f591",
+    "productionCodeRelease": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+    "evidence": {
+      "nonprod": "CF-020-022-027-nonprod-deployment-verification.json",
+      "production": "CF-020-022-027-production-deployment-verification.json"
+    },
+    "allEarlierUnitsRetained": true,
+    "CF020Included": true,
+    "CF019NonprodAssetRepairPreserved": true,
+    "connectionsCertificatesAndEmailConfigurationPreserved": true,
+    "automaticClearanceResetsEnabled": false,
+    "productionCostTypeAutomaticEnabled": true,
+    "firstProductionCostTypeAutomaticCycleCompleted": true,
+    "existingCostTypePreferenceAndRulesPreserved": true,
+    "authenticatedStaffAcceptancePerformed": false
+  },
+  "emailConfigurationUpdatedAtUtc": "2026-11-07T03:38:32.330883+00:00",
+  "productionEmailDns": {
+    "verified": true,
+    "verifiedAtUtc": "2026-11-07T03:14:17.922863+00:00",
+    "evidence": "CF-004-production-DNS-verification.json",
+    "productionNotificationsEnabled": true,
+    "nextAction": "First automatic production bill-approval notification using the portal managed identity remains unverified; no production approval was fabricated to test it.",
+    "enablementVerification": "CF-004-production-email-enablement-verification.json"
+  },
+  "productionEmail": {
+    "enabled": true,
+    "sender": "StudentBilling@nelson.edu",
+    "verification": "CF-004-production-email-enablement-verification.json",
+    "configuredAtUtc": "2026-11-07T03:38:32.330883+00:00",
+    "managedIdentity": "87d9fe5c-789d-4631-9d62-84f773f26721",
+    "setupTestInboxVerified": true,
+    "managedIdentityRuntimeSendVerified": false,
+    "remainingAcceptance": "First automatic production bill-approval notification using the portal managed identity remains unverified; no production approval was fabricated to test it."
+  },
+  "preparedCombinedRelease": {
+    "units": [
+      "CF-020",
+      "CF-022",
+      "CF-023",
+      "CF-024",
+      "CF-025",
+      "CF-026",
+      "CF-027"
+    ],
+    "heldExcluded": [],
+    "committed": true,
+    "deployed": true,
+    "verification": "CF-020-022-027-batch-verification.json",
+    "tests": {
+      "production": 1017,
+      "nonprod": 1011
+    },
+    "browserScenariosPerEnvironment": 19,
+    "migrationRequired": [
+      "CF-027"
+    ],
+    "setupAndWriteAcceptancePending": false,
+    "nonprodControlledWriteCanariesPassed": true,
+    "remainingSetup": "None for deployment; signed-in staff acceptance and policy/vendor/IT decisions remain.",
+    "pushed": true,
+    "deploymentVerification": {
+      "nonprod": "CF-020-022-027-nonprod-deployment-verification.json",
+      "production": "CF-020-022-027-production-deployment-verification.json"
+    }
+  },
+  "operationalFollowUp": {
+    "costTypeSchedule": "CF-026-post-deployment-worker-verification.json"
+  },
+  "nonprodReadinessTestData": {
+    "verifiedAtUtc": "2026-11-10T05:04:42.523247+00:00",
+    "catalogAndTaxBatch": "CF-020-027-nonprod-test-setup.json",
+    "awardCanary": "CF-025-nonprod-award-canary.json",
+    "taxCanary": "CF-027-nonprod-tax-canary.json",
+    "temporarySyntheticChargesAndAssignmentsRemoved": true,
+    "productionDataChanged": false,
+    "portalSettingsChanged": false
+  }
+}

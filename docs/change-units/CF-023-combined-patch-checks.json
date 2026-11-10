@@ -1,0 +1,14 @@
+[
+  {
+    "environment": "production",
+    "base": "f5d68b938633c277dfc8c61f2504dbb0c2d08305",
+    "combinedPatchesApplyCleanly": true,
+    "sourceCheckoutModified": false
+  },
+  {
+    "environment": "nonprod",
+    "base": "0f66983612a81db8f4a2674051b564c2e81c41b7",
+    "combinedPatchesApplyCleanly": true,
+    "sourceCheckoutModified": false
+  }
+]

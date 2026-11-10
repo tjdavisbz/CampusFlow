@@ -1,0 +1,21 @@
+{
+  "environment": "production",
+  "readOnly": true,
+  "studentIdentifiersPrinted": false,
+  "drafts": [
+    {
+      "period": 1,
+      "savedDraftAssignments": 923,
+      "uniqueStudents": 923,
+      "snapshotHash": "ae0e557399bdaeb775a288073fdf9ae79b473f5be508495290a36720dde27e48",
+      "lastModified": "2026-11-04T22:10:08.974189"
+    },
+    {
+      "period": 2,
+      "savedDraftAssignments": 113,
+      "uniqueStudents": 113,
+      "snapshotHash": "aadce5f7df6ec49a1a1302bab047112aa16f4a265e93537b1bb1967f9ffe900a",
+      "lastModified": "2026-11-09T01:53:53.873409"
+    }
+  ]
+}

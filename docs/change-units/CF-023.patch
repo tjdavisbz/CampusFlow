@@ -1,0 +1,401 @@
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs
+index baaf3f1..d455809 100644
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs
+@@ -1,4 +1,5 @@
+ using System;
++using System.Data;
+ using System.Collections.Generic;
+ using System.Linq;
+ using System.Net.Http;
+@@ -24,15 +25,18 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
+     private readonly IConfiguration _configuration;
+     private readonly IMemoryCache _cache;
+     private readonly HttpClient _client;
++    private readonly Func<int,int,int,int,string,CancellationToken,Task<bool>> _deletedAssignment;
+ 
+     public ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache)
+         : this(configuration, cache, SharedHttpClient) { }
+ 
+-    internal ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache, HttpClient client)
++    internal ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache, HttpClient client,
++        Func<int,int,int,int,string,CancellationToken,Task<bool>>? deletedAssignment = null)
+     {
+         _configuration = configuration;
+         _cache = cache;
+         _client = client;
++        _deletedAssignment = deletedAssignment ?? IsDeletedAssignmentAsync;
+     }
+ 
+     public void EnsureWriteEnabled()
+@@ -72,10 +76,43 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
+         var root = await ReadAsync(response, cancellationToken);
+         var data = root["data"] as JsonArray;
+         if (data is null) throw new InvalidOperationException("Elements returned an invalid assignment list.");
+-        var matches = data.OfType<JsonObject>()
+-            .Where(x => ReadInt(x, "housingPeriodID") == periodId)
+-            .Select(x => (Building: ReadString(x, "building"), Room: ReadString(x, "roomName")))
+-            .ToList();
++        var matches = new List<(string Building, string Room)>();
++        if (data.Any(x => x is not JsonObject))
++            throw new InvalidOperationException("Elements returned an invalid assignment row.");
++        foreach (var row in data.OfType<JsonObject>().Where(x => ReadInt(x, "housingPeriodID") == periodId))
++        {
++            var propertyId = ReadInt(row, "housingPeriodPropertyID");
++            var building = ReadString(row, "building").Trim();
++            var roomName = ReadString(row, "roomName").Trim();
++            if (propertyId <= 0 || building.Length == 0 || roomName.Length == 0)
++                throw new InvalidOperationException("Elements returned an incomplete room identity.");
++            var property = (await HousingDataAsync(
++                $"/api/student-life/housing/housing-periods/housing-period-properties/{propertyId}", cancellationToken)).AsObject();
++            if (ReadInt(property, "housingPeriodPropertyID") != propertyId ||
++                ReadInt(property, "housingPeriodID") != periodId ||
++                !string.Equals(ReadString(property, "propertyName").Trim(), building, StringComparison.OrdinalIgnoreCase) ||
++                property["rooms"] is not JsonArray rooms || rooms.Any(x => x is not JsonObject))
++                throw new InvalidOperationException("The live housing property identity could not be verified.");
++            // The student endpoint retains deleted assignments after a period's rooms are replaced.
++            // Only a room still returned by the live property's current catalog can be assigned.
++            var current = rooms.OfType<JsonObject>()
++                .Where(x => x["isDeleted"]?.GetValue<bool>() != true &&
++                    string.Equals(ReadString(x, "roomName").Trim(), roomName, StringComparison.OrdinalIgnoreCase)).ToList();
++            if (current.Count == 0)
++            {
++                var roomId = ReadInt(row, "roomID");
++                if (roomId <= 0) throw new InvalidOperationException("Elements omitted the assigned room identifier.");
++                // Absence from the property alone is not proof of deallocation. Keep the
++                // original live conflict unless the exact matching assignment is tombstoned.
++                if (await _deletedAssignment(studentUid, periodId, propertyId, roomId, roomName, cancellationToken)) continue;
++                matches.Add((building, roomName));
++                continue;
++            }
++            if (current.Count != 1 || ReadInt(current[0], "housingPeriodRoomID") <= 0 ||
++                ReadInt(current[0], "housingPeriodID") != periodId)
++                throw new InvalidOperationException("The live room identity is ambiguous or belongs to another period.");
++            matches.Add((building, roomName));
++        }
+         if (matches.Count > 1)
+             throw new InvalidOperationException("Elements returned multiple room assignments for one student and period.");
+         if (matches.Count == 0) return null;
+@@ -84,6 +121,31 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
+         return matches[0];
+     }
+ 
++    private async Task<bool> IsDeletedAssignmentAsync(int studentUid, int periodId, int propertyId,
++        int roomId, string roomName, CancellationToken cancellationToken)
++    {
++        await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
++        await connection.OpenAsync(cancellationToken);
++        await using var command = new SqlCommand("""
++            SELECT COUNT(*), COALESCE(SUM(CASE WHEN a.IsDeleted=0 THEN 1 ELSE 0 END),0)
++            FROM StudentLife.HousingPeriodRoomAssignments a
++            JOIN StudentLife.HousingPeriodRooms r ON r.HousingPeriodRoomID=a.HousingPeriodRoomID
++                AND r.HousingPeriodID=a.HousingPeriodID
++            WHERE a.StudentUID=@Student AND a.HousingPeriodID=@Period
++                AND r.HousingPeriodPropertyID=@Property
++                AND (r.HousingPeriodRoomID=@Room OR r.OriginalRoomID=@Room)
++                AND LTRIM(RTRIM(r.RoomName))=@Name;
++            """, connection) { CommandTimeout = 30 };
++        command.Parameters.Add("@Student", SqlDbType.Int).Value=studentUid;
++        command.Parameters.Add("@Period", SqlDbType.Int).Value=periodId;
++        command.Parameters.Add("@Property", SqlDbType.Int).Value=propertyId;
++        command.Parameters.Add("@Room", SqlDbType.Int).Value=roomId;
++        command.Parameters.Add("@Name", SqlDbType.NVarChar, 200).Value=roomName;
++        await using var reader=await command.ExecuteReaderAsync(cancellationToken);
++        if(!await reader.ReadAsync(cancellationToken))throw new InvalidOperationException("The assignment history could not be verified.");
++        return reader.GetInt32(0)>0 && reader.GetInt32(1)==0;
++    }
++
+     public Task AssignAsync(int studentUid, int periodId, int periodRoomId,
+         CancellationToken cancellationToken = default) =>
+         ChangeAsync("assign", studentUid, periodId, periodRoomId, cancellationToken);
+diff --git a/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml b/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml
+index bf1dd80..a89f7dc 100644
+--- a/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml
++++ b/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml
+@@ -19,6 +19,8 @@
+     }
+     <header class="meal-admin-hero"><div><span>Business Services</span><h1>Manage Student Meal Plans</h1><p>Review a student's meal-plan assignments, assign an available plan or remove an individual assignment in Elements.</p></div><i class="fa-solid fa-utensils"></i></header>
+ 
++    <div asp-validation-summary="All" class="meal-validation" role="alert"></div>
++
+     <section class="meal-card">
+         <div class="section-heading"><span>Step 1</span><h2>Find a student</h2><p>Search by name, student ID, Elements ID, or email address.</p></div>
+         <form method="get" asp-fragment="student-results" class="student-search"><input asp-for="Query" placeholder="Name, ID, or email" autocomplete="off" /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Search</button></form>
+@@ -86,7 +88,7 @@
+     {
+         var selectedHousing = Model.Context.HousingStatuses.SingleOrDefault(x => x.Id == Model.HousingStatus);
+         <section class="meal-card confirmation" id="confirm"><div class="warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div><span class="eyebrow">Step 4 · Confirmation required</span><h2>Apply this housing and meal-plan selection?</h2><p>This will set <strong>@selectedHousing?.Name</strong> and assign <strong>@Model.Preview.Name</strong> to <strong>@Model.Context.Student.Name</strong> (Student ID @Model.Context.Student.StudentId) in Elements.</p>
+-            <form method="post" asp-page-handler="Assign"><input asp-for="Input.ExternalStudentId" type="hidden" value="@Model.Context.Student.ExternalStudentId" /><input asp-for="Input.TermCalendarId" type="hidden" value="@Model.Term" /><input asp-for="Input.HousingStatusId" type="hidden" value="@Model.HousingStatus" /><input asp-for="Input.MealPlanId" type="hidden" value="@Model.Preview.MealPlanId" /><label class="confirm-check"><input asp-for="Input.Confirmed" /><span>I have verified the student, term, housing status, meal plan, and applicable dates.</span></label><span asp-validation-for="Input.Confirmed" class="validation-message"></span><div class="confirm-actions"><a asp-route-query="@Model.Query" asp-route-student="@Model.Context.Student.ExternalStudentId" asp-route-term="@Model.Term" asp-route-housingStatus="@Model.HousingStatus">Cancel</a><button type="submit"><i class="fa-solid fa-utensils"></i> Apply selection</button></div></form>
++            <form method="post" asp-page-handler="Assign"><input asp-for="Input.ExternalStudentId" type="hidden" value="@Model.Context.Student.ExternalStudentId" /><input asp-for="Input.TermCalendarId" type="hidden" value="@Model.Term" /><input asp-for="Input.HousingStatusId" type="hidden" value="@Model.HousingStatus" /><input asp-for="Input.MealPlanId" type="hidden" value="@Model.Preview.MealPlanId" /><label class="confirm-check"><input asp-for="Input.Confirmed" required aria-required="true" /><span>I have verified the student, term, housing status, meal plan, and applicable dates.</span></label><span asp-validation-for="Input.Confirmed" class="validation-message"></span><div class="confirm-actions"><a asp-route-query="@Model.Query" asp-route-student="@Model.Context.Student.ExternalStudentId" asp-route-term="@Model.Term" asp-route-housingStatus="@Model.HousingStatus">Cancel</a><button type="submit"><i class="fa-solid fa-utensils"></i> Apply selection</button></div></form>
+         </div></section>
+     }
+ </main>
+diff --git a/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs b/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs
+index 153bd13..630497f 100644
+--- a/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs
+@@ -29,7 +29,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
+         _logger = logger;
+     }
+ 
+-    [BindProperty(SupportsGet = true)] public string Query { get; set; } = string.Empty;
++    [BindProperty(SupportsGet = true)] public string? Query { get; set; }
+     [BindProperty(SupportsGet = true)] public string? Student { get; set; }
+     [BindProperty(SupportsGet = true)] public int? Term { get; set; }
+     [BindProperty(SupportsGet = true)] public int? HousingStatus { get; set; }
+@@ -76,7 +76,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
+         Theme = _themeProvider.Get(CurrentTenant.Name);
+         CanRemove = (await AuthorizationService.AuthorizeAsync(User, CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded;
+         // Assignment and removal are separate forms. Only validate the submitted assignment input.
+-        foreach (var key in ModelState.Keys.Where(x => x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
++        foreach (var key in ModelState.Keys.Where(x => x == nameof(Query) || x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
+             ModelState.Remove(key);
+         Context = await _service.GetContextAsync(Input.ExternalStudentId, Input.TermCalendarId);
+         Student = Context.Student.ExternalStudentId;
+diff --git a/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.css b/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.css
+index d25af7b..2ce7bbe 100644
+--- a/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.css
++++ b/src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.css
+@@ -30,3 +30,6 @@
+ .confirm-actions { display:flex; justify-content:flex-end; gap:.75rem; }
+ .confirm-actions a { display:flex; align-items:center; }
+ @media(max-width:760px) { .meal-admin-hero{padding:2rem}.meal-admin-hero>i{display:none}.student-search{grid-template-columns:1fr}.student-results article,.plan-list article{align-items:stretch;flex-direction:column}.plan-action{justify-items:start}.confirmation{flex-direction:column} }
++
++.meal-validation.validation-summary-valid { display: none; }
++.meal-validation.validation-summary-errors { margin: 1rem 0; padding: 1rem; border: 1px solid #b42318; border-radius: .75rem; color: #b42318; background: #fff; }
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs
+index 5171653..318dceb 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs
+@@ -2,6 +2,7 @@ using System;
+ using System.Threading.Tasks;
+ using CampusFlow.Housing;
+ using CampusFlow.Permissions;
++using Volo.Abp;
+ using Microsoft.AspNetCore.Authorization;
+ using Microsoft.AspNetCore.Mvc;
+ using Microsoft.Extensions.Configuration;
+@@ -27,7 +28,14 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
+     public async Task<JsonResult> OnGetPreviewAsync(int periodId) => new(await workspace.PreviewAsync(periodId));
+     public async Task<JsonResult> OnGetRateRevisionAsync(int periodId) => new(await workspace.GetRateRevisionAsync(periodId));
+     public async Task<JsonResult> OnPostSaveAsync([FromBody] HousingWorkspaceState input) => new(await workspace.SaveAsync(input));
+-    public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input) => new(await workspace.ApplyAssignmentsAsync(input));
++    public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input)
++    {
++        try { return new(await workspace.ApplyAssignmentsAsync(input)); }
++        catch (UserFriendlyException error)
++        {
++            return new(new { error = new { message = error.Message } }) { StatusCode = 409 };
++        }
++    }
+     public async Task<JsonResult> OnPostRefreshAsync([FromBody] RefreshInput input)
+     {
+         if (!input.Confirmed) throw new InvalidOperationException("Confirm replacing the draft before refreshing.");
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
+index 8bc80dd..aff6fac 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
+@@ -169,8 +169,20 @@
+         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
+         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
+         if (!confirm(`Apply ${actionable.length} assignment/rate/capacity change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
+-        state = await request('Apply', {periodId:state.periodId, revision:state.revision,
+-            rateRevision, confirmed:true});
++        try {
++            state = await request('Apply', {periodId:state.periodId, revision:state.revision,
++                rateRevision, confirmed:true});
++        } catch (error) {
++            // Read the saved draft, never Refresh from Elements: a failed/uncertain apply
++            // must not discard the assignments staff already entered.
++            try {
++                const saved = await request('Draft', undefined, {periodId:state.periodId});
++                if (saved?.id === state.id && JSON.stringify(saved.rooms) === JSON.stringify(state.rooms)) state = saved;
++                else state.applyStatus = 'Needs review';
++            } catch { state.applyStatus = 'Needs review'; }
++            render();
++            throw error;
++        }
+         dirty = false; selected.clear(); render();
+         message(`Room assignments and CampusFlow housing charges were applied to ${root.dataset.environment} Elements and verified.`);
+     });
+diff --git a/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs b/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
+index bddde0e..c9c1ab5 100644
+--- a/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
+@@ -93,15 +93,41 @@ public class HousingApplyTests
+     }
+     [Fact]public async Task Fee_revision_change_prevents_all_writes()
+     {Desired(x=>x[0].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));var input=Input();input.RateRevision="stale";await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(input));Assert.Empty(_writer.Calls);}
++    private void SavedCommuterBatch()
++    {
++        _before.Clear();
++        for(var id=1;id<=20;id++)
++        {
++            var room=new HousingWorkspaceRoom{Id=id,Name=$"Commuter {id}",Building="Commuter",Capacity=10};
++            _before.Add(room);_writer.RoomNames[id]=(room.Building,room.Name);
++        }
++        _draft.Refresh(JsonSerializer.Serialize(_before),DateTime.UtcNow);
++        Desired(rooms=>{for(var id=1;id<=113;id++)rooms[(id-1)%20].Occupants.Add(new(){StudentUid=id,Name=$"Test {id}",Rate="Standard"});});
++    }
++    [Fact]public async Task All_113_saved_commuter_assignments_survive_successful_apply_without_housing_charges()
++    {
++        SavedCommuterBatch();var result=await _service.ApplyAssignmentsAsync(Input(false));
++        Assert.Equal(113,result.Rooms.Sum(x=>x.Occupants.Count));Assert.Equal(113,JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.BaselineJson)!.Sum(x=>x.Occupants.Count));
++        Assert.Equal(113,_writer.Calls.Count(x=>x=="assign"));Assert.Equal("Completed",result.ApplyStatus);
++        await _billing.Received(113).ReconcileAsync(Arg.Any<int>(),268,Arg.Is<IReadOnlyList<HousingChargeLine>>(x=>x.Count==0),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
++    }
++    [Fact]public async Task Partial_failure_preserves_all_113_draft_entries_and_blocks_a_blind_retry()
++    {
++        SavedCommuterBatch();_writer.FailAtStudent=60;var desired=_draft.RoomsJson;var baseline=_draft.BaselineJson;
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));
++        Assert.Equal(desired,_draft.RoomsJson);Assert.Equal(baseline,_draft.BaselineJson);Assert.Equal(113,JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!.Sum(x=>x.Occupants.Count));
++        Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);Assert.Equal(60,_writer.Calls.Count(x=>x=="assign"));
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));Assert.Equal(60,_writer.Calls.Count(x=>x=="assign"));
++    }
+     private sealed class Writer(Func<HousingApplyProgress?> progress):IElementsHousingAssignmentWriter
+     {
+-        public bool Fail;public List<string> Calls=[];private readonly Dictionary<int,(string,string)> _assigned=[];
++        public bool Fail;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];private readonly Dictionary<int,(string,string)> _assigned=[];
+         public void EnsureWriteEnabled(){}
+         public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default)=>Task.FromResult(_assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);
+         public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>Task.CompletedTask;
+         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}
+         public Task UpdateCapacitiesAsync(int p,IReadOnlyList<HousingCapacityChange> changes,CancellationToken ct=default){Claimed();Calls.Add(changes[0].Capacity>changes[0].PreviousCapacity?"increase":"decrease");return Task.CompletedTask;}
+-        public Task AssignAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("assign");if(Fail)throw new InvalidOperationException();_assigned[id]=room==1?("Bridges Hall","101"):("Commuter",room==2?"000":"001");return Task.CompletedTask;}
++        public Task AssignAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("assign");if(Fail||FailAtStudent==id)throw new InvalidOperationException();_assigned[id]=RoomNames.TryGetValue(room,out var named)?named:room==1?("Bridges Hall","101"):("Commuter",room==2?"000":"001");return Task.CompletedTask;}
+         public Task DeallocateAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("remove");_assigned.Remove(id);return Task.CompletedTask;}
+     }
+ }
+diff --git a/test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs b/test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs
+index 1d7d05e..76a4f32 100644
+--- a/test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs
++++ b/test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs
+@@ -9,7 +9,7 @@ public class AdminMealPlanAssignmentHandlerTests
+         var page=new AddStudentMealPlanModel(service,Substitute.For<ITenantThemeProvider>(),NullLogger<AddStudentMealPlanModel>.Instance){LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()},Input=new(){ExternalStudentId="123",TermCalendarId=269,HousingStatusId=10,MealPlanId=20,Confirmed=true}};return(page,service);
+     }
+     [Fact] public async Task Errors_from_the_other_form_do_not_silently_block_a_valid_assignment()
+-    {var(p,s)=Setup();p.ModelState.AddModelError("RemoveInput.ExternalStudentId","The removal input is required.");Assert.IsType<RedirectToPageResult>(await p.OnPostAssignAsync());await s.Received(1).AssignAsync(Arg.Is<AssignStudentMealPlanInput>(x=>x.ExternalStudentId=="123"&&x.TermCalendarId==269&&x.MealPlanId==20));Assert.True(p.CanRemove);}
++    {var(p,s)=Setup();p.ModelState.AddModelError("RemoveInput.ExternalStudentId","The removal input is required.");p.ModelState.AddModelError("Query","The Query field is required.");Assert.IsType<RedirectToPageResult>(await p.OnPostAssignAsync());await s.Received(1).AssignAsync(Arg.Is<AssignStudentMealPlanInput>(x=>x.ExternalStudentId=="123"&&x.TermCalendarId==269&&x.MealPlanId==20));Assert.True(p.CanRemove);}
+     [Theory] [InlineData("Input.MealPlanId")] [InlineData("Input.TermCalendarId")]
+     public async Task Active_form_validation_still_blocks_invalid_input(string key)
+     {var(p,s)=Setup();p.ModelState.AddModelError(key,"Invalid assignment input");Assert.IsType<PageResult>(await p.OnPostAssignAsync());await s.DidNotReceiveWithAnyArgs().AssignAsync(default!);Assert.True(p.CanRemove);}
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingAssignmentReadbackTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingAssignmentReadbackTests.cs
+new file mode 100644
+index 0000000..32aa0ee
+--- /dev/null
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingAssignmentReadbackTests.cs
+@@ -0,0 +1,47 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Net;
++using System.Net.Http;
++using System.Text;
++using System.Text.Json.Nodes;
++using System.Threading;
++using System.Threading.Tasks;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.Extensions.Caching.Memory;
++using Microsoft.Extensions.Configuration;
++using Xunit;
++namespace CampusFlow.EntityFrameworkCore.Tests.Housing;
++public class HousingAssignmentReadbackTests
++{
++    private static JsonObject Assigned(int property,string room)=>new(){["housingPeriodID"]=2,["housingPeriodPropertyID"]=property,["roomID"]=property*100,["building"]="Commuter",["roomName"]=room};
++    private static JsonObject Property(int id,params string[] names)=>new(){["housingPeriodPropertyID"]=id,["housingPeriodID"]=2,["propertyName"]="Commuter",["rooms"]=new JsonArray(names.Select((name,i)=>(JsonNode)new JsonObject{["housingPeriodRoomID"]=id*100+i,["housingPeriodID"]=2,["roomName"]=name}).ToArray())};
++    [Fact]public async Task Deleted_assignments_to_rooms_absent_from_live_property_do_not_block_a_saved_draft()
++    {var(writer,http)=Setup(new JsonArray(Assigned(21,"Old commuter room")),new(){[21]=Property(21)});Assert.Null(await writer.GetAssignedRoomAsync(10,2));Assert.All(http.Methods,x=>Assert.Equal(HttpMethod.Get,x));}
++    [Fact]public async Task Current_assignment_still_blocks_a_second_assignment_even_when_old_rows_are_returned()
++    {var(writer,http)=Setup(new JsonArray(Assigned(21,"Old"),Assigned(22,"New")),new(){[21]=Property(21),[22]=Property(22,"New")});Assert.Equal(("Commuter","New"),await writer.GetAssignedRoomAsync(10,2));}
++    [Fact]public async Task Two_current_assignments_are_never_treated_as_unassigned()
++    {var(writer,_)=Setup(new JsonArray(Assigned(21,"One"),Assigned(22,"Two")),new(){[21]=Property(21,"One"),[22]=Property(22,"Two")});await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.GetAssignedRoomAsync(10,2));}
++    [Fact]public async Task Missing_room_without_exact_deleted_assignment_proof_remains_a_live_conflict()
++    {var(writer,_)=Setup(new JsonArray(Assigned(21,"One")),new(){[21]=Property(21)},deleted:false);Assert.Equal(("Commuter","One"),await writer.GetAssignedRoomAsync(10,2));}
++    [Fact]public async Task Failed_property_read_never_turns_an_assignment_into_unassigned()
++    {var(writer,http)=Setup(new JsonArray(Assigned(21,"One")),new());http.Fail=true;await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.GetAssignedRoomAsync(10,2));}
++    [Theory][InlineData("housingPeriodID")][InlineData("housingPeriodPropertyID")][InlineData("propertyName")][InlineData("rooms")]
++    public async Task Mismatched_or_incomplete_property_metadata_fails_closed(string field)
++    {var p=Property(21,"One");p.Remove(field);var(writer,_)=Setup(new JsonArray(Assigned(21,"One")),new(){[21]=p});await Assert.ThrowsAnyAsync<Exception>(()=>writer.GetAssignedRoomAsync(10,2));}
++    private static (ElementsHousingAssignmentWriter,Handler) Setup(JsonArray rows,Dictionary<int,JsonObject> properties,bool deleted=true)
++    {
++        var values=new Dictionary<string,string?> { ["Housing:EnableNonProductionWrites"]="true",["Housing:EnableProductionWrites"]="false",["App:EnvironmentLabel"]="NON-PRODUCTION",["StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl"]="https://app-elm-nonprod-usc-integrationapi.azurewebsites.net",["StudentInformationSystems:Providers:ThesisElements:Api:RegistrationBaseUrl"]="https://np-usc-gateway.thesiscloud.com",["StudentInformationSystems:Providers:ThesisElements:Api:TenantHost"]="el-np-nel.thesiscloud.com",["StudentInformationSystems:Providers:ThesisElements:Api:Username"]="test",["StudentInformationSystems:Providers:ThesisElements:Api:Password"]="test",["ConnectionStrings:ThesisElementsReadOnly"]="Server=sql-elm-nonprod-usc-replica.database.windows.net;Database=EL-NP-NEL-DB;"};
++        var handler=new Handler(rows,properties);return(new(new ConfigurationBuilder().AddInMemoryCollection(values).Build(),new MemoryCache(new MemoryCacheOptions()),new HttpClient(handler),(_,_,_,_,_,_)=>Task.FromResult(deleted)),handler);
++    }
++    private sealed class Handler(JsonArray rows,Dictionary<int,JsonObject> properties):HttpMessageHandler
++    {
++        public bool Fail;public List<HttpMethod> Methods=[];
++        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
++        {
++            Methods.Add(request.Method);var path=request.RequestUri!.AbsolutePath;
++            JsonNode? data=path.Contains("Authenticate")?new JsonObject{["token"]="test"}:path.Contains("get-assigned-rooms")?rows:properties.GetValueOrDefault(int.Parse(path.Split('/').Last()));
++            var ok=data is not null&&!Fail;return Task.FromResult(new HttpResponseMessage(ok?HttpStatusCode.OK:HttpStatusCode.BadGateway){Content=new StringContent(new JsonObject{["isSuccess"]=ok,["data"]=data?.DeepClone()}.ToJsonString(),Encoding.UTF8,"application/json")});
++        }
++    }
++}
+diff --git a/test/CampusFlow.Web.Tests/Pages/HousingApplyFailurePageTests.cs b/test/CampusFlow.Web.Tests/Pages/HousingApplyFailurePageTests.cs
+new file mode 100644
+index 0000000..b1a8955
+--- /dev/null
++++ b/test/CampusFlow.Web.Tests/Pages/HousingApplyFailurePageTests.cs
+@@ -0,0 +1,29 @@
++using System.Threading.Tasks;
++using CampusFlow.Housing;
++using CampusFlow.Web.Pages.Admin.Housing;
++using Microsoft.AspNetCore.Mvc;
++using Microsoft.AspNetCore.Mvc.ModelBinding;
++using Microsoft.Extensions.Configuration;
++using NSubstitute;
++using Volo.Abp;
++using Xunit;
++namespace CampusFlow.Pages;
++public class HousingApplyFailurePageTests
++{
++    [Fact]public async Task Known_preflight_failure_is_actionable_and_never_refreshes_or_saves_the_draft()
++    {
++        var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new UserFriendlyException("A student has a new Elements assignment. Review the saved draft.")));
++        var page=new AssignmentsModel(service,new ConfigurationBuilder().Build());var result=await page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true});Assert.Equal(409,result.StatusCode);Assert.Contains("new Elements assignment",System.Text.Json.JsonSerializer.Serialize(result.Value));await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
++    }
++    [Fact]public async Task Unexpected_failures_are_not_exposed_to_the_browser()
++    {
++        var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new System.InvalidOperationException("private internal detail")));var page=new AssignmentsModel(service,new ConfigurationBuilder().Build());await Assert.ThrowsAsync<System.InvalidOperationException>(()=>page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true}));
++    }
++}
++public class MealPlanSearchMetadataTests:CampusFlowWebTestBase
++{
++    [Fact]public void Search_query_does_not_become_a_required_assignment_field()
++    {
++        var metadata=GetRequiredService<Microsoft.AspNetCore.Mvc.ModelBinding.IModelMetadataProvider>();Assert.False(metadata.GetMetadataForProperty(typeof(CampusFlow.Web.Pages.Admin.BusinessServices.AddStudentMealPlanModel),"Query").IsRequired);Assert.True(metadata.GetMetadataForProperty(typeof(CampusFlow.Web.Pages.Admin.BusinessServices.AddStudentMealPlanModel.AssignInputModel),"ExternalStudentId").IsRequired);
++    }
++}
+diff --git a/test/browser/housing-draft-preservation.cjs b/test/browser/housing-draft-preservation.cjs
+new file mode 100644
+index 0000000..e174539
+--- /dev/null
++++ b/test/browser/housing-draft-preservation.cjs
+@@ -0,0 +1,26 @@
++const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require('playwright');
++const root=path.resolve(__dirname,'../..'),script=fs.readFileSync(path.join(root,'src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js'),'utf8');
++let markup=fs.readFileSync(path.join(root,'src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml'),'utf8');
++markup=markup.replace(/@if \(Model.CanApplyToElements\)\s*\{([\s\S]*?)\}\s*else\s*\{[\s\S]*?\}/g,'$1').replace(/@if \(Model.CanApplyToElements\)\s*\{([\s\S]*?)\}/g,'$1').replace('@Html.AntiForgeryToken()','<input name="__RequestVerificationToken" value="test" type="hidden">').replace('@Model.EnvironmentName','NON-PRODUCTION').split('\n').filter(x=>!x.trimStart().startsWith('@')).join('\n');
++const rooms=Array.from({length:20},(_,i)=>({id:i+1,building:'Commuter',name:'Room '+(i+1),capacity:10,occupants:[]}));
++for(let id=1;id<=113;id++)rooms[(id-1)%20].occupants.push({studentUid:id,name:'Test '+id,rate:'Standard',intentionalSingle:false,notes:''});
++(async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.CHAPEL_TEST_BROWSER||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});let passed=0;
++try{for(const mode of ['preflight-failure','partial-failure','uncertain-response','success','changed-server-draft','unavailable-server-status']){
++ const page=await browser.newPage(),calls=[],errors=[];let state={id:'draft',periodId:2,revision:'original',refreshedAt:'2026-11-09T12:00:00Z',rooms:structuredClone(rooms),applyStatus:null},submitted=false;
++ page.on('pageerror',e=>errors.push(e.message));await page.route('http://housing.test/**',route=>{const request=route.request();if(request.isNavigationRequest())return route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8">'+markup});const handler=new URL(request.url()).searchParams.get('handler');calls.push({handler,method:request.method()});
++  if(handler==='Setup')return route.fulfill({json:{periodId:2,periodName:'Spring 2027',masterCommuterRoomCount:20,periodCommuterRoomCount:20,missingCommuterRooms:[]}});
++  if(handler==='Periods')return route.fulfill({json:[{id:2,name:'Spring 2027'}]});
++  if(handler==='Draft'){if(submitted&&mode==='unavailable-server-status')return route.fulfill({status:503,json:{error:{message:'Unavailable'}}});return route.fulfill({json:state});}
++  if(handler==='RateRevision')return route.fulfill({json:''});
++  if(handler==='Preview')return route.fulfill({json:Array.from({length:113},(_,i)=>({action:'Assign',detail:'Test '+(i+1)}))});
++  if(handler==='Apply'){submitted=true;if(mode==='success'){state={...state,applyStatus:'Completed',revision:'completed'};return route.fulfill({json:state});}if(mode==='partial-failure'||mode==='uncertain-response')state={...state,applyStatus:mode==='partial-failure'?'Needs review':'Running',revision:'claimed'};if(mode==='changed-server-draft')state={...state,rooms:[]};return route.fulfill({status:mode==='uncertain-response'?502:409,json:{error:{message:mode==='preflight-failure'?'The live assignment changed. Review before applying.':'The apply needs review.'}}});}
++  throw new Error('Unexpected mutation: '+handler);
++ });
++ await page.goto('http://housing.test/');await page.addScriptTag({content:script});await page.waitForFunction(()=>document.querySelector('#housing-period').options.length===2);await page.selectOption('#housing-period','2');await page.waitForFunction(()=>document.querySelector('#housing-summary').textContent.startsWith('113 assigned'));
++ page.once('dialog',d=>d.accept());await page.click('#housing-apply');await page.waitForFunction(()=>document.querySelector('#housing-message').textContent.includes('applied')||document.querySelector('#housing-message').textContent.includes('review')||document.querySelector('#housing-message').textContent.includes('Review'));
++ assert.equal(await page.locator('#housing-rows input[aria-label^="Select Test "]').count(),113);assert.match(await page.locator('#housing-summary').innerText(),/^113 assigned/);assert.equal(calls.filter(x=>x.handler==='Apply').length,1);assert.equal(calls.filter(x=>['Refresh','Save'].includes(x.handler)).length,0);
++ if(['partial-failure','uncertain-response','changed-server-draft','unavailable-server-status'].includes(mode))assert.equal(await page.locator('#housing-apply').isDisabled(),true);
++ if(mode==='success')assert.match(await page.locator('#housing-summary').innerText(),/Completed/);
++ assert.deepEqual(errors,[]);console.log('PASS '+mode+' retains 113 saved assignments without Refresh or Save');passed++;await page.close();
++ }console.log(`${passed} housing preservation browser scenarios passed.`);}finally{await browser.close();}
++})().catch(e=>{console.error(e);process.exit(1)});

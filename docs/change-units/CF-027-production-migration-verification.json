@@ -1,0 +1,17 @@
+{
+  "environment": "production",
+  "mode": "verify",
+  "migrationId": "20261110041612_AddMealPlanTaxCharges",
+  "migrationApplied": true,
+  "tableCreated": false,
+  "auditRows": 0,
+  "uniqueIndexCount": 1,
+  "unrelatedSchemaAndHistoryPreserved": true,
+  "existingStudentDataModified": false,
+  "sqlSha256": "452bdad4dbe58c931a92a596beecba752499aac8cff08155acca07d9942cc33d",
+  "financialAidPermissionGrants": [
+    "CampusFlow.Admin.FinancialAid:R:admin",
+    "CampusFlow.Admin.FinancialAid.ReconcileAwardCodes:R:admin"
+  ],
+  "checkedAtUtc": "2026-11-10T05:37:05.766144Z"
+}
