@@ -24,8 +24,8 @@
     <header class="approval-hero">
         <div>
             <span class="eyebrow">Registration checkout</span>
-            <h1>Review and approve your bill</h1>
-            <p>Confirm your classes, funding@(Model.RemainingBalance > 0 ? ", payment choice," : ",") and agreement in one guided review.</p>
+            <h1>@(Model.IsAlreadyAccepted ? (Model.RegistrationComplete ? "Your registration is complete!" : "Your bill has been approved") : "Review and approve your bill")</h1>
+            @if (!Model.IsAlreadyAccepted) { <p>Confirm your classes, funding@(Model.RemainingBalance > 0 ? ", payment choice," : ",") and agreement in one guided review.</p> }
             <a asp-page="/BillApprovalHistory">View bill approval history</a>
         </div>
         <div class="student-chip"><span>@Model.StudentName</span><strong>ID @Model.StudentId</strong></div>
@@ -42,7 +42,9 @@
             <section class="approval-complete" role="status">
                 <div class="finish-icon"><i class="fa-solid fa-file-circle-check"></i></div>
                 <span class="eyebrow">Approval complete</span>
-                <h2>Your bill has been approved</h2>
+                <h2>Congratulations, @Model.StudentName!</h2>
+                <p>@(Model.RegistrationComplete ? CampusFlow.Web.BillApprovals.BillApprovalStudentCompletion.CompleteMessage : CampusFlow.Web.BillApprovals.BillApprovalStudentCompletion.PendingMessage)</p>
+                @if (Model.RegistrationComplete) { <img class="celebrating-lion" src="~/images/tenants/nelson/judah-celebrating.jpg" alt="Judah the lion celebrating with balloons" /> }
                 @if (Model.LegacyApproval?.CountsAsApproved == true)
                 {
                     <p>This approval was recorded in the previous student portal on @Model.LegacyApproval.AcceptTime?.ToString("MMMM d, yyyy"). Historical agreement files are not included in this import.</p>
@@ -56,15 +58,14 @@
                 {
                     <p>Your agreement is complete. Your downloadable copy is being prepared.</p>
                 }
-                @if (Model.LegacyApproval is null)
+                @if (!Model.RegistrationComplete || !Model.PdfAvailable && Model.LegacyApproval is null)
                 {
-                    <p>Document delivery and completion notifications may still be processing.</p>
-                    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage)) { <p>@Model.StatusMessage</p> }
-                    <form method="post" asp-page-handler="GeneratePdf" asp-route-term="@Model.TermCode"><button class="secondary" type="submit">Retry pending completion work</button></form>
+                    <p>You can refresh this page to check your registration and agreement.</p>
+                    <a class="secondary" asp-page="/BillApproval" asp-route-term="@Model.TermCode">Refresh status</a>
                 }
                 @if (Model.BookstoreUrl is not null)
                 {
-                    <p><a href="@Model.BookstoreUrl" target="_blank" rel="noopener noreferrer">Get your course materials now <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></p>
+                    <p><a href="@Model.BookstoreUrl" target="_blank" rel="noopener noreferrer">Click here to purchase your textbooks. <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></p>
                 }
             </section>
         }
@@ -218,7 +219,7 @@
                         <input type="hidden" name="ReviewVersion" value="@Model.CurrentReviewVersion" />
                         <input type="hidden" asp-for="PaymentChoiceInput" id="paymentChoiceInput" value="@(Model.RemainingBalance <= 0 ? "NoBalanceDue" : "PayNow")" />
                         <input type="hidden" asp-for="AgreementAcceptedInput" id="agreementAcceptedInput" value="false" />
-                        <button class="primary final-button" type="submit" id="finalApprovalButton" data-has-balance="@(Model.RemainingBalance > 0 ? "true" : "false")" disabled><i class="fa-solid fa-lock"></i> Record agreement</button>
+                        <button class="primary final-button" type="submit" id="finalApprovalButton" data-has-balance="@(Model.RemainingBalance > 0 ? "true" : "false")" disabled><i class="fa-solid fa-lock"></i> Click Here to Approve Your Bill &amp; Complete Registration!</button>
                     </form>
                     <small class="final-help">Please keep this page open while your agreement is recorded.</small>
                     <button class="link-button" type="button" data-next="agreement">Back to agreement</button>

@@ -120,7 +120,7 @@ public static class BillApprovalNotification
             if(!bookstore&&(pdf.Length==0||string.IsNullOrWhiteSpace(fileName)))throw new BillCompletionPreparationException("The approved PDF is required before emailing the student.");
             var message=new MailMessage {From=from,IsBodyHtml=false,
                 Subject=bookstore?$"Bill approval completed - {approval.TermName}":"Approved Bill and Schedule",
-                Body=bookstore?$"{profile.DisplayName} ({approval.StudentId}) has completed bill approval for {approval.TermName}.\n\nApproval reference: {approval.Id:D}\nPlease use the current bookstore voucher process for the student's available purchasing amount.":
+                Body=bookstore?$"{profile.FirstName} {profile.LastName} ({approval.StudentId}) has completed bill approval for {approval.TermName}.\n\nApproval reference: {approval.Id:D}\nThe student is approved to charge up to {CampusFlow.Web.Formatting.UsdCurrency.Format(CampusFlow.Bibliu.BibliuRules.VoucherAmount(approval.RemainingBalance, 0m))} for required textbooks and software. Only actual purchases will be charged; this allowance is not a cash refund.":
                     $"Congratulations, {profile.DisplayName}! Your bill approval for {approval.TermName} is complete.\n\nYour approved bill and schedule are attached. Keep this copy for your records.\n\nPlease contact Student Billing with any questions."};
             var nonprod=IsNonProduction(configuration);
             if(nonprod)

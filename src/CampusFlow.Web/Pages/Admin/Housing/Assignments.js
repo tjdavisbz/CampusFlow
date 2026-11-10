@@ -54,6 +54,7 @@
         i.addEventListener('change', () => change(type === 'checkbox' ? i.checked : i.value)); return i;
     }
     function matchesFilter(room, occupant, filter) {
+        if (el('dorm').value && room.building !== el('dorm').value) return false;
         if (!filter) return true;
         return [room.building, room.name, occupant?.name, occupant?.rate, occupant?.notes,
             occupant ? (occupant.intentionalSingle ? 'intentional single yes' : 'intentional single no') : 'vacant']
@@ -89,6 +90,11 @@
     }
     function render() {
         const rows = el('rows'); rows.replaceChildren(); summary();
+        const dorm = el('dorm'), previous = dorm.value;
+        const buildings = [...new Set((state?.rooms || []).map(room => room.building))].sort((a,b) => a.localeCompare(b));
+        dorm.replaceChildren(new Option('All Dorms',''));
+        buildings.forEach(building => dorm.add(new Option(building,building)));
+        dorm.value = buildings.includes(previous) ? previous : '';
         if (!state) return;
         const filter = el('filter').value.toLowerCase();
         state.rooms.forEach(room => {
@@ -139,6 +145,7 @@
         });
         controls();
     }
+    el('dorm').onchange = () => { selected.clear(); render(); };
     el('period').onchange = () => run(async () => {
         if (dirty && !confirm('Discard unsaved edits and open the selected period?')) { el('period').value = loadedPeriod; return; }
         const next = el('period').value;

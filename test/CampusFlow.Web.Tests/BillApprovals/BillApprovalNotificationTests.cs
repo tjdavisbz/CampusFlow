@@ -37,4 +37,17 @@ public class BillApprovalNotificationTests
     }
     [Fact] public void Nonproduction_without_a_test_recipient_cannot_prepare_a_real_delivery()=>Assert.Throws<BillCompletionPreparationException>(()=>BillApprovalNotification.Create(NewBill(),Profile(NewBill()),BillCompletionStep.BookstoreEmail,Config(true),Array.Empty<byte>(),""));
     [Fact] public void A_personal_address_is_not_used_as_the_student_school_address()=>Assert.Throws<BillCompletionPreparationException>(()=>BillApprovalNotification.Create(NewBill(),Profile(NewBill(),"student@example.com"),BillCompletionStep.StudentEmail,Config(),new byte[]{1},"approved.pdf"));
+    [Theory]
+    [InlineData(200, "$500.00")]
+    [InlineData(0, "$500.00")]
+    [InlineData(-499, "$500.00")]
+    [InlineData(-500, "$500.00")]
+    [InlineData(-1250.75, "$1,250.75")]
+    public void Bookstore_uses_legal_name_and_legacy_allowance_from_the_accepted_snapshot(decimal balance,string amount)
+    {
+        var bill=NewBill();bill.UpdateDraft(BillPaymentChoice.PayNow,0,0,0,balance,0,"[]","{}");
+        var profile=new StudentProfile(Guid.NewGuid(),bill.TenantId,null,new(StudentInformationSystemProvider.ThesisElements,"10","100","student@nelson.edu","Jeffrey","Jeff","Francis"));
+        using var message=BillApprovalNotification.Create(bill,profile,BillCompletionStep.BookstoreEmail,Config(),Array.Empty<byte>(),"");
+        Assert.Contains("Jeffrey Francis",message.Body);Assert.DoesNotContain("Jeff Francis",message.Body);Assert.Contains(amount,message.Body);Assert.DoesNotContain("current bookstore voucher process",message.Body);Assert.Contains("Only actual purchases",message.Body);Assert.Empty(message.Attachments);
+    }
 }
