@@ -30,3 +30,6 @@
 .confirm-actions { display:flex; justify-content:flex-end; gap:.75rem; }
 .confirm-actions a { display:flex; align-items:center; }
 @media(max-width:760px) { .meal-admin-hero{padding:2rem}.meal-admin-hero>i{display:none}.student-search{grid-template-columns:1fr}.student-results article,.plan-list article{align-items:stretch;flex-direction:column}.plan-action{justify-items:start}.confirmation{flex-direction:column} }
+
+.meal-validation.validation-summary-valid { display: none; }
+.meal-validation.validation-summary-errors { margin: 1rem 0; padding: 1rem; border: 1px solid #b42318; border-radius: .75rem; color: #b42318; background: #fff; }

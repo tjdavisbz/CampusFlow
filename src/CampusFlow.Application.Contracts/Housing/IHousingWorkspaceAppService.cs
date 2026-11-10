@@ -7,6 +7,7 @@ namespace CampusFlow.Housing;
 public interface IHousingWorkspaceAppService : IApplicationService
 {
     Task<List<HousingPeriodOption>> GetPeriodsAsync();
+    Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId);
     Task<HousingWorkspaceState?> GetAsync(int periodId);
     Task<HousingWorkspaceState> RefreshAsync(int periodId, string? revision);
     Task<HousingWorkspaceState> SaveAsync(HousingWorkspaceState input);

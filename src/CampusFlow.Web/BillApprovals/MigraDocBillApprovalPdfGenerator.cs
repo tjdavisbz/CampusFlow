@@ -214,8 +214,24 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         accepted.Format.RightIndent = Unit.FromPoint(12);
         accepted.Format.SpaceBefore = Unit.FromPoint(7);
         accepted.Format.SpaceAfter = Unit.FromPoint(13);
-        foreach (var block in HtmlToBlocks(approval.RenderedAgreementSnapshot ?? ""))
-            section.AddParagraph(block.Text, block.IsHeading ? StyleNames.Heading2 : StyleNames.Normal);
+        foreach (var block in AgreementPdfContent.Read(approval.RenderedAgreementSnapshot ?? ""))
+        {
+            if (block.Rows is not { Count: > 0 } rows)
+            {
+                section.AddParagraph(block.Text, block.IsHeading ? StyleNames.Heading2 : StyleNames.Normal);
+                continue;
+            }
+            var columns = rows.Max(row => row.Count);
+            var table = CreateTable(section, Enumerable.Repeat(7.2 / columns, columns).ToArray());
+            foreach (var cells in rows)
+            {
+                var row = table.AddRow();
+                row.TopPadding = Unit.FromPoint(4);
+                row.BottomPadding = Unit.FromPoint(4);
+                for (var column = 0; column < cells.Count; column++) row.Cells[column].AddParagraph(cells[column]);
+            }
+            section.AddParagraph().Format.SpaceAfter = Unit.FromPoint(3);
+        }
         var fingerprint = section.AddParagraph();
         fingerprint.Format.SpaceBefore = Unit.FromPoint(12);
         fingerprint.Format.Font.Size = 7;
@@ -292,14 +308,6 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
     }
 
     private static BillApprovalReviewSnapshot EmptySnapshot() => new("", 0, [], [], []);
-
-    private static IEnumerable<(string Text, bool IsHeading)> HtmlToBlocks(string html)
-    {
-        var normalized = Regex.Replace(html, "</?(h[1-6]|p|div|li|br)[^>]*>", "\n", RegexOptions.IgnoreCase);
-        normalized = Regex.Replace(normalized, "<[^>]+>", " ");
-        return WebUtility.HtmlDecode(normalized).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(x => (Regex.Replace(x, "\\s+", " "), x.Length < 70 && !x.EndsWith('.')));
-    }
 
     private static void EnsureFonts()
     {

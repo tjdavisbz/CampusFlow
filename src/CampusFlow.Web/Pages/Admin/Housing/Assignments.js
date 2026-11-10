@@ -54,6 +54,7 @@
         i.addEventListener('change', () => change(type === 'checkbox' ? i.checked : i.value)); return i;
     }
     function matchesFilter(room, occupant, filter) {
+        if (el('dorm').value && room.building !== el('dorm').value) return false;
         if (!filter) return true;
         return [room.building, room.name, occupant?.name, occupant?.rate, occupant?.notes,
             occupant ? (occupant.intentionalSingle ? 'intentional single yes' : 'intentional single no') : 'vacant']
@@ -89,6 +90,11 @@
     }
     function render() {
         const rows = el('rows'); rows.replaceChildren(); summary();
+        const dorm = el('dorm'), previous = dorm.value;
+        const buildings = [...new Set((state?.rooms || []).map(room => room.building))].sort((a,b) => a.localeCompare(b));
+        dorm.replaceChildren(new Option('All Dorms',''));
+        buildings.forEach(building => dorm.add(new Option(building,building)));
+        dorm.value = buildings.includes(previous) ? previous : '';
         if (!state) return;
         const filter = el('filter').value.toLowerCase();
         state.rooms.forEach(room => {
@@ -139,15 +145,32 @@
         });
         controls();
     }
+    el('dorm').onchange = () => { selected.clear(); render(); };
+    async function showSetup(periodId) {
+        el('setup').hidden = !periodId;
+        el('setup-missing').hidden = true;
+        el('setup-rooms').replaceChildren();
+        if (!periodId) return;
+        el('setup-counts').textContent = 'Checking commuter rooms…';
+        try {
+            const setup = await request('Setup', undefined, {periodId});
+            el('setup-counts').textContent = `${setup.periodName}: ${setup.periodCommuterRoomCount} commuter rooms in this period; ${setup.masterCommuterRoomCount} active commuter rooms under Properties in Elements.`;
+            const missing = setup.missingCommuterRooms || [];
+            el('setup-missing').hidden = !missing.length;
+            missing.forEach(name => { const item = document.createElement('li'); item.textContent = name; el('setup-rooms').append(item); });
+        } catch {
+            el('setup-counts').textContent = 'Commuter room setup could not be checked. Reload the period to try again. No assignments were changed.';
+        }
+    }
     el('period').onchange = () => run(async () => {
         if (dirty && !confirm('Discard unsaved edits and open the selected period?')) { el('period').value = loadedPeriod; return; }
         const next = el('period').value;
-        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); }
+        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next); }
         catch (e) { el('period').value = loadedPeriod; throw e; }
     });
     el('refresh').onclick = () => run(async () => {
         if (!confirm('Refresh from Elements will replace this CampusFlow draft. Any changes not applied—including saved draft assignments, rate choices, notes, and unsaved edits—will be lost. Rate choices and intentional-single flags from the last successful Apply will be kept. This action will not change Elements. Continue?')) return;
-        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.');
+        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.'); await showSetup(el('period').value);
     });
     async function save() { state = await request('Save', state); dirty = false; render(); message('Draft saved in CampusFlow. Elements is unchanged.'); }
     el('save').onclick = () => run(save);
@@ -169,8 +192,20 @@
         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
         if (!confirm(`Apply ${actionable.length} assignment/rate/capacity change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
-        state = await request('Apply', {periodId:state.periodId, revision:state.revision,
-            rateRevision, confirmed:true});
+        try {
+            state = await request('Apply', {periodId:state.periodId, revision:state.revision,
+                rateRevision, confirmed:true});
+        } catch (error) {
+            // Read the saved draft, never Refresh from Elements: a failed/uncertain apply
+            // must not discard the assignments staff already entered.
+            try {
+                const saved = await request('Draft', undefined, {periodId:state.periodId});
+                if (saved?.id === state.id && JSON.stringify(saved.rooms) === JSON.stringify(state.rooms)) state = saved;
+                else state.applyStatus = 'Needs review';
+            } catch { state.applyStatus = 'Needs review'; }
+            render();
+            throw error;
+        }
         dirty = false; selected.clear(); render();
         message(`Room assignments and CampusFlow housing charges were applied to ${root.dataset.environment} Elements and verified.`);
     });

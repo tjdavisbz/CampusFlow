@@ -141,4 +141,43 @@ public class MealPlanSelectionTests
         await _sis.DidNotReceiveWithAnyArgs().GetContextAsync(default!, default);
         await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default);
     }
+    [Fact]
+    public async Task Actual_Spring_Elements_names_resolve_and_keep_commuter_choices_separate()
+    {
+        Eligibility("Graduate", "Teeter Hall");
+        var context = await _sis.GetContextAsync("10",270);
+        _sis.GetContextAsync("10",270,Arg.Any<CancellationToken>()).Returns(context with
+        {
+            Catalog = new[] {
+                new StudentMealPlanCatalogItem(9,"12 Meal Plan - Spr 27","Dining",2475,new(2027,1,1),new(2027,5,1)),
+                new StudentMealPlanCatalogItem(10,"20 Block Meal Plan - Spr 27","Dining",315,new(2027,1,1),new(2027,5,1)) }
+        });
+        var view=await _service.GetAsync("270");
+        Assert.Equal(9,Assert.Single(view.Options[HousingChoice.OnCampus]).ExternalMealPlanId);
+        Assert.Empty(view.Options[HousingChoice.Commuter]);
+        Assert.Null(view.UnavailableReason);
+    }
+    [Fact]
+    public async Task Missing_term_catalog_explains_the_setup_problem_and_does_not_offer_a_previous_term_plan()
+    {
+        Eligibility("Graduate", "Teeter Hall");
+        var context=await _sis.GetContextAsync("10",270);
+        _sis.GetContextAsync("10",270,Arg.Any<CancellationToken>()).Returns(context with {Catalog=Array.Empty<StudentMealPlanCatalogItem>()});
+        var view=await _service.GetAsync("270");
+        Assert.All(view.Options.Values,x=>Assert.Empty(x));
+        Assert.Contains("not yet available",view.UnavailableReason);
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!,default);
+    }
+    [Fact]
+    public async Task Closed_access_explains_that_the_selection_window_has_closed()
+    {
+        Eligibility("Graduate", "Teeter Hall");_clock.Now.Returns(new DateTime(2027,3,1));
+        Assert.Contains("window for this term has closed",(await _service.GetAsync("270")).UnavailableReason);
+    }
+    [Fact]
+    public async Task Future_access_explains_that_selection_uses_the_bill_approval_window()
+    {
+        Eligibility("Graduate", "Teeter Hall");_clock.Now.Returns(new DateTime(2026,10,1));
+        Assert.Contains("opens with bill approval",(await _service.GetAsync("270")).UnavailableReason);
+    }
 }

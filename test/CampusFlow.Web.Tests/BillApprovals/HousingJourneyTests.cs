@@ -29,4 +29,16 @@ public class HousingJourneyTests
         Assert.Equal(billBlocked, bill.Url is null);
         if (housingRequired) Assert.Contains("term=270", journey.Steps.Single(x => x.Title == "Housing").Url);
     }
+    [Theory]
+    [InlineData("Meal plans are not yet available for your assigned housing in this term.")]
+    [InlineData("Meal plan selection opens with bill approval for this term.")]
+    public void Meal_step_explains_its_own_blocker_without_unlocking_selection(string reason)
+    {
+        var journey=new IndexModel.RegistrationJourneyViewModel {
+            Term=new(StudentInformationSystemProvider.ThesisElements,"269","B27C","Spring 2027",new(2027,1,11),new(2027,4,30)),
+            HousingRequired=true,HasHousingAssignment=true,MealPlanEligible=true,BillApprovalEnabled=true,
+            MealPlanEnabled=false,MealPlanUnavailableReason=reason};
+        journey.BuildSteps();var step=journey.Steps.Single(x=>x.Title=="Meal plan");
+        Assert.Equal(reason,step.Description);Assert.Null(step.Url);
+    }
 }

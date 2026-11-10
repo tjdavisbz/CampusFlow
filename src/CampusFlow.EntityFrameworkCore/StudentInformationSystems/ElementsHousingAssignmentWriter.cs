@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -24,15 +25,18 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
     private readonly HttpClient _client;
+    private readonly Func<int,int,int,int,string,CancellationToken,Task<bool>> _deletedAssignment;
 
     public ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache)
         : this(configuration, cache, SharedHttpClient) { }
 
-    internal ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache, HttpClient client)
+    internal ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache, HttpClient client,
+        Func<int,int,int,int,string,CancellationToken,Task<bool>>? deletedAssignment = null)
     {
         _configuration = configuration;
         _cache = cache;
         _client = client;
+        _deletedAssignment = deletedAssignment ?? IsDeletedAssignmentAsync;
     }
 
     public void EnsureWriteEnabled()
@@ -72,16 +76,74 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         var root = await ReadAsync(response, cancellationToken);
         var data = root["data"] as JsonArray;
         if (data is null) throw new InvalidOperationException("Elements returned an invalid assignment list.");
-        var matches = data.OfType<JsonObject>()
-            .Where(x => ReadInt(x, "housingPeriodID") == periodId)
-            .Select(x => (Building: ReadString(x, "building"), Room: ReadString(x, "roomName")))
-            .ToList();
+        var matches = new List<(string Building, string Room)>();
+        if (data.Any(x => x is not JsonObject))
+            throw new InvalidOperationException("Elements returned an invalid assignment row.");
+        foreach (var row in data.OfType<JsonObject>().Where(x => ReadInt(x, "housingPeriodID") == periodId))
+        {
+            var propertyId = ReadInt(row, "housingPeriodPropertyID");
+            var building = ReadString(row, "building").Trim();
+            var roomName = ReadString(row, "roomName").Trim();
+            if (propertyId <= 0 || building.Length == 0 || roomName.Length == 0)
+                throw new InvalidOperationException("Elements returned an incomplete room identity.");
+            var property = (await HousingDataAsync(
+                $"/api/student-life/housing/housing-periods/housing-period-properties/{propertyId}", cancellationToken)).AsObject();
+            if (ReadInt(property, "housingPeriodPropertyID") != propertyId ||
+                ReadInt(property, "housingPeriodID") != periodId ||
+                !string.Equals(ReadString(property, "propertyName").Trim(), building, StringComparison.OrdinalIgnoreCase) ||
+                property["rooms"] is not JsonArray rooms || rooms.Any(x => x is not JsonObject))
+                throw new InvalidOperationException("The live housing property identity could not be verified.");
+            // The student endpoint retains deleted assignments after a period's rooms are replaced.
+            // Only a room still returned by the live property's current catalog can be assigned.
+            var current = rooms.OfType<JsonObject>()
+                .Where(x => x["isDeleted"]?.GetValue<bool>() != true &&
+                    string.Equals(ReadString(x, "roomName").Trim(), roomName, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (current.Count == 0)
+            {
+                var roomId = ReadInt(row, "roomID");
+                if (roomId <= 0) throw new InvalidOperationException("Elements omitted the assigned room identifier.");
+                // Absence from the property alone is not proof of deallocation. Keep the
+                // original live conflict unless the exact matching assignment is tombstoned.
+                if (await _deletedAssignment(studentUid, periodId, propertyId, roomId, roomName, cancellationToken)) continue;
+                matches.Add((building, roomName));
+                continue;
+            }
+            if (current.Count != 1 || ReadInt(current[0], "housingPeriodRoomID") <= 0 ||
+                ReadInt(current[0], "housingPeriodID") != periodId)
+                throw new InvalidOperationException("The live room identity is ambiguous or belongs to another period.");
+            matches.Add((building, roomName));
+        }
         if (matches.Count > 1)
             throw new InvalidOperationException("Elements returned multiple room assignments for one student and period.");
         if (matches.Count == 0) return null;
         if (string.IsNullOrWhiteSpace(matches[0].Building) || string.IsNullOrWhiteSpace(matches[0].Room))
             throw new InvalidOperationException("Elements returned an assignment without a building or room.");
         return matches[0];
+    }
+
+    private async Task<bool> IsDeletedAssignmentAsync(int studentUid, int periodId, int propertyId,
+        int roomId, string roomName, CancellationToken cancellationToken)
+    {
+        await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new SqlCommand("""
+            SELECT COUNT(*), COALESCE(SUM(CASE WHEN a.IsDeleted=0 THEN 1 ELSE 0 END),0)
+            FROM StudentLife.HousingPeriodRoomAssignments a
+            JOIN StudentLife.HousingPeriodRooms r ON r.HousingPeriodRoomID=a.HousingPeriodRoomID
+                AND r.HousingPeriodID=a.HousingPeriodID
+            WHERE a.StudentUID=@Student AND a.HousingPeriodID=@Period
+                AND r.HousingPeriodPropertyID=@Property
+                AND (r.HousingPeriodRoomID=@Room OR r.OriginalRoomID=@Room)
+                AND LTRIM(RTRIM(r.RoomName))=@Name;
+            """, connection) { CommandTimeout = 30 };
+        command.Parameters.Add("@Student", SqlDbType.Int).Value=studentUid;
+        command.Parameters.Add("@Period", SqlDbType.Int).Value=periodId;
+        command.Parameters.Add("@Property", SqlDbType.Int).Value=propertyId;
+        command.Parameters.Add("@Room", SqlDbType.Int).Value=roomId;
+        command.Parameters.Add("@Name", SqlDbType.NVarChar, 200).Value=roomName;
+        await using var reader=await command.ExecuteReaderAsync(cancellationToken);
+        if(!await reader.ReadAsync(cancellationToken))throw new InvalidOperationException("The assignment history could not be verified.");
+        return reader.GetInt32(0)>0 && reader.GetInt32(1)==0;
     }
 
     public Task AssignAsync(int studentUid, int periodId, int periodRoomId,

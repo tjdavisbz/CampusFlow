@@ -38,6 +38,10 @@ public class CampusFlowPermissionDefinitionProvider : PermissionDefinitionProvid
             L("Permission:Admin.StudentBilling"), MultiTenancySides.Tenant);
         studentBilling.AddChild(CampusFlowPermissions.Admin.ResetIndividualBillApproval,
             L("Permission:Admin.StudentBilling.ResetIndividualBillApproval"), MultiTenancySides.Tenant);
+        var financialAid = admin.AddChild(CampusFlowPermissions.Admin.FinancialAid,
+            new FixedLocalizableString("Access Financial Aid administration"), MultiTenancySides.Tenant);
+        financialAid.AddChild(CampusFlowPermissions.Admin.ReconcileAwardCodes,
+            new FixedLocalizableString("Reconcile financial award codes"), MultiTenancySides.Tenant);
         var businessServices = admin.AddChild(CampusFlowPermissions.Admin.BusinessServices,
             L("Permission:Admin.BusinessServices"), MultiTenancySides.Tenant);
         admin.AddChild(CampusFlowPermissions.Admin.HousingAssignments,

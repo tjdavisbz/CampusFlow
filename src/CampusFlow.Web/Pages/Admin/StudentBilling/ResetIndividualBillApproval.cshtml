@@ -55,7 +55,7 @@
                 <p><strong>@Model.Preview.StudentName</strong> (Student ID @Model.Preview.StudentId) will be able to restart Bill Approval for <strong>@Model.Preview.TermName</strong>. This does not change the student's charges, aid, or registration.</p>
                 <form method="post" asp-page-handler="Reset">
                     <input asp-for="ResetInput.ApprovalId" type="hidden" value="@Model.Preview.Id" />
-                    <label class="confirm-check"><input asp-for="ResetInput.Confirmed" /><span>I have verified the student and term and intend to reset this Bill Approval.</span></label>
+                    <label class="confirm-check"><input asp-for="ResetInput.Confirmed" required aria-required="true" /><span>I have verified the student and term and intend to reset this Bill Approval.</span></label>
                     <span asp-validation-for="ResetInput.Confirmed" class="validation-message"></span>
                     <div class="confirmation-actions"><a asp-route-termCode="@Model.TermCode" asp-route-query="@Model.Query">Cancel</a><button type="submit"><i class="fa-solid fa-arrow-rotate-left"></i> Reset Bill Approval</button></div>
                 </form>

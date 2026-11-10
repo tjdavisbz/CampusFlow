@@ -37,6 +37,13 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         _unitOfWorkManager = unitOfWorkManager;
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
     }
+    public async Task<HousingPeriodSetup> GetPeriodSetupAsync(int periodId)
+    {
+        Tenant();
+        if (periodId <= 0) throw new UserFriendlyException("Choose a housing period.");
+        try { return await _elements.GetPeriodSetupAsync(periodId); }
+        catch (InvalidOperationException exception) { throw new UserFriendlyException(exception.Message); }
+    }
     private Guid Tenant() => CurrentTenant.Id ?? throw new UserFriendlyException("Select a university before managing housing.");
     private async Task<HousingAssignmentDraft?> Find(int periodId)
     {
