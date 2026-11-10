@@ -34,6 +34,10 @@ namespace CampusFlow.BillApprovals;
 public class BillApprovalAccessHandlerTests
 {
     private readonly CampusFlow.Web.Pages.BillApprovalModel _model;
+    private readonly IConfigurationRoot _taxConfiguration=new ConfigurationBuilder().AddInMemoryCollection().Build();
+    private readonly CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator _tax=Substitute.For<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>();
+    private readonly ICurrentStudentView _current=Substitute.For<ICurrentStudentView>();
+    private readonly IBillApprovalCompletionLookup _completion=Substitute.For<IBillApprovalCompletionLookup>();
     private readonly IMealPlanAppService _meal=Substitute.For<IMealPlanAppService>();
     private readonly IStudentInformationSystemBillingRecalculationService _recalculation=Substitute.For<IStudentInformationSystemBillingRecalculationService>();
     private readonly IPayflowGateway _gateway=Substitute.For<IPayflowGateway>();
@@ -50,8 +54,8 @@ public class BillApprovalAccessHandlerTests
     {
         var owner=Guid.NewGuid();var userId=Guid.NewGuid();var user=Substitute.For<ICurrentUser>();user.Id.Returns(userId);
         var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(owner);tenant.Name.Returns("nelson");
-        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
-        var current=Substitute.For<ICurrentStudentView>();
+        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>().Returns(_tax);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
+        var current=_current;
         current.GetProfileAsync(Arg.Any<CancellationToken>()).Returns(new StudentProfile(Guid.NewGuid(),owner,userId,new(StudentInformationSystemProvider.ThesisElements,"10","100","student@example.test","Test",null,"Student")));
         var termLookup=Substitute.For<IStudentInformationSystemTermLookup>();termLookup.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
         termLookup.GetCurrentTermAsync(Arg.Any<CancellationToken>()).Returns(new StudentInformationSystemTerm(StudentInformationSystemProvider.ThesisElements,"269","B27S","Spring 2027",new(2027,1,11),new(2027,4,30)));
@@ -73,11 +77,11 @@ public class BillApprovalAccessHandlerTests
         _model=new(theme,Substitute.For<IRepository<StudentProfile,Guid>>(),current,Array.Empty<IStudentInformationSystemStudentLookup>(),
             new[]{termLookup},new[]{schedule},new[]{_billing},new[]{aid},new[]{_planLookup},
             Array.Empty<IStudentInformationSystemDocumentTrackingService>(),Array.Empty<IStudentInformationSystemPaymentPostingService>(),
-            new ConfigurationBuilder().Build(),_agreements,_policies,
+            _taxConfiguration,_agreements,_policies,
             terms,_approvals,Substitute.For<IRepository<BillApprovalArtifact,Guid>>(),Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
             Substitute.For<IBillApprovalPdfGenerator>(),Substitute.For<IGuidGenerator>(),clock,Substitute.For<IRepository<PayflowPayment,Guid>>(),
             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
-            Substitute.For<ILegacyBillApprovalLookup>(),_meal,Substitute.For<IBillApprovalCompletionLookup>(), Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>(),new[]{_aidDecisions})
+            Substitute.For<ILegacyBillApprovalLookup>(),_meal,_completion, Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>(),new[]{_aidDecisions})
         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
     }
 
@@ -237,4 +241,33 @@ public class BillApprovalAccessHandlerTests
         await _model.OnGetAsync("B27S");Assert.Equal(version,_model.CurrentReviewVersion);
     }
 
+    [Fact]
+    public async Task Meal_tax_is_verified_after_recalculation_and_before_bill_totals_are_read()
+    {
+        _taxConfiguration["MealPlanTax:Enabled"]="true";_term.ConfigureTestAccess(true,new[]{"100"});
+        await _model.OnGetAsync("B27S");Assert.False(_model.IsUnavailable);
+        Received.InOrder(()=>{
+            _recalculation.RecalculateAsync("10","269",Arg.Any<Guid>(),Arg.Any<CancellationToken>());
+            _tax.EnsureForBillReviewAsync("10","269",Arg.Any<CancellationToken>());
+            _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>());
+        });
+    }
+    [Theory][InlineData(false)][InlineData(true)]
+    public async Task Unconfirmed_tax_blocks_direct_approval_and_payment(bool payment)
+    {
+        _taxConfiguration["MealPlanTax:Enabled"]="true";_term.ConfigureTestAccess(true,new[]{"100"});
+        _tax.EnsureForBillReviewAsync("10","269",Arg.Any<CancellationToken>()).Returns(Task.FromException(new Volo.Abp.UserFriendlyException("Tax needs review")));
+        if(payment)await _model.OnPostPaymentAsync("B27S");else await _model.OnPostAsync("B27S");
+        Assert.True(_model.IsUnavailable);Assert.Empty(_gateway.ReceivedCalls());
+        await _billing.DidNotReceive().GetTransactionsAsync("10",Arg.Any<CancellationToken>());
+        await _approvals.DidNotReceiveWithAnyArgs().InsertAsync(default!,default,default);
+    }
+    [Theory][InlineData(false)][InlineData(true)]
+    public async Task Approved_and_read_only_views_do_not_post_meal_tax(bool approved)
+    {
+        _taxConfiguration["MealPlanTax:Enabled"]="true";_term.ConfigureTestAccess(true,new[]{"100"});
+        _completion.IsApprovedAsync(Arg.Any<StudentProfile>(),"269",Arg.Any<CancellationToken>()).Returns(approved);
+        _current.IsImpersonating.Returns(!approved);
+        await _model.OnGetAsync("B27S");Assert.Empty(_tax.ReceivedCalls());
+    }
 }

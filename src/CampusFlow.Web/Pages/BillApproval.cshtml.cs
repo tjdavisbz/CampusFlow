@@ -284,6 +284,10 @@ public class BillApprovalModel : CampusFlowPageModel
                     ?? throw new InvalidOperationException("The billing recalculation provider is unavailable.");
                 await recalculation.RecalculateAsync(profile.ExternalStudentId, ExternalTermId!, Guid.NewGuid(), HttpContext.RequestAborted);
             }
+            if (!alreadyApproved && !_currentStudentView.IsImpersonating &&
+                _configuration.GetValue<bool>("MealPlanTax:Enabled"))
+                await LazyServiceProvider.LazyGetRequiredService<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>()
+                    .EnsureForBillReviewAsync(profile.ExternalStudentId, ExternalTermId!, HttpContext.RequestAborted);
             // Read billing only after Elements has confirmed completion; never reuse the pre-recalculation ledger.
             var allTransactions = await billingLookup.GetTransactionsAsync(profile.ExternalStudentId, HttpContext.RequestAborted);
             Charges = allTransactions.Where(x => x.TermCode == TermCode)

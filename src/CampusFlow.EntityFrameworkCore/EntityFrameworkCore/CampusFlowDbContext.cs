@@ -56,6 +56,7 @@ public class CampusFlowDbContext :
     public DbSet<CourseSectionAttendanceTypeMapping> CourseSectionAttendanceTypeMappings { get; set; }
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
+    public DbSet<CampusFlow.MealPlanTaxes.MealPlanTaxCharge> MealPlanTaxCharges { get; set; }
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<CostTypeConfiguration> CostTypeConfigurations { get; set; }
     public DbSet<CostTypeRun> CostTypeRuns { get; set; }
@@ -432,6 +433,17 @@ public class CampusFlowDbContext :
             b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.ExternalTermId }).IsUnique();
         });
 
+        builder.Entity<CampusFlow.MealPlanTaxes.MealPlanTaxCharge>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "MealPlanTaxCharges", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x=>x.Reference).IsRequired().HasMaxLength(80);
+            b.Property(x=>x.State).IsRequired().HasMaxLength(40);
+            b.Property(x=>x.ExternalEntryId).HasMaxLength(80);
+            b.Property(x=>x.BaseAmount).HasPrecision(18,2);
+            b.Property(x=>x.TaxAmount).HasPrecision(18,2);
+            b.HasIndex(x=>new{x.TenantId,x.AssignmentId}).IsUnique();
+        });
         builder.Entity<HousingAssignmentDraft>(b =>
         {
             b.ToTable(CampusFlowConsts.DbTablePrefix + "HousingAssignmentDrafts", CampusFlowConsts.DbSchema);
