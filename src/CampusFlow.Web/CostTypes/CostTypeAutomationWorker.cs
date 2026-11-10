@@ -27,7 +27,8 @@ public sealed class CostTypeAutomationWorker(IServiceScopeFactory scopes,ILogger
         var current=scope.ServiceProvider.GetRequiredService<ICurrentTenant>();
         var store=scope.ServiceProvider.GetRequiredService<ITenantStore>();
         TenantConfiguration? nelson;
-        using(current.Change(null)) nelson=await store.FindAsync("nelson");
+        var normalizer=scope.ServiceProvider.GetRequiredService<ITenantNormalizer>();
+        using(current.Change(null)) nelson=await store.FindAsync(normalizer.NormalizeName("nelson") ?? throw new InvalidOperationException("The Nelson tenant name could not be normalized."));
         if(nelson is null)return;
         // The Elements integration is Nelson-only. Never apply another tenant's rules to its students.
         using(current.Change(nelson.Id))
