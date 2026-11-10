@@ -41,7 +41,8 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         var student = await _students.FindByExternalStudentIdAsync(externalStudentId)
             ?? throw new UserFriendlyException("That student could not be found.");
         var context = await _mealPlans.GetContextAsync(externalStudentId, termCalendarId);
-        var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId);
+        var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId)
+            ?? throw new UserFriendlyException("Choose an available term before managing meal-plan assignments.");
         return new AdminMealPlanContextDto
         {
             CanRemove=_removal.IsEnabled,
@@ -62,7 +63,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
                 Name = x.Name
             }).ToList(),
             Options = context.Catalog
-                .Where(x => selectedTerm is null || (x.StartDate <= selectedTerm.EndDate && x.EndDate >= selectedTerm.StartDate))
+                .Where(x => x.StartDate <= selectedTerm.EndDate && x.EndDate >= selectedTerm.StartDate)
                 .OrderByDescending(x => x.StartDate)
                 .ThenBy(x => x.Name)
                 .Select(x => new AdminMealPlanOptionDto

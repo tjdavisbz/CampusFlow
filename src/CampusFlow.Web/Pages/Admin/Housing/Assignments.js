@@ -139,15 +139,31 @@
         });
         controls();
     }
+    async function showSetup(periodId) {
+        el('setup').hidden = !periodId;
+        el('setup-missing').hidden = true;
+        el('setup-rooms').replaceChildren();
+        if (!periodId) return;
+        el('setup-counts').textContent = 'Checking commuter rooms…';
+        try {
+            const setup = await request('Setup', undefined, {periodId});
+            el('setup-counts').textContent = `${setup.periodName}: ${setup.periodCommuterRoomCount} commuter rooms in this period; ${setup.masterCommuterRoomCount} active commuter rooms under Properties in Elements.`;
+            const missing = setup.missingCommuterRooms || [];
+            el('setup-missing').hidden = !missing.length;
+            missing.forEach(name => { const item = document.createElement('li'); item.textContent = name; el('setup-rooms').append(item); });
+        } catch {
+            el('setup-counts').textContent = 'Commuter room setup could not be checked. Reload the period to try again. No assignments were changed.';
+        }
+    }
     el('period').onchange = () => run(async () => {
         if (dirty && !confirm('Discard unsaved edits and open the selected period?')) { el('period').value = loadedPeriod; return; }
         const next = el('period').value;
-        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); }
+        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next); }
         catch (e) { el('period').value = loadedPeriod; throw e; }
     });
     el('refresh').onclick = () => run(async () => {
         if (!confirm('Refresh from Elements will replace this CampusFlow draft. Any changes not applied—including saved draft assignments, rate choices, notes, and unsaved edits—will be lost. Rate choices and intentional-single flags from the last successful Apply will be kept. This action will not change Elements. Continue?')) return;
-        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.');
+        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.'); await showSetup(el('period').value);
     });
     async function save() { state = await request('Save', state); dirty = false; render(); message('Draft saved in CampusFlow. Elements is unchanged.'); }
     el('save').onclick = () => run(save);

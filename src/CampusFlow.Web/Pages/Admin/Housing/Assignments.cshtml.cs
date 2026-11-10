@@ -22,6 +22,7 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
          string.IsNullOrWhiteSpace(configuration["App:EnvironmentLabel"]));
     public void OnGet() { }
     public async Task<JsonResult> OnGetPeriodsAsync() => new(await workspace.GetPeriodsAsync());
+    public async Task<JsonResult> OnGetSetupAsync(int periodId) => new(await workspace.GetPeriodSetupAsync(periodId));
     public async Task<JsonResult> OnGetDraftAsync(int periodId) => new(await workspace.GetAsync(periodId));
     public async Task<JsonResult> OnGetStudentsAsync(string query, int periodId) => new(await workspace.SearchStudentsAsync(query, periodId));
     public async Task<JsonResult> OnGetPreviewAsync(int periodId) => new(await workspace.PreviewAsync(periodId));

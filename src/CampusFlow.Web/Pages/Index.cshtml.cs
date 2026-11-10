@@ -400,6 +400,7 @@ public class IndexModel : CampusFlowPageModel
             journey.HousingRequired = mealPlan.HousingRequired;
             journey.HasHousingAssignment = mealPlan.HasHousingAssignment;
             journey.MealPlanEligible = mealPlan.MealPlanEligible;
+            journey.MealPlanUnavailableReason = mealPlan.UnavailableReason;
             journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
             journey.MealPlanRequired = journey.MealPlanEnabled;
             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
@@ -442,6 +443,7 @@ public class IndexModel : CampusFlowPageModel
         public bool HousingRequired { get; set; }
         public bool HasHousingAssignment { get; set; }
         public bool MealPlanEligible { get; set; }
+        public string? MealPlanUnavailableReason { get; set; }
         public bool MealPlanEnabled { get; set; }
         public bool MealPlanRequired { get; set; }
         public bool MealPlanSelected { get; set; }
@@ -493,7 +495,9 @@ public class IndexModel : CampusFlowPageModel
             Steps.Add(!HasHousingAssignment
                 ? new("Meal plan", "A housing assignment is required before choosing a meal plan.", "disabled", null, "Housing required")
                 : !BillApprovalEnabled || !MealPlanEnabled
-                ? UnavailableBillStep("Meal plan")
+                ? MealPlanUnavailableReason is { Length: > 0 } reason
+                    ? new("Meal plan", reason, "disabled", null, "Unavailable")
+                    : UnavailableBillStep("Meal plan")
                 : !MealPlanRequired
                 ? new("Meal plan", "A meal-plan selection is not required for you.", "not-required", housingUrl, "View options")
                 : MealPlanSelected

@@ -46,6 +46,16 @@ public class HousingApplyTests
         _writer=new(()=>HousingApplyProgress.Read(_draft));
         _service=new(drafts,_rates,_reader,_writer,_billing,config,Substitute.For<IUnitOfWorkManager>(),[students]){LazyServiceProvider=lazy};
     }
+    [Fact] public async Task Period_setup_is_read_only_and_does_not_require_or_change_a_draft()
+    {
+        var setup=new HousingPeriodSetup {PeriodId=2,PeriodName="Spring 2027",MasterCommuterRoomCount=20,PeriodCommuterRoomCount=1,MissingCommuterRooms=["Commuter / 2"]};
+        _reader.GetPeriodSetupAsync(2,Arg.Any<CancellationToken>()).Returns(setup);
+        var before=_draft.RoomsJson;
+        Assert.Same(setup,await _service.GetPeriodSetupAsync(2));
+        Assert.Equal(before,_draft.RoomsJson);
+        Assert.Empty(_billing.ReceivedCalls());
+        await _reader.DidNotReceiveWithAnyArgs().GetRoomsAsync(default,default);
+    }
     private void Desired(Action<List<HousingWorkspaceRoom>> change)
     {var rooms=JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.BaselineJson)!;change(rooms);_draft.Save(JsonSerializer.Serialize(rooms));}
     private ApplyHousingDraftInput Input(bool fees=true)=>new(){PeriodId=1,Revision=_draft.ConcurrencyStamp,RateRevision=fees?_schedule.ConcurrencyStamp:"",Confirmed=true};

@@ -27,12 +27,21 @@
         }
     </div>
     <p id="housing-summary"></p>
+    <section id="housing-setup" class="alert alert-info" aria-live="polite" hidden>
+        <strong>Commuter room setup for this period</strong>
+        <p id="housing-setup-counts"></p>
+        <div id="housing-setup-missing" hidden>
+            <p>These rooms exist under Properties in Elements but are not included in this housing period:</p>
+            <ul id="housing-setup-rooms"></ul>
+            <p>Update the housing period’s property setup in Elements, then refresh CampusFlow. Refresh reads the period’s rooms; it does not add master rooms. Review existing assignments before reinitializing a housing period.</p>
+        </div>
+    </section>
     <section id="housing-capacity-warning" class="housing-capacity-warning" role="alert" hidden>
         <strong id="housing-capacity-title"></strong>
         <p>These assignments came from Elements. You can review and save the draft, but New assignments cannot exceed capacity. An unrelated existing violation does not block fixing another room. Capacity edits must accommodate the occupants remaining in that room.</p>
         <ul id="housing-capacity-list"></ul>
     </section>
-    <p>Elements supports 1–10 students per room. For larger commuter groups, set up multiple rooms under Commuter or Commuter Dorm in Elements, then refresh this period. Commuter rooms create no CampusFlow housing charge and do not use intentional-single rates.</p>
+    <p>Elements supports 1–10 students per room. For larger commuter groups, set up multiple rooms under Commuter or Commuter Dorm in Elements and include them in the selected housing period, then refresh this period. Commuter rooms create no CampusFlow housing charge and do not use intentional-single rates.</p>
     <p>CampusFlow uses the amounts saved in <a href="~/Admin/Housing/Fees">Housing Fee Setup</a>, not the Elements room rate. Save a fee schedule for this term before applying assignments. Intentional-single charges appear as separate lines. Refreshed assignments start with the Standard rate choice.</p>
     <div class="housing-toolbar">
         <label>Filter assignments <input id="housing-filter" class="form-control" type="search" placeholder="Building, room, student, rate, or notes" /></label>

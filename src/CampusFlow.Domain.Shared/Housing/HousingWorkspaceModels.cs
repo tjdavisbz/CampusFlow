@@ -9,6 +9,15 @@ public class HousingPeriodOption
     public string Name { get; set; } = "";
 }
 
+public class HousingPeriodSetup
+{
+    public int PeriodId { get; set; }
+    public string PeriodName { get; set; } = "";
+    public int MasterCommuterRoomCount { get; set; }
+    public int PeriodCommuterRoomCount { get; set; }
+    public List<string> MissingCommuterRooms { get; set; } = [];
+}
+
 public class HousingStudentOption
 {
     public int StudentUid { get; set; }
