@@ -9,7 +9,7 @@
         <p>Plan room assignments together. Save changes here before reviewing what needs to change in Elements.</p></header>
     @if (Model.CanApplyToElements)
     {
-        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Reviewed capacity changes are saved to this housing period in Elements. Notes stay in CampusFlow. If an apply needs review, inspect live Elements data before refreshing and retrying.</div>
+        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Reviewed capacity changes are saved to this housing period in Elements. Notes stay in CampusFlow. A partial apply preserves the saved plan and requires review before recovery.</div>
     }
     else
     {
@@ -27,6 +27,22 @@
         }
     </div>
     <p id="housing-summary"></p>
+    @if (Model.CanApplyToElements)
+    {
+        <section id="housing-recovery" class="alert alert-warning" hidden aria-labelledby="housing-recovery-title">
+            <h2 id="housing-recovery-title">Review a partial apply</h2>
+            <p id="housing-recovery-failure"></p>
+            <p>The saved assignments are retained. Recovery supports added commuter assignments only. Moves, removals, capacity changes, residential charges or conflicting live assignments need administrator review.</p>
+            <button id="housing-review-recovery" type="button" class="btn btn-outline-primary">Review recovery</button>
+            <div id="housing-recovery-preview" hidden>
+                <p id="housing-recovery-counts"></p>
+                <p>Already completed assignments will be checked and skipped. The remaining assignments will be submitted. CampusFlow will check and reconcile the affected students’ unposted managed housing batch entries to no housing charge; manual and posted entries remain protected.</p>
+                <label>Review reason <textarea id="housing-recovery-reason" class="form-control" maxlength="500" rows="2"></textarea></label>
+                <label class="d-block"><input id="housing-recovery-confirmed" type="checkbox" /> I reviewed the live assignments and housing batch and want to resume this saved plan.</label>
+                <button id="housing-resume" type="button" class="btn btn-danger" disabled>Resume remaining commuter assignments</button>
+            </div>
+        </section>
+    }
     <section id="housing-setup" class="alert alert-info" aria-live="polite" hidden>
         <strong>Commuter room setup for this period</strong>
         <p id="housing-setup-counts"></p>

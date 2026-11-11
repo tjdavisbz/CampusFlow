@@ -3,6 +3,8 @@
     const root = document.getElementById('housing-workspace');
     const el = name => document.getElementById('housing-' + name);
     let state = null, dirty = false, busy = false, selectedRoom = null, loadedPeriod = '';
+    let recovery = null;
+    const blocked = () => ['Running','Needs review'].includes(state?.applyStatus);
     const selected = new Set();
     const rates = ['Unreviewed','Standard','AIC Triple Room','Savell Triple Occupancy'];
     function message(text, error = false) { el('message').textContent = text; el('message').dataset.error = error; }
@@ -21,11 +23,17 @@
     }
     function controls() {
         el('period').disabled = busy;
-        el('refresh').disabled = busy || !el('period').value;
-        ['save','preview'].forEach(x => el(x).disabled = busy || !state);
+        el('refresh').disabled = busy || !el('period').value || state?.applyStatus === 'Needs review';
+        ['save','preview'].forEach(x => el(x).disabled = busy || !state || blocked());
         if (el('apply')) el('apply').disabled = busy || !state || ['Running','Needs review'].includes(state.applyStatus);
-        el('clear').disabled = busy || !state || !selected.size;
-        el('rows').querySelectorAll('input,select,button').forEach(x => x.disabled = busy);
+        el('clear').disabled = busy || !state || !selected.size || blocked();
+        el('rows').querySelectorAll('input,select,button').forEach(x => x.disabled = busy || blocked());
+        if (el('recovery')) {
+            el('recovery').hidden = state?.applyStatus !== 'Needs review';
+            el('recovery-failure').textContent = state?.applyFailure || 'The last operation could not be confirmed. Review live Elements data.';
+            el('review-recovery').disabled = busy;
+            el('resume').disabled = busy || !recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim();
+        }
         updateSelectionUi();
     }
     async function request(handler, body, parameters = {}) {
@@ -77,15 +85,15 @@
         const filtered = filteredStudentIds(), selectedFiltered = filtered.filter(id => selected.has(id));
         el('select-all').checked = filtered.length > 0 && selectedFiltered.length === filtered.length;
         el('select-all').indeterminate = selectedFiltered.length > 0 && selectedFiltered.length < filtered.length;
-        el('select-all').disabled = busy || !filtered.length;
+        el('select-all').disabled = busy || blocked() || !filtered.length;
         el('selected-count').textContent = selected.size ? `${selected.size} student${selected.size === 1 ? '' : 's'} selected.` : 'No students selected.';
-        el('bulk-rate-enabled').disabled = busy || !selected.size;
-        el('bulk-notes-enabled').disabled = busy || !selected.size;
-        el('bulk-single-enabled').disabled = busy || !selected.size;
+        el('bulk-rate-enabled').disabled = busy || blocked() || !selected.size;
+        el('bulk-notes-enabled').disabled = busy || blocked() || !selected.size;
+        el('bulk-single-enabled').disabled = busy || blocked() || !selected.size;
         el('bulk-rate').disabled = busy || !selected.size || !el('bulk-rate-enabled').checked;
         el('bulk-notes').disabled = busy || !selected.size || !el('bulk-notes-enabled').checked;
         el('bulk-single').disabled = busy || !selected.size || !el('bulk-single-enabled').checked;
-        el('bulk-apply').disabled = busy || !selected.size ||
+        el('bulk-apply').disabled = busy || blocked() || !selected.size ||
             (!el('bulk-rate-enabled').checked && !el('bulk-notes-enabled').checked && !el('bulk-single-enabled').checked);
     }
     function render() {
@@ -165,6 +173,7 @@
     el('period').onchange = () => run(async () => {
         if (dirty && !confirm('Discard unsaved edits and open the selected period?')) { el('period').value = loadedPeriod; return; }
         const next = el('period').value;
+        resetRecovery();
         try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next); }
         catch (e) { el('period').value = loadedPeriod; throw e; }
     });
@@ -173,6 +182,42 @@
         state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.'); await showSetup(el('period').value);
     });
     async function save() { state = await request('Save', state); dirty = false; render(); message('Draft saved in CampusFlow. Elements is unchanged.'); }
+    function resetRecovery() {
+        recovery = null;
+        if (!el('recovery')) return;
+        el('recovery-preview').hidden = true;
+        el('recovery-confirmed').checked = false;
+        el('recovery-reason').value = '';
+    }
+    async function reloadAfterFailure() {
+        try {
+            const saved = await request('Draft', undefined, {periodId:state.periodId});
+            if (saved?.id === state.id && JSON.stringify(saved.rooms) === JSON.stringify(state.rooms)) state = saved;
+            else state.applyStatus = 'Needs review';
+        } catch { state.applyStatus = 'Needs review'; }
+        resetRecovery(); render();
+    }
+    if (el('review-recovery')) {
+        el('recovery-confirmed').onchange = controls;
+        el('recovery-reason').oninput = controls;
+        el('review-recovery').onclick = () => run(async () => {
+            resetRecovery();
+            const preview = await request('Recovery', undefined, {periodId:state.periodId});
+            if (preview.revision !== state.revision) { await reloadAfterFailure(); throw new Error('The saved run changed. Review recovery again.'); }
+            recovery = preview;
+            el('recovery-counts').textContent = `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining.`;
+            el('recovery-preview').hidden = false;
+            message('Recovery reviewed. No Elements data was changed.');
+        });
+        el('resume').onclick = () => run(async () => {
+            if (!recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim()) return;
+            if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? Already completed assignments will be checked and skipped. The saved plan and prior run history will be retained.`)) return;
+            try { state = await request('Resume', {...recovery, reason:el('recovery-reason').value.trim(), confirmed:true}); }
+            catch (error) { await reloadAfterFailure(); throw error; }
+            resetRecovery(); dirty = false; selected.clear(); render();
+            message('The saved commuter plan was applied and verified. Prior run history was retained.');
+        });
+    }
     el('save').onclick = () => run(save);
     el('preview').onclick = () => run(async () => {
         if (dirty) await save();
@@ -198,12 +243,7 @@
         } catch (error) {
             // Read the saved draft, never Refresh from Elements: a failed/uncertain apply
             // must not discard the assignments staff already entered.
-            try {
-                const saved = await request('Draft', undefined, {periodId:state.periodId});
-                if (saved?.id === state.id && JSON.stringify(saved.rooms) === JSON.stringify(state.rooms)) state = saved;
-                else state.applyStatus = 'Needs review';
-            } catch { state.applyStatus = 'Needs review'; }
-            render();
+            await reloadAfterFailure();
             throw error;
         }
         dirty = false; selected.clear(); render();

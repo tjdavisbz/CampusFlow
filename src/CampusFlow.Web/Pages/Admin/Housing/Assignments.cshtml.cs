@@ -28,6 +28,16 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
     public async Task<JsonResult> OnGetStudentsAsync(string query, int periodId) => new(await workspace.SearchStudentsAsync(query, periodId));
     public async Task<JsonResult> OnGetPreviewAsync(int periodId) => new(await workspace.PreviewAsync(periodId));
     public async Task<JsonResult> OnGetRateRevisionAsync(int periodId) => new(await workspace.GetRateRevisionAsync(periodId));
+    public async Task<JsonResult> OnGetRecoveryAsync(int periodId)
+    {
+        try { return new(await workspace.PreviewRecoveryAsync(periodId)); }
+        catch (UserFriendlyException error) { return new(new { error = new { message = error.Message } }) { StatusCode = 409 }; }
+    }
+    public async Task<JsonResult> OnPostResumeAsync([FromBody] RecoverHousingDraftInput input)
+    {
+        try { return new(await workspace.ResumeCommuterAssignmentsAsync(input)); }
+        catch (UserFriendlyException error) { return new(new { error = new { message = error.Message } }) { StatusCode = 409 }; }
+    }
     public async Task<JsonResult> OnPostSaveAsync([FromBody] HousingWorkspaceState input) => new(await workspace.SaveAsync(input));
     public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input)
     {

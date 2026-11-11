@@ -95,6 +95,13 @@ public class HousingApplyTests
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input()));Assert.Single(_writer.Calls);
         await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
     }
+    [Fact]public async Task A_success_envelope_without_a_confirmed_room_never_reaches_billing()
+    {
+        Desired(x=>x[1].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));_writer.SuppressAssignment=true;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));
+        Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
+        await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
+    }
     [Fact]public async Task Concurrent_draft_change_before_claim_prevents_all_writes()
     {
         Desired(x=>x[0].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));var input=Input();
@@ -129,15 +136,99 @@ public class HousingApplyTests
         Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);Assert.Equal(60,_writer.Calls.Count(x=>x=="assign"));
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));Assert.Equal(60,_writer.Calls.Count(x=>x=="assign"));
     }
+
+    private void ReplicaTracksWriter() => _reader.GetRoomsAsync(1,Arg.Any<CancellationToken>()).Returns(_ =>
+    {
+        var rooms=JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(JsonSerializer.Serialize(_before))!;
+        foreach(var (id,identity) in _writer.Assigned)
+            rooms.Single(x=>x.Building==identity.Item1&&x.Name==identity.Item2).Occupants.Add(new(){StudentUid=id,Rate="Standard"});
+        return rooms;
+    });
+    private async Task<HousingRecoveryPreview> FailedCommuterRun()
+    {
+        SavedCommuterBatch();_writer.FailAtStudent=2;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));
+        ReplicaTracksWriter();_writer.FailAtStudent=null;
+        return await _service.PreviewRecoveryAsync(1);
+    }
+    private static RecoverHousingDraftInput Recover(HousingRecoveryPreview preview)=>new()
+    {PeriodId=preview.PeriodId,RunId=preview.RunId,Revision=preview.Revision,RecoveryRevision=preview.RecoveryRevision,Confirmed=true,Reason="Reviewed the live rooms and housing batch"};
+    [Fact] public async Task Reviewed_recovery_skips_completed_rooms_retains_all_113_and_reconciles_every_affected_student()
+    {
+        var preview=await FailedCommuterRun();var desired=_draft.RoomsJson;var original=HousingApplyProgress.Read(_draft)!;
+        Assert.Equal(113,preview.SavedAssignments);Assert.Equal(1,preview.AlreadyAssigned);Assert.Equal(112,preview.RemainingAssignments);
+        Assert.Equal(2,_writer.Calls.Count);_writer.Calls.Clear();
+        var result=await _service.ResumeCommuterAssignmentsAsync(Recover(preview));
+        Assert.Equal(112,_writer.Calls.Count);Assert.All(_writer.Calls,x=>Assert.Equal("assign",x));
+        Assert.Equal(113,result.Rooms.Sum(x=>x.Occupants.Count));Assert.Equal(desired,_draft.RoomsJson);Assert.Equal(desired,_draft.BaselineJson);
+        var progress=HousingApplyProgress.Read(_draft)!;Assert.Equal("Completed",progress.Status);Assert.Equal(original.RunId,progress.RecoveryOfRunId);Assert.NotEmpty(progress.ReviewReason!);
+        var history=JsonSerializer.Deserialize<List<HousingApplyProgress>>(_draft.ExtraProperties["HousingApplyHistoryV1"]!.ToString()!)!;
+        Assert.Equal(original.RunId,Assert.Single(history).RunId);Assert.Equal(original.DesiredJson,history[0].DesiredJson);Assert.Equal(original.Operations,history[0].Operations);
+        await _billing.Received(113).ReconcileAsync(Arg.Any<int>(),268,Arg.Is<IReadOnlyList<HousingChargeLine>>(x=>x.Count==0),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+    }
+    [Theory][InlineData("revision")][InlineData("run")][InlineData("preview")][InlineData("confirmation")][InlineData("reason")][InlineData("reason-length")]
+    public async Task Recovery_requires_the_exact_reviewed_run_and_explicit_confirmation(string invalid)
+    {
+        var preview=await FailedCommuterRun();var input=Recover(preview);_writer.Calls.Clear();var desired=_draft.RoomsJson;
+        switch(invalid){case "revision":input.Revision="stale";break;case "run":input.RunId=Guid.NewGuid();break;case "preview":input.RecoveryRevision="wrong";break;case "confirmation":input.Confirmed=false;break;case "reason":input.Reason=" ";break;case "reason-length":input.Reason=new string('x',501);break;}
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(input));Assert.Empty(_writer.Calls);Assert.Equal(desired,_draft.RoomsJson);
+    }
+    [Fact]public async Task Conflicting_live_assignment_blocks_recovery_without_writes_or_draft_loss()
+    {
+        var preview=await FailedCommuterRun();_writer.Assigned[2]=_writer.RoomNames[20];_writer.Calls.Clear();var desired=_draft.RoomsJson;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Empty(_writer.Calls);Assert.Equal(desired,_draft.RoomsJson);
+    }
+    [Fact]public async Task Live_api_disagreement_blocks_the_read_only_recovery_preview()
+    {
+        await FailedCommuterRun();_reader.GetRoomsAsync(1,Arg.Any<CancellationToken>()).Returns(_before);_writer.Calls.Clear();
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.PreviewRecoveryAsync(1));Assert.Empty(_writer.Calls);
+    }
+    [Fact]public async Task Another_partial_failure_keeps_the_plan_and_requires_a_new_review()
+    {
+        var preview=await FailedCommuterRun();var desired=_draft.RoomsJson;_writer.FailAtStudent=3;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
+        Assert.Equal(desired,_draft.RoomsJson);Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
+        var count=_writer.Calls.Count;await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Equal(count,_writer.Calls.Count);
+        _writer.FailAtStudent=null;var next=await _service.PreviewRecoveryAsync(1);Assert.Equal(2,next.AlreadyAssigned);Assert.Equal(111,next.RemainingAssignments);
+        await _service.ResumeCommuterAssignmentsAsync(Recover(next));Assert.Equal("Completed",HousingApplyProgress.Read(_draft)!.Status);
+        Assert.Equal(2,JsonSerializer.Deserialize<List<HousingApplyProgress>>(_draft.ExtraProperties["HousingApplyHistoryV1"]!.ToString()!)!.Count);
+    }
+    [Fact]public async Task All_rooms_already_assigned_still_checks_billing_without_duplicate_assignments()
+    {
+        await FailedCommuterRun();foreach(var room in JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!)foreach(var student in room.Occupants)_writer.Assigned[student.StudentUid]=(room.Building,room.Name);
+        var preview=await _service.PreviewRecoveryAsync(1);Assert.Equal(0,preview.RemainingAssignments);_writer.Calls.Clear();
+        await _service.ResumeCommuterAssignmentsAsync(Recover(preview));Assert.Empty(_writer.Calls);
+        await _billing.Received(113).ReconcileAsync(Arg.Any<int>(),268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+    }
+    [Fact]public async Task A_room_change_during_recovery_stops_before_reconciling_that_students_charges()
+    {
+        var preview=await FailedCommuterRun();
+        _billing.ReconcileAsync(1,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>()).Returns(_=>{_writer.Assigned[2]=_writer.RoomNames[20];return Task.CompletedTask;});
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
+        await _billing.Received(1).ReconcileAsync(1,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+        await _billing.DidNotReceive().ReconcileAsync(2,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+        Assert.Equal(113,JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!.Sum(x=>x.Occupants.Count));Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
+    }
+    [Fact]public async Task Running_operation_cannot_be_recovered_or_archived()
+    {
+        var preview=await FailedCommuterRun();var progress=HousingApplyProgress.Read(_draft)!;progress.Status="Running";progress.Save(_draft);_writer.Calls.Clear();
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Empty(_writer.Calls);Assert.False(_draft.ExtraProperties.ContainsKey("HousingApplyHistoryV1"));
+    }
+    [Fact]public async Task Billing_preflight_failure_does_not_claim_recovery_or_change_rooms()
+    {
+        var preview=await FailedCommuterRun();_writer.Calls.Clear();_billing.VerifyCanReconcileAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("blocked")));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Empty(_writer.Calls);Assert.Equal(preview.RunId,HousingApplyProgress.Read(_draft)!.RunId);
+    }
+
     private sealed class Writer(Func<HousingApplyProgress?> progress):IElementsHousingAssignmentWriter
     {
-        public bool Fail;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];private readonly Dictionary<int,(string,string)> _assigned=[];
+        public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
         public void EnsureWriteEnabled(){}
-        public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default)=>Task.FromResult(_assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);
+        public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default)=>Task.FromResult(Assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);
         public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>Task.CompletedTask;
         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}
         public Task UpdateCapacitiesAsync(int p,IReadOnlyList<HousingCapacityChange> changes,CancellationToken ct=default){Claimed();Calls.Add(changes[0].Capacity>changes[0].PreviousCapacity?"increase":"decrease");return Task.CompletedTask;}
-        public Task AssignAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("assign");if(Fail||FailAtStudent==id)throw new InvalidOperationException();_assigned[id]=RoomNames.TryGetValue(room,out var named)?named:room==1?("Bridges Hall","101"):("Commuter",room==2?"000":"001");return Task.CompletedTask;}
-        public Task DeallocateAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("remove");_assigned.Remove(id);return Task.CompletedTask;}
+        public Task AssignAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("assign");if(Fail||FailAtStudent==id)throw new InvalidOperationException();if(!SuppressAssignment)Assigned[id]=RoomNames.TryGetValue(room,out var named)?named:room==1?("Bridges Hall","101"):("Commuter",room==2?"000":"001");return Task.CompletedTask;}
+        public Task DeallocateAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("remove");Assigned.Remove(id);return Task.CompletedTask;}
     }
 }
