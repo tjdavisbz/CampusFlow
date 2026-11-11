@@ -1,0 +1,16 @@
+{
+  "checkedAtUtc": "2026-11-11T03:44:29.146077+00:00",
+  "environment": "production",
+  "userExplicitlyAuthorizedReadOnlyStudentView": true,
+  "correctReportedStudentLocated": true,
+  "selectedTerm": "Spring 2027",
+  "readOnlyDashboardLoaded": true,
+  "readOnlyBillPageLoaded": true,
+  "error500Reproduced": false,
+  "ownStudentSessionRecalculationNotTested": true,
+  "noBillApprovalResetRecalculationAssignmentOrChargeWritePerformed": true,
+  "studentViewExitedAndDiagnosticTabClosed": true,
+  "noClaimOriginalErrorFixed": true,
+  "remainingNeed": "Jeff signed-in retest and approximate time/selected term if it fails; read-only impersonation bypasses write-dependent refresh paths.",
+  "privacy": "No student account identifiers or financial details stored here."
+}

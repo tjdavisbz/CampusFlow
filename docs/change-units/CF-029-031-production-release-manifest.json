@@ -1,0 +1,1343 @@
+{
+  "environment": "production",
+  "app": "app-campusflow-prod-001",
+  "units": [
+    "CF-029",
+    "CF-030",
+    "CF-031"
+  ],
+  "commit": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+  "branch": "codex/cf-029-031-production-release",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "unitSourceCommits": {
+    "CF-029": "ad43347f2de6aeff8f4ce76126e47d18189bc391",
+    "CF-030": "29a8248a4e3734592bec3b23b32862b735e0d444",
+    "CF-031": "9dc260c845ded9240b1539f1d8b166971127d5f4"
+  },
+  "files": {
+    "CampusFlow.Application.Contracts.dll": "dfbda4f0e9993e12332dabab1bfc70101ad2f4846a015f0f378992ce643401fb",
+    "CampusFlow.Application.dll": "9c8526cdff909c7a07b2dac93f202a4ad3ff4e3751b0def892b08ac271f56c45",
+    "CampusFlow.Domain.Shared.dll": "ac9b5dd615ecae0c60ceaf1f482e5ccd8d42b04543a0ecc8e897e14fc94cac10",
+    "CampusFlow.Domain.dll": "9977391dbabcda29c6201171d3d5c6ccd4e73be251bed194d38b4f7243f2b8a2",
+    "CampusFlow.EntityFrameworkCore.dll": "6df057c22127596667d76d8afa68579016f86a7cbfb7aa77f21a45b83f058cfc",
+    "CampusFlow.HttpApi.dll": "fe082b5b8180d82ab31308a7d74066dcf3ed14a123e7399bda3c265ac49c2e55",
+    "CampusFlow.Web.dll": "566ca9251a4eac877f18492a999ae4c8508d8ea0422d994869e7781bc89382b9",
+    "Pages/Admin/Housing/Assignments.css": "dc19964c131d92e70697bfdf5539cf1f415d5af043ea8d7644ce0b9c871b5b6a",
+    "Pages/Admin/Housing/Assignments.js": "8ae2b65600cf71d3cb91d4df04f6968cec57d0960d7aedfe7dac214c279faf68",
+    "Pages/Housing.css": "ece32d67c7696653ea23dab7d4067e337e25edcb5dbebc68fdd8cb3372e595eb"
+  },
+  "baselineFiles": {
+    "Pages/Admin/Chapel/Attendance.css": "de119c0bccfd805703da3e49d6ea8b5caab8f734354020d1b868c2ec1e843a6f",
+    "Pages/Admin/Chapel/Attendance.js": "7d0fd7cb8dbc01aaf708ab9e6923b4aef1bc5f7f20a7053b40b496e969975f77",
+    "wwwroot/global-styles.css": "6ed1dfb19598215f1323eade36e578ba22d8846cc8f690d3605fdd8a6dcdcdd7",
+    "Pages/Advisor/Advisor.css": "82d12a29d37d3944f8c954aaf731c750da2585f2b0c1c2f1e77dff6b0918965c",
+    "Pages/DegreeAudit.css": "8569c2d3a1ee14c65716705e2d877d3fa56a4add9de43863f93608d0e4963206",
+    "Pages/DegreeAudit.js": "bbc110fe0363417ac6f77a02b5e63c1cdb2a21f80fb2d2ea4e317e846920a308",
+    "Pages/Admin/AdminConfiguration.css": "a8a1d038039a4ef45cdd84b6acaed4b4544a2d9ebade3544aacc958be354c5d0",
+    "CampusFlow.Web.runtimeconfig.json": "eff38a9750f7cca2407b1d639a963d56ffea92088e6da971bbbfa74e3dcd7224",
+    "Azure.Identity.dll": "c2d572e9be14a4d686c18d8da6ef548503c2817b76a5ada742d641f3a7cf5831",
+    "Azure.Core.dll": "f87221287bde26eac8b932da37db8a9ed2998e1e0559408585a48339a625d938",
+    "Azure.Communication.Email.dll": "2b13c8f4db02579ed78d432d785222d0c2127a5f4342a9ff462ca215dc377346",
+    "CampusFlow.Web.deps.json": "04043d4dc962c9b304761a90ae36e89305abfdbda89f973a47247facd9cc3223",
+    "Pages/BillApproval.js": "b488088881155488f50f940a32cbb8572194fe00b1b4a737480b0aae6c4594db",
+    "Pages/Billing.css": "b5ed42d3594808ef355c6ad88c070b5d038c36ef474feecdd403deba78e262e0",
+    "Pages/FinancialAid.js": "b4316d0f33268315907c194a2f5cc81625ca95fbdb83477276e82d9432cda99e",
+    "Pages/FinancialAid.css": "c9f4c98d42b03742d1dd470c836b3ff4e9af1c9ccfdd71f8292ebcd52d0ead5d",
+    "Pages/Admin/StudentBilling/CostTypes.js": "f16ddf43128ce3827c8c96eeeee7f55936a52d007a4ece9b2062bf7c2701d7a0",
+    "Pages/Admin/StudentBilling/ClearanceResets.js": "e6e1e711f4cb12cc08d2b85814ab6be0acbdddf20c93db99e56ef422cc627e95",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css": "5abdb8615ede42769101febbd322bd8640c7cbfe9ab28650f7a8246930b08083",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.br": "b100671fadfd8e1b3f4c00461aed2ff6807181a76e0f06c8fcbc29a5c5777fdb",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.gz": "a026f28d75910102243686c7a3e70c2e4021f35efeb002f36d55e7bdf796f8a3",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css": "96b0b349d1d3ba17169f41cbb6a2be2d55d6945c6eeda2e0520d9e675bb23405",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.br": "32988761e35493d368ef17f67a2736380bbd014e28d12d3d619dfe0859524aee",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.gz": "0ca16ea8b8570c532c56b0559277fecb96f3355b87f6f3b4e9a7288ea887317e",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2": "ff66d1cfb67dbe3da432bbe36572cabfa4eef0e591303c2cba111474ba1d15bc",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2": "f4722d10b9e1b41eefe3b51a026312ee1970edb7782f94b0080d3d475945734c",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2": "24e5fae26b41c08b2df81c91669f5aaae71d81a84a4713fc56b5c621b78dd456",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-v4compatibility.woff2": "c776ee1f1fe21cd72195e91de7afd5c9dbd007e9d06016254d65fbcc091398ca",
+    "CampusFlow.Application.Contracts.dll": "5855c5faf172f767390cc316b91447d7153eb6642d8fb9d82b72c831456138de",
+    "CampusFlow.Application.dll": "88fc0289c4b5516b676daffef173c2ca1d9e4233dbd6998bb3b05292cf1f5c22",
+    "CampusFlow.Domain.Shared.dll": "92b3271531e1ff1ee4592fcd39d6b684c4b75a8a23b97af0b16d3609648bc448",
+    "CampusFlow.Domain.dll": "8f427c4d269328cd42e24e1b46666962f8d3d9e144846e5c4541417cb3bbf278",
+    "CampusFlow.EntityFrameworkCore.dll": "af6a4a0fef33b64b50c260576fd02343a00a7ff62e576aaa02e6dc38188d4fca",
+    "CampusFlow.HttpApi.dll": "f950f5c923770385d4f7cc36877b75c6e88e4ed1ccf5d4425489ebdb302030a1",
+    "CampusFlow.Web.dll": "c1244349d8f41b0afc9f46150847f420d2009df4b6a24804371923db0b5886db",
+    "Pages/Admin/BusinessServices/AddStudentMealPlan.css": "29661b22d56ca39685a09bceb14269c02692d226a506f7e0be6c27ac1fff618b",
+    "Pages/Admin/FinancialAid/ReconcileAwardCodes.css": "6bb485173994bc23360d7aec7aa727bd9583ae5a64d7dc46f79d80689ed378f6",
+    "Pages/Admin/Housing/Assignments.js": "6ab5209e9357f3a50b8190c7786acf3086dad077e0dabf7ff1c55129ddaa0dba",
+    "Pages/BillApproval.css": "973c99e53704c94faecc5e484ebf8e86ca65bfad5b2f6487c193248099cc54fa",
+    "wwwroot/images/tenants/nelson/judah-celebrating.jpg": "e52d774dbc75fae857b125c8132ee4e1644d239d6c56c5ae7b241b2fed6f6e78",
+    "CampusFlow.Web.staticwebassets.endpoints.json": "05a3452c6af0110a10856b584b025a30a1f6e5c071e4ce1a4a8c3732e531590d",
+    "Pages/Admin/Housing/Assignments.css": "1cf65ac81313edb7d6d2df03eeb0b802520c81430e724d94d98e15248ec03312",
+    "Pages/Housing.css": "0c8791ace9e606a983867b38b64b20864ed33f874a7d8124f0e56804ae0a2071"
+  },
+  "preservedFiles": {
+    "Pages/Admin/Chapel/Attendance.css": "de119c0bccfd805703da3e49d6ea8b5caab8f734354020d1b868c2ec1e843a6f",
+    "Pages/Admin/Chapel/Attendance.js": "7d0fd7cb8dbc01aaf708ab9e6923b4aef1bc5f7f20a7053b40b496e969975f77",
+    "wwwroot/global-styles.css": "6ed1dfb19598215f1323eade36e578ba22d8846cc8f690d3605fdd8a6dcdcdd7",
+    "Pages/Advisor/Advisor.css": "82d12a29d37d3944f8c954aaf731c750da2585f2b0c1c2f1e77dff6b0918965c",
+    "Pages/DegreeAudit.css": "8569c2d3a1ee14c65716705e2d877d3fa56a4add9de43863f93608d0e4963206",
+    "Pages/DegreeAudit.js": "bbc110fe0363417ac6f77a02b5e63c1cdb2a21f80fb2d2ea4e317e846920a308",
+    "Pages/Admin/AdminConfiguration.css": "a8a1d038039a4ef45cdd84b6acaed4b4544a2d9ebade3544aacc958be354c5d0",
+    "CampusFlow.Web.runtimeconfig.json": "eff38a9750f7cca2407b1d639a963d56ffea92088e6da971bbbfa74e3dcd7224",
+    "Azure.Identity.dll": "c2d572e9be14a4d686c18d8da6ef548503c2817b76a5ada742d641f3a7cf5831",
+    "Azure.Core.dll": "f87221287bde26eac8b932da37db8a9ed2998e1e0559408585a48339a625d938",
+    "Azure.Communication.Email.dll": "2b13c8f4db02579ed78d432d785222d0c2127a5f4342a9ff462ca215dc377346",
+    "CampusFlow.Web.deps.json": "04043d4dc962c9b304761a90ae36e89305abfdbda89f973a47247facd9cc3223",
+    "Pages/BillApproval.js": "b488088881155488f50f940a32cbb8572194fe00b1b4a737480b0aae6c4594db",
+    "Pages/Billing.css": "b5ed42d3594808ef355c6ad88c070b5d038c36ef474feecdd403deba78e262e0",
+    "Pages/FinancialAid.js": "b4316d0f33268315907c194a2f5cc81625ca95fbdb83477276e82d9432cda99e",
+    "Pages/FinancialAid.css": "c9f4c98d42b03742d1dd470c836b3ff4e9af1c9ccfdd71f8292ebcd52d0ead5d",
+    "Pages/Admin/StudentBilling/CostTypes.js": "f16ddf43128ce3827c8c96eeeee7f55936a52d007a4ece9b2062bf7c2701d7a0",
+    "Pages/Admin/StudentBilling/ClearanceResets.js": "e6e1e711f4cb12cc08d2b85814ab6be0acbdddf20c93db99e56ef422cc627e95",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css": "5abdb8615ede42769101febbd322bd8640c7cbfe9ab28650f7a8246930b08083",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.br": "b100671fadfd8e1b3f4c00461aed2ff6807181a76e0f06c8fcbc29a5c5777fdb",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.gz": "a026f28d75910102243686c7a3e70c2e4021f35efeb002f36d55e7bdf796f8a3",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css": "96b0b349d1d3ba17169f41cbb6a2be2d55d6945c6eeda2e0520d9e675bb23405",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.br": "32988761e35493d368ef17f67a2736380bbd014e28d12d3d619dfe0859524aee",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.gz": "0ca16ea8b8570c532c56b0559277fecb96f3355b87f6f3b4e9a7288ea887317e",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2": "ff66d1cfb67dbe3da432bbe36572cabfa4eef0e591303c2cba111474ba1d15bc",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2": "f4722d10b9e1b41eefe3b51a026312ee1970edb7782f94b0080d3d475945734c",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2": "24e5fae26b41c08b2df81c91669f5aaae71d81a84a4713fc56b5c621b78dd456",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-v4compatibility.woff2": "c776ee1f1fe21cd72195e91de7afd5c9dbd007e9d06016254d65fbcc091398ca",
+    "Pages/Admin/BusinessServices/AddStudentMealPlan.css": "29661b22d56ca39685a09bceb14269c02692d226a506f7e0be6c27ac1fff618b",
+    "Pages/Admin/FinancialAid/ReconcileAwardCodes.css": "6bb485173994bc23360d7aec7aa727bd9583ae5a64d7dc46f79d80689ed378f6",
+    "Pages/BillApproval.css": "973c99e53704c94faecc5e484ebf8e86ca65bfad5b2f6487c193248099cc54fa",
+    "wwwroot/images/tenants/nelson/judah-celebrating.jpg": "e52d774dbc75fae857b125c8132ee4e1644d239d6c56c5ae7b241b2fed6f6e78",
+    "CampusFlow.Web.staticwebassets.endpoints.json": "05a3452c6af0110a10856b584b025a30a1f6e5c071e4ce1a4a8c3732e531590d"
+  },
+  "fontFiles": {
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css": "5abdb8615ede42769101febbd322bd8640c7cbfe9ab28650f7a8246930b08083",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.br": "b100671fadfd8e1b3f4c00461aed2ff6807181a76e0f06c8fcbc29a5c5777fdb",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.gz": "a026f28d75910102243686c7a3e70c2e4021f35efeb002f36d55e7bdf796f8a3",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css": "96b0b349d1d3ba17169f41cbb6a2be2d55d6945c6eeda2e0520d9e675bb23405",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.br": "32988761e35493d368ef17f67a2736380bbd014e28d12d3d619dfe0859524aee",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.gz": "0ca16ea8b8570c532c56b0559277fecb96f3355b87f6f3b4e9a7288ea887317e",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2": "ff66d1cfb67dbe3da432bbe36572cabfa4eef0e591303c2cba111474ba1d15bc",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2": "f4722d10b9e1b41eefe3b51a026312ee1970edb7782f94b0080d3d475945734c",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2": "24e5fae26b41c08b2df81c91669f5aaae71d81a84a4713fc56b5c621b78dd456",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-v4compatibility.woff2": "c776ee1f1fe21cd72195e91de7afd5c9dbd007e9d06016254d65fbcc091398ca"
+  },
+  "newFilesPreviouslyAbsent": [],
+  "protected": {
+    "appSettingsHash": "20a5e925c5b5023351d048282a68348475d749857b73ea6031cfc5a8473234f8",
+    "connectionSettingsHash": "cb9694c0b14eba9dc25da25d52409d047e34ec5b6862f3cf32e4e92e2b88c5e3",
+    "protectedMetadata": {
+      "appsettings.Development.json": {
+        "size": 196,
+        "mtime": "2026-11-04T14:23:18+00:00"
+      },
+      "appsettings.json": {
+        "size": 5419,
+        "mtime": "2026-11-04T14:23:18+00:00"
+      },
+      "openiddict.pfx": {
+        "size": 4267,
+        "mtime": "2026-11-05T11:29:16+00:00"
+      }
+    },
+    "physicalConfigurationHash": "eb15c69081c36e46725529d580bdfe3309607723bb2f401f7c3fb671b224cf86",
+    "appConfiguration": {
+      "alwaysOn": true,
+      "healthCheckPath": null,
+      "linuxFxVersion": "DOTNETCORE|10.0"
+    }
+  },
+  "unchangedRootMetadata": {
+    "appsettings.Development.json": {
+      "size": 196,
+      "mtime": "2026-11-04T14:23:18+00:00"
+    },
+    "appsettings.json": {
+      "size": 5419,
+      "mtime": "2026-11-04T14:23:18+00:00"
+    },
+    "Asp.Versioning.Abstractions.dll": {
+      "size": 75672,
+      "mtime": "2024-03-26T12:36:46+00:00"
+    },
+    "Asp.Versioning.Http.dll": {
+      "size": 132504,
+      "mtime": "2024-03-26T12:36:46+00:00"
+    },
+    "Asp.Versioning.Mvc.ApiExplorer.dll": {
+      "size": 57240,
+      "mtime": "2024-03-26T12:36:48+00:00"
+    },
+    "Asp.Versioning.Mvc.dll": {
+      "size": 63896,
+      "mtime": "2024-03-26T12:36:46+00:00"
+    },
+    "Autofac.dll": {
+      "size": 395776,
+      "mtime": "2026-03-12T16:08:02+00:00"
+    },
+    "Autofac.Extensions.DependencyInjection.dll": {
+      "size": 38912,
+      "mtime": "2026-03-31T11:23:44+00:00"
+    },
+    "Autofac.Extras.DynamicProxy.dll": {
+      "size": 20480,
+      "mtime": "2023-06-29T09:06:10+00:00"
+    },
+    "Azure.Communication.Email.dll": {
+      "size": 212528,
+      "mtime": "2025-10-07T17:02:14+00:00"
+    },
+    "Azure.Core.dll": {
+      "size": 438856,
+      "mtime": "2025-11-06T17:13:44+00:00"
+    },
+    "Azure.Identity.dll": {
+      "size": 365128,
+      "mtime": "2025-11-19T13:12:04+00:00"
+    },
+    "CampusFlow.Application.Contracts.pdb": {
+      "size": 28720,
+      "mtime": "2026-11-05T11:23:44+00:00"
+    },
+    "CampusFlow.Application.pdb": {
+      "size": 51788,
+      "mtime": "2026-11-05T11:23:44+00:00"
+    },
+    "CampusFlow.Domain.pdb": {
+      "size": 79572,
+      "mtime": "2026-11-05T11:23:42+00:00"
+    },
+    "CampusFlow.Domain.Shared.pdb": {
+      "size": 21372,
+      "mtime": "2026-11-05T11:23:42+00:00"
+    },
+    "CampusFlow.EntityFrameworkCore.pdb": {
+      "size": 293948,
+      "mtime": "2026-11-05T11:23:48+00:00"
+    },
+    "CampusFlow.HttpApi.pdb": {
+      "size": 27512,
+      "mtime": "2026-11-05T11:23:46+00:00"
+    },
+    "CampusFlow.Web": {
+      "size": 123944,
+      "mtime": "2026-11-05T11:29:42+00:00"
+    },
+    "CampusFlow.Web.deps.json": {
+      "size": 346674,
+      "mtime": "2026-11-06T16:58:16+00:00"
+    },
+    "CampusFlow.Web.dll.config": {
+      "size": 50799,
+      "mtime": "2026-11-04T15:16:32+00:00"
+    },
+    "CampusFlow.Web.pdb": {
+      "size": 512604,
+      "mtime": "2026-11-05T11:29:42+00:00"
+    },
+    "CampusFlow.Web.runtimeconfig.json": {
+      "size": 540,
+      "mtime": "2026-11-04T15:16:36+00:00"
+    },
+    "CampusFlow.Web.staticwebassets.endpoints.json": {
+      "size": 4298548,
+      "mtime": "2026-11-09T23:32:34+00:00"
+    },
+    "Castle.Core.AsyncInterceptor.dll": {
+      "size": 19456,
+      "mtime": "2022-03-17T14:57:00+00:00"
+    },
+    "Castle.Core.dll": {
+      "size": 388608,
+      "mtime": "2025-03-09T16:06:12+00:00"
+    },
+    "Duende.IdentityModel.dll": {
+      "size": 202752,
+      "mtime": "2025-06-30T14:42:00+00:00"
+    },
+    "Fractions.dll": {
+      "size": 22016,
+      "mtime": "2023-10-01T13:44:18+00:00"
+    },
+    "Grpc.Core.Api.dll": {
+      "size": 69408,
+      "mtime": "2023-09-05T20:23:08+00:00"
+    },
+    "Grpc.Net.Client.dll": {
+      "size": 294176,
+      "mtime": "2023-09-05T20:23:14+00:00"
+    },
+    "Grpc.Net.Common.dll": {
+      "size": 22304,
+      "mtime": "2023-09-05T20:23:24+00:00"
+    },
+    "HealthChecks.UI.Client.dll": {
+      "size": 22528,
+      "mtime": "2024-12-19T04:52:50+00:00"
+    },
+    "HealthChecks.UI.Core.dll": {
+      "size": 16896,
+      "mtime": "2024-12-19T04:52:46+00:00"
+    },
+    "HealthChecks.UI.Data.dll": {
+      "size": 27136,
+      "mtime": "2024-12-19T04:52:46+00:00"
+    },
+    "HealthChecks.UI.dll": {
+      "size": 1526784,
+      "mtime": "2024-12-19T04:52:48+00:00"
+    },
+    "HealthChecks.UI.InMemory.Storage.dll": {
+      "size": 14848,
+      "mtime": "2024-12-19T04:52:54+00:00"
+    },
+    "hostingstart.html": {
+      "size": 3269,
+      "mtime": "2026-08-26T23:02:53.8963633+00:00"
+    },
+    "HtmlAgilityPack.dll": {
+      "size": 171520,
+      "mtime": "2025-09-15T15:56:32+00:00"
+    },
+    "Humanizer.dll": {
+      "size": 355944,
+      "mtime": "2022-01-29T09:04:04+00:00"
+    },
+    "IdentityModel.dll": {
+      "size": 191488,
+      "mtime": "2024-04-09T14:25:56+00:00"
+    },
+    "JetBrains.Annotations.dll": {
+      "size": 122368,
+      "mtime": "2025-09-01T17:47:46+00:00"
+    },
+    "KubernetesClient.dll": {
+      "size": 10459648,
+      "mtime": "2025-10-15T17:24:16+00:00"
+    },
+    "MagicOnion.Abstractions.dll": {
+      "size": 47616,
+      "mtime": "2025-07-29T03:00:50+00:00"
+    },
+    "MagicOnion.Client.dll": {
+      "size": 139264,
+      "mtime": "2025-07-29T03:01:00+00:00"
+    },
+    "MagicOnion.Serialization.MessagePack.dll": {
+      "size": 37376,
+      "mtime": "2025-07-29T03:00:52+00:00"
+    },
+    "MagicOnion.Shared.dll": {
+      "size": 7168,
+      "mtime": "2025-07-29T03:00:52+00:00"
+    },
+    "MessagePack.Annotations.dll": {
+      "size": 18432,
+      "mtime": "2024-12-26T03:09:56+00:00"
+    },
+    "MessagePack.dll": {
+      "size": 377856,
+      "mtime": "2024-12-26T03:10:36+00:00"
+    },
+    "Microsoft.AspNetCore.Authentication.JwtBearer.dll": {
+      "size": 52488,
+      "mtime": "2026-04-17T15:09:28+00:00"
+    },
+    "Microsoft.AspNetCore.Authentication.OpenIdConnect.dll": {
+      "size": 127248,
+      "mtime": "2026-04-17T15:09:36+00:00"
+    },
+    "Microsoft.AspNetCore.Mvc.Razor.Extensions.dll": {
+      "size": 86128,
+      "mtime": "2021-10-26T16:51:16+00:00"
+    },
+    "Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation.dll": {
+      "size": 72528,
+      "mtime": "2026-05-20T15:21:08+00:00"
+    },
+    "Microsoft.AspNetCore.Razor.Language.dll": {
+      "size": 1009280,
+      "mtime": "2021-10-26T16:51:08+00:00"
+    },
+    "Microsoft.Bcl.AsyncInterfaces.dll": {
+      "size": 20744,
+      "mtime": "2026-04-17T13:45:56+00:00"
+    },
+    "Microsoft.Build.Framework.dll": {
+      "size": 269608,
+      "mtime": "2025-10-21T05:15:54+00:00"
+    },
+    "Microsoft.CodeAnalysis.CSharp.dll": {
+      "size": 6839608,
+      "mtime": "2025-11-17T17:20:08+00:00"
+    },
+    "Microsoft.CodeAnalysis.CSharp.Workspaces.dll": {
+      "size": 944904,
+      "mtime": "2025-11-17T17:20:12+00:00"
+    },
+    "Microsoft.CodeAnalysis.dll": {
+      "size": 3059000,
+      "mtime": "2025-11-17T17:14:18+00:00"
+    },
+    "Microsoft.CodeAnalysis.ExternalAccess.RazorCompiler.dll": {
+      "size": 21256,
+      "mtime": "2025-11-17T17:23:54+00:00"
+    },
+    "Microsoft.CodeAnalysis.Razor.dll": {
+      "size": 91248,
+      "mtime": "2021-10-26T16:51:14+00:00"
+    },
+    "Microsoft.CodeAnalysis.Workspaces.dll": {
+      "size": 4230448,
+      "mtime": "2025-11-17T17:18:46+00:00"
+    },
+    "Microsoft.CodeAnalysis.Workspaces.MSBuild.dll": {
+      "size": 141576,
+      "mtime": "2025-11-17T17:25:26+00:00"
+    },
+    "Microsoft.Data.SqlClient.dll": {
+      "size": 929912,
+      "mtime": "2026-01-15T03:50:16+00:00"
+    },
+    "Microsoft.EntityFrameworkCore.Abstractions.dll": {
+      "size": 34656,
+      "mtime": "2026-05-20T15:03:26+00:00"
+    },
+    "Microsoft.EntityFrameworkCore.Design.dll": {
+      "size": 631648,
+      "mtime": "2026-05-20T15:04:16+00:00"
+    },
+    "Microsoft.EntityFrameworkCore.dll": {
+      "size": 2828640,
+      "mtime": "2026-05-20T15:03:54+00:00"
+    },
+    "Microsoft.EntityFrameworkCore.InMemory.dll": {
+      "size": 240992,
+      "mtime": "2026-05-20T15:03:56+00:00"
+    },
+    "Microsoft.EntityFrameworkCore.Relational.dll": {
+      "size": 2194784,
+      "mtime": "2026-05-20T15:04:10+00:00"
+    },
+    "Microsoft.Extensions.Caching.Hybrid.dll": {
+      "size": 96328,
+      "mtime": "2025-09-08T16:13:24+00:00"
+    },
+    "Microsoft.Extensions.DependencyModel.dll": {
+      "size": 84816,
+      "mtime": "2026-05-20T14:29:44+00:00"
+    },
+    "Microsoft.Identity.Client.dll": {
+      "size": 1141280,
+      "mtime": "2025-12-19T02:57:00+00:00"
+    },
+    "Microsoft.Identity.Client.Extensions.Msal.dll": {
+      "size": 66592,
+      "mtime": "2025-10-23T14:36:44+00:00"
+    },
+    "Microsoft.IdentityModel.Abstractions.dll": {
+      "size": 19528,
+      "mtime": "2026-02-11T21:32:02+00:00"
+    },
+    "Microsoft.IdentityModel.JsonWebTokens.dll": {
+      "size": 173088,
+      "mtime": "2026-02-11T21:32:52+00:00"
+    },
+    "Microsoft.IdentityModel.Logging.dll": {
+      "size": 38432,
+      "mtime": "2026-02-11T21:32:32+00:00"
+    },
+    "Microsoft.IdentityModel.Protocols.dll": {
+      "size": 53280,
+      "mtime": "2026-02-11T21:32:02+00:00"
+    },
+    "Microsoft.IdentityModel.Protocols.OpenIdConnect.dll": {
+      "size": 137248,
+      "mtime": "2026-02-11T21:32:42+00:00"
+    },
+    "Microsoft.IdentityModel.Tokens.dll": {
+      "size": 391200,
+      "mtime": "2026-02-11T21:32:42+00:00"
+    },
+    "Microsoft.IdentityModel.Validators.dll": {
+      "size": 45080,
+      "mtime": "2026-02-11T21:32:22+00:00"
+    },
+    "Microsoft.NET.StringTools.dll": {
+      "size": 30880,
+      "mtime": "2024-08-06T09:42:44+00:00"
+    },
+    "Microsoft.OpenApi.dll": {
+      "size": 477768,
+      "mtime": "2025-08-28T20:02:46+00:00"
+    },
+    "Microsoft.SqlServer.Server.dll": {
+      "size": 23976,
+      "mtime": "2022-01-27T11:19:08+00:00"
+    },
+    "Microsoft.VisualStudio.SolutionPersistence.dll": {
+      "size": 172072,
+      "mtime": "2025-03-04T13:02:26+00:00"
+    },
+    "MigraDoc.DocumentObjectModel.dll": {
+      "size": 334848,
+      "mtime": "2026-01-06T04:12:56+00:00"
+    },
+    "MigraDoc.Rendering.dll": {
+      "size": 135680,
+      "mtime": "2026-01-06T04:13:40+00:00"
+    },
+    "MigraDoc.RtfRendering.dll": {
+      "size": 70656,
+      "mtime": "2026-01-06T04:13:32+00:00"
+    },
+    "Mono.TextTemplating.dll": {
+      "size": 177664,
+      "mtime": "2024-09-03T16:57:16+00:00"
+    },
+    "MyCSharp.HttpUserAgentParser.dll": {
+      "size": 38400,
+      "mtime": "2025-08-25T06:02:54+00:00"
+    },
+    "Newtonsoft.Json.dll": {
+      "size": 712464,
+      "mtime": "2023-03-08T01:09:54+00:00"
+    },
+    "Nito.AsyncEx.Context.dll": {
+      "size": 13824,
+      "mtime": "2021-09-25T19:23:26+00:00"
+    },
+    "Nito.AsyncEx.Tasks.dll": {
+      "size": 35840,
+      "mtime": "2021-09-25T19:23:26+00:00"
+    },
+    "Nito.Disposables.dll": {
+      "size": 22528,
+      "mtime": "2021-09-25T16:43:20+00:00"
+    },
+    "Npgsql.dll": {
+      "size": 1477632,
+      "mtime": "2025-11-22T10:49:16+00:00"
+    },
+    "Npgsql.EntityFrameworkCore.PostgreSQL.dll": {
+      "size": 676864,
+      "mtime": "2025-11-22T11:32:50+00:00"
+    },
+    "NUglify.dll": {
+      "size": 637440,
+      "mtime": "2025-07-29T04:34:24+00:00"
+    },
+    "OpenIddict.Abstractions.dll": {
+      "size": 391680,
+      "mtime": "2026-04-21T19:04:36+00:00"
+    },
+    "OpenIddict.Core.dll": {
+      "size": 340480,
+      "mtime": "2026-04-21T19:04:46+00:00"
+    },
+    "openiddict.pfx": {
+      "size": 4267,
+      "mtime": "2026-11-05T11:29:16+00:00"
+    },
+    "OpenIddict.Server.AspNetCore.dll": {
+      "size": 103936,
+      "mtime": "2026-04-21T19:04:50+00:00"
+    },
+    "OpenIddict.Server.dll": {
+      "size": 529408,
+      "mtime": "2026-04-21T19:04:42+00:00"
+    },
+    "OpenIddict.Validation.AspNetCore.dll": {
+      "size": 61440,
+      "mtime": "2026-04-21T19:05:18+00:00"
+    },
+    "OpenIddict.Validation.dll": {
+      "size": 167424,
+      "mtime": "2026-04-21T19:04:44+00:00"
+    },
+    "OpenIddict.Validation.ServerIntegration.dll": {
+      "size": 36864,
+      "mtime": "2026-04-21T19:05:20+00:00"
+    },
+    "package.json": {
+      "size": 187,
+      "mtime": "2026-11-04T14:23:18+00:00"
+    },
+    "PdfSharp.BarCodes.dll": {
+      "size": 35840,
+      "mtime": "2026-01-06T04:13:04+00:00"
+    },
+    "PdfSharp.Charting.dll": {
+      "size": 88064,
+      "mtime": "2026-01-06T04:13:04+00:00"
+    },
+    "PdfSharp.Cryptography.dll": {
+      "size": 15360,
+      "mtime": "2026-01-06T04:12:48+00:00"
+    },
+    "PdfSharp.dll": {
+      "size": 794624,
+      "mtime": "2026-01-06T04:12:52+00:00"
+    },
+    "PdfSharp.Quality.dll": {
+      "size": 40448,
+      "mtime": "2026-01-06T04:13:12+00:00"
+    },
+    "PdfSharp.Shared.dll": {
+      "size": 23040,
+      "mtime": "2026-01-06T04:09:34+00:00"
+    },
+    "PdfSharp.Snippets.dll": {
+      "size": 154624,
+      "mtime": "2026-01-06T04:13:16+00:00"
+    },
+    "PdfSharp.System.dll": {
+      "size": 8192,
+      "mtime": "2026-01-06T04:10:32+00:00"
+    },
+    "PdfSharp.WPFonts.dll": {
+      "size": 421376,
+      "mtime": "2026-01-06T04:09:26+00:00"
+    },
+    "Polly.Core.dll": {
+      "size": 223136,
+      "mtime": "2025-08-22T06:29:12+00:00"
+    },
+    "Polly.dll": {
+      "size": 287648,
+      "mtime": "2025-08-22T06:29:12+00:00"
+    },
+    "Riok.Mapperly.Abstractions.dll": {
+      "size": 33280,
+      "mtime": "2025-12-22T06:54:16+00:00"
+    },
+    "Scriban.dll": {
+      "size": 557056,
+      "mtime": "2026-05-24T13:04:00+00:00"
+    },
+    "Serilog.AspNetCore.dll": {
+      "size": 17920,
+      "mtime": "2024-12-08T18:38:40+00:00"
+    },
+    "Serilog.dll": {
+      "size": 161792,
+      "mtime": "2025-05-18T16:22:28+00:00"
+    },
+    "Serilog.Extensions.Hosting.dll": {
+      "size": 35840,
+      "mtime": "2024-12-08T18:31:56+00:00"
+    },
+    "Serilog.Extensions.Logging.dll": {
+      "size": 27648,
+      "mtime": "2024-12-08T18:18:50+00:00"
+    },
+    "Serilog.Formatting.Compact.dll": {
+      "size": 9728,
+      "mtime": "2024-06-09T17:17:52+00:00"
+    },
+    "Serilog.Settings.Configuration.dll": {
+      "size": 70144,
+      "mtime": "2024-12-08T18:16:38+00:00"
+    },
+    "Serilog.Sinks.Async.dll": {
+      "size": 14848,
+      "mtime": "2024-10-23T21:08:30+00:00"
+    },
+    "Serilog.Sinks.Console.dll": {
+      "size": 38400,
+      "mtime": "2024-06-09T17:13:26+00:00"
+    },
+    "Serilog.Sinks.Debug.dll": {
+      "size": 7168,
+      "mtime": "2024-06-14T03:12:04+00:00"
+    },
+    "Serilog.Sinks.File.dll": {
+      "size": 30720,
+      "mtime": "2024-06-22T17:44:08+00:00"
+    },
+    "Swashbuckle.AspNetCore.Swagger.dll": {
+      "size": 17408,
+      "mtime": "2025-11-12T16:07:10+00:00"
+    },
+    "Swashbuckle.AspNetCore.SwaggerGen.dll": {
+      "size": 157184,
+      "mtime": "2025-11-12T16:07:34+00:00"
+    },
+    "Swashbuckle.AspNetCore.SwaggerUI.dll": {
+      "size": 724480,
+      "mtime": "2025-11-12T16:07:22+00:00"
+    },
+    "System.ClientModel.dll": {
+      "size": 232520,
+      "mtime": "2025-11-03T12:18:08+00:00"
+    },
+    "System.CodeDom.dll": {
+      "size": 185144,
+      "mtime": "2026-04-17T13:47:30+00:00"
+    },
+    "System.Composition.AttributedModel.dll": {
+      "size": 20248,
+      "mtime": "2024-10-28T21:38:10+00:00"
+    },
+    "System.Composition.Convention.dll": {
+      "size": 54040,
+      "mtime": "2024-10-28T21:38:24+00:00"
+    },
+    "System.Composition.Hosting.dll": {
+      "size": 56072,
+      "mtime": "2024-10-28T21:38:28+00:00"
+    },
+    "System.Composition.Runtime.dll": {
+      "size": 27424,
+      "mtime": "2024-10-28T21:38:16+00:00"
+    },
+    "System.Composition.TypedParts.dll": {
+      "size": 65816,
+      "mtime": "2024-10-28T21:38:36+00:00"
+    },
+    "System.Configuration.ConfigurationManager.dll": {
+      "size": 443176,
+      "mtime": "2025-10-17T18:29:30+00:00"
+    },
+    "System.IdentityModel.Tokens.Jwt.dll": {
+      "size": 92232,
+      "mtime": "2026-02-11T21:32:22+00:00"
+    },
+    "System.Linq.Dynamic.Core.dll": {
+      "size": 241152,
+      "mtime": "2025-07-28T10:32:36+00:00"
+    },
+    "System.Management.dll": {
+      "size": 74504,
+      "mtime": "2026-04-17T13:50:14+00:00"
+    },
+    "System.Memory.Data.dll": {
+      "size": 30472,
+      "mtime": "2024-09-16T18:10:06+00:00"
+    },
+    "System.Security.Cryptography.ProtectedData.dll": {
+      "size": 38696,
+      "mtime": "2025-10-17T18:29:20+00:00"
+    },
+    "TimeZoneConverter.dll": {
+      "size": 64000,
+      "mtime": "2025-10-20T14:24:44+00:00"
+    },
+    "Volo.Abp.Account.Application.Contracts.dll": {
+      "size": 181760,
+      "mtime": "2026-06-30T01:42:02+00:00"
+    },
+    "Volo.Abp.Account.Application.dll": {
+      "size": 34816,
+      "mtime": "2026-06-30T01:42:04+00:00"
+    },
+    "Volo.Abp.Account.HttpApi.dll": {
+      "size": 9728,
+      "mtime": "2026-06-30T01:42:04+00:00"
+    },
+    "Volo.Abp.Account.Web.dll": {
+      "size": 240640,
+      "mtime": "2026-06-30T01:42:06+00:00"
+    },
+    "Volo.Abp.Account.Web.OpenIddict.dll": {
+      "size": 18944,
+      "mtime": "2026-06-30T01:42:08+00:00"
+    },
+    "Volo.Abp.ApiVersioning.Abstractions.dll": {
+      "size": 5120,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.AspNetCore.Abstractions.dll": {
+      "size": 6656,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.AspNetCore.Authentication.JwtBearer.dll": {
+      "size": 17920,
+      "mtime": "2026-06-30T01:38:34+00:00"
+    },
+    "Volo.Abp.AspNetCore.Bundling.dll": {
+      "size": 22528,
+      "mtime": "2026-06-30T01:38:18+00:00"
+    },
+    "Volo.Abp.AspNetCore.dll": {
+      "size": 129024,
+      "mtime": "2026-06-30T01:38:34+00:00"
+    },
+    "Volo.Abp.AspNetCore.MultiTenancy.dll": {
+      "size": 32256,
+      "mtime": "2026-06-30T01:38:38+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.Contracts.dll": {
+      "size": 31744,
+      "mtime": "2026-06-30T01:38:28+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.dll": {
+      "size": 246272,
+      "mtime": "2026-06-30T01:38:38+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.dll": {
+      "size": 244224,
+      "mtime": "2026-06-30T01:38:42+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Bundling.Abstractions.dll": {
+      "size": 24064,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Bundling.dll": {
+      "size": 41472,
+      "mtime": "2026-06-30T01:38:42+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.dll": {
+      "size": 35840,
+      "mtime": "2026-06-30T01:38:40+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.MultiTenancy.dll": {
+      "size": 46592,
+      "mtime": "2026-06-30T01:38:46+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Packages.dll": {
+      "size": 25088,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite.dll": {
+      "size": 15502336,
+      "mtime": "2026-06-30T05:21:26+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.dll": {
+      "size": 190976,
+      "mtime": "2026-06-30T01:38:44+00:00"
+    },
+    "Volo.Abp.AspNetCore.Mvc.UI.Widgets.dll": {
+      "size": 43520,
+      "mtime": "2026-06-30T01:38:44+00:00"
+    },
+    "Volo.Abp.AspNetCore.Serilog.dll": {
+      "size": 9216,
+      "mtime": "2026-06-30T01:38:40+00:00"
+    },
+    "Volo.Abp.Auditing.Contracts.dll": {
+      "size": 7168,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Auditing.dll": {
+      "size": 49152,
+      "mtime": "2026-06-30T01:38:32+00:00"
+    },
+    "Volo.Abp.AuditLogging.Domain.dll": {
+      "size": 31232,
+      "mtime": "2026-06-30T01:41:38+00:00"
+    },
+    "Volo.Abp.AuditLogging.Domain.Shared.dll": {
+      "size": 158208,
+      "mtime": "2026-06-30T01:41:36+00:00"
+    },
+    "Volo.Abp.AuditLogging.EntityFrameworkCore.dll": {
+      "size": 54272,
+      "mtime": "2026-06-30T01:41:38+00:00"
+    },
+    "Volo.Abp.Authorization.Abstractions.dll": {
+      "size": 34304,
+      "mtime": "2026-06-30T01:38:28+00:00"
+    },
+    "Volo.Abp.Authorization.dll": {
+      "size": 128512,
+      "mtime": "2026-06-30T01:38:32+00:00"
+    },
+    "Volo.Abp.Autofac.dll": {
+      "size": 23040,
+      "mtime": "2026-06-30T01:38:18+00:00"
+    },
+    "Volo.Abp.BackgroundJobs.Abstractions.dll": {
+      "size": 28160,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.BackgroundJobs.dll": {
+      "size": 24064,
+      "mtime": "2026-06-30T01:38:32+00:00"
+    },
+    "Volo.Abp.BackgroundJobs.Domain.dll": {
+      "size": 15872,
+      "mtime": "2026-06-30T01:41:48+00:00"
+    },
+    "Volo.Abp.BackgroundJobs.Domain.Shared.dll": {
+      "size": 5632,
+      "mtime": "2026-06-30T01:41:46+00:00"
+    },
+    "Volo.Abp.BackgroundJobs.EntityFrameworkCore.dll": {
+      "size": 17408,
+      "mtime": "2026-06-30T01:41:48+00:00"
+    },
+    "Volo.Abp.BackgroundWorkers.dll": {
+      "size": 34816,
+      "mtime": "2026-06-30T01:38:24+00:00"
+    },
+    "Volo.Abp.BlobStoring.Database.Domain.dll": {
+      "size": 17920,
+      "mtime": "2026-06-30T01:42:42+00:00"
+    },
+    "Volo.Abp.BlobStoring.Database.Domain.Shared.dll": {
+      "size": 12288,
+      "mtime": "2026-06-30T01:42:42+00:00"
+    },
+    "Volo.Abp.BlobStoring.Database.EntityFrameworkCore.dll": {
+      "size": 20992,
+      "mtime": "2026-06-30T01:42:44+00:00"
+    },
+    "Volo.Abp.BlobStoring.dll": {
+      "size": 27648,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.Caching.dll": {
+      "size": 79872,
+      "mtime": "2026-06-30T01:38:32+00:00"
+    },
+    "Volo.Abp.Castle.Core.dll": {
+      "size": 11776,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Core.dll": {
+      "size": 288768,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Data.dll": {
+      "size": 24576,
+      "mtime": "2026-06-30T01:38:22+00:00"
+    },
+    "Volo.Abp.Ddd.Application.Contracts.dll": {
+      "size": 36864,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.Ddd.Application.dll": {
+      "size": 44032,
+      "mtime": "2026-06-30T01:38:36+00:00"
+    },
+    "Volo.Abp.Ddd.Domain.dll": {
+      "size": 165888,
+      "mtime": "2026-06-30T01:38:34+00:00"
+    },
+    "Volo.Abp.Ddd.Domain.Shared.dll": {
+      "size": 8704,
+      "mtime": "2026-06-30T01:38:28+00:00"
+    },
+    "Volo.Abp.DistributedLocking.Abstractions.dll": {
+      "size": 8192,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Emailing.dll": {
+      "size": 88064,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.EntityFrameworkCore.dll": {
+      "size": 224256,
+      "mtime": "2026-06-30T01:38:36+00:00"
+    },
+    "Volo.Abp.EntityFrameworkCore.PostgreSql.dll": {
+      "size": 11776,
+      "mtime": "2026-06-30T01:38:36+00:00"
+    },
+    "Volo.Abp.EventBus.Abstractions.dll": {
+      "size": 20480,
+      "mtime": "2026-06-30T01:38:22+00:00"
+    },
+    "Volo.Abp.EventBus.dll": {
+      "size": 87040,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.ExceptionHandling.dll": {
+      "size": 78848,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.FeatureManagement.Application.Contracts.dll": {
+      "size": 11264,
+      "mtime": "2026-06-30T01:40:12+00:00"
+    },
+    "Volo.Abp.FeatureManagement.Application.dll": {
+      "size": 18944,
+      "mtime": "2026-06-30T01:40:14+00:00"
+    },
+    "Volo.Abp.FeatureManagement.Domain.dll": {
+      "size": 92160,
+      "mtime": "2026-06-30T01:40:14+00:00"
+    },
+    "Volo.Abp.FeatureManagement.Domain.Shared.dll": {
+      "size": 47104,
+      "mtime": "2026-06-30T01:40:12+00:00"
+    },
+    "Volo.Abp.FeatureManagement.EntityFrameworkCore.dll": {
+      "size": 25600,
+      "mtime": "2026-06-30T01:40:14+00:00"
+    },
+    "Volo.Abp.FeatureManagement.HttpApi.dll": {
+      "size": 9216,
+      "mtime": "2026-06-30T01:40:14+00:00"
+    },
+    "Volo.Abp.FeatureManagement.Web.dll": {
+      "size": 82944,
+      "mtime": "2026-06-30T01:40:18+00:00"
+    },
+    "Volo.Abp.Features.dll": {
+      "size": 73728,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.GlobalFeatures.dll": {
+      "size": 26112,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.Guids.dll": {
+      "size": 6144,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Http.Abstractions.dll": {
+      "size": 6144,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Http.dll": {
+      "size": 58880,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.Identity.Application.Contracts.dll": {
+      "size": 20480,
+      "mtime": "2026-06-30T01:40:30+00:00"
+    },
+    "Volo.Abp.Identity.Application.dll": {
+      "size": 51200,
+      "mtime": "2026-06-30T01:40:30+00:00"
+    },
+    "Volo.Abp.Identity.AspNetCore.dll": {
+      "size": 51200,
+      "mtime": "2026-06-30T01:40:32+00:00"
+    },
+    "Volo.Abp.Identity.Domain.dll": {
+      "size": 256512,
+      "mtime": "2026-06-30T01:40:30+00:00"
+    },
+    "Volo.Abp.Identity.Domain.Shared.dll": {
+      "size": 373760,
+      "mtime": "2026-06-30T01:40:28+00:00"
+    },
+    "Volo.Abp.Identity.EntityFrameworkCore.dll": {
+      "size": 204800,
+      "mtime": "2026-06-30T01:40:32+00:00"
+    },
+    "Volo.Abp.Identity.HttpApi.dll": {
+      "size": 12800,
+      "mtime": "2026-06-30T01:40:32+00:00"
+    },
+    "Volo.Abp.Identity.Web.dll": {
+      "size": 203776,
+      "mtime": "2026-06-30T01:40:36+00:00"
+    },
+    "Volo.Abp.Json.Abstractions.dll": {
+      "size": 5120,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Json.dll": {
+      "size": 4608,
+      "mtime": "2026-06-30T01:38:30+00:00"
+    },
+    "Volo.Abp.Json.SystemTextJson.dll": {
+      "size": 23552,
+      "mtime": "2026-06-30T01:38:28+00:00"
+    },
+    "Volo.Abp.Localization.Abstractions.dll": {
+      "size": 12800,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Localization.dll": {
+      "size": 62976,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.Mapperly.dll": {
+      "size": 17920,
+      "mtime": "2026-06-30T01:38:32+00:00"
+    },
+    "Volo.Abp.Minify.dll": {
+      "size": 7168,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.MultiTenancy.Abstractions.dll": {
+      "size": 27136,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.MultiTenancy.dll": {
+      "size": 29696,
+      "mtime": "2026-06-30T01:38:28+00:00"
+    },
+    "Volo.Abp.ObjectExtending.dll": {
+      "size": 46080,
+      "mtime": "2026-06-30T01:38:22+00:00"
+    },
+    "Volo.Abp.ObjectMapping.dll": {
+      "size": 16896,
+      "mtime": "2026-06-30T01:38:16+00:00"
+    },
+    "Volo.Abp.OpenIddict.AspNetCore.dll": {
+      "size": 112640,
+      "mtime": "2026-06-30T01:41:06+00:00"
+    },
+    "Volo.Abp.OpenIddict.Domain.dll": {
+      "size": 218112,
+      "mtime": "2026-06-30T01:41:04+00:00"
+    },
+    "Volo.Abp.OpenIddict.Domain.Shared.dll": {
+      "size": 46592,
+      "mtime": "2026-06-30T01:41:04+00:00"
+    },
+    "Volo.Abp.OpenIddict.EntityFrameworkCore.dll": {
+      "size": 78336,
+      "mtime": "2026-06-30T01:41:04+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Application.Contracts.dll": {
+      "size": 13824,
+      "mtime": "2026-06-30T01:39:32+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Application.dll": {
+      "size": 40448,
+      "mtime": "2026-06-30T01:39:36+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Domain.dll": {
+      "size": 157184,
+      "mtime": "2026-06-30T01:39:34+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Domain.Identity.dll": {
+      "size": 27648,
+      "mtime": "2026-06-30T01:40:30+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Domain.OpenIddict.dll": {
+      "size": 19456,
+      "mtime": "2026-06-30T01:41:04+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Domain.Shared.dll": {
+      "size": 59392,
+      "mtime": "2026-06-30T01:39:32+00:00"
+    },
+    "Volo.Abp.PermissionManagement.EntityFrameworkCore.dll": {
+      "size": 36864,
+      "mtime": "2026-06-30T01:39:36+00:00"
+    },
+    "Volo.Abp.PermissionManagement.HttpApi.dll": {
+      "size": 9728,
+      "mtime": "2026-06-30T01:39:36+00:00"
+    },
+    "Volo.Abp.PermissionManagement.Web.dll": {
+      "size": 146432,
+      "mtime": "2026-06-30T01:39:38+00:00"
+    },
+    "Volo.Abp.Security.dll": {
+      "size": 46080,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Serialization.dll": {
+      "size": 7168,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.SettingManagement.Application.Contracts.dll": {
+      "size": 13824,
+      "mtime": "2026-06-30T01:39:52+00:00"
+    },
+    "Volo.Abp.SettingManagement.Application.dll": {
+      "size": 21504,
+      "mtime": "2026-06-30T01:39:54+00:00"
+    },
+    "Volo.Abp.SettingManagement.Domain.dll": {
+      "size": 79872,
+      "mtime": "2026-06-30T01:39:52+00:00"
+    },
+    "Volo.Abp.SettingManagement.Domain.Shared.dll": {
+      "size": 88576,
+      "mtime": "2026-06-30T01:39:50+00:00"
+    },
+    "Volo.Abp.SettingManagement.EntityFrameworkCore.dll": {
+      "size": 22016,
+      "mtime": "2026-06-30T01:39:54+00:00"
+    },
+    "Volo.Abp.SettingManagement.HttpApi.dll": {
+      "size": 8704,
+      "mtime": "2026-06-30T01:39:54+00:00"
+    },
+    "Volo.Abp.SettingManagement.Web.dll": {
+      "size": 105984,
+      "mtime": "2026-06-30T01:39:58+00:00"
+    },
+    "Volo.Abp.Settings.dll": {
+      "size": 37888,
+      "mtime": "2026-06-30T01:38:24+00:00"
+    },
+    "Volo.Abp.Specifications.dll": {
+      "size": 11264,
+      "mtime": "2026-06-30T01:38:16+00:00"
+    },
+    "Volo.Abp.Studio.Client.AspNetCore.dll": {
+      "size": 63488,
+      "mtime": "2026-07-13T08:51:30+00:00"
+    },
+    "Volo.Abp.Studio.Client.Contracts.dll": {
+      "size": 84480,
+      "mtime": "2026-07-13T08:51:32+00:00"
+    },
+    "Volo.Abp.Studio.Client.dll": {
+      "size": 104448,
+      "mtime": "2026-07-13T08:51:26+00:00"
+    },
+    "Volo.Abp.Swashbuckle.dll": {
+      "size": 31232,
+      "mtime": "2026-06-30T01:38:40+00:00"
+    },
+    "Volo.Abp.TenantManagement.Application.Contracts.dll": {
+      "size": 11264,
+      "mtime": "2026-06-30T01:41:20+00:00"
+    },
+    "Volo.Abp.TenantManagement.Application.dll": {
+      "size": 20480,
+      "mtime": "2026-06-30T01:41:22+00:00"
+    },
+    "Volo.Abp.TenantManagement.Domain.dll": {
+      "size": 27648,
+      "mtime": "2026-06-30T01:41:20+00:00"
+    },
+    "Volo.Abp.TenantManagement.Domain.Shared.dll": {
+      "size": 44544,
+      "mtime": "2026-06-30T01:41:20+00:00"
+    },
+    "Volo.Abp.TenantManagement.EntityFrameworkCore.dll": {
+      "size": 21504,
+      "mtime": "2026-06-30T01:41:22+00:00"
+    },
+    "Volo.Abp.TenantManagement.HttpApi.dll": {
+      "size": 8704,
+      "mtime": "2026-06-30T01:41:22+00:00"
+    },
+    "Volo.Abp.TenantManagement.Web.dll": {
+      "size": 88064,
+      "mtime": "2026-06-30T01:41:26+00:00"
+    },
+    "Volo.Abp.TextTemplating.Core.dll": {
+      "size": 40448,
+      "mtime": "2026-06-30T01:38:22+00:00"
+    },
+    "Volo.Abp.TextTemplating.dll": {
+      "size": 5120,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.TextTemplating.Scriban.dll": {
+      "size": 14848,
+      "mtime": "2026-06-30T01:38:24+00:00"
+    },
+    "Volo.Abp.Threading.dll": {
+      "size": 33792,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Timing.dll": {
+      "size": 19456,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.UI.dll": {
+      "size": 83456,
+      "mtime": "2026-06-30T01:38:28+00:00"
+    },
+    "Volo.Abp.UI.Navigation.dll": {
+      "size": 39936,
+      "mtime": "2026-06-30T01:38:34+00:00"
+    },
+    "Volo.Abp.Uow.dll": {
+      "size": 36352,
+      "mtime": "2026-06-30T01:38:14+00:00"
+    },
+    "Volo.Abp.Users.Abstractions.dll": {
+      "size": 11776,
+      "mtime": "2026-06-30T01:39:18+00:00"
+    },
+    "Volo.Abp.Users.Domain.dll": {
+      "size": 20480,
+      "mtime": "2026-06-30T01:39:18+00:00"
+    },
+    "Volo.Abp.Users.Domain.Shared.dll": {
+      "size": 5120,
+      "mtime": "2026-06-30T01:39:16+00:00"
+    },
+    "Volo.Abp.Users.EntityFrameworkCore.dll": {
+      "size": 17408,
+      "mtime": "2026-06-30T01:39:20+00:00"
+    },
+    "Volo.Abp.Validation.Abstractions.dll": {
+      "size": 7168,
+      "mtime": "2026-06-30T01:38:16+00:00"
+    },
+    "Volo.Abp.Validation.dll": {
+      "size": 132608,
+      "mtime": "2026-06-30T01:38:26+00:00"
+    },
+    "Volo.Abp.VirtualFileSystem.dll": {
+      "size": 20480,
+      "mtime": "2026-06-30T01:38:16+00:00"
+    },
+    "web.config": {
+      "size": 656,
+      "mtime": "2026-11-05T11:29:44+00:00"
+    },
+    "YamlDotNet.dll": {
+      "size": 293376,
+      "mtime": "2024-12-23T14:18:10+00:00"
+    },
+    "_backup.filter": {
+      "size": 15,
+      "mtime": "2026-10-22T23:10:49.6379839+00:00"
+    }
+  },
+  "packageSha256": "fc9226be6cc24894ccb494636ff706d6b8be3dc15062deeea176de69e8e17ef2",
+  "deploymentIds": [
+    "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "9bf2b1cb-5f67-4df9-b614-49863441579b",
+    "e6cfc69f-4c7d-4c63-b89d-e6a52ca1c7cb",
+    "ed2415a8-ef9a-44cc-93e3-2319e0c9cb0f",
+    "0eb2caee-3d52-4711-8c5c-2c2520a39be1",
+    "09653b7c-65f7-4540-af2a-fcfee100fb56",
+    "d1fd68bb-6c7c-4954-8004-13ab9d92ddad",
+    "92cf8a5a-b1d7-4bbd-a8c7-62b6180a1b47",
+    "4fa94eef-a808-460a-ba26-c330ddd67297",
+    "19e385e4-950a-47c1-9dce-b307a799c47f"
+  ],
+  "tests": {
+    "domain": 322,
+    "application": 118,
+    "entityframeworkcore": 322,
+    "web": 338
+  },
+  "testTotal": 1100,
+  "browserScenarios": 17,
+  "staticEndpointManifestPreserved": true,
+  "retainedEarlierUnits": [
+    "CF-001",
+    "CF-002",
+    "CF-003",
+    "CF-004",
+    "CF-005",
+    "CF-006",
+    "CF-007",
+    "CF-008",
+    "CF-009",
+    "CF-010",
+    "CF-011",
+    "CF-012",
+    "CF-013",
+    "CF-014",
+    "CF-015",
+    "CF-016",
+    "CF-017",
+    "CF-018",
+    "CF-019",
+    "CF-020",
+    "CF-021",
+    "CF-022",
+    "CF-023",
+    "CF-024",
+    "CF-025",
+    "CF-026",
+    "CF-027"
+  ],
+  "excludedPausedUnits": [
+    "CF-028"
+  ],
+  "migrationRequired": "20261111022402_AllowMealPlanReselectionAfterReset",
+  "settingsChanged": false,
+  "permissionsChanged": false,
+  "housingRecoveryExecuted": false,
+  "preparedAtUtc": "2026-11-11T04:31:20.094633+00:00"
+}

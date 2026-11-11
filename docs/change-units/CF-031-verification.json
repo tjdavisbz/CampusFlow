@@ -1,0 +1,92 @@
+{
+  "unit": "CF-031",
+  "verifiedAtUtc": "2026-11-11T04:19:21.664400+00:00",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "sourceFiles": {
+    "src/CampusFlow.Application.Contracts/Housing/IHousingWorkspaceAppService.cs": "2cb59b9da6f06b8cdc273effa046d712233f7318dd2219b98d1df61a3bda8013",
+    "src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs": "c4ed29203a037a9909535c93c715a65e7485d1613474bdd6a9d365a3e6bed8ff",
+    "src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs": "a82cdbaba8551bf78a58a46b5e654296506cc64b2ad3c1414a6bfb751a6a20a5",
+    "src/CampusFlow.Domain/Housing/HousingApplyProgress.cs": "8715b4b476ca66825a29c3bc073559b79e55eea635dde24a053e46bd9d961af7",
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs": "36b6e51ceb7e18d916992e0a1ef5bd7fb21dacc391c96e6d7c092232c9af163f",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml": "bf33d76c83d1e1f0bdcf019705d5a77a73765af2d90450f30fa46558c50be64f",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml.cs": "6dac80039082fa3498aa532821da2b284f7e160cfb329006505b8f760e0a95a3",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.css": "dc19964c131d92e70697bfdf5539cf1f415d5af043ea8d7644ce0b9c871b5b6a",
+    "src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js": "8ae2b65600cf71d3cb91d4df04f6968cec57d0960d7aedfe7dac214c279faf68",
+    "test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs": "7e1aebc422a93bcdf7d1fc3ee61d9a8efc3e94dc67a448ca5ee9462b68af4c72",
+    "test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingApplyPersistenceTests.cs": "228024e6a7b36ab27e80c0298a5054e054b383056176087f8f0dc9aa7e2bd373",
+    "test/CampusFlow.Web.Tests/Pages/HousingApplyFailurePageTests.cs": "fda73786da4fb0f0bef3362c5d5d7eedb80b045e30ab7056c055edda5c7f63b5",
+    "src/CampusFlow.Application/Housing/HousingWorkspaceRecovery.cs": "935e29539af2e67e8ea22a343e43d197a15a8f84f7c9beb8d60c6f75e5cea47a",
+    "src/CampusFlow.Domain/Housing/HousingCommuterRecovery.cs": "5ead701bd69f1cda5b956c7e82441cda5b0a1216c43c1d0c2026b531624e0d5b",
+    "src/CampusFlow.Domain/Housing/HousingRequestException.cs": "59ee894d454849d9e254ff40cfb9510cc20bd37a5f1a666ba9ec835a727d3e62",
+    "test/CampusFlow.Domain.Tests/Housing/HousingCommuterRecoveryTests.cs": "48290f2eb293f1b4f4c103c60d881e67dc2ff2e412ff44e03988d2e2f9cd3b8d",
+    "test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingFailureSafetyTests.cs": "aafe15e2fc8bdec5160cce431cb51717e14eadc9072baadb03aab2269ed380a7",
+    "test/browser/housing-recovery.cjs": "048f525922b1b8ebe9df92eebd7f62bb00f691545600361e85f66b1fa8001780"
+  },
+  "tests": {
+    "domain": 322,
+    "application": 118,
+    "entityframeworkcore": 322,
+    "web": 338,
+    "total": 1100
+  },
+  "testScope": "Clean deployed-production base plus CF-029, CF-030 and exact CF-031 source; no CF-028.",
+  "releasePublishSucceeded": true,
+  "browserScenarios": {
+    "recovery": 7,
+    "existingDraftPreservation": 6
+  },
+  "browserWidths": [
+    320,
+    390,
+    768,
+    1440
+  ],
+  "screenshotsVisuallyInspected": true,
+  "schemaMigrationRequired": false,
+  "productionWrites": false,
+  "productionOriginalFailureReproduced": false,
+  "verificationScope": [
+    "All 113 synthetic commuter additions survive a partial run, preview, resume, another failure and final completion.",
+    "Already assigned students are verified and skipped; every affected student retains billing preflight and idempotent reconciliation to no commuter housing charge.",
+    "Fresh live snapshot and per-student API checks, original run and revision, unchanged complete draft, explicit confirmation and required reason protect recovery.",
+    "Room topology/capacity changes, moves/removals, residential charges, special commuter rates, unrelated or conflicting live students, active runs and stale previews block recovery before writes.",
+    "A room change during recovery stops charge reconciliation for that student.",
+    "Original baseline, desired plan, operations, failure category and recovery history persist across real database reloads.",
+    "Partial Needs review runs cannot discard the plan through Refresh.",
+    "HTTP failures and explicit nested vendor business failures use fixed safe categories; arbitrary vendor body/exception text is never persisted or exposed. Minimal documented success envelopes remain compatible and require live readback."
+  ],
+  "liveNonprodCanary": {
+    "syntheticIdentityVerified": true,
+    "isolatedZeroRentSetup": true,
+    "assignDeallocateReassignSucceeded": true,
+    "liveReadbackMatchedEachStep": true,
+    "fullSourceApplyRecoveryNotRunAgainstLiveStudents": true,
+    "productionWrites": false,
+    "historicalRoomRemovalEdgeCase": {
+      "oldRoomRemovalNotConfirmed": true,
+      "reassignmentAfterRemovalNotAttempted": true,
+      "scenarioStoppedAndFixtureRemoved": true,
+      "notEvidenceOfOriginalProductionCause": true
+    }
+  },
+  "currentProductionPlanQualification": {
+    "BaselineAssignments": 0,
+    "DesiredAssignments": 113,
+    "AddedAssignments": 113,
+    "RemovedAssignments": 0,
+    "MovesOrRateChanges": 0,
+    "UnsupportedAdditions": 0,
+    "RoomIdentityOrCapacityChanges": 0
+  },
+  "remainingLimitation": "Original production vendor rejection has not been reproduced. It was not retained by the old code. New error categories/reviewed recovery require staff acceptance after deployment; do not mark original failure resolved.",
+  "nonprodFixtureCleanup": {
+    "verifiedAtUtc": "2026-11-11T04:20:12.034625+00:00",
+    "isolatedPeriodsCreated": 12,
+    "activeFixturePeriods": 0,
+    "activeFixtureAssignments": 0,
+    "nonzeroSyntheticHousingBatchCharges": 0,
+    "allFixturesSoftDeleted": true,
+    "replicaLagRequiredOneTargetedCleanup": true,
+    "noProductionWrites": true
+  }
+}

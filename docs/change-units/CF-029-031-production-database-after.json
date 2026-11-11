@@ -1,0 +1,29 @@
+{
+  "environment": "production",
+  "mode": "verify",
+  "migrationId": "20261111022402_AllowMealPlanReselectionAfterReset",
+  "migrationApplied": true,
+  "migrationAppliedByThisCall": false,
+  "selectionRowsPreserved": true,
+  "selectionRowsCount": 4,
+  "selectionRowsFingerprint": "981f400539677bf68a235c99738a91df",
+  "unrelatedIndexesAndHistoryPreserved": true,
+  "billApprovalConfigurationFingerprint": "2:d2c8144c76b0439197bf78444cc633ae",
+  "generalOpenSpringTerms": "0",
+  "sqlSha256": "42f2a8b02d033d33c2b418c02a15fc0629f2b0b7ca60f28d3e51551fa67092ca",
+  "drafts": [
+    {
+      "periodId": 1,
+      "snapshotHash": "ae0e557399bdaeb775a288073fdf9ae79b473f5be508495290a36720dde27e48",
+      "desiredAssignments": 923,
+      "status": null
+    },
+    {
+      "periodId": 2,
+      "snapshotHash": "aadce5f7df6ec49a1a1302bab047112aa16f4a265e93537b1bb1967f9ffe900a",
+      "desiredAssignments": 113,
+      "status": "Needs review"
+    }
+  ],
+  "checkedAtUtc": "2026-11-11T04:40:42.124938Z"
+}

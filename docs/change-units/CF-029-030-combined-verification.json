@@ -1,0 +1,34 @@
+{
+  "verifiedAtUtc": "2026-11-11T03:44:29.146077+00:00",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "includedUnits": [
+    "CF-029",
+    "CF-030"
+  ],
+  "excludedPausedUnit": "CF-028",
+  "cleanSourceAssembly": true,
+  "sourceChecks": {
+    "CF-029": {
+      "fileCount": 9,
+      "allSourceHashesMatch": true,
+      "sourcePatchSha256": "7e71f1afeacba90069bb1bf5586f2ec146bf533f9e8050f3dc876288b22c4358"
+    },
+    "CF-030": {
+      "fileCount": 23,
+      "allSourceHashesMatch": true,
+      "sourcePatchSha256": "e6c3cd39e5d5f9d15829535b254a3b6d16dac06231d841913dceb59edb4a2ef1"
+    }
+  },
+  "tests": {
+    "domain": 307,
+    "application": 103,
+    "entityframeworkcore": 311,
+    "web": 336,
+    "total": 1057
+  },
+  "releasePublishSucceeded": true,
+  "migrationRequired": "20261111022402_AllowMealPlanReselectionAfterReset",
+  "migrationApplied": false,
+  "committed": false,
+  "deployed": false
+}

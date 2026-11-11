@@ -1,0 +1,12 @@
+[
+  {
+    "environment": "nonprod",
+    "iconsVerified": 4,
+    "fontsLoaded": true
+  },
+  {
+    "environment": "production",
+    "iconsVerified": 4,
+    "fontsLoaded": true
+  }
+]

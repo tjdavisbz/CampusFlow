@@ -1,0 +1,64 @@
+{
+  "unit": "CF-029",
+  "scope": "Bill approval uses stored net distribution amounts; new approved-bill document descriptions include the semester through the documented custom-description API mode.",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "branch": "codex/cf-029-billing-aid-followup",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-billing-aid-followup/CampusFlow",
+  "state": "committed-pushed-deployed-both-awaiting-staff-retest",
+  "commit": "ad43347f2de6aeff8f4ce76126e47d18189bc391",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "2a661b37a5b171739fb06407807279c6aeda02bf",
+    "currentRelease": "2a661b37a5b171739fb06407807279c6aeda02bf",
+    "currentVerification": "CF-029-031-nonprod-deployment-verification.json",
+    "currentDeploymentId": "70bd1c88-d4ad-4442-93c7-f56245f4e88c",
+    "currentVerifiedAtUtc": "2026-11-11T04:33:44.516190+00:00",
+    "deploymentId": "70bd1c88-d4ad-4442-93c7-f56245f4e88c",
+    "deployedAtUtc": "2026-11-11T04:33:01.7237012Z",
+    "verifiedAtUtc": "2026-11-11T04:33:44.516190+00:00",
+    "verification": "CF-029-031-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+    "currentRelease": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+    "currentVerification": "CF-029-031-production-deployment-verification.json",
+    "currentDeploymentId": "6408e933-6e7e-46bd-b849-84f317bc4c99",
+    "currentVerifiedAtUtc": "2026-11-11T04:40:57.228089+00:00",
+    "deploymentId": "6408e933-6e7e-46bd-b849-84f317bc4c99",
+    "deployedAtUtc": "2026-11-11T04:38:40.0485731Z",
+    "verifiedAtUtc": "2026-11-11T04:40:57.228089+00:00",
+    "verification": "CF-029-031-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "sourcePatch": "CF-029.patch",
+  "sourcePatchSha256": "7e71f1afeacba90069bb1bf5586f2ec146bf533f9e8050f3dc876288b22c4358",
+  "verification": "CF-029-verification.json",
+  "schemaMigrationRequired": false,
+  "studentAwardFieldsChanged": false,
+  "productionDataChanged": false,
+  "relatedDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-5.pdf",
+  "implementedItems": [
+    4,
+    5
+  ],
+  "investigatedButNotFixed": [
+    {
+      "item": 10,
+      "environment": "production",
+      "state": "needs-fresh-reproduction-and-timestamp",
+      "details": "Retained redacted Docker error filter and Application Insights aggregate search did not identify the reported bill-page exception. No cause guessed and no production bill page invoked to trigger recalc/tax."
+    },
+    {
+      "item": 12,
+      "state": "awaiting-student-id-from-Jeff",
+      "details": "User will ask Jeff for the affected student ID when updating the document. Preserve lock/billing/cancellation safeguards until the actual award is identified."
+    }
+  ],
+  "updatedAtUtc": "2026-11-11T04:42:25.075353+00:00",
+  "combinedVerification": "CF-029-031-combined-verification.json"
+}

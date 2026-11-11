@@ -1,0 +1,60 @@
+{
+  "unit": "CF-030",
+  "scope": "Explicit student meal-plan choice; return-to-Home continuation; visible and audited staff-clearable No Meal Plan choice using the existing meal-plan removal permission.",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "branch": "codex/cf-030-meal-selection-followup",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf030-meal-selection-followup/CampusFlow",
+  "state": "committed-pushed-deployed-both-awaiting-staff-retest",
+  "commit": "29a8248a4e3734592bec3b23b32862b735e0d444",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "2a661b37a5b171739fb06407807279c6aeda02bf",
+    "currentRelease": "2a661b37a5b171739fb06407807279c6aeda02bf",
+    "currentVerification": "CF-029-031-nonprod-deployment-verification.json",
+    "currentDeploymentId": "70bd1c88-d4ad-4442-93c7-f56245f4e88c",
+    "currentVerifiedAtUtc": "2026-11-11T04:33:44.516190+00:00",
+    "deploymentId": "70bd1c88-d4ad-4442-93c7-f56245f4e88c",
+    "deployedAtUtc": "2026-11-11T04:33:01.7237012Z",
+    "verifiedAtUtc": "2026-11-11T04:33:44.516190+00:00",
+    "verification": "CF-029-031-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+    "currentRelease": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+    "currentVerification": "CF-029-031-production-deployment-verification.json",
+    "currentDeploymentId": "6408e933-6e7e-46bd-b849-84f317bc4c99",
+    "currentVerifiedAtUtc": "2026-11-11T04:40:57.228089+00:00",
+    "deploymentId": "6408e933-6e7e-46bd-b849-84f317bc4c99",
+    "deployedAtUtc": "2026-11-11T04:38:40.0485731Z",
+    "verifiedAtUtc": "2026-11-11T04:40:57.228089+00:00",
+    "verification": "CF-029-031-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "sourcePatch": "CF-030.patch",
+  "sourcePatchSha256": "e6c3cd39e5d5f9d15829535b254a3b6d16dac06231d841913dceb59edb4a2ef1",
+  "verification": "CF-030-verification.json",
+  "schemaMigrationRequired": true,
+  "migrationId": "20261111022402_AllowMealPlanReselectionAfterReset",
+  "migrationApplied": true,
+  "implementedItems": [
+    7,
+    8,
+    9
+  ],
+  "relatedAccessItem": 11,
+  "remainingChecks": [
+    "Jeff\u2019s effective removal permission and an actual selected-term Elements assignment must be verified if a real plan removal button remains absent. No permission grants broadened.",
+    "Housing tile report remains under investigation; existing policy counts an actual commuter assignment. The recorded test account currently has no active Spring 2027 assignment in either replica; nonprod has an active Fall 2026 assignment. Confirm the exact account/environment/selected term if staff still see a mismatch."
+  ],
+  "updatedAtUtc": "2026-11-11T04:42:25.075353+00:00",
+  "combinedVerification": "CF-029-031-combined-verification.json",
+  "migrationAppliedTo": [
+    "nonprod",
+    "production"
+  ]
+}

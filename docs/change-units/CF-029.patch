@@ -1,0 +1,407 @@
+diff --git a/src/CampusFlow.Domain/StudentInformationSystems/FinancialAidRules.cs b/src/CampusFlow.Domain/StudentInformationSystems/FinancialAidRules.cs
+index d82d1d9..5420f23 100644
+--- a/src/CampusFlow.Domain/StudentInformationSystems/FinancialAidRules.cs
++++ b/src/CampusFlow.Domain/StudentInformationSystems/FinancialAidRules.cs
+@@ -3,6 +3,18 @@ namespace CampusFlow.StudentInformationSystems;
+ 
+ public static class FinancialAidRules
+ {
++    public static decimal BillApprovalAmount(StudentFinancialAidAward award)
++    {
++        // Elements calls this Distribution Amount in its UI and EstimatedAmount in its API/database.
++        // Retain Amount for award decisions; never substitute gross aid into a bill when net aid is missing.
++        var amount = award.Provider == StudentInformationSystemProvider.ThesisElements
++            ? award.DistributionAmount ?? throw new InvalidOperationException("The financial aid distribution amount could not be verified.")
++            : award.Amount;
++        if (amount < 0)
++            throw new InvalidOperationException("The financial aid distribution amount requires Financial Aid review.");
++        return amount;
++    }
++
+     public static bool CanDecide(StudentFinancialAidAward award) => award.Amount > 0 &&
+         !award.IsSentToBilling && !award.IsLocked && award.StudentAccepted is null &&
+         !award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase);
+diff --git a/src/CampusFlow.Domain/StudentInformationSystems/StudentFinancialAidAward.cs b/src/CampusFlow.Domain/StudentInformationSystems/StudentFinancialAidAward.cs
+index 7fac601..87cee78 100644
+--- a/src/CampusFlow.Domain/StudentInformationSystems/StudentFinancialAidAward.cs
++++ b/src/CampusFlow.Domain/StudentInformationSystems/StudentFinancialAidAward.cs
+@@ -17,4 +17,5 @@ public sealed record StudentFinancialAidAward(
+     int? StudentAccepted,
+     DateTime? StudentAcceptedTime,
+     bool? IsLoan = null,
+-    bool IsLocked = false);
++    bool IsLocked = false,
++    decimal? DistributionAmount = null);
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs
+index 90e8b14..a0ddc88 100644
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs
+@@ -7,6 +7,7 @@ using System.Net.Http;
+ using System.Net.Http.Headers;
+ using System.Text;
+ using System.Text.Json.Nodes;
++using System.Text.RegularExpressions;
+ using System.Threading;
+ using System.Threading.Tasks;
+ using Microsoft.Data.SqlClient;
+@@ -64,30 +65,7 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
+             string.IsNullOrWhiteSpace(matches[0]?["description"]?.GetValue<string>()))
+             throw new InvalidOperationException("The approved bill document type or location is missing, inactive or mismatched.");
+         var description = matches[0]!["description"]!.GetValue<string>();
+-        var acceptedAt = request.AcceptedAt.ToString("O", CultureInfo.InvariantCulture);
+-        var body = new JsonArray
+-        {
+-            new JsonObject
+-            {
+-                ["docTrackId"] = 0,
+-                ["studentUid"] = studentUid,
+-                ["docDate"] = acceptedAt,
+-                ["docNameId"] = GetTrackingInt("DocumentNameId"),
+-                ["docDescription"] = description,
+-                ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
+-                ["comments"] = "CampusFlow approved bill - " + request.TermName,
+-                ["reference"] = reference,
+-                ["compDate"] = acceptedAt,
+-                ["userDefinedFieldId"] = GetTrackingInt("UserDefinedFieldId"),
+-                ["finAidYearSeq"] = null,
+-                ["userId"] = GetTrackingSetting("UserId", "CampusFlow"),
+-                ["docGroupID"] = null,
+-                ["locationId"] = GetTrackingInt("LocationId"),
+-                ["admissionGpagroupId"] = null,
+-                ["internal"] = GetTrackingBool("Internal"),
+-                ["isProspectDoc"] = false
+-            }
+-        };
++        var body = new JsonArray(BuildDocumentBody(request, description));
+ 
+         using var httpRequest = CreateRequest(HttpMethod.Post, "api/student/document-tracking/add", token);
+         httpRequest.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+@@ -105,6 +83,37 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
+         throw new InvalidOperationException("The document creation result could not be verified. Review Elements before allowing another creation.");
+     }
+ 
++    internal JsonObject BuildDocumentBody(StudentDocumentTrackingRequest request, string description)
++    {
++        ArgumentException.ThrowIfNullOrWhiteSpace(description);
++        ArgumentException.ThrowIfNullOrWhiteSpace(request.TermName);
++        var termDescription = Regex.Replace(description.Trim(), @"\s+", " ") + " - " + request.TermName.Trim();
++        if (termDescription.Length > 512)
++            throw new InvalidOperationException("The approved bill document description is too long.");
++        var acceptedAt = request.AcceptedAt.ToString("O", CultureInfo.InvariantCulture);
++        return new JsonObject
++            {
++                ["docTrackId"] = 0,
++                ["studentUid"] = int.Parse(request.ExternalStudentId, CultureInfo.InvariantCulture),
++                ["docDate"] = acceptedAt,
++                // The documented custom-description mode does not rename the shared document type.
++                ["docNameId"] = 0,
++                ["docDescription"] = termDescription,
++                ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
++                ["comments"] = "CampusFlow approved bill - " + request.TermName,
++                ["reference"] = request.ApprovalId.ToString("N"),
++                ["compDate"] = acceptedAt,
++                ["userDefinedFieldId"] = GetTrackingInt("UserDefinedFieldId"),
++                ["finAidYearSeq"] = null,
++                ["userId"] = GetTrackingSetting("UserId", "CampusFlow"),
++                ["docGroupID"] = null,
++                ["locationId"] = GetTrackingInt("LocationId"),
++                ["admissionGpagroupId"] = null,
++                ["internal"] = GetTrackingBool("Internal"),
++                ["isProspectDoc"] = false
++            };
++    }
++
+     public async Task<bool> HasImageAsync(string documentTrackingId, CancellationToken cancellationToken = default)
+     {
+         EnsureEnabled();
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidLookup.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidLookup.cs
+index 10ade9e..14466f6 100644
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidLookup.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidLookup.cs
+@@ -41,7 +41,7 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
+         const string sql = """
+             SELECT f.FinancialAwardID, f.TermCalendarID, f.Term, f.TextTerm, f.TransDate,
+                 f.AwardType, f.AwardStatus, f.[Description], f.Amount, f.SentToBilling,
+-                f.StudentAccepted, f.StudentAcceptedTime, r.IsALoan, f.[Lock]
++                f.StudentAccepted, f.StudentAcceptedTime, r.IsALoan, f.[Lock], f.EstimatedAmount
+             FROM dbo.CAMS_FinancialAward_View f
+             LEFT JOIN dbo.FinancialAwardRef r ON r.AwardTypeID=f.TransTypeID
+             WHERE f.StudentUID = @StudentUID
+@@ -57,7 +57,16 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
+         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+         while (await reader.ReadAsync(cancellationToken))
+         {
+-            awards.Add(new StudentFinancialAidAward(
++            awards.Add(ReadAward(reader));
++        }
++
++        if (awards.Select(x => x.ExternalAwardId).Distinct().Count() != awards.Count)
++            throw new InvalidOperationException("Financial aid award-type references are ambiguous.");
++        return awards;
++    }
++
++    internal static StudentFinancialAidAward ReadAward(IDataRecord reader) =>
++            new StudentFinancialAidAward(
+                 StudentInformationSystemProvider.ThesisElements,
+                 Convert.ToString(reader.GetValue(0))!,
+                 Convert.ToString(reader.GetValue(1))!,
+@@ -71,13 +80,8 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
+                 ReadBoolean(reader, 9),
+                 reader.IsDBNull(10) ? null : Convert.ToInt32(reader.GetValue(10)),
+                 reader.IsDBNull(11) ? null : Convert.ToDateTime(reader.GetValue(11)),
+-                ReadLoanFlag(reader.IsDBNull(12) ? null : reader.GetValue(12)), ReadBoolean(reader, 13)));
+-        }
+-
+-        if (awards.Select(x => x.ExternalAwardId).Distinct().Count() != awards.Count)
+-            throw new InvalidOperationException("Financial aid award-type references are ambiguous.");
+-        return awards;
+-    }
++                ReadLoanFlag(reader.IsDBNull(12) ? null : reader.GetValue(12)), ReadBoolean(reader, 13),
++                reader.IsDBNull(14) ? null : Convert.ToDecimal(reader.GetValue(14)));
+ 
+     internal static bool? ReadLoanFlag(object? value) => Convert.ToString(value)?.Trim().ToLowerInvariant() switch
+     {
+@@ -86,7 +90,7 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
+         _ => null
+     };
+ 
+-    private static bool ReadBoolean(SqlDataReader reader, int ordinal)
++    private static bool ReadBoolean(IDataRecord reader, int ordinal)
+     {
+         if (reader.IsDBNull(ordinal))
+         {
+diff --git a/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs b/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs
+index fde6636..eb0b21d 100644
+--- a/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs
+@@ -307,7 +307,9 @@ public class BillApprovalModel : CampusFlowPageModel
+             }
+             PendingLoans = termAid.Where(FinancialAidRules.IsLoanAwaitingAcceptance)
+                 .OrderBy(x => x.Description).ThenBy(x => x.ExternalAwardId).ToArray();
+-            Aid = termAid.Where(IsEligibleAid).OrderByDescending(x => x.Amount).ToArray();
++            Aid = termAid.Where(IsEligibleAid)
++                .Select(x => x with { Amount = FinancialAidRules.BillApprovalAmount(x) })
++                .Where(IsEligibleAid).OrderByDescending(x => x.Amount).ToArray();
+             var paymentPlanLookup = _paymentPlanLookups.SingleOrDefault(x => x.Provider == profile.Provider);
+             if (RemainingBalance > 0 && paymentPlanLookup is not null && !string.IsNullOrWhiteSpace(ExternalTermId))
+             {
+diff --git a/test/CampusFlow.Domain.Tests/StudentInformationSystems/FinancialAidRulesTests.cs b/test/CampusFlow.Domain.Tests/StudentInformationSystems/FinancialAidRulesTests.cs
+index 60f9259..9d62493 100644
+--- a/test/CampusFlow.Domain.Tests/StudentInformationSystems/FinancialAidRulesTests.cs
++++ b/test/CampusFlow.Domain.Tests/StudentInformationSystems/FinancialAidRulesTests.cs
+@@ -4,6 +4,30 @@ using Xunit;
+ namespace CampusFlow.StudentInformationSystems;
+ public class FinancialAidRulesTests
+ {
++    [Fact]
++    public void Bill_amount_uses_stored_net_without_changing_gross_decision_amount()
++    {
++        var award = Award() with { Amount = 1000m, DistributionAmount = 989.43m };
++        Assert.Equal(989.43m, FinancialAidRules.BillApprovalAmount(award));
++        Assert.Equal(1000m, award.Amount);
++        Assert.True(FinancialAidRules.CanDecide(award));
++    }
++
++    [Fact]
++    public void Missing_or_invalid_distribution_amount_does_not_fall_back_to_gross()
++    {
++        Assert.Throws<InvalidOperationException>(() => FinancialAidRules.BillApprovalAmount(Award()));
++        Assert.Throws<InvalidOperationException>(() => FinancialAidRules.BillApprovalAmount(Award() with { DistributionAmount = -1 }));
++        Assert.Equal(0m, FinancialAidRules.BillApprovalAmount(Award() with { DistributionAmount = 0 }));
++    }
++
++    [Fact]
++    public void Other_providers_bill_their_existing_award_amount()
++    {
++        var provider = Array.Find(Enum.GetValues<StudentInformationSystemProvider>(), x => x != StudentInformationSystemProvider.ThesisElements);
++        Assert.Equal(100m, FinancialAidRules.BillApprovalAmount(Award() with { Provider = provider }));
++    }
++
+     [Theory]
+     [InlineData("TEG","Guarantee",false,null,true)]
+     [InlineData("teg "," guarantee ",false,1,true)]
+diff --git a/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs b/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs
+index b56b20c..e88b553 100644
+--- a/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs
++++ b/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs
+@@ -85,12 +85,58 @@ public class BillApprovalAccessHandlerTests
+         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
+     }
+ 
++    [Fact]
++    public async Task Bill_rows_balance_and_fingerprint_use_net_distribution_while_original_award_stays_gross()
++    {
++        _term.ConfigureTestAccess(true, new[] { "100" });
++        var award = new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,
++            "net-loan", "269", "B27S", "Spring 2027", null, "Loan", "Anticipated Aid", "Loan",
++            1000m, false, null, null, true, DistributionAmount: 989.43m);
++        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] { award });
++        _aidDecisions.GetDecisionsAsync("10", Arg.Any<CancellationToken>()).Returns(
++            new Dictionary<string, int?> { ["net-loan"] = 1 });
++
++        await _model.OnGetAsync("B27S");
++        Assert.False(_model.IsUnavailable);
++        Assert.Equal(989.43m, _model.PendingAidTotal);
++        Assert.Equal(-989.43m, _model.RemainingBalance);
++        Assert.Equal(989.43m, Assert.Single(_model.Aid).Amount);
++        Assert.Equal(1000m, award.Amount);
++        var fingerprint = _model.CurrentReviewVersion;
++
++        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] { award with { Amount = 1100m } });
++        await _model.OnGetAsync("B27S");
++        Assert.Equal(fingerprint, _model.CurrentReviewVersion);
++
++        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] { award with { DistributionAmount = 980m } });
++        await _model.OnGetAsync("B27S");
++        Assert.Equal(980m, _model.PendingAidTotal);
++        Assert.NotEqual(fingerprint, _model.CurrentReviewVersion);
++    }
++
++    [Theory]
++    [InlineData(null)]
++    [InlineData(-1d)]
++    public async Task Unverified_distribution_amount_blocks_bill_review_without_payment(double? amount)
++    {
++        _term.ConfigureTestAccess(true, new[] { "100" });
++        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] {
++            new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements, "grant", "269",
++                "B27S", "Spring 2027", null, "Grant", "Awarded", "Grant", 1000m,
++                false, null, null, false, DistributionAmount: (decimal?)amount) });
++        _aidDecisions.GetDecisionsAsync("10", Arg.Any<CancellationToken>()).Returns(
++            new Dictionary<string, int?> { ["grant"] = null });
++        await _model.OnGetAsync("B27S");
++        Assert.True(_model.IsUnavailable);
++        Assert.Empty(_gateway.ReceivedCalls());
++    }
++
+     [Fact]
+     public async Task Bill_rows_totals_and_review_fingerprint_use_the_same_aid_policy_and_live_decisions()
+     {
+         _term.ConfigureTestAccess(true,new[]{"100"});
+         StudentFinancialAidAward A(string id,string type,string status,decimal amount,bool loan,int? decision=null)=>
+-            new(StudentInformationSystemProvider.ThesisElements,id,"269","B27S","Spring 2027",new DateTime(2027,1,26),type,status,type,amount,false,decision,null,loan);
++            new(StudentInformationSystemProvider.ThesisElements,id,"269","B27S","Spring 2027",new DateTime(2027,1,26),type,status,type,amount,false,decision,null,loan,DistributionAmount:amount);
+         var rows=new[]{A("1","TEG","Guarantee",300,false),A("2","Loan","Guarantee",100,true),A("3","Gift","Awarded",200,false),A("4","FWS","Guarantee",999,false),A("5","TEG","Estimated",888,false),A("6","Private loan","Guarantee",777,true)};
+         _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows);
+         _aidDecisions.GetDecisionsAsync("10",Arg.Any<CancellationToken>()).Returns(new Dictionary<string,int?>{{"1",null},{"2",1},{"3",null},{"4",1},{"5",1},{"6",null}});
+@@ -103,7 +149,7 @@ public class BillApprovalAccessHandlerTests
+     {
+         _term.ConfigureTestAccess(true,new[]{"100"});
+         StudentFinancialAidAward Loan(string id,string term="269") =>
+-            new(StudentInformationSystemProvider.ThesisElements,id,term,"B27S","Spring 2027",null,"Loan","Awarded","Loan "+id,500,false,null,null,true);
++            new(StudentInformationSystemProvider.ThesisElements,id,term,"B27S","Spring 2027",null,"Loan","Awarded","Loan "+id,500,false,null,null,true,DistributionAmount:500);
+         var rows=new[]{Loan("pending"),Loan("accepted"),Loan("declined"),Loan("other-term","268"),Loan("gift") with {IsLoan=false},Loan("cancelled") with {AwardStatus="Cancelled"},Loan("billed") with {IsSentToBilling=true}};
+         _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows);
+         var decisions=new Dictionary<string,int?>{{"pending",null},{"accepted",1},{"declined",0},{"gift",null},{"cancelled",null},{"billed",null}};
+@@ -113,7 +159,7 @@ public class BillApprovalAccessHandlerTests
+         Assert.Equal("pending",Assert.Single(_model.PendingLoans).ExternalAwardId);
+         Assert.Equal(1000,_model.PendingAidTotal);Assert.Equal(-1000,_model.RemainingBalance);
+         var fingerprint=_model.CurrentReviewVersion;
+-        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows.Select(x=>x.ExternalAwardId=="pending"?x with {Amount=9000}:x).ToArray());
++        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows.Select(x=>x.ExternalAwardId=="pending"?x with {Amount=9000,DistributionAmount=9000}:x).ToArray());
+         await _model.OnGetAsync("B27S");
+         Assert.Equal(9000,Assert.Single(_model.PendingLoans).Amount);
+         Assert.Equal(1000,_model.PendingAidTotal);Assert.Equal(fingerprint,_model.CurrentReviewVersion);
+@@ -128,7 +174,7 @@ public class BillApprovalAccessHandlerTests
+     [Fact]
+     public async Task Missing_live_aid_decision_stops_bill_review_instead_of_using_a_stale_loan_state()
+     {
+-        _term.ConfigureTestAccess(true,new[]{"100"});_aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",null,"Loan","Guarantee","Loan",100,false,1,null,true)});
++        _term.ConfigureTestAccess(true,new[]{"100"});_aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",null,"Loan","Guarantee","Loan",100,false,1,null,true,DistributionAmount:100)});
+         await _model.OnGetAsync("B27S");Assert.True(_model.IsUnavailable);Assert.Empty(_gateway.ReceivedCalls());
+     }
+ 
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs
+new file mode 100644
+index 0000000..2fd76c9
+--- /dev/null
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs
+@@ -0,0 +1,51 @@
++using System;
++using System.Collections.Generic;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.Extensions.Caching.Memory;
++using Microsoft.Extensions.Configuration;
++using Xunit;
++
++namespace CampusFlow.EntityFrameworkCore.Tests.BillApprovals;
++
++public class DocumentTermDescriptionTests
++{
++    [Theory]
++    [InlineData("Spring 2027")]
++    [InlineData("Fall 2027")]
++    public void Term_description_uses_documented_custom_mode_and_preserves_delivery_metadata(string term)
++    {
++        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
++        {
++            ["BillApproval:DocumentTracking:DocumentNameId"] = "123",
++            ["BillApproval:DocumentTracking:LocationId"] = "7",
++            ["BillApproval:DocumentTracking:DocumentStatusId"] = "8",
++            ["BillApproval:DocumentTracking:UserDefinedFieldId"] = "9",
++            ["BillApproval:DocumentTracking:Internal"] = "false"
++        }).Build();
++        using var cache = new MemoryCache(new MemoryCacheOptions());
++        var service = new ThesisElementsDocumentTrackingService(cfg, cache);
++        var approvalId = Guid.NewGuid();
++        var request = new StudentDocumentTrackingRequest("10", term, approvalId, DateTime.UtcNow);
++
++        var body = service.BuildDocumentBody(request, " Approved  Bill ");
++
++        Assert.Equal(0, body["docNameId"]!.GetValue<int>());
++        Assert.Equal("Approved Bill - " + term, body["docDescription"]!.GetValue<string>());
++        Assert.Equal(approvalId.ToString("N"), body["reference"]!.GetValue<string>());
++        Assert.Equal(10, body["studentUid"]!.GetValue<int>());
++        Assert.Equal(7, body["locationId"]!.GetValue<int>());
++        Assert.Equal(8, body["docStatusId"]!.GetValue<int>());
++        Assert.Equal(9, body["userDefinedFieldId"]!.GetValue<int>());
++        Assert.False(body["internal"]!.GetValue<bool>());
++        Assert.Equal("123", cfg["BillApproval:DocumentTracking:DocumentNameId"]);
++    }
++
++    [Fact]
++    public void Missing_term_cannot_create_an_ambiguous_document()
++    {
++        using var cache = new MemoryCache(new MemoryCacheOptions());
++        var service = new ThesisElementsDocumentTrackingService(new ConfigurationBuilder().Build(), cache);
++        Assert.Throws<ArgumentException>(() => service.BuildDocumentBody(
++            new("10", " ", Guid.NewGuid(), DateTime.UtcNow), "Approved Bill"));
++    }
++}
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/FinancialAidDistributionAmountTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/FinancialAidDistributionAmountTests.cs
+new file mode 100644
+index 0000000..96d49f0
+--- /dev/null
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/FinancialAidDistributionAmountTests.cs
+@@ -0,0 +1,31 @@
++using System;
++using System.Data;
++using CampusFlow.StudentInformationSystems;
++using Xunit;
++
++namespace CampusFlow.EntityFrameworkCore.Tests.StudentInformationSystems;
++
++public class FinancialAidDistributionAmountTests
++{
++    [Theory]
++    [InlineData(989.43)]
++    [InlineData(0d)]
++    [InlineData(null)]
++    public void Lookup_preserves_gross_and_stored_distribution_amount_separately(double? net)
++    {
++        using var table = new DataTable();
++        for (var i = 0; i < 15; i++) table.Columns.Add("Field" + i, typeof(object));
++        table.Rows.Add(123, 269, "B27C", "Spring 2027", new DateTime(2027, 1, 26),
++            "Loan", "Anticipated Aid", "Unsubsidized loan", 1000m, "No", DBNull.Value,
++            DBNull.Value, true, false, net.HasValue ? (object)(decimal)net.Value : DBNull.Value);
++        using var reader = table.CreateDataReader();
++        Assert.True(reader.Read());
++
++        var award = ThesisElementsFinancialAidLookup.ReadAward(reader);
++
++        Assert.Equal(1000m, award.Amount);
++        Assert.Equal(net.HasValue ? (decimal?)net.Value : null, award.DistributionAmount);
++        Assert.True(award.IsLoan);
++        Assert.Null(award.StudentAccepted);
++    }
++}

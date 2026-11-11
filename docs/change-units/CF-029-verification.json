@@ -1,0 +1,65 @@
+{
+  "unit": "CF-029",
+  "verifiedAtUtc": "2026-11-11T02:14:43.417310+00:00",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "tests": {
+    "domain": 307,
+    "application": 86,
+    "entityframeworkcore": 310,
+    "web": 326,
+    "total": 1029
+  },
+  "focusedFinalDocumentAndMapping": 6,
+  "releasePublishSucceeded": true,
+  "sourceFiles": {
+    "src/CampusFlow.Domain/StudentInformationSystems/FinancialAidRules.cs": "b6889ed964fdcd952dc4a1b4a5bee16dc5d2ef98735e95c6e732e8b3946bc6f4",
+    "src/CampusFlow.Domain/StudentInformationSystems/StudentFinancialAidAward.cs": "92e83e0ce8746ce2cae78feea2e700317f6a95a6739b382ab14bde52715e22c0",
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs": "7d0b5f4da48f99585eac8104d25f8a3d45624a405c814c9596809bf8204626c9",
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsFinancialAidLookup.cs": "b05390d91489c52a4c3336c181ea09db9161e198110b22a90bac6270ff219ffd",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml.cs": "68f742247d6864e5a583d9bfa47ec705f58def31645226dfae549c28dee1f1dc",
+    "test/CampusFlow.Domain.Tests/StudentInformationSystems/FinancialAidRulesTests.cs": "dbe9f21681288ee3f892c9a5da773cb9ab1f2d1a9b9f7cad4a66228eef330e13",
+    "test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs": "dbd108142b5244e8924c830dca6b77010f3ba39380198abeb75f83423e056142",
+    "test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs": "4e948f8aa8000840c51eb213aa3b34d5693a31e5335dc0f8d7ef1053b3f80140",
+    "test/CampusFlow.EntityFrameworkCore.Tests/StudentInformationSystems/FinancialAidDistributionAmountTests.cs": "f7e6bca72b732dedaf17c4dd145dbe6ccd2232190068259121b5f9be2e86d16c"
+  },
+  "distributionEvidence": {
+    "databaseColumn": "dbo.CAMS_FinancialAward_View.EstimatedAmount",
+    "vendorUiMaps": "distAmount <- estimatedAmount",
+    "officialVendorSource": "https://el-nel.thesiscloud.com/assets/maintenanceAid-Bd28Ilhr.js",
+    "usesStoredValue": true,
+    "doesNotRecalculateFees": true,
+    "grossAwardDecisionsPreserved": true,
+    "missingOrNegativeNetBlocksBillReview": true,
+    "zeroNetDoesNotFallBackToGross": true
+  },
+  "documentEvidence": {
+    "officialContract": "https://app-elm-prod-usc-integrationapi.azurewebsites.net/Admissions/swagger/Integrations/swagger.json",
+    "route": "/api/student/document-tracking/add",
+    "customDescriptionMode": "docNameId = 0",
+    "sharedDocumentTypeNotRenamed": true,
+    "newDocumentsOnly": true,
+    "existingRecoveryIdentityPreserved": true,
+    "nonprodSyntheticCanary": {
+      "syntheticIdentityVerified": true,
+      "created": true,
+      "termDescription": "Approved Bill - Spring 2027",
+      "billingReportingViewVerified": true,
+      "pdfBytesRoundtripped": true,
+      "retryRecoveredSameDocument": true,
+      "exactTestDocumentDeletedAndAbsenceVerified": true
+    },
+    "staffUiReviewStillRequired": true,
+    "integrationListEndpointDidNotVerifyBillingList": true
+  },
+  "regressionSetup": {
+    "browserAssetsRestoredWithAbpInstallLibs": true,
+    "initialMissingAssetAndAdminPreviewFailureResolvedInFullSuite": true,
+    "cleanBaselineAlsoReproducedFocusedAdminPreviewFailure": true
+  },
+  "productionWrites": false,
+  "deployed": false,
+  "liveDeploymentIdsChecked": {
+    "production": "a8f271f3-69b0-46a3-9576-4e08b0ca3541",
+    "nonprod": "af29f743-5a24-4faa-b009-93603c3cae25"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "unit": "CF-030",
+  "verifiedAtUtc": "2026-11-11T03:19:42.858475+00:00",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "tests": {
+    "domain": 304,
+    "application": 103,
+    "entityframeworkcore": 305,
+    "web": 333,
+    "total": 1045
+  },
+  "browserScenarios": 4,
+  "browserWidths": [
+    320,
+    390,
+    768,
+    1440
+  ],
+  "browserScript": "test/browser/meal-plan-choice.cjs",
+  "screenshotsVisuallyInspected": true,
+  "releasePublishSucceeded": true,
+  "sourceFiles": {
+    "src/CampusFlow.Application.Contracts/Housing/AdminMealPlanDtos.cs": "83f10934edffdc80838cb831a4b1975a1d27dae832c8a2e2f47fb2df54bda282",
+    "src/CampusFlow.Application.Contracts/Housing/IAdminMealPlanAppService.cs": "89b4e7f32d969aa0d9a2fc84f8dcc403ecefa2624f7d2216fb117dc22c3a78ca",
+    "src/CampusFlow.Application.Contracts/Housing/MealPlanDtos.cs": "87ba70061da356cbec44807d55d78f8bafdfa1915fc80d7a34bf51f6d401b821",
+    "src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs": "a0d710fd50f39df9c48b754cd3f2d60ace27aa2b6558fff04b1771c24b82287a",
+    "src/CampusFlow.Application/Housing/MealPlanAppService.cs": "5eeba2cf25040d1f53d1af45bb2ab1bc777e6987314d6e272f30e6fe1445f6e5",
+    "src/CampusFlow.EntityFrameworkCore/EntityFrameworkCore/CampusFlowDbContext.cs": "91af0a110918bb75d484472a7bdaa6602acfd5f3e714e4ab207b9b968c441beb",
+    "src/CampusFlow.EntityFrameworkCore/Migrations/CampusFlowDbContextModelSnapshot.cs": "75fc3de6a7a1c28cd73ca78380dcb9172dfd306145e656770cc11d2187288cb9",
+    "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml": "95696a52866e71f3f4e19b7d3ae731eb4a5dab73c65dbcad6ab9944a64ed6f09",
+    "src/CampusFlow.Web/Pages/Admin/BusinessServices/AddStudentMealPlan.cshtml.cs": "c0448ba1e29ae892b83178c598e78f07c27af571eba5229c1e92f06702fdc463",
+    "src/CampusFlow.Web/Pages/Housing.cshtml": "239cc33b8da892cf10d66b18b3a292a82b9287a08a2b6cbc37ff220dfc9a3ef0",
+    "src/CampusFlow.Web/Pages/Housing.cshtml.cs": "a7008b01380f49281279a39f356e141771b47ee04c4d38be68f9c22e8142f6c9",
+    "src/CampusFlow.Web/Pages/Housing.css": "ece32d67c7696653ea23dab7d4067e337e25edcb5dbebc68fdd8cb3372e595eb",
+    "test/CampusFlow.Application.Tests/Housing/AdminMealPlanAssignmentTests.cs": "7d6d37eeca0918913ef8e6ee6a83f6ef42ab24790093ded2113f51e37fd113d0",
+    "test/CampusFlow.Application.Tests/Housing/AdminMealPlanRemovalTests.cs": "5136fc310305c814f099f67322f2ec4e254816c58d743d16cdf340bdc18ec16d",
+    "test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs": "cda32e074a4c7d6d5114081b260b6f01af48bcb2900b04c012d4cf5469eee4db",
+    "test/CampusFlow.Web.Tests/Pages/AdminMealPlanAssignmentHandlerTests.cs": "ae1f2be0f06bcef702901465bf0a05aa57e7c0c706343f9e139b18d504a9a7e5",
+    "test/CampusFlow.Web.Tests/Pages/AdminMealPlanRemovalHandlerTests.cs": "fb517045a225afa349b2a00742a3d3f9eef95fb5bd176e437dacb0f2477b00ad",
+    "src/CampusFlow.EntityFrameworkCore/Migrations/20261111022402_AllowMealPlanReselectionAfterReset.Designer.cs": "738b05018722083f4c3a63c6c4ab25636ac97b71a0730044a48bffd1b521e1df",
+    "src/CampusFlow.EntityFrameworkCore/Migrations/20261111022402_AllowMealPlanReselectionAfterReset.cs": "766062fa40bb3c2e692f3d6f8553f1e0c578bb87e3328684d2eeff9667110801",
+    "test/CampusFlow.Application.Tests/Housing/AdminNoMealPlanSelectionTests.cs": "d946aa5a7b276aee185db7bbeb621ae93312666f44f55c9e46788712fe8c5307",
+    "test/CampusFlow.EntityFrameworkCore.Tests/Housing/NoMealPlanResetPersistenceTests.cs": "b41c487aea96e71366d7281fdde9f6d053c3822bb618fe435e97d36628ce184f",
+    "test/CampusFlow.Web.Tests/Pages/MealPlanChoiceHandlerTests.cs": "d318a1abdcb05a250805cc82f9aeb7ab8190787a61b6807f1b5acf4ab1f8fb7e",
+    "test/browser/meal-plan-choice.cjs": "c0b6013bd5d655cf4c19e618a4b3bca05fa2e73832fb01d4d5c72e37e189383a"
+  },
+  "verificationScope": [
+    "Empty or conflicting choices rejected server-side; explicit None remains valid only in an eligible catalog.",
+    "Real-plan and None radio choices enable submission; no initial selection, retained term and processing guard checked in browser.",
+    "No Meal Plan displayed to staff and cleared by existing removal permission, confirmation, reason, tenant/student/term ownership and concurrency checks.",
+    "Clear action uses audited soft deletion, no Elements assignment/housing/charge/approval writes.",
+    "Existing Elements assignments block resetting None into another selection.",
+    "Real persistence test proves cleared history survives, replacement succeeds, duplicate active choice still fails.",
+    "New form does not block existing add/removal forms.",
+    "Migration contains only an index replacement and migration-history entry; no row updates, deletes or seeding."
+  ],
+  "migration": {
+    "id": "20261111022402_AllowMealPlanReselectionAfterReset",
+    "required": true,
+    "sql": "CF-030-migration.sql",
+    "appliedToAnyLiveDatabase": false,
+    "scope": "Unique student/term selection index applies only to active rows, preserving soft-deleted history.",
+    "rollbackRequiresReviewAfterReplacementChoices": true
+  },
+  "productionWrites": false,
+  "livePermissionsChanged": false,
+  "liveSettingsChanged": false
+}

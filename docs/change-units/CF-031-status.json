@@ -1,0 +1,51 @@
+{
+  "unit": "CF-031",
+  "scope": "Preserve and review partial additive commuter Apply runs; explicitly resume only remaining assignments; retain prior run history and safe vendor error categories.",
+  "sourceBase": "73a576d5edc1e16f7ef3df71d9adcb561e4b1b26",
+  "branch": "codex/cf-031-housing-apply-recovery",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf031-housing-apply-recovery/CampusFlow",
+  "state": "committed-pushed-deployed-both-awaiting-staff-retest",
+  "commit": "9dc260c845ded9240b1539f1d8b166971127d5f4",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "2a661b37a5b171739fb06407807279c6aeda02bf",
+    "currentRelease": "2a661b37a5b171739fb06407807279c6aeda02bf",
+    "currentVerification": "CF-029-031-nonprod-deployment-verification.json",
+    "currentDeploymentId": "70bd1c88-d4ad-4442-93c7-f56245f4e88c",
+    "currentVerifiedAtUtc": "2026-11-11T04:33:44.516190+00:00",
+    "deploymentId": "70bd1c88-d4ad-4442-93c7-f56245f4e88c",
+    "deployedAtUtc": "2026-11-11T04:33:01.7237012Z",
+    "verifiedAtUtc": "2026-11-11T04:33:44.516190+00:00",
+    "verification": "CF-029-031-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+    "currentRelease": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+    "currentVerification": "CF-029-031-production-deployment-verification.json",
+    "currentDeploymentId": "6408e933-6e7e-46bd-b849-84f317bc4c99",
+    "currentVerifiedAtUtc": "2026-11-11T04:40:57.228089+00:00",
+    "deploymentId": "6408e933-6e7e-46bd-b849-84f317bc4c99",
+    "deployedAtUtc": "2026-11-11T04:38:40.0485731Z",
+    "verifiedAtUtc": "2026-11-11T04:40:57.228089+00:00",
+    "verification": "CF-029-031-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "sourcePatch": "CF-031.patch",
+  "sourcePatchSha256": "4c456937646e932783664fdbf8abca8006eb509dac53f6a6d90e1f26d094e404",
+  "verification": "CF-031-verification.json",
+  "combinedVerification": "CF-029-031-combined-verification.json",
+  "schemaMigrationRequired": false,
+  "relatedDocumentItems": [
+    3
+  ],
+  "production113PlanPreserved": true,
+  "originalProductionFailureCauseKnown": false,
+  "recoveryScope": "Added Standard-rate commuter assignments only; no moves, removals, residential charges, capacity changes or unrelated live changes.",
+  "productionRecoveryExecuted": false,
+  "updatedAtUtc": "2026-11-11T04:42:25.075353+00:00"
+}

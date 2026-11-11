@@ -1,0 +1,27 @@
+{
+  "environment": "nonprod",
+  "mode": "apply",
+  "migrationId": "20261111022402_AllowMealPlanReselectionAfterReset",
+  "migrationApplied": true,
+  "migrationAppliedByThisCall": true,
+  "selectionRowsPreserved": true,
+  "selectionRowsCount": 3,
+  "selectionRowsFingerprint": "7bba9f39363f5ec45d9c400a3b06818a",
+  "unrelatedIndexesAndHistoryPreserved": true,
+  "sqlSha256": "42f2a8b02d033d33c2b418c02a15fc0629f2b0b7ca60f28d3e51551fa67092ca",
+  "drafts": [
+    {
+      "periodId": 1,
+      "snapshotHash": "ddaf50f964a2196a3a5d331d80517890e81e3bc2b4a142795998120c0d2fc72e",
+      "desiredAssignments": 2,
+      "status": "Completed"
+    },
+    {
+      "periodId": 2,
+      "snapshotHash": "b3a855b99f395d1b5ddda399e728aa90776cba67a2cf7063f89cf862a6a2b572",
+      "desiredAssignments": 0,
+      "status": null
+    }
+  ],
+  "checkedAtUtc": "2026-11-11T04:32:02.590562Z"
+}

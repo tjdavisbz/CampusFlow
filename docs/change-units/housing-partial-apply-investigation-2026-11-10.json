@@ -1,0 +1,54 @@
+{
+  "state": "recovery-source-verified-original-production-failure-not-reproduced",
+  "documentItem": 3,
+  "relatedChangeUnits": [
+    "CF-006",
+    "CF-023"
+  ],
+  "productionReadOnlyFindings": {
+    "savedDesiredAssignments": 113,
+    "uniqueStudents": 113,
+    "snapshotHash": "aadce5f7df6ec49a1a1302bab047112aa16f4a265e93537b1bb1967f9ffe900a",
+    "hashMatchesOriginalPreservedPlan": true,
+    "status": "Needs review",
+    "roomAssignmentsVerified": 1,
+    "chargeReconciliationsVerified": 0,
+    "lastStage": "Starting second room assignment",
+    "failedTargetHasActiveAssignment": false,
+    "failedTargetHasOneDeletedHistoricalAssignment": true,
+    "failedTargetDeletedAssignmentIsNotDesiredRoom": true,
+    "liveApiReportsNoActiveAssignmentForFailedTarget": true
+  },
+  "originalPrivateBackupSha256": "4050848dcf87eb307ed0583941c07ecd0c98441b32ba3fe919c7782140e07ff2",
+  "productionDraftOrElementsWritesPerformed": false,
+  "doNotRefreshOrRetryProductionUntilReviewed": true,
+  "nonprodFixtureNotes": {
+    "isolatedPeriodsCreated": 12,
+    "activeFixturePeriods": 0,
+    "activeFixtureAssignments": 0,
+    "nonzeroSyntheticHousingBatchCharges": 0,
+    "normalAssignDeallocateReassignPassed": true,
+    "historicalRoomRemovalNotConfirmedScenarioStopped": true,
+    "allFixturesRemoved": true
+  },
+  "checkedAtUtc": "2026-11-11T04:20:12.034625+00:00",
+  "rentInvestigation": {
+    "nonprodIsolatedUnconfiguredRoomRejectedWithoutRentSetup": true,
+    "productionCommuterPropertyHasActiveRentConfiguration": true,
+    "productionCommuterRooms": 20,
+    "allProductionCommuterPerPersonRatesAreZero": true,
+    "missingRentSetupNotEstablishedAsProductionCause": true
+  },
+  "remainingBlocker": "Original Elements assignment exception was not retained in the persisted Apply progress. Read-only checks cannot establish the rejected write result; do not blind retry/refresh or guess a billing fix.",
+  "preparedChangeUnit": "CF-031",
+  "productionPlanQualification": {
+    "BaselineAssignments": 0,
+    "DesiredAssignments": 113,
+    "AddedAssignments": 113,
+    "RemovedAssignments": 0,
+    "MovesOrRateChanges": 0,
+    "UnsupportedAdditions": 0,
+    "RoomIdentityOrCapacityChanges": 0
+  },
+  "recoveryVerification": "CF-031-verification.json"
+}
