@@ -307,7 +307,9 @@ public class BillApprovalModel : CampusFlowPageModel
             }
             PendingLoans = termAid.Where(FinancialAidRules.IsLoanAwaitingAcceptance)
                 .OrderBy(x => x.Description).ThenBy(x => x.ExternalAwardId).ToArray();
-            Aid = termAid.Where(IsEligibleAid).OrderByDescending(x => x.Amount).ToArray();
+            Aid = termAid.Where(IsEligibleAid)
+                .Select(x => x with { Amount = FinancialAidRules.BillApprovalAmount(x) })
+                .Where(IsEligibleAid).OrderByDescending(x => x.Amount).ToArray();
             var paymentPlanLookup = _paymentPlanLookups.SingleOrDefault(x => x.Provider == profile.Provider);
             if (RemainingBalance > 0 && paymentPlanLookup is not null && !string.IsNullOrWhiteSpace(ExternalTermId))
             {

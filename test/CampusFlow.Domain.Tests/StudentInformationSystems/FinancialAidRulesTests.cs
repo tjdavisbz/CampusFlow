@@ -4,6 +4,30 @@ using Xunit;
 namespace CampusFlow.StudentInformationSystems;
 public class FinancialAidRulesTests
 {
+    [Fact]
+    public void Bill_amount_uses_stored_net_without_changing_gross_decision_amount()
+    {
+        var award = Award() with { Amount = 1000m, DistributionAmount = 989.43m };
+        Assert.Equal(989.43m, FinancialAidRules.BillApprovalAmount(award));
+        Assert.Equal(1000m, award.Amount);
+        Assert.True(FinancialAidRules.CanDecide(award));
+    }
+
+    [Fact]
+    public void Missing_or_invalid_distribution_amount_does_not_fall_back_to_gross()
+    {
+        Assert.Throws<InvalidOperationException>(() => FinancialAidRules.BillApprovalAmount(Award()));
+        Assert.Throws<InvalidOperationException>(() => FinancialAidRules.BillApprovalAmount(Award() with { DistributionAmount = -1 }));
+        Assert.Equal(0m, FinancialAidRules.BillApprovalAmount(Award() with { DistributionAmount = 0 }));
+    }
+
+    [Fact]
+    public void Other_providers_bill_their_existing_award_amount()
+    {
+        var provider = Array.Find(Enum.GetValues<StudentInformationSystemProvider>(), x => x != StudentInformationSystemProvider.ThesisElements);
+        Assert.Equal(100m, FinancialAidRules.BillApprovalAmount(Award() with { Provider = provider }));
+    }
+
     [Theory]
     [InlineData("TEG","Guarantee",false,null,true)]
     [InlineData("teg "," guarantee ",false,1,true)]

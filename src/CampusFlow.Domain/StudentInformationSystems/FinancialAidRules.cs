@@ -3,6 +3,18 @@ namespace CampusFlow.StudentInformationSystems;
 
 public static class FinancialAidRules
 {
+    public static decimal BillApprovalAmount(StudentFinancialAidAward award)
+    {
+        // Elements calls this Distribution Amount in its UI and EstimatedAmount in its API/database.
+        // Retain Amount for award decisions; never substitute gross aid into a bill when net aid is missing.
+        var amount = award.Provider == StudentInformationSystemProvider.ThesisElements
+            ? award.DistributionAmount ?? throw new InvalidOperationException("The financial aid distribution amount could not be verified.")
+            : award.Amount;
+        if (amount < 0)
+            throw new InvalidOperationException("The financial aid distribution amount requires Financial Aid review.");
+        return amount;
+    }
+
     public static bool CanDecide(StudentFinancialAidAward award) => award.Amount > 0 &&
         !award.IsSentToBilling && !award.IsLocked && award.StudentAccepted is null &&
         !award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase);
