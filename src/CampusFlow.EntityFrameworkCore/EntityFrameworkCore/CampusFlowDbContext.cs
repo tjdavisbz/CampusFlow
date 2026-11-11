@@ -293,7 +293,8 @@ public class CampusFlowDbContext :
             b.Property(x => x.SourceIp).HasMaxLength(64);
             b.Property(x => x.UserAgent).HasMaxLength(1024);
             b.Property(x => x.ReviewSnapshotJson).IsRequired();
-            b.HasIndex(x => new { x.TenantId, x.UserId, x.ExternalTermId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.UserId, x.ExternalTermId })
+                .IsUnique().HasFilter("\"IsDeleted\" = false");
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<AgreementTemplate>().WithMany().HasForeignKey(x => x.AgreementTemplateId).OnDelete(DeleteBehavior.Restrict);
         });
