@@ -64,6 +64,8 @@ public class HousingWorkspaceState
     public int PeriodId { get; set; }
     public DateTime RefreshedAt { get; set; }
     public string? ApplyStatus { get; set; }
+    public Guid? ApplyRunId { get; set; }
+    public string? ApplyFailure { get; set; }
     public List<HousingWorkspaceRoom> Rooms { get; set; } = [];
 }
 
@@ -78,6 +80,28 @@ public class ApplyHousingDraftInput
     public int PeriodId { get; set; }
     public string Revision { get; set; } = "";
     public string RateRevision { get; set; } = "";
+    public bool Confirmed { get; set; }
+}
+
+public class HousingRecoveryPreview
+{
+    public int PeriodId { get; set; }
+    public Guid RunId { get; set; }
+    public string Revision { get; set; } = "";
+    public string RecoveryRevision { get; set; } = "";
+    public int SavedAssignments { get; set; }
+    public int AlreadyAssigned { get; set; }
+    public int RemainingAssignments { get; set; }
+    public string Failure { get; set; } = "";
+}
+
+public class RecoverHousingDraftInput
+{
+    public int PeriodId { get; set; }
+    public Guid RunId { get; set; }
+    public string Revision { get; set; } = "";
+    public string RecoveryRevision { get; set; } = "";
+    public string Reason { get; set; } = "";
     public bool Confirmed { get; set; }
 }
 

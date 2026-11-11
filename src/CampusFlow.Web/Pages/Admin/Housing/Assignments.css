@@ -28,4 +28,8 @@
 #housing-search-results button { display:block; width:100%; text-align:left; margin:.5rem 0; }
 #housing-search-results .housing-student-result { white-space:pre-line; line-height:1.5; }
 #housing-changes { background:white; padding:1.5rem; margin-top:1rem; border-radius:1rem; }
+#housing-recovery label { display:block; margin:.75rem 0; }
+#housing-recovery textarea { width:100%; max-width:100%; box-sizing:border-box; }
+#housing-recovery button { max-width:100%; white-space:normal; }
 @media (max-width: 1000px) { .housing-bulk { grid-template-columns:1fr 1fr; } }
+@media (max-width: 600px) { .housing-bulk { grid-template-columns:minmax(0,1fr); } }
