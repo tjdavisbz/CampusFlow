@@ -136,6 +136,9 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
     {
         if (_currentStudentView.IsImpersonating)
             throw new Volo.Abp.Authorization.AbpAuthorizationException("Student impersonation is read-only.");
+        if (input.ExternalMealPlanId is <= 0 ||
+            input.ExternalMealPlanId.HasValue == input.SelectNoMealPlan)
+            throw new UserFriendlyException("Choose a meal plan, or explicitly select No Meal Plan.");
         if (!Enum.IsDefined(input.HousingChoice)) throw new UserFriendlyException("Choose a housing option.");
         var profile = await GetProfileAsync();
         var view = await GetAsync(input.ExternalTermId);
@@ -146,7 +149,8 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         if (input.HousingChoice != view.AssignedHousingChoice)
             throw new UserFriendlyException("Your meal plan options must match your assigned housing.");
         var option = view.Options[input.HousingChoice].SingleOrDefault(x => x.ExternalMealPlanId == input.ExternalMealPlanId);
-        if (option is null) throw new UserFriendlyException("Choose an available meal plan.");
+        if (option is null || option.IsNoPlanOption != input.SelectNoMealPlan)
+            throw new UserFriendlyException("Choose an available meal plan.");
 
         if (string.IsNullOrWhiteSpace(view.TermName))
             throw new UserFriendlyException("A housing selection period is not available.");

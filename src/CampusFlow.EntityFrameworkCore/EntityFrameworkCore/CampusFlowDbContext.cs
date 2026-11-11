@@ -519,7 +519,8 @@ public class CampusFlowDbContext :
             b.Property(x => x.MealPlanName).IsRequired().HasMaxLength(160);
             b.Property(x => x.LastSyncError).HasMaxLength(4000);
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
-            b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.TermName }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.TermName }).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             b.HasIndex(x => new { x.TenantId, x.SyncedToStudentInformationSystem, x.SubmittedAt });
         });
 
