@@ -41,7 +41,7 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
         const string sql = """
             SELECT f.FinancialAwardID, f.TermCalendarID, f.Term, f.TextTerm, f.TransDate,
                 f.AwardType, f.AwardStatus, f.[Description], f.Amount, f.SentToBilling,
-                f.StudentAccepted, f.StudentAcceptedTime, r.IsALoan, f.[Lock]
+                f.StudentAccepted, f.StudentAcceptedTime, r.IsALoan, f.[Lock], f.EstimatedAmount
             FROM dbo.CAMS_FinancialAward_View f
             LEFT JOIN dbo.FinancialAwardRef r ON r.AwardTypeID=f.TransTypeID
             WHERE f.StudentUID = @StudentUID
@@ -57,7 +57,16 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            awards.Add(new StudentFinancialAidAward(
+            awards.Add(ReadAward(reader));
+        }
+
+        if (awards.Select(x => x.ExternalAwardId).Distinct().Count() != awards.Count)
+            throw new InvalidOperationException("Financial aid award-type references are ambiguous.");
+        return awards;
+    }
+
+    internal static StudentFinancialAidAward ReadAward(IDataRecord reader) =>
+            new StudentFinancialAidAward(
                 StudentInformationSystemProvider.ThesisElements,
                 Convert.ToString(reader.GetValue(0))!,
                 Convert.ToString(reader.GetValue(1))!,
@@ -71,13 +80,8 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
                 ReadBoolean(reader, 9),
                 reader.IsDBNull(10) ? null : Convert.ToInt32(reader.GetValue(10)),
                 reader.IsDBNull(11) ? null : Convert.ToDateTime(reader.GetValue(11)),
-                ReadLoanFlag(reader.IsDBNull(12) ? null : reader.GetValue(12)), ReadBoolean(reader, 13)));
-        }
-
-        if (awards.Select(x => x.ExternalAwardId).Distinct().Count() != awards.Count)
-            throw new InvalidOperationException("Financial aid award-type references are ambiguous.");
-        return awards;
-    }
+                ReadLoanFlag(reader.IsDBNull(12) ? null : reader.GetValue(12)), ReadBoolean(reader, 13),
+                reader.IsDBNull(14) ? null : Convert.ToDecimal(reader.GetValue(14)));
 
     internal static bool? ReadLoanFlag(object? value) => Convert.ToString(value)?.Trim().ToLowerInvariant() switch
     {
@@ -86,7 +90,7 @@ public sealed class ThesisElementsFinancialAidLookup : IStudentInformationSystem
         _ => null
     };
 
-    private static bool ReadBoolean(SqlDataReader reader, int ordinal)
+    private static bool ReadBoolean(IDataRecord reader, int ordinal)
     {
         if (reader.IsDBNull(ordinal))
         {

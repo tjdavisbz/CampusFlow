@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -64,30 +65,7 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
             string.IsNullOrWhiteSpace(matches[0]?["description"]?.GetValue<string>()))
             throw new InvalidOperationException("The approved bill document type or location is missing, inactive or mismatched.");
         var description = matches[0]!["description"]!.GetValue<string>();
-        var acceptedAt = request.AcceptedAt.ToString("O", CultureInfo.InvariantCulture);
-        var body = new JsonArray
-        {
-            new JsonObject
-            {
-                ["docTrackId"] = 0,
-                ["studentUid"] = studentUid,
-                ["docDate"] = acceptedAt,
-                ["docNameId"] = GetTrackingInt("DocumentNameId"),
-                ["docDescription"] = description,
-                ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
-                ["comments"] = "CampusFlow approved bill - " + request.TermName,
-                ["reference"] = reference,
-                ["compDate"] = acceptedAt,
-                ["userDefinedFieldId"] = GetTrackingInt("UserDefinedFieldId"),
-                ["finAidYearSeq"] = null,
-                ["userId"] = GetTrackingSetting("UserId", "CampusFlow"),
-                ["docGroupID"] = null,
-                ["locationId"] = GetTrackingInt("LocationId"),
-                ["admissionGpagroupId"] = null,
-                ["internal"] = GetTrackingBool("Internal"),
-                ["isProspectDoc"] = false
-            }
-        };
+        var body = new JsonArray(BuildDocumentBody(request, description));
 
         using var httpRequest = CreateRequest(HttpMethod.Post, "api/student/document-tracking/add", token);
         httpRequest.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
@@ -103,6 +81,37 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
         throw new InvalidOperationException("The document creation result could not be verified. Review Elements before allowing another creation.");
+    }
+
+    internal JsonObject BuildDocumentBody(StudentDocumentTrackingRequest request, string description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.TermName);
+        var termDescription = Regex.Replace(description.Trim(), @"\s+", " ") + " - " + request.TermName.Trim();
+        if (termDescription.Length > 512)
+            throw new InvalidOperationException("The approved bill document description is too long.");
+        var acceptedAt = request.AcceptedAt.ToString("O", CultureInfo.InvariantCulture);
+        return new JsonObject
+            {
+                ["docTrackId"] = 0,
+                ["studentUid"] = int.Parse(request.ExternalStudentId, CultureInfo.InvariantCulture),
+                ["docDate"] = acceptedAt,
+                // The documented custom-description mode does not rename the shared document type.
+                ["docNameId"] = 0,
+                ["docDescription"] = termDescription,
+                ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
+                ["comments"] = "CampusFlow approved bill - " + request.TermName,
+                ["reference"] = request.ApprovalId.ToString("N"),
+                ["compDate"] = acceptedAt,
+                ["userDefinedFieldId"] = GetTrackingInt("UserDefinedFieldId"),
+                ["finAidYearSeq"] = null,
+                ["userId"] = GetTrackingSetting("UserId", "CampusFlow"),
+                ["docGroupID"] = null,
+                ["locationId"] = GetTrackingInt("LocationId"),
+                ["admissionGpagroupId"] = null,
+                ["internal"] = GetTrackingBool("Internal"),
+                ["isProspectDoc"] = false
+            };
     }
 
     public async Task<bool> HasImageAsync(string documentTrackingId, CancellationToken cancellationToken = default)

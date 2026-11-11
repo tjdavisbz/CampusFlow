@@ -86,11 +86,57 @@ public class BillApprovalAccessHandlerTests
     }
 
     [Fact]
+    public async Task Bill_rows_balance_and_fingerprint_use_net_distribution_while_original_award_stays_gross()
+    {
+        _term.ConfigureTestAccess(true, new[] { "100" });
+        var award = new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,
+            "net-loan", "269", "B27S", "Spring 2027", null, "Loan", "Anticipated Aid", "Loan",
+            1000m, false, null, null, true, DistributionAmount: 989.43m);
+        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] { award });
+        _aidDecisions.GetDecisionsAsync("10", Arg.Any<CancellationToken>()).Returns(
+            new Dictionary<string, int?> { ["net-loan"] = 1 });
+
+        await _model.OnGetAsync("B27S");
+        Assert.False(_model.IsUnavailable);
+        Assert.Equal(989.43m, _model.PendingAidTotal);
+        Assert.Equal(-989.43m, _model.RemainingBalance);
+        Assert.Equal(989.43m, Assert.Single(_model.Aid).Amount);
+        Assert.Equal(1000m, award.Amount);
+        var fingerprint = _model.CurrentReviewVersion;
+
+        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] { award with { Amount = 1100m } });
+        await _model.OnGetAsync("B27S");
+        Assert.Equal(fingerprint, _model.CurrentReviewVersion);
+
+        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] { award with { DistributionAmount = 980m } });
+        await _model.OnGetAsync("B27S");
+        Assert.Equal(980m, _model.PendingAidTotal);
+        Assert.NotEqual(fingerprint, _model.CurrentReviewVersion);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(-1d)]
+    public async Task Unverified_distribution_amount_blocks_bill_review_without_payment(double? amount)
+    {
+        _term.ConfigureTestAccess(true, new[] { "100" });
+        _aid.GetAwardsAsync("10", Arg.Any<CancellationToken>()).Returns(new[] {
+            new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements, "grant", "269",
+                "B27S", "Spring 2027", null, "Grant", "Awarded", "Grant", 1000m,
+                false, null, null, false, DistributionAmount: (decimal?)amount) });
+        _aidDecisions.GetDecisionsAsync("10", Arg.Any<CancellationToken>()).Returns(
+            new Dictionary<string, int?> { ["grant"] = null });
+        await _model.OnGetAsync("B27S");
+        Assert.True(_model.IsUnavailable);
+        Assert.Empty(_gateway.ReceivedCalls());
+    }
+
+    [Fact]
     public async Task Bill_rows_totals_and_review_fingerprint_use_the_same_aid_policy_and_live_decisions()
     {
         _term.ConfigureTestAccess(true,new[]{"100"});
         StudentFinancialAidAward A(string id,string type,string status,decimal amount,bool loan,int? decision=null)=>
-            new(StudentInformationSystemProvider.ThesisElements,id,"269","B27S","Spring 2027",new DateTime(2027,1,26),type,status,type,amount,false,decision,null,loan);
+            new(StudentInformationSystemProvider.ThesisElements,id,"269","B27S","Spring 2027",new DateTime(2027,1,26),type,status,type,amount,false,decision,null,loan,DistributionAmount:amount);
         var rows=new[]{A("1","TEG","Guarantee",300,false),A("2","Loan","Guarantee",100,true),A("3","Gift","Awarded",200,false),A("4","FWS","Guarantee",999,false),A("5","TEG","Estimated",888,false),A("6","Private loan","Guarantee",777,true)};
         _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows);
         _aidDecisions.GetDecisionsAsync("10",Arg.Any<CancellationToken>()).Returns(new Dictionary<string,int?>{{"1",null},{"2",1},{"3",null},{"4",1},{"5",1},{"6",null}});
@@ -103,7 +149,7 @@ public class BillApprovalAccessHandlerTests
     {
         _term.ConfigureTestAccess(true,new[]{"100"});
         StudentFinancialAidAward Loan(string id,string term="269") =>
-            new(StudentInformationSystemProvider.ThesisElements,id,term,"B27S","Spring 2027",null,"Loan","Awarded","Loan "+id,500,false,null,null,true);
+            new(StudentInformationSystemProvider.ThesisElements,id,term,"B27S","Spring 2027",null,"Loan","Awarded","Loan "+id,500,false,null,null,true,DistributionAmount:500);
         var rows=new[]{Loan("pending"),Loan("accepted"),Loan("declined"),Loan("other-term","268"),Loan("gift") with {IsLoan=false},Loan("cancelled") with {AwardStatus="Cancelled"},Loan("billed") with {IsSentToBilling=true}};
         _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows);
         var decisions=new Dictionary<string,int?>{{"pending",null},{"accepted",1},{"declined",0},{"gift",null},{"cancelled",null},{"billed",null}};
@@ -113,7 +159,7 @@ public class BillApprovalAccessHandlerTests
         Assert.Equal("pending",Assert.Single(_model.PendingLoans).ExternalAwardId);
         Assert.Equal(1000,_model.PendingAidTotal);Assert.Equal(-1000,_model.RemainingBalance);
         var fingerprint=_model.CurrentReviewVersion;
-        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows.Select(x=>x.ExternalAwardId=="pending"?x with {Amount=9000}:x).ToArray());
+        _aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(rows.Select(x=>x.ExternalAwardId=="pending"?x with {Amount=9000,DistributionAmount=9000}:x).ToArray());
         await _model.OnGetAsync("B27S");
         Assert.Equal(9000,Assert.Single(_model.PendingLoans).Amount);
         Assert.Equal(1000,_model.PendingAidTotal);Assert.Equal(fingerprint,_model.CurrentReviewVersion);
@@ -128,7 +174,7 @@ public class BillApprovalAccessHandlerTests
     [Fact]
     public async Task Missing_live_aid_decision_stops_bill_review_instead_of_using_a_stale_loan_state()
     {
-        _term.ConfigureTestAccess(true,new[]{"100"});_aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",null,"Loan","Guarantee","Loan",100,false,1,null,true)});
+        _term.ConfigureTestAccess(true,new[]{"100"});_aid.GetAwardsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentFinancialAidAward(StudentInformationSystemProvider.ThesisElements,"1","269","B27S","Spring 2027",null,"Loan","Guarantee","Loan",100,false,1,null,true,DistributionAmount:100)});
         await _model.OnGetAsync("B27S");Assert.True(_model.IsUnavailable);Assert.Empty(_gateway.ReceivedCalls());
     }
 
