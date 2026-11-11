@@ -13,6 +13,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Volo.Abp.DependencyInjection;
+using CampusFlow.Housing;
 
 namespace CampusFlow.StudentInformationSystems;
 
@@ -169,7 +170,14 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
             housingPeriodId = periodId, housingApplicationFormId = 0
         }), Encoding.UTF8, "application/json");
         using var response = await _client.SendAsync(request, cancellationToken);
-        await ReadAsync(response, cancellationToken);
+        var root = await ReadAsync(response, cancellationToken);
+        // Some vendor responses add a second business outcome inside the envelope.
+        // Honor an explicit failure; older/minimal envelopes still require the caller's
+        // existing live assignment readback before an operation can be marked verified.
+        if (root["data"] is JsonObject outcome && outcome.ContainsKey("success") &&
+            (outcome["success"] is not JsonValue success || !success.TryGetValue<bool>(out var applied) || !applied))
+            throw new HousingRequestException(HousingApplyFailure.ResponseCode((int)response.StatusCode,
+                root["data"]?.ToJsonString() ?? ""), (int)response.StatusCode);
     }
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
@@ -211,8 +219,12 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         JsonObject? root;
         try { root = JsonNode.Parse(body) as JsonObject; }
         catch (JsonException) { root = null; }
-        if (!response.IsSuccessStatusCode || root?["isSuccess"]?.GetValue<bool>() != true)
-            throw new InvalidOperationException($"Elements rejected the housing request (HTTP {(int)response.StatusCode}).");
+        if (!response.IsSuccessStatusCode || root?["isSuccess"] is not JsonValue success ||
+            !success.TryGetValue<bool>(out var accepted) || !accepted)
+        {
+            var code = HousingApplyFailure.ResponseCode((int)response.StatusCode, body);
+            throw new HousingRequestException(code, (int)response.StatusCode);
+        }
         return root;
     }
 

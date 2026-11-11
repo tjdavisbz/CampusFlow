@@ -16,7 +16,7 @@ using Volo.Abp.Uow;
 namespace CampusFlow.Housing;
 
 [Authorize(CampusFlowPermissions.Admin.HousingAssignments)]
-public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspaceAppService
+public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspaceAppService
 {
     private readonly IRepository<HousingAssignmentDraft, Guid> _drafts;
     private readonly IRepository<HousingRateSchedule, Guid> _rateSchedules;
@@ -178,14 +178,26 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         return changes;
     }
     [UnitOfWork(IsDisabled = true)]
-    public async Task<HousingWorkspaceState> ApplyAssignmentsAsync(ApplyHousingDraftInput input)
+    public Task<HousingWorkspaceState> ApplyAssignmentsAsync(ApplyHousingDraftInput input) => ApplyCoreAsync(input, null);
+
+    private async Task<HousingWorkspaceState> ApplyCoreAsync(ApplyHousingDraftInput input, RecoverHousingDraftInput? recovery)
     {
         using var preparation=_unitOfWorkManager.Begin(requiresNew:true,isTransactional:false);
         if (!input.Confirmed) throw new UserFriendlyException("Review and confirm the Elements changes before applying them.");
         _writer.EnsureWriteEnabled();
         var draft = await Find(input.PeriodId) ?? throw new UserFriendlyException("Refresh from Elements first.");
         CheckRevision(draft, input.Revision);
-        EnsureEditable(draft);
+        List<HousingWorkspaceRoom>? recoveryCurrent = null;
+        List<int>? recoveryRemaining = null;
+        if (recovery is null) EnsureEditable(draft);
+        else
+        {
+            var review = await PrepareRecoveryAsync(draft);
+            if (review.Preview.RunId != recovery.RunId || review.Preview.RecoveryRevision != recovery.RecoveryRevision)
+                throw new UserFriendlyException("The recovery preview changed. Review the live assignments again; the saved plan is unchanged.");
+            recoveryCurrent = review.Current;
+            recoveryRemaining = review.Remaining;
+        }
         var before = Read(draft.BaselineJson);
         var after = Read(draft.RoomsJson);
         Validate(before, after);
@@ -206,6 +218,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
                          oldAssignments[id].o.Rate != newAssignments[id].o.Rate ||
                          oldAssignments[id].o.IntentionalSingle != newAssignments[id].o.IntentionalSingle)
             .Order().ToList();
+        var roomWriteIds = recoveryRemaining ?? roomChangedIds;
         if (changedIds.Count == 0 && capacityChanges.Count == 0) return Map(draft);
 
         var pricing = changedIds.Count>0 ? await _elements.GetPricingAsync(input.PeriodId) : new HousingPricingContext(0,Array.Empty<HousingTermFee>(),0);
@@ -234,14 +247,16 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
         }
 
         var current = await _elements.GetRoomsAsync(input.PeriodId);
-        if (!SameAssignments(before, current))
+        if (!SameAssignments(recoveryCurrent ?? before, current))
             throw new UserFriendlyException("Elements assignments or room capacities changed since this draft was refreshed. Review and refresh before applying changes.");
 
         // The replica is only a first check. Confirm every affected student through the live API.
+        var expectedAssignments = (recoveryCurrent ?? before).SelectMany(room => room.Occupants.Select(o => (room, o)))
+            .ToDictionary(x => x.o.StudentUid);
         foreach (var id in changedIds)
         {
             var actual = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
-            if (!oldAssignments.TryGetValue(id, out var old))
+            if (!expectedAssignments.TryGetValue(id, out var old))
             {
                 if (actual is not null)
                     throw new UserFriendlyException("A student has a new Elements assignment. Refresh the draft before applying changes.");
@@ -252,17 +267,27 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
 
         var touchedRoomIds=roomChangedIds.SelectMany(id=>new[]{oldAssignments.TryGetValue(id,out var old)?old.room.Id:0,newAssignments.TryGetValue(id,out var desired)?desired.room.Id:0})
             .Concat(capacityChanges.Select(x=>x.RoomId)).Where(x=>x>0).ToHashSet();
-        await _writer.VerifyRoomsAsync(input.PeriodId,before.Where(x=>touchedRoomIds.Contains(x.Id)).ToList());
+        await _writer.VerifyRoomsAsync(input.PeriodId,(recoveryCurrent ?? before).Where(x=>touchedRoomIds.Contains(x.Id)).ToList());
         await preparation.CompleteAsync();
         var run=Guid.NewGuid();
         using(var claim=_unitOfWorkManager.Begin(requiresNew:true,isTransactional:true))
         {
             var latest=await Find(input.PeriodId)??throw new UserFriendlyException("The draft no longer exists.");
-            CheckRevision(latest,input.Revision);EnsureEditable(latest);
+            CheckRevision(latest,input.Revision);
+            if (recovery is null) EnsureEditable(latest);
+            else
+            {
+                var previous = HousingApplyProgress.Read(latest);
+                if (previous?.Status != "Needs review" || previous.RunId != recovery.RunId ||
+                    previous.BeforeJson != latest.BaselineJson || previous.DesiredJson != latest.RoomsJson)
+                    throw new UserFriendlyException("Housing recovery ownership changed. Review again.");
+                HousingApplyProgress.Archive(latest, previous);
+            }
             if(latest.RoomsJson!=draft.RoomsJson||latest.BaselineJson!=draft.BaselineJson ||
                 (needsRates && (await SavedRatesAsync(input.PeriodId,pricing.TermCalendarId)).Revision!=input.RateRevision))
                 throw new UserFriendlyException("The housing draft or fees changed. Review again.");
-            new HousingApplyProgress{RunId=run,StartedAt=Clock.Now,UserId=CurrentUser.Id,BeforeJson=latest.BaselineJson,DesiredJson=latest.RoomsJson}.Save(latest);
+            new HousingApplyProgress{RunId=run,StartedAt=Clock.Now,UserId=CurrentUser.Id,BeforeJson=latest.BaselineJson,DesiredJson=latest.RoomsJson,
+                RecoveryOfRunId=recovery?.RunId,ReviewReason=recovery?.Reason.Trim()}.Save(latest);
             await _drafts.UpdateAsync(latest,autoSave:true);await claim.CompleteAsync();
         }
         async Task Record(string operation)
@@ -278,7 +303,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
             // Expand capacities before assignment; shrink only after students have been removed.
             var increases=capacityChanges.Where(x=>x.Capacity>x.PreviousCapacity).ToList();
             if(increases.Count>0){await Record("Starting capacity increases");await _writer.UpdateCapacitiesAsync(input.PeriodId,increases);await Record("Capacity increases verified");}
-            foreach(var id in roomChangedIds.Where(oldAssignments.ContainsKey))
+            foreach(var id in roomWriteIds.Where(oldAssignments.ContainsKey))
             {
                 await Record($"Starting room removal for {id}");await _writer.DeallocateAsync(id,input.PeriodId,oldAssignments[id].room.Id);
                 if(await _writer.GetAssignedRoomAsync(id,input.PeriodId) is not null)throw new InvalidOperationException("Room removal was not confirmed.");
@@ -286,7 +311,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
             }
             var decreases=capacityChanges.Where(x=>x.Capacity<x.PreviousCapacity).ToList();
             if(decreases.Count>0){await Record("Starting capacity decreases");await _writer.UpdateCapacitiesAsync(input.PeriodId,decreases);await Record("Capacity decreases verified");}
-            foreach(var id in roomChangedIds.Where(newAssignments.ContainsKey))
+            foreach(var id in roomWriteIds.Where(newAssignments.ContainsKey))
             {
                 await Record($"Starting room assignment for {id}");var room=newAssignments[id].room;await _writer.AssignAsync(id,input.PeriodId,room.Id);
                 var confirmed=await _writer.GetAssignedRoomAsync(id,input.PeriodId);
@@ -295,6 +320,12 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
             }
             foreach(var id in changedIds)
             {
+                if (recovery is not null)
+                {
+                    var assigned = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
+                    if (assigned is null || !SameRoom(assigned.Value, newAssignments[id].room))
+                        throw new InvalidOperationException("The recovered commuter assignment changed before charge reconciliation.");
+                }
                 await Record($"Starting charge reconciliation for {id}");
                 await _billingWriter.ReconcileAsync(id,pricing.TermCalendarId,proposedCharges[id],documents);await Record($"Charges verified for {id}");
             }
@@ -305,12 +336,12 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
             progress.Status="Completed";progress.FinishedAt=Clock.Now;progress.Save(latest);
             latest.Refresh(JsonSerializer.Serialize(after),Clock.Now);await _drafts.UpdateAsync(latest,autoSave:true);await finish.CompleteAsync();return Map(latest);
         }
-        catch(Exception)
+        catch(Exception error)
         {
             using var failed=_unitOfWorkManager.Begin(requiresNew:true,isTransactional:true);
             var latest=await Find(input.PeriodId);var progress=latest is null?null:HousingApplyProgress.Read(latest);
-            if(progress?.RunId==run){progress.Status="Needs review";progress.FinishedAt=Clock.Now;progress.Save(latest!);await _drafts.UpdateAsync(latest!,autoSave:true);await failed.CompleteAsync();}
-            throw new UserFriendlyException("The apply did not finish. Review the live Elements assignments, room capacities and housing batch before refreshing. Further apply attempts are blocked until that review and refresh.");
+            if(progress?.RunId==run){progress.Status="Needs review";progress.FailureCode=HousingApplyFailure.Code(error);progress.FailureHttpStatus=(error as HousingRequestException)?.StatusCode;progress.FinishedAt=Clock.Now;progress.Save(latest!);await _drafts.UpdateAsync(latest!,autoSave:true);await failed.CompleteAsync();}
+            throw new UserFriendlyException($"The apply did not finish. {HousingApplyFailure.Description(HousingApplyFailure.Code(error))} The saved plan is retained. Review recovery before another attempt. Reference: {run}.");
         }
     }
     public async Task<List<HousingStudentOption>> SearchStudentsAsync(string query, int periodId)
@@ -439,5 +470,7 @@ public class HousingWorkspaceAppService : CampusFlowAppService, IHousingWorkspac
                        .SequenceEqual(found.Occupants.Select(x => x.StudentUid).Order());
         });
     private static HousingWorkspaceState Map(HousingAssignmentDraft x) => new()
-    { Id = x.Id, PeriodId = x.PeriodId, Revision = x.ConcurrencyStamp, RefreshedAt = x.RefreshedAt, Rooms = Read(x.RoomsJson), ApplyStatus = HousingApplyProgress.Read(x)?.Status };
+    { Id = x.Id, PeriodId = x.PeriodId, Revision = x.ConcurrencyStamp, RefreshedAt = x.RefreshedAt, Rooms = Read(x.RoomsJson), ApplyStatus = HousingApplyProgress.Read(x)?.Status,
+        ApplyRunId = HousingApplyProgress.Read(x)?.RunId,
+        ApplyFailure = HousingApplyProgress.Read(x)?.Status == "Needs review" ? HousingApplyFailure.Description(HousingApplyProgress.Read(x)?.FailureCode) : null };
 }
