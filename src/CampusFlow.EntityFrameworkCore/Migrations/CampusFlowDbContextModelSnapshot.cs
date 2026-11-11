@@ -419,7 +419,8 @@ namespace CampusFlow.Migrations
                     b.HasIndex("StudentProfileId");
 
                     b.HasIndex("TenantId", "UserId", "ExternalTermId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("AppBillApprovals", (string)null);
                 });
