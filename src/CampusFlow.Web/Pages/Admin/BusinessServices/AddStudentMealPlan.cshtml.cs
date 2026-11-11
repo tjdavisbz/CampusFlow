@@ -37,6 +37,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
     [BindProperty] public AssignInputModel Input { get; set; } = new();
 
     [BindProperty] public RemoveStudentMealPlanInput RemoveInput { get; set; } = new();
+    [BindProperty] public ClearNoMealPlanSelectionInput ClearInput { get; set; } = new();
     public bool CanRemove { get; private set; }
 
     public TenantTheme Theme { get; private set; } = null!;
@@ -76,7 +77,8 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         Theme = _themeProvider.Get(CurrentTenant.Name);
         CanRemove = (await AuthorizationService.AuthorizeAsync(User, CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded;
         // Assignment and removal are separate forms. Only validate the submitted assignment input.
-        foreach (var key in ModelState.Keys.Where(x => x == nameof(Query) || x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal)).ToArray())
+        foreach (var key in ModelState.Keys.Where(x => x == nameof(Query) || x == nameof(RemoveInput) || x.StartsWith(nameof(RemoveInput) + ".", StringComparison.Ordinal) ||
+            x == nameof(ClearInput) || x.StartsWith(nameof(ClearInput) + ".", StringComparison.Ordinal)).ToArray())
             ModelState.Remove(key);
         Context = await _service.GetContextAsync(Input.ExternalStudentId, Input.TermCalendarId);
         Student = Context.Student.ExternalStudentId;
@@ -112,6 +114,19 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
         await _service.RemoveAsync(RemoveInput);
         Alerts.Success("The meal-plan assignment was removed from Elements. Elements may retain the meal-plan charge and any sales tax. Review billing separately; no refund or housing-status change was requested.");
         return RedirectToPage(new{student=RemoveInput.ExternalStudentId,term=RemoveInput.TermCalendarId});
+    }
+
+    public async Task<IActionResult> OnPostClearNoMealPlanAsync()
+    {
+        if (!(await AuthorizationService.AuthorizeAsync(User, CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded)
+            return Forbid();
+        if (!ClearInput.Confirmed || ClearInput.SelectionId == Guid.Empty || ClearInput.TermCalendarId <= 0 ||
+            string.IsNullOrWhiteSpace(ClearInput.ExternalStudentId) || string.IsNullOrWhiteSpace(ClearInput.ConcurrencyStamp) ||
+            string.IsNullOrWhiteSpace(ClearInput.Reason) || ClearInput.Reason.Length > 500)
+            return BadRequest();
+        await _service.ClearNoMealPlanSelectionAsync(ClearInput);
+        Alerts.Success("The recorded No Meal Plan choice was cleared. The student can choose again when meal selection is open and bill approval permits changes.");
+        return RedirectToPage(new { student = ClearInput.ExternalStudentId, term = ClearInput.TermCalendarId });
     }
 
     public class AssignInputModel

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Auditing;
+using Volo.Abp.Domain.Repositories;
 
 namespace CampusFlow.Housing;
 
@@ -18,14 +19,15 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
     private readonly IStudentInformationSystemMealPlanService _mealPlans;
     private readonly ILogger<AdminMealPlanAppService> _logger;
     private readonly IStudentInformationSystemMealPlanRemovalService _removal;
+    private readonly IRepository<StudentHousingSelection, Guid> _localSelections;
 
     public AdminMealPlanAppService(IEnumerable<IStudentInformationSystemStudentLookup> students,
         IEnumerable<IStudentInformationSystemMealPlanService> mealPlans, ILogger<AdminMealPlanAppService> logger,
-        IStudentInformationSystemMealPlanRemovalService removal)
+        IStudentInformationSystemMealPlanRemovalService removal, IRepository<StudentHousingSelection, Guid> localSelections)
     {
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
         _mealPlans = mealPlans.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
-        _logger = logger;_removal=removal;
+        _logger = logger;_removal=removal;_localSelections=localSelections;
     }
 
     public async Task<List<AdminMealPlanStudentDto>> SearchStudentsAsync(string query)
@@ -43,8 +45,15 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         var context = await _mealPlans.GetContextAsync(externalStudentId, termCalendarId);
         var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId)
             ?? throw new UserFriendlyException("Choose an available term before managing meal-plan assignments.");
+        var localTermName = selectedTerm.StartDate.ToString("MMMM yyyy");
+        var localNoneSelections = await _localSelections.GetListAsync(x =>
+            x.ExternalStudentId == externalStudentId && x.TermName == localTermName &&
+            x.TermStartDate == selectedTerm.StartDate && x.TermEndDate == selectedTerm.EndDate &&
+            x.ExternalMealPlanId == null);
         return new AdminMealPlanContextDto
         {
+            NoMealPlanSelections = localNoneSelections.Select(x =>
+                new AdminNoMealPlanSelectionDto(x.Id, x.SubmittedAt, x.ConcurrencyStamp)).ToList(),
             CanRemove=_removal.IsEnabled,
             Assignments=(await _removal.GetAssignmentsAsync(externalStudentId)).Where(x=>x.TermCalendarId==context.SelectedTermCalendarId)
                 .Select(x=>new AdminMealPlanAssignmentDto(x.AssignmentId,x.MealPlanId,x.TermCalendarId,x.Name,x.Amount)).ToList(),
@@ -128,6 +137,30 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
                 context.Student.StudentId);
             throw new UserFriendlyException($"The housing status was updated to {housingStatus.Name}, but the meal-plan assignment could not be confirmed. Refresh and check current assignments and Elements before trying again; the request may already have succeeded.");
         }
+    }
+
+    [Audited]
+    [Authorize(CampusFlowPermissions.Admin.RemoveStudentMealPlan)]
+    public async Task ClearNoMealPlanSelectionAsync(ClearNoMealPlanSelectionInput input)
+    {
+        if (CurrentTenant.Id is null || !input.Confirmed || input.SelectionId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(input.Reason) || input.Reason.Length > 500 ||
+            string.IsNullOrWhiteSpace(input.ConcurrencyStamp))
+            throw new UserFriendlyException("Confirm the student and term and provide a reason for clearing No Meal Plan.");
+        var context = await GetContextAsync(input.ExternalStudentId, input.TermCalendarId);
+        if (context.SelectedTermCalendarId != input.TermCalendarId ||
+            !context.NoMealPlanSelections.Any(x => x.SelectionId == input.SelectionId && x.ConcurrencyStamp == input.ConcurrencyStamp))
+            throw new UserFriendlyException("The recorded choice changed. Refresh before clearing it.");
+        if (context.Assignments.Count > 0)
+            throw new UserFriendlyException("This student already has an Elements meal-plan assignment for this term. Review that assignment before resetting the recorded choice.");
+        var selection = await _localSelections.GetAsync(input.SelectionId);
+        if (selection.TenantId != CurrentTenant.Id || selection.ExternalStudentId != input.ExternalStudentId ||
+            selection.ExternalMealPlanId.HasValue || selection.ConcurrencyStamp != input.ConcurrencyStamp)
+            throw new UserFriendlyException("The recorded choice changed. Refresh before clearing it.");
+        // FullAuditedAggregateRoot uses soft deletion; the original choice and actor remain auditable.
+        await _localSelections.DeleteAsync(selection, autoSave: true);
+        _logger.LogInformation("No Meal Plan choice {SelectionId} cleared for term {TermId} by administrator {UserId}.",
+            selection.Id, input.TermCalendarId, CurrentUser.Id);
     }
 
     [Audited]

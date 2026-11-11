@@ -30,7 +30,9 @@ public class AdminMealPlanRemovalTests
         _removal.IsEnabled.Returns(true);_removal.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(new StudentMealPlanAssignment[]{new(10,20,269,"Spring plan",100),new(11,21,268,"Fall plan",100)});
         var lazy=Substitute.For<IAbpLazyServiceProvider>();var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
         var user=Substitute.For<ICurrentUser>();user.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
-        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal){LazyServiceProvider=lazy};
+        var locals=Substitute.For<Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid>>();
+        locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new List<StudentHousingSelection>());
+        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,locals){LazyServiceProvider=lazy};
     }
     private static RemoveStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,AssignmentId=10,MealPlanId=20,Confirmed=true};
     [Fact]public async Task Removal_never_changes_housing_status_or_assigns_a_new_plan()

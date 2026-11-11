@@ -40,4 +40,5 @@ public sealed class SaveMealPlanSelectionInput
     public string? ExternalTermId { get; set; }
     public HousingChoice HousingChoice { get; set; }
     public int? ExternalMealPlanId { get; set; }
+    public bool SelectNoMealPlan { get; set; }
 }

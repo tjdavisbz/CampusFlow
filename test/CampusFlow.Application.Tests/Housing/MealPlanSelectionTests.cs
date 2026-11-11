@@ -13,6 +13,9 @@ using NSubstitute;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Timing;
+using Volo.Abp.DependencyInjection;
+using Volo.Abp.MultiTenancy;
+using Volo.Abp.Guids;
 using Xunit;
 
 namespace CampusFlow.Application.Tests.Housing;
@@ -24,6 +27,7 @@ public class MealPlanSelectionTests
     private readonly MealPlanAppService _service;
     private readonly IBillApprovalCompletionLookup _completion = Substitute.For<IBillApprovalCompletionLookup>();
     private readonly IClock _clock = Substitute.For<IClock>();
+    private readonly IRepository<StudentHousingSelection, Guid> _selections = Substitute.For<IRepository<StudentHousingSelection, Guid>>();
 
     public MealPlanSelectionTests()
     {
@@ -54,14 +58,70 @@ public class MealPlanSelectionTests
                 new(3, "20 Meal Plan", "Spring", 315m, new(2027, 1, 1), new(2027, 5, 1)),
                 new(4, "12 Meal Plan", "Future", 1m, new(2028, 1, 1), new(2028, 5, 1))
             }, new StudentMealPlanTerm[] { new(270, "Spring 2027", new(2027, 1, 1), new(2027, 5, 1)) }, 270, Array.Empty<StudentHousingStatusOption>(), null));
+        StudentHousingSelection? stored = null;
+        _selections.FindAsync(Arg.Any<Expression<Func<StudentHousingSelection, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(stored));
+        _selections.InsertAsync(Arg.Any<StudentHousingSelection>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(call => { stored = call.Arg<StudentHousingSelection>(); return Task.FromResult(stored); });
+        var lazy = Substitute.For<IAbpLazyServiceProvider>();
+        var guids = Substitute.For<IGuidGenerator>(); guids.Create().Returns(_ => Guid.NewGuid());
+        lazy.LazyGetRequiredService<IGuidGenerator>().Returns(guids);
+        lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Substitute.For<ICurrentTenant>());
         _service = new(Substitute.For<IRepository<StudentProfile, Guid>>(), current, configurations,
-            Substitute.For<IRepository<StudentHousingSelection, Guid>>(), new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
+            _selections, new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
             _housing, terms, _clock, _completion);
+        _service.LazyServiceProvider = lazy;
     }
 
     private void Eligibility(string attendance, string? building) =>
         _housing.GetStudentEligibilityAsync(10, 270, Arg.Any<CancellationToken>())
             .Returns(new StudentHousingEligibility(attendance, "Main", building));
+
+    [Fact]
+    public async Task No_choice_is_rejected_without_recording_None()
+    {
+        Eligibility("Residential Undergraduate", "Commuter");
+        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter }));
+        await _selections.DidNotReceiveWithAnyArgs().InsertAsync(default!, default, default);
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task Explicit_None_is_recorded_without_assigning_a_fake_Elements_plan()
+    {
+        Eligibility("Residential Undergraduate", "Commuter");
+        var result = await _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true });
+        Assert.Equal(HousingChoice.Commuter, result.SelectedHousingChoice);
+        Assert.Equal("None", result.SelectedMealPlanName);
+        Assert.Null(result.SelectedMealPlanId);
+        Assert.True(result.SyncedToStudentInformationSystem);
+        await _selections.Received(1).InsertAsync(Arg.Is<StudentHousingSelection>(x => x.ExternalMealPlanId == null), true, Arg.Any<CancellationToken>());
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    [InlineData(3, true)]
+    public async Task Missing_invalid_or_conflicting_choices_do_not_write(int? id, bool none)
+    {
+        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, ExternalMealPlanId = id, SelectNoMealPlan = none }));
+        await _selections.DidNotReceiveWithAnyArgs().InsertAsync(default!, default, default);
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task Explicit_None_cannot_bypass_a_residential_catalog()
+    {
+        Eligibility("Residential Undergraduate", "Bridges");
+        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.OnCampus, SelectNoMealPlan = true }));
+        await _selections.DidNotReceiveWithAnyArgs().InsertAsync(default!, default, default);
+    }
 
     [Fact]
     public async Task Residential_options_use_selected_term_and_tax_inclusive_configured_price()

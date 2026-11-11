@@ -49,7 +49,7 @@
             }
             else if (!Model.Context.CanRemove)
             {
-                <p class="notice">Meal-plan removal is not enabled for this environment. Ask an administrator to review its setup.</p>
+                <p class="notice">Removal of Elements meal-plan assignments is not enabled for this environment. Recorded No Meal Plan choices below can still be cleared.</p>
             }
             @if(Model.Context.Assignments.Count==0){<p>No assigned meal plans were returned for this term.</p>}
             @foreach(var assignment in Model.Context.Assignments)
@@ -68,6 +68,30 @@
                     </form>
                 }
                 else {<p>Removal requires the removal permission and enabled administrative removal setting.</p>}
+                </article>
+            }
+            @foreach (var selection in Model.Context.NoMealPlanSelections)
+            {
+                <article class="meal-card">
+                    <strong>Recorded choice: No Meal Plan</strong>
+                    <p>Recorded @selection.SubmittedAt.ToString("MMM d, yyyy"). This choice completes meal-plan selection without assigning a plan in Elements.</p>
+                    @if (Model.Context.Assignments.Count > 0)
+                    {
+                        <p>A meal plan is already assigned in Elements for this term. Review that assignment before resetting this choice.</p>
+                    }
+                    else if (Model.CanRemove)
+                    {
+                        <p>Clearing this choice lets the student choose again when selection is open. Room assignments, charges and approved bills are retained.</p>
+                        <form method="post" asp-page-handler="ClearNoMealPlan">
+                            <input type="hidden" name="ClearInput.ExternalStudentId" value="@Model.Context.Student.ExternalStudentId" />
+                            <input type="hidden" name="ClearInput.TermCalendarId" value="@Model.Context.SelectedTermCalendarId" />
+                            <input type="hidden" name="ClearInput.SelectionId" value="@selection.SelectionId" />
+                            <input type="hidden" name="ClearInput.ConcurrencyStamp" value="@selection.ConcurrencyStamp" />
+                            <label>Reason <input name="ClearInput.Reason" required maxlength="500" /></label>
+                            <label class="confirm-check"><input type="checkbox" name="ClearInput.Confirmed" value="true" required /> I verified this student and term and intend to clear this choice.</label>
+                            <button type="submit" class="btn btn-danger">Clear No Meal Plan choice</button>
+                        </form>
+                    }
                 </article>
             }
             <div class="section-heading plan-heading"><span>Step 3</span><h2>Choose a meal plan</h2></div>

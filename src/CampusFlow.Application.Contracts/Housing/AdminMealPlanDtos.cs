@@ -31,6 +31,7 @@ public class AdminMealPlanContextDto
     public int? CurrentHousingStatusId { get; set; }
     public bool CanRemove { get; set; }
     public List<AdminMealPlanAssignmentDto> Assignments { get; set; } = [];
+    public List<AdminNoMealPlanSelectionDto> NoMealPlanSelections { get; set; } = [];
     public List<AdminMealPlanOptionDto> Options { get; set; } = [];
 }
 
@@ -61,5 +62,17 @@ public class RemoveStudentMealPlanInput
     public int TermCalendarId { get; set; }
     public int AssignmentId { get; set; }
     public int MealPlanId { get; set; }
+    public bool Confirmed { get; set; }
+}
+
+public sealed record AdminNoMealPlanSelectionDto(Guid SelectionId, DateTime SubmittedAt, string ConcurrencyStamp);
+
+public class ClearNoMealPlanSelectionInput
+{
+    public string ExternalStudentId { get; set; } = "";
+    public int TermCalendarId { get; set; }
+    public Guid SelectionId { get; set; }
+    public string ConcurrencyStamp { get; set; } = "";
+    public string Reason { get; set; } = "";
     public bool Confirmed { get; set; }
 }
