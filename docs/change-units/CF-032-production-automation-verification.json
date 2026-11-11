@@ -1,0 +1,46 @@
+{
+  "readOnly": true,
+  "productionCostTypeScheduleAndRuleHashPreserved": true,
+  "clearanceScheduleRemainsOff": true,
+  "before": [
+    {
+      "kind": "costType",
+      "enabled": true,
+      "nextRunAtUtc": "2026-11-11T23:44:21.1975626Z",
+      "policyVersion": null,
+      "hasRunningClaim": false,
+      "extraPropertiesHash": "e0b63d92cd7889a15fbaa8c6e336abf3b53fb2af8812e99b0d41b01e597a4f3a",
+      "rulesHash": "9f3ff9d3245b58d2c867b704fc6c60061411a26b9edd3d319c952c557e4a15a1"
+    },
+    {
+      "kind": "clearance",
+      "enabled": false,
+      "nextRunAtUtc": null,
+      "policyVersion": 0,
+      "hasRunningClaim": false,
+      "extraPropertiesHash": "225870bd10e82157abedc0ffad584c18b7a6b444310b5cce68e698ed84f6035e",
+      "rulesHash": null
+    }
+  ],
+  "after": [
+    {
+      "kind": "costType",
+      "enabled": true,
+      "nextRunAtUtc": "2026-11-11T23:44:21.1975626Z",
+      "policyVersion": null,
+      "hasRunningClaim": false,
+      "extraPropertiesHash": "e0b63d92cd7889a15fbaa8c6e336abf3b53fb2af8812e99b0d41b01e597a4f3a",
+      "rulesHash": "9f3ff9d3245b58d2c867b704fc6c60061411a26b9edd3d319c952c557e4a15a1"
+    },
+    {
+      "kind": "clearance",
+      "enabled": false,
+      "nextRunAtUtc": null,
+      "policyVersion": 0,
+      "hasRunningClaim": false,
+      "extraPropertiesHash": "225870bd10e82157abedc0ffad584c18b7a6b444310b5cce68e698ed84f6035e",
+      "rulesHash": null
+    }
+  ],
+  "checkedAtUtc": "2026-11-11T23:37:16.756893Z"
+}

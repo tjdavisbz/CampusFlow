@@ -1,0 +1,49 @@
+{
+  "unit": "CF-032",
+  "updatedAtUtc": "2026-11-11T23:38:22.222863+00:00",
+  "rootCause": "Staff reset soft-deletes an approved bill, but the old unique index included deleted rows and rejected a replacement under the same tenant/account/term key.",
+  "productionEvidence": {
+    "failedBillSubmissions": 5,
+    "lastObservedFailureUtc": "2026-11-11T12:02:21.777957",
+    "httpMethod": "POST",
+    "status": 500,
+    "consoleMorningLogsRotated": true,
+    "retainedAuditMessageMasked": true,
+    "reportedStudentDeletedApprovalMatchesSameAccountAndSpringTerm": true,
+    "oldIndexUnfiltered": true,
+    "recentStudentRecalculationJobsCompleted": true,
+    "readOnlyBillViewLoaded": true
+  },
+  "nonprodEvidence": {
+    "syntheticRecalculationCompleted": true,
+    "reportedTestAccountRecalculationCompleted": true,
+    "rollbackOnlyPostgresReproductionSqlState": "23505",
+    "constraint": "IX_AppBillApprovals_TenantId_UserId_ExternalTermId",
+    "fixedMigrationAndTwoResetReapprovalCyclesPassedInsideRollback": true,
+    "noTestApprovalOrCompletionJobCommitted": true
+  },
+  "tests": {
+    "nonprodPersistence": 312,
+    "productionPersistence": 323,
+    "sharedBillAndResetHandlers": 27,
+    "newRegressionFailedBeforeFixForUniqueConstraint": true,
+    "newRegressionPassedAfterFix": true,
+    "historyAndArtifactsRetained": true,
+    "secondActiveApprovalStillRejected": true
+  },
+  "releaseBuildsPassedBoth": true,
+  "userAuthorizedProductionPromotion": true,
+  "productionBillingWritesPerformedByAgent": false,
+  "privateStudentPayloadsIncluded": false,
+  "state": "committed-pushed-deployed-both-awaiting-staff-retest",
+  "migrationAppliedBoth": true,
+  "approvalRowsAndHistoryPreservedBoth": true,
+  "impersonationUnchanged": true,
+  "paymentSettingsUnchanged": true,
+  "productionSignedInSubmissionPerformedByAgent": false,
+  "staffRetestPending": true,
+  "releaseVerifications": {
+    "nonprod": "CF-032-nonprod-deployment-verification.json",
+    "production": "CF-032-production-deployment-verification.json"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "environment": "nonprod",
+  "mode": "apply",
+  "migrationId": "20261111232327_AllowBillReapprovalAfterReset",
+  "migrationApplied": true,
+  "migrationAppliedByThisCall": true,
+  "approvalRowsPreserved": true,
+  "approvalRowsCount": 1,
+  "approvalRowsFingerprint": "185d126a81f744006a064400e9545c68",
+  "deletedHistoryRows": 1,
+  "unrelatedIndexesAndHistoryPreserved": true,
+  "sqlSha256": "d4197499d7e354a26159258356fefadd8d9879aa2c2842b7085e90b92c783309",
+  "checkedAtUtc": "2026-11-11T23:31:01.54884Z"
+}

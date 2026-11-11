@@ -1,0 +1,25 @@
+{
+  "updatedAtUtc": "2026-11-11T23:32:54.505697+00:00",
+  "state": "discussed-not-implemented",
+  "userRequest": "Consider writable Impersonate Student only in nonprod for realistic workflow testing.",
+  "currentStudentImpersonation": "Read-only in both environments; unchanged by CF-032.",
+  "paymentCheck": {
+    "nonprod": {
+      "testMode": true,
+      "enabled": false,
+      "credentialsConfigured": false
+    },
+    "production": {
+      "testMode": false,
+      "enabled": true
+    },
+    "settingsChanged": false
+  },
+  "mailCheck": "Bill-approval nonprod completion emails route only to the captured signed-in actor, with no Bcc. Other email features have not been verified for writable impersonation.",
+  "designConsiderations": [
+    "Keep impersonated target identity separate from read-only/write authorization; never falsify IsImpersonating.",
+    "Use explicit nonprod gates covering app environment, Elements and app database; production must remain read-only.",
+    "Preserve real staff actor in audit and notification capture; require explicit test mode and approved permissions.",
+    "Payment testing requires Payflow test configuration and test credentials before enabling."
+  ]
+}

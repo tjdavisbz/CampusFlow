@@ -1,5 +1,5 @@
 {
-  "updatedAtUtc": "2026-11-11T04:42:25.075353+00:00",
+  "updatedAtUtc": "2026-11-11T23:38:22.222863+00:00",
   "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-5.pdf",
   "purpose": "Preserve answers and decisions for TJ\u2019s requested later consolidated summary; not sent to Jeff.",
   "currentReview": "Jeff-bill-approval-review-2026-11-10.json",
@@ -120,31 +120,28 @@
     {
       "item": "10",
       "topic": "Bill-approval page returns 500",
-      "answer": "The reported error was in production. With TJ\u2019s explicit authorization, the correct student\u2019s Spring 2027 Home and bill-review page loaded through read-only impersonation. That view skips write-dependent profile refresh, recalculation and meal-tax actions, so it does not prove the student\u2019s own failing flow is fixed. Retained redacted logs/aggregate monitoring did not establish the cause.",
-      "nextStep": "Ask Jeff to retry in his own signed-in production student session and supply selected term and approximate time if it fails, then trace only that exception.",
+      "answer": "Retained production audit records identify POST failures on final bill approval, including 6:02 AM Central on November 11. Elements recalculation completed. Staff reset retained a deleted approval occupying the unfiltered tenant/account/term unique key. CF-032 reproduces that PostgreSQL 23505 conflict and changes only the index to exclude deleted rows, preserving historical agreements and artifacts. The fixed regression verifies repeated resets and one active approval. CF-032 is now committed, pushed and deployed in nonprod and production; migration row hashes verify all existing approvals/history unchanged.",
+      "nextStep": "Jeff should retry a fresh signed-in production bill submission. Reset/reapproval was tested in nonprod; the agent did not submit or approve a production bill.",
       "decision": "Fresh own-session retest and failure time are needed; production environment is already confirmed.",
       "changeUnits": [
-        "CF-003",
-        "CF-004",
-        "CF-016",
-        "CF-024",
-        "CF-027"
+        "CF-032"
       ],
-      "state": "blocking-error-not-yet-diagnosed",
-      "investigation": "bill-page-readonly-investigation-2026-11-10.json"
+      "state": "cf032-deployed-both-awaiting-signed-in-retest",
+      "investigation": "CF-032-verification.json"
     },
     {
       "item": "11",
       "topic": "Meal-plan delete still absent after access grant",
-      "answer": "Removal exists behind a separate RemoveStudentMealPlan permission, the environment adapter switch and an actual selected-term Elements assignment. A local None selection has no Elements assignment row. A report that access was granted does not establish the effective permission or context.",
-      "nextStep": "CF-030 addresses the local None choice. If a real Elements plan remains missing its removal button, verify effective permission/session, term, returned assignment and environment flag; no access grant was changed.",
+      "answer": "Jeff Francis\u2019s active staff account jfrancis has both role-based and direct grants for opening Manage Student Meal Plans and for removing/clearing choices, in production and nonprod. The granting role is CampusFlow Business Services Manager. CF-030 is deployed for local No Meal Plan choices; no access changes were needed or made.",
+      "nextStep": "Jeff should retest with his staff account and selected term. If the control remains missing, inspect session/read-only context and the actual local choice or Elements assignment; do not assume missing grants.",
       "decision": null,
       "changeUnits": [
         "CF-015",
         "CF-023",
         "CF-030"
       ],
-      "state": "access-or-context-investigation"
+      "state": "permissions-confirmed-both-environments-awaiting-ui-retest",
+      "accessVerification": "CF-030-Jeff-meal-plan-access-verification.json"
     },
     {
       "item": "12",
@@ -480,7 +477,7 @@
     {
       "item": "11",
       "topic": "Meal-plan delete still absent after access grant",
-      "nextStep": "CF-030 addresses the local None choice. If a real Elements plan remains missing its removal button, verify effective permission/session, term, returned assignment and environment flag; no access grant was changed.",
+      "nextStep": "Jeff should retest with his staff account and selected term. If the control remains missing, inspect session/read-only context and the actual local choice or Elements assignment; do not assume missing grants.",
       "decision": null
     },
     {

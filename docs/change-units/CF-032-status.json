@@ -1,0 +1,60 @@
+{
+  "unit": "CF-032",
+  "scope": "Allow repeated bill-approval reset/reapproval while retaining deleted approvals, agreement snapshots and artifacts; enforce one active approval per tenant, student account and term.",
+  "branch": "codex/cf-032-bill-reapproval",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow",
+  "sourceBase": "2a661b37a5b171739fb06407807279c6aeda02bf",
+  "commit": "0a706a1ec21871c06f9cf75bcde2b9205031122e",
+  "pushed": true,
+  "productionBranch": "codex/cf-032-production-release",
+  "productionBase": "7123ff54f719cabf208b7e3ecf5598739e897a70",
+  "productionCommit": "a1f1692ffb6fbbac7b0b0f21254fc0c0e93270bb",
+  "state": "committed-pushed-deployed-both-awaiting-staff-retest",
+  "schemaMigrationRequired": true,
+  "migrationId": "20261111232327_AllowBillReapprovalAfterReset",
+  "migrationSqlSha256": "d4197499d7e354a26159258356fefadd8d9879aa2c2842b7085e90b92c783309",
+  "updatedAtUtc": "2026-11-11T23:38:22.222863+00:00",
+  "verification": "CF-032-verification.json",
+  "productionDataRowsChanged": false,
+  "impersonationBehaviorChanged": false,
+  "paymentSettingsChanged": false,
+  "remainingChecks": [
+    "Jeff signed-in acceptance test of a new production submission."
+  ],
+  "rollback": "Retain the filtered index if reverting application assemblies. Restoring the old index after multiple historical approvals would fail; do not delete history to restore it.",
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "0a706a1ec21871c06f9cf75bcde2b9205031122e",
+    "branch": "codex/cf-032-bill-reapproval",
+    "deploymentId": "08de136d-d972-4a49-8e03-f414e67e1566",
+    "deployedAtUtc": "2026-11-11T23:32:36.5931982Z",
+    "verifiedAtUtc": "2026-11-11T23:34:14.566474+00:00",
+    "verification": "CF-032-nonprod-deployment-verification.json",
+    "migrationApplied": true,
+    "approvalRowsPreserved": true,
+    "deletedHistoryRowsPreserved": true,
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "a1f1692ffb6fbbac7b0b0f21254fc0c0e93270bb",
+    "branch": "codex/cf-032-production-release",
+    "deploymentId": "ab3c90e6-4ff3-482e-99b6-7eb2da3d8254",
+    "deployedAtUtc": "2026-11-11T23:35:40.3875278Z",
+    "verifiedAtUtc": "2026-11-11T23:37:18.768141+00:00",
+    "verification": "CF-032-production-deployment-verification.json",
+    "migrationApplied": true,
+    "approvalRowsPreserved": true,
+    "deletedHistoryRowsPreserved": true,
+    "staffAcceptancePending": true
+  },
+  "patchSha256": "33eea2a154af7f1ab18955fc2294c161c1abe8caadecf35b327151336d259964",
+  "sourcePatch": "CF-032.patch",
+  "migrationAppliedTo": [
+    "nonprod",
+    "production"
+  ],
+  "completionEmail": "CF-032-email-notification.json"
+}

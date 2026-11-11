@@ -1,0 +1,8 @@
+{
+  "environment": "nonprod",
+  "success": true,
+  "resetThenReapproveSucceeded": true,
+  "testTransactionRolledBack": true,
+  "committed": false,
+  "externalCompletionExecuted": false
+}

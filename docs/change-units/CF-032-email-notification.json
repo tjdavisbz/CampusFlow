@@ -1,0 +1,14 @@
+{
+  "requestedRecipient": "tjdavisbz@gmail.com",
+  "senderAccount": "TJDavis@fullydisbursed.com",
+  "state": "sent",
+  "purpose": "Notify TJ after CF-032 is deployed and verified in both environments.",
+  "studentOrBillingDetailsIncluded": false,
+  "attachments": false,
+  "cc": [],
+  "bcc": [],
+  "sentAtUtc": "2026-11-11T23:39:14.148692+00:00",
+  "via": "Connected Outlook Email",
+  "savedToSentItems": true,
+  "inboxDeliveryConfirmed": false
+}

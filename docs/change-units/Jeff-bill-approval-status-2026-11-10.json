@@ -1,5 +1,5 @@
 {
-  "updatedAtUtc": "2026-11-11T04:42:25.075353+00:00",
+  "updatedAtUtc": "2026-11-11T05:01:28.253099Z",
   "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-5.pdf",
   "outstanding": [
     {
@@ -133,15 +133,16 @@
     {
       "item": "11",
       "topic": "Meal-plan delete still absent after access grant",
-      "answer": "Removal exists behind a separate RemoveStudentMealPlan permission, the environment adapter switch and an actual selected-term Elements assignment. A local None selection has no Elements assignment row. A report that access was granted does not establish the effective permission or context.",
-      "nextStep": "CF-030 addresses the local None choice. If a real Elements plan remains missing its removal button, verify effective permission/session, term, returned assignment and environment flag; no access grant was changed.",
+      "answer": "Jeff Francis\u2019s active staff account jfrancis has both role-based and direct grants for opening Manage Student Meal Plans and for removing/clearing choices, in production and nonprod. The granting role is CampusFlow Business Services Manager. CF-030 is deployed for local No Meal Plan choices; no access changes were needed or made.",
+      "nextStep": "Jeff should retest with his staff account and selected term. If the control remains missing, inspect session/read-only context and the actual local choice or Elements assignment; do not assume missing grants.",
       "decision": null,
       "changeUnits": [
         "CF-015",
         "CF-023",
         "CF-030"
       ],
-      "state": "access-or-context-investigation"
+      "state": "permissions-confirmed-both-environments-awaiting-ui-retest",
+      "accessVerification": "CF-030-Jeff-meal-plan-access-verification.json"
     },
     {
       "item": "12",
@@ -342,5 +343,13 @@
   "productionHousingRecoveryExecuted": false,
   "all113Preserved": true,
   "cf028Paused": true,
-  "googleDocUpdated": false
+  "googleDocUpdated": false,
+  "cf032FollowUp": {
+    "updatedAtUtc": "2026-11-11T23:38:22.222863+00:00",
+    "topic": "Production bill-approval POST 500",
+    "state": "fixed-deployed-both-awaiting-Jeff-retest",
+    "details": "CF-032-status.json",
+    "originalContext": "Latest screenshot email reported November 11 6:10 AM Central; exact failed POST retained at 6:02 AM.",
+    "note": "The prior read-only page load did not test final submission. Reset retained a deleted approval occupying an unfiltered unique index; the filtered index permits replacement while preserving history."
+  }
 }
