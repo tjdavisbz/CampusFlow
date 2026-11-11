@@ -2611,7 +2611,8 @@ namespace CampusFlow.Migrations
                     b.HasIndex("StudentProfileId");
 
                     b.HasIndex("TenantId", "StudentProfileId", "TermName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("TenantId", "SyncedToStudentInformationSystem", "SubmittedAt");
 

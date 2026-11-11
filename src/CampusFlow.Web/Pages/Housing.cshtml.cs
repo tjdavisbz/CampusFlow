@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using CampusFlow.Web.Students;
 using System.Linq;
 using System.Threading.Tasks;
@@ -47,6 +48,7 @@ public class HousingModel : CampusFlowPageModel
 
     [BindProperty(SupportsGet = true)] public string? Term { get; set; }
     [BindProperty] public SaveMealPlanSelectionInput Input { get; set; } = new();
+    [BindProperty] public string? MealPlanChoice { get; set; }
     [BindProperty(SupportsGet = true)] public bool Saved { get; set; }
     public MealPlanSelectionDto? Selection { get; private set; }
     public StudentHousingAssignment? CurrentAssignment { get; private set; }
@@ -93,6 +95,16 @@ public class HousingModel : CampusFlowPageModel
     {
         try
         {
+            Input.SelectNoMealPlan = string.Equals(MealPlanChoice, "none", StringComparison.Ordinal);
+            Input.ExternalMealPlanId = !Input.SelectNoMealPlan && int.TryParse(MealPlanChoice,
+                NumberStyles.None, CultureInfo.InvariantCulture, out var planId) && planId > 0 ? planId : null;
+            if (!Input.SelectNoMealPlan && Input.ExternalMealPlanId is null)
+                ModelState.AddModelError(nameof(MealPlanChoice), "Choose a meal plan to continue.");
+            if (!ModelState.IsValid)
+            {
+                await OnGetAsync();
+                return Page();
+            }
             var result = await _mealPlans.SaveAsync(Input);
             return RedirectToPage(new { saved = true, term = Input.ExternalTermId });
         }

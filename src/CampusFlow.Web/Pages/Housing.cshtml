@@ -63,6 +63,7 @@
                 <div><span>Housing</span><strong>@HousingModel.ChoiceName(Model.Selection.SelectedHousingChoice.Value)</strong></div>
                 <div><span>Meal plan</span><strong>@(Model.Selection.SelectedMealPlanName ?? "No meal plan")</strong></div>
             </section>
+            <p><a asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId">Click here to continue with bill approval</a></p>
         }
         else
         {
@@ -79,12 +80,12 @@
                     <div class="plan-grid" data-choice="@choice">
                         @foreach (var plan in Model.Selection.Options[choice])
                         {
-                            var value = plan.ExternalMealPlanId?.ToString() ?? "";
-                            <label class="plan-card"><input type="radio" asp-for="Input.ExternalMealPlanId" value="@value" /><span class="plan-check"><i class="fa-solid fa-check"></i></span><div><strong>@plan.Name</strong><p>@plan.Description</p></div><span class="plan-price">@(plan.Price is null ? "Contact Student Services" : plan.Price == 0 ? "No charge" : $"${plan.Price.Value:N2}")</span></label>
+                            var value = plan.IsNoPlanOption ? "none" : plan.ExternalMealPlanId?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                            <label class="plan-card"><input type="radio" asp-for="MealPlanChoice" value="@value" required /><span class="plan-check"><i class="fa-solid fa-check"></i></span><div><strong>@plan.Name</strong><p>@plan.Description</p></div><span class="plan-price">@(plan.Price is null ? "Contact Student Services" : plan.Price == 0 ? "No charge" : $"${plan.Price.Value:N2}")</span></label>
                         }
                     </div>
                 }
-                <button type="submit" class="housing-submit"><span>Record selection</span><i class="fa-solid fa-arrow-right"></i></button>
+                <button type="submit" class="housing-submit" disabled><span>Record selection</span><i class="fa-solid fa-arrow-right"></i></button>
             </section>
         </form>
         }
@@ -97,7 +98,14 @@
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('housing-form');
   if (!form) return;
-  form.addEventListener('submit', () => {
+  const submit = form.querySelector('button[type="submit"]');
+  const choices = form.querySelectorAll('input[name="MealPlanChoice"]');
+  const update = () => { submit.disabled = !Array.from(choices).some(choice => choice.checked); };
+  choices.forEach(choice => choice.addEventListener('change', update));
+  update();
+  form.addEventListener('submit', event => {
+    if (!Array.from(choices).some(choice => choice.checked)) { event.preventDefault(); return; }
+    submit.disabled = true;
     const modal = document.getElementById('housing-processing');
     modal.classList.add('visible'); modal.setAttribute('aria-hidden', 'false');
   });
