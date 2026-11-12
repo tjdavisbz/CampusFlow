@@ -47,7 +47,16 @@
 
     @if (Model.IsUnavailable || Model.Selection is null)
     {
-        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Meal plan selection is unavailable</h2><p>@(Model.Selection?.UnavailableReason ?? (Model.Selection is { IsLockedByBillApproval: true } ? "Your bill is approved for this term. Contact Student Billing to request changes." : Model.Selection is { MealPlanEligible: false, HousingRequired: true } ? "Your housing includes your meal plan; a separate selection is not required." : Model.Selection is { HasHousingAssignment: false, HousingRequired: true } ? "A housing assignment is required before you can select a meal plan or approve your bill. Contact Student Services." : "Meal plan selection is not currently open for your record and term."))</p></div></section>
+        <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Meal plan selection is unavailable</h2>
+            @if (Model.Selection is { IsLockedByBillApproval: true })
+            {
+                <p>Your bill is approved for this term. Contact <a href="mailto:BusinessServices@nelson.edu">BusinessServices@nelson.edu</a> to request changes.</p>
+            }
+            else
+            {
+                <p>@(Model.Selection?.UnavailableReason ?? (Model.Selection is { MealPlanEligible: false, HousingRequired: true } ? "Your housing includes your meal plan; a separate selection is not required." : Model.Selection is { HasHousingAssignment: false, HousingRequired: true } ? "A housing assignment is required before you can select a meal plan or approve your bill. Contact Student Services." : "Meal plan selection is not currently open for your record and term."))</p>
+            }
+        </div></section>
     }
     else
     {

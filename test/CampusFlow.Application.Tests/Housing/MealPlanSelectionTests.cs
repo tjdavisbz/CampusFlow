@@ -285,6 +285,7 @@ public class MealPlanSelectionTests
         _completion.IsApprovedAsync(Arg.Any<StudentProfile>(), "270", Arg.Any<CancellationToken>()).Returns(true);
         var view = await _service.GetAsync("270");
         Assert.True(view.IsLockedByBillApproval);
+        Assert.Equal("Your bill is approved for this term. Contact BusinessServices@nelson.edu to request changes.",view.UnavailableReason);
         await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new() { ExternalTermId = "270", HousingChoice = HousingChoice.OnCampus, ExternalMealPlanId = 2 }));
         await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default);
     }

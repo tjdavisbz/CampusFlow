@@ -19,6 +19,8 @@
 .approval-complete { padding: 3rem 2rem; border: 1px solid #a6d8b8; border-radius: 1rem; background: #fff; box-shadow: 0 10px 28px rgba(16,24,40,.05); text-align: center; }
 .approval-complete h2 { margin: .45rem 0; font-size: 1.8rem; }
 .approval-complete p { margin: 0 auto; color: #667085; }
+.approval-complete .completion-bookstore { margin-top: 1.5rem; font-size: 1.125rem; font-weight: 700; }
+.completion-bookstore a { display: inline-flex; justify-content: center; align-items: baseline; flex-wrap: wrap; gap: .4rem; padding: .35rem .5rem; }
 .bill-payment-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
 .payment-amount { display: grid; gap: .5rem; margin-bottom: .9rem; padding: .9rem 1rem; border-radius: .75rem; background: var(--tenant-surface); }
 .payment-amount div { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }

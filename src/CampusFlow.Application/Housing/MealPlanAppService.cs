@@ -136,7 +136,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
             return result;
         }
         result.UnavailableReason = result.IsLockedByBillApproval
-            ? "Your bill is approved for this term. Contact Student Billing to request changes."
+            ? "Your bill is approved for this term. Contact BusinessServices@nelson.edu to request changes."
             : !result.MealPlanEligible
             ? (eligibility.IsAmericanIndianCollege ? "Your housing includes your meal plan; a separate selection is not required."
                 : "A separate meal plan is not available for your student record.")
@@ -166,7 +166,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         await using var lease=await _removals.LockAsync(student,termId);
         view = await GetAsync(view.ExternalTermId);
         if (view.IsLockedByBillApproval)
-            throw new UserFriendlyException("Your bill is approved for this term. Contact Student Billing to request changes.");
+            throw new UserFriendlyException("Your bill is approved for this term. Contact BusinessServices@nelson.edu to request changes.");
         if (!view.IsSelectionOpen || !view.MealPlanEligible || !view.HasHousingAssignment)
             throw new UserFriendlyException(view.UnavailableReason ?? "Meal plan selection is not available for your student record and term.");
         if (input.HousingChoice != view.AssignedHousingChoice)
