@@ -27,6 +27,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
     private readonly IRepository<BillApprovalTermConfiguration, Guid> _terms;
     private readonly IClock _clock;
     private readonly IBillApprovalCompletionLookup _completion;
+    private readonly IStudentInformationSystemMealPlanRemovalService _assignments;
 
     public MealPlanAppService(IRepository<StudentProfile, Guid> profiles,
         ICurrentStudentView currentStudentView,
@@ -34,7 +35,8 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         IRepository<StudentHousingSelection, Guid> selections,
         IEnumerable<IStudentInformationSystemMealPlanService> services,
         ILogger<MealPlanAppService> logger, IElementsHousingReader housing,
-        IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion)
+        IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion,
+        IStudentInformationSystemMealPlanRemovalService assignments)
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
@@ -46,6 +48,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         _terms = terms;
         _clock = clock;
         _completion = completion;
+        _assignments = assignments;
     }
 
     public async Task<MealPlanSelectionDto> GetAsync(string? externalTermId = null)
@@ -87,6 +90,15 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         var selection = string.IsNullOrWhiteSpace(result.TermName)
             ? null
             : await _selections.FindAsync(x => x.StudentProfileId == profile.Id && x.TermName == result.TermName);
+        if (selection is { ExternalMealPlanId: not null, SyncedToStudentInformationSystem: true } &&
+            profile.Provider == StudentInformationSystemProvider.ThesisElements)
+        {
+            var assigned = (await _assignments.GetAssignmentsAsync(profile.ExternalStudentId))
+                .Where(x => x.TermCalendarId == termId).ToArray();
+            if (assigned.Length == 0) selection = null; // Read-only reconciliation; retain the prior choice for audit.
+            else if (!assigned.Any(x => x.MealPlanId == selection.ExternalMealPlanId))
+                throw new UserFriendlyException("Your meal-plan assignment has changed. Contact Student Billing to review it before choosing another plan.");
+        }
         result.SelectedHousingChoice = selection?.HousingChoice;
         result.SelectedMealPlanId = selection?.ExternalMealPlanId;
         result.SelectedMealPlanName = selection?.MealPlanName;
@@ -156,6 +168,18 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
             throw new UserFriendlyException("A housing selection period is not available.");
         var selection = await _selections.FindAsync(x =>
             x.StudentProfileId == profile.Id && x.TermName == view.TermName);
+        if (profile.Provider == StudentInformationSystemProvider.ThesisElements)
+        {
+            var assigned = await _assignments.GetAssignmentsAsync(profile.ExternalStudentId);
+            if (assigned.Any(x => x.TermCalendarId.ToString(System.Globalization.CultureInfo.InvariantCulture) == view.ExternalTermId))
+                throw new UserFriendlyException("A meal plan is already assigned for this term. Contact Student Billing before choosing another plan.");
+            if (selection is { ExternalMealPlanId: not null, SyncedToStudentInformationSystem: true })
+            {
+                // Replace only a choice whose removal has just been verified in live Elements.
+                await _selections.DeleteAsync(selection, autoSave: true);
+                selection = null;
+            }
+        }
         if (selection is not null)
             throw new UserFriendlyException("Your housing and meal plan selection has already been recorded.");
 
