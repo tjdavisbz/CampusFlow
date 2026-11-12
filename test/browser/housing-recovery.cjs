@@ -19,7 +19,7 @@ try{for(const scenario of [{width:320,mode:'success'},{width:390,mode:'success'}
   if(handler==='Periods')return route.fulfill({json:[{id:2,name:'Spring 2027'}]});
   if(handler==='Setup')return route.fulfill({json:{periodId:2,masterCommuterRoomCount:20,periodCommuterRoomCount:20,missingCommuterRooms:[]}});
   if(handler==='Draft')return route.fulfill({json:state});
-  if(handler==='Recovery'){if(mode==='unsupported')return route.fulfill({status:409,json:{error:{message:'Elements contains an unexpected assignment. The saved plan was preserved.'}}});return route.fulfill({json:{periodId:2,runId:'run',revision:'original',recoveryRevision:'reviewed',savedAssignments:113,alreadyAssigned:1,remainingAssignments:112}});}
+  if(handler==='Recovery'){if(mode==='unsupported')return route.fulfill({status:409,json:{error:{message:'Elements contains an unexpected assignment. The saved plan was preserved.'}}});return route.fulfill({json:{periodId:2,runId:'run',revision:'original',recoveryRevision:'reviewed',savedAssignments:113,alreadyAssigned:1,remainingAssignments:112,historicalAssignmentsToClear:111}});}
   if(handler==='Resume'){const data=req.postDataJSON();assert.equal(data.confirmed,true);assert.equal(data.reason,'Reviewed rooms and batch');assert.equal(data.recoveryRevision,'reviewed');assert.equal(data.runId,'run');
    if(mode==='success'){state={...state,applyStatus:'Completed',revision:'done'};return route.fulfill({json:state});}
    state={...state,revision:'new-review',applyRunId:'new-run'};return route.fulfill({status:409,json:{error:{message:mode==='stale'?'The recovery preview changed. Review again.':'The apply did not finish. The saved plan is retained.'}}});}
@@ -31,10 +31,10 @@ try{for(const scenario of [{width:320,mode:'success'},{width:390,mode:'success'}
  if(mode==='unsupported'){await page.waitForFunction(()=>document.querySelector('#housing-message').textContent.includes('unexpected'));assert.equal(await page.locator('#housing-resume').isDisabled(),true);}
  else{
   await page.waitForFunction(()=>document.querySelector('#housing-recovery-counts').textContent.includes('112 remaining'));
-  assert.equal(calls.filter(x=>x.method==='POST').length,0);assert.equal(await page.locator('#housing-resume').isDisabled(),true);
+  assert.match(await page.locator('#housing-recovery-counts').innerText(),/111 deleted historical room records/);assert.equal(calls.filter(x=>x.method==='POST').length,0);assert.equal(await page.locator('#housing-resume').isDisabled(),true);
   await page.fill('#housing-recovery-reason','Reviewed rooms and batch');assert.equal(await page.locator('#housing-resume').isDisabled(),true);await page.check('#housing-recovery-confirmed');assert.equal(await page.locator('#housing-resume').isDisabled(),false);
   if(process.env.CAMPUSFLOW_SCREENSHOT_DIR&&mode==='success'&&[390,1440].includes(width)){fs.mkdirSync(process.env.CAMPUSFLOW_SCREENSHOT_DIR,{recursive:true});await page.locator('#housing-recovery').screenshot({path:path.join(process.env.CAMPUSFLOW_SCREENSHOT_DIR,`recovery-${width}.png`)});}
-  page.once('dialog',d=>d.accept());await page.click('#housing-resume');await page.waitForFunction(()=>{const t=document.querySelector('#housing-message').textContent;return t.includes('applied and verified')||t.includes('did not finish')||t.includes('preview changed');});
+  let confirmation;page.once('dialog',d=>{confirmation=d.message();return d.accept();});await page.click('#housing-resume');assert.match(confirmation,/111 reviewed deleted historical room records/);await page.waitForFunction(()=>{const t=document.querySelector('#housing-message').textContent;return t.includes('applied and verified')||t.includes('did not finish')||t.includes('preview changed');});
   assert.equal(calls.filter(x=>x.handler==='Resume').length,1);
   if(mode==='success')assert.match(await page.locator('#housing-summary').innerText(),/Completed/);
   else {assert.equal(await page.locator('#housing-resume').isDisabled(),true);assert.equal(await page.locator('#housing-recovery-preview').isHidden(),true);}

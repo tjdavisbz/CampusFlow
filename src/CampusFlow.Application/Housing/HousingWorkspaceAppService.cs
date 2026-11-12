@@ -189,6 +189,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
         CheckRevision(draft, input.Revision);
         List<HousingWorkspaceRoom>? recoveryCurrent = null;
         List<int>? recoveryRemaining = null;
+        List<HousingHistoricalAssignment> recoveryHistorical = [];
         if (recovery is null) EnsureEditable(draft);
         else
         {
@@ -197,6 +198,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                 throw new UserFriendlyException("The recovery preview changed. Review the live assignments again; the saved plan is unchanged.");
             recoveryCurrent = review.Current;
             recoveryRemaining = review.Remaining;
+            recoveryHistorical = review.Historical;
         }
         var before = Read(draft.BaselineJson);
         var after = Read(draft.RoomsJson);
@@ -313,6 +315,12 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             if(decreases.Count>0){await Record("Starting capacity decreases");await _writer.UpdateCapacitiesAsync(input.PeriodId,decreases);await Record("Capacity decreases verified");}
             foreach(var id in roomWriteIds.Where(newAssignments.ContainsKey))
             {
+                foreach (var historical in recoveryHistorical.Where(x => x.StudentUid == id))
+                {
+                    await Record($"Starting historical room deallocation for {id}, deleted room {historical.PeriodRoomId}");
+                    await _writer.ClearHistoricalAssignmentAsync(historical);
+                    await Record($"Historical room deallocation acknowledged for {id}, deleted room {historical.PeriodRoomId}");
+                }
                 await Record($"Starting room assignment for {id}");var room=newAssignments[id].room;await _writer.AssignAsync(id,input.PeriodId,room.Id);
                 var confirmed=await _writer.GetAssignedRoomAsync(id,input.PeriodId);
                 if(confirmed is null||!SameRoom(confirmed.Value,room))throw new InvalidOperationException("New room assignment was not confirmed.");

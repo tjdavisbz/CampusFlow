@@ -92,6 +92,7 @@ public class HousingRecoveryPreview
     public int SavedAssignments { get; set; }
     public int AlreadyAssigned { get; set; }
     public int RemainingAssignments { get; set; }
+    public int HistoricalAssignmentsToClear { get; set; }
     public string Failure { get; set; } = "";
 }
 
