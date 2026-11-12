@@ -49,6 +49,7 @@ public class BillApprovalAccessHandlerTests
     private readonly IRepository<AgreementTemplate,Guid> _agreements=Substitute.For<IRepository<AgreementTemplate,Guid>>();
     private readonly IRepository<PaymentPlanPolicy,Guid> _policies=Substitute.For<IRepository<PaymentPlanPolicy,Guid>>();
     private readonly IRepository<BillApproval,Guid> _approvals=Substitute.For<IRepository<BillApproval,Guid>>();
+    private readonly IRepository<BillApprovalArtifact,Guid> _artifacts=Substitute.For<IRepository<BillApprovalArtifact,Guid>>();
 
     public BillApprovalAccessHandlerTests()
     {
@@ -78,11 +79,68 @@ public class BillApprovalAccessHandlerTests
             new[]{termLookup},new[]{schedule},new[]{_billing},new[]{aid},new[]{_planLookup},
             Array.Empty<IStudentInformationSystemDocumentTrackingService>(),Array.Empty<IStudentInformationSystemPaymentPostingService>(),
             _taxConfiguration,_agreements,_policies,
-            terms,_approvals,Substitute.For<IRepository<BillApprovalArtifact,Guid>>(),Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
+            terms,_approvals,_artifacts,Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
             Substitute.For<IBillApprovalPdfGenerator>(),Substitute.For<IGuidGenerator>(),clock,Substitute.For<IRepository<PayflowPayment,Guid>>(),
             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
             Substitute.For<ILegacyBillApprovalLookup>(),_meal,_completion, Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>(),new[]{_aidDecisions})
         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
+    }
+
+    private async Task<BillApproval> AcceptedApproval(bool otherStudent = false)
+    {
+        var profile = (await _current.GetProfileAsync())!;
+        var approval = new BillApproval(Guid.NewGuid(), profile.TenantId!.Value, Guid.NewGuid(),
+            otherStudent ? Guid.NewGuid() : profile.Id, "10", "100", "269", "B27S", "Spring 2027");
+        approval.Accept(Guid.NewGuid(), 1, "<p>Accepted terms</p>", DateTime.UtcNow, null, null);
+        _approvals.FindAsync(Arg.Any<Expression<Func<BillApproval, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Expression<Func<BillApproval, bool>>>().Compile()(approval) ? approval : null);
+        return approval;
+    }
+
+    [Fact]
+    public async Task Completion_poll_reads_only_current_students_saved_status_without_running_work()
+    {
+        var approval = await AcceptedApproval();
+        var progress = new BillApprovalCompletionProgress();
+        progress.Step(BillCompletionStep.Cleared).Status = BillCompletionStatus.Completed;
+        progress.Save(approval);
+        var artifact = new BillApprovalArtifact(Guid.NewGuid(), approval.TenantId, approval.Id);
+        artifact.MarkPdfCompleted("bill.pdf", "private-blob", "hash", DateTime.UtcNow);
+        _artifacts.FindAsync(Arg.Any<Expression<Func<BillApprovalArtifact, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(artifact);
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.JsonResult>(await _model.OnGetCompletionStatusAsync("B27S"));
+        Assert.Equal(new BillApprovalModel.CompletionStatus(true, true, false), result.Value);
+        Assert.Equal("no-store", _model.Response.Headers.CacheControl);
+        Assert.Empty(_recalculation.ReceivedCalls());
+        Assert.Empty(_tax.ReceivedCalls());
+        Assert.Empty(_meal.ReceivedCalls());
+        Assert.Empty(_billing.ReceivedCalls());
+        await _approvals.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
+    }
+
+    [Theory]
+    [InlineData(true, "B27S")]
+    [InlineData(false, "B26F")]
+    public async Task Completion_poll_cannot_read_another_student_or_terms_approval(bool otherStudent, string term)
+    {
+        await AcceptedApproval(otherStudent);
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(await _model.OnGetCompletionStatusAsync(term));
+        Assert.Empty(_artifacts.ReceivedCalls());
+    }
+
+    [Theory]
+    [InlineData(BillCompletionStatus.Pending, false)]
+    [InlineData(BillCompletionStatus.Failed, true)]
+    [InlineData(BillCompletionStatus.Uncertain, true)]
+    public async Task Completion_poll_distinguishes_pending_from_review_without_claiming_completion(BillCompletionStatus state, bool needsReview)
+    {
+        var approval = await AcceptedApproval();
+        var progress = new BillApprovalCompletionProgress();
+        progress.Step(BillCompletionStep.Cleared).Status = state;
+        progress.Step(BillCompletionStep.Cleared).Error = "Private vendor error must not be returned";
+        progress.Save(approval);
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.JsonResult>(await _model.OnGetCompletionStatusAsync("B27S"));
+        Assert.Equal(new BillApprovalModel.CompletionStatus(false, false, needsReview), result.Value);
     }
 
     [Fact]

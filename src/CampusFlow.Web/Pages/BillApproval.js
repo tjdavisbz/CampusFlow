@@ -1,4 +1,39 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const completion = document.querySelector('[data-completion-url]');
+    if (completion) {
+        let attempts = 0;
+        let failures = 0;
+        const delayed = () => {
+            completion.textContent = 'Your approval is saved. Processing is taking longer than expected. Check Bill Approval History later, or contact Student Billing if it does not finish.';
+        };
+        const checkCompletion = async () => {
+            if (++attempts > 24) { delayed(); return; }
+            try {
+                const response = await fetch(completion.dataset.completionUrl, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
+                if (response.status === 404) {
+                    completion.textContent = 'Your approval status has changed. Open Bill Approval History to review the current status.';
+                    return;
+                }
+                if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Status unavailable');
+                const status = await response.json();
+                if (typeof status.registrationComplete !== 'boolean' || typeof status.pdfAvailable !== 'boolean' || typeof status.needsReview !== 'boolean') throw new Error('Invalid status');
+                failures = 0;
+                if (String(status.registrationComplete) !== completion.dataset.registrationComplete ||
+                    String(status.pdfAvailable) !== completion.dataset.pdfAvailable) {
+                    window.location.reload();
+                    return;
+                }
+                if (status.needsReview) {
+                    completion.textContent = 'Your bill approval is saved. Student Billing needs to review the remaining registration or agreement steps.';
+                    return;
+                }
+            } catch {
+                if (++failures >= 3) { delayed(); return; }
+            }
+            window.setTimeout(checkCompletion, 5000);
+        };
+        window.setTimeout(checkCompletion, 3000);
+    }
     const steps = [...document.querySelectorAll('[data-step]')];
     const nav = [...document.querySelectorAll('[data-step-target]')];
     const show = name => {
