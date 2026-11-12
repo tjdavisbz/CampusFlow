@@ -62,6 +62,7 @@ public partial class HousingWorkspaceAppService
         catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
         var identity = new
         {
+            Policy = "commuter-assignments-preserve-billing-v2",
             Tenant = Tenant(), User = CurrentUser.Id, draft.Id, draft.PeriodId, draft.ConcurrencyStamp,
             progress.RunId, draft.BaselineJson, draft.RoomsJson,
             Historical = historical.OrderBy(x => x.StudentUid).ThenBy(x => x.AssignmentId).ToArray(),

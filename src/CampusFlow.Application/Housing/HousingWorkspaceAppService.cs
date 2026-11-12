@@ -245,7 +245,19 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                 catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
             }
             else proposedCharges[id] = [];
-            await _billingWriter.VerifyCanReconcileAsync(id, pricing.TermCalendarId, documents);
+            if (recovery is not null)
+            {
+                if (proposedCharges[id].Count != 0)
+                    throw new UserFriendlyException("Commuter recovery cannot change charges. Review this housing plan separately.");
+            }
+            else
+            {
+                try { await _billingWriter.VerifyCanReconcileAsync(id, pricing.TermCalendarId, documents); }
+                catch (InvalidOperationException error)
+                {
+                    throw new UserFriendlyException($"Housing billing review stopped before any assignment changed. {error.Message} The saved plan is retained.");
+                }
+            }
         }
 
         var current = await _elements.GetRoomsAsync(input.PeriodId);
@@ -333,6 +345,8 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                     var assigned = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
                     if (assigned is null || !SameRoom(assigned.Value, newAssignments[id].room))
                         throw new InvalidOperationException("The recovered commuter assignment changed before charge reconciliation.");
+                    await Record($"Existing billing preserved for {id}; zero-charge commuter recovery");
+                    continue;
                 }
                 await Record($"Starting charge reconciliation for {id}");
                 await _billingWriter.ReconcileAsync(id,pricing.TermCalendarId,proposedCharges[id],documents);await Record($"Charges verified for {id}");

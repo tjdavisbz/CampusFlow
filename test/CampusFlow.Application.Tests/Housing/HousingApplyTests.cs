@@ -179,7 +179,7 @@ public class HousingApplyTests
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
         Assert.Empty(_writer.Calls);Assert.Equal(desired,_draft.RoomsJson);Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
     }
-    [Fact] public async Task Reviewed_recovery_skips_completed_rooms_retains_all_113_and_reconciles_every_affected_student()
+    [Fact] public async Task Reviewed_recovery_skips_completed_rooms_retains_all_113_and_preserves_all_billing()
     {
         var preview=await FailedCommuterRun();var desired=_draft.RoomsJson;var original=HousingApplyProgress.Read(_draft)!;
         Assert.Equal(113,preview.SavedAssignments);Assert.Equal(1,preview.AlreadyAssigned);Assert.Equal(112,preview.RemainingAssignments);
@@ -190,7 +190,8 @@ public class HousingApplyTests
         var progress=HousingApplyProgress.Read(_draft)!;Assert.Equal("Completed",progress.Status);Assert.Equal(original.RunId,progress.RecoveryOfRunId);Assert.NotEmpty(progress.ReviewReason!);
         var history=JsonSerializer.Deserialize<List<HousingApplyProgress>>(_draft.ExtraProperties["HousingApplyHistoryV1"]!.ToString()!)!;
         Assert.Equal(original.RunId,Assert.Single(history).RunId);Assert.Equal(original.DesiredJson,history[0].DesiredJson);Assert.Equal(original.Operations,history[0].Operations);
-        await _billing.Received(113).ReconcileAsync(Arg.Any<int>(),268,Arg.Is<IReadOnlyList<HousingChargeLine>>(x=>x.Count==0),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+        await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
+        Assert.Equal(113,progress.Operations.Count(x=>x.StartsWith("Existing billing preserved")));
     }
     [Theory][InlineData("revision")][InlineData("run")][InlineData("preview")][InlineData("confirmation")][InlineData("reason")][InlineData("reason-length")]
     public async Task Recovery_requires_the_exact_reviewed_run_and_explicit_confirmation(string invalid)
@@ -219,20 +220,19 @@ public class HousingApplyTests
         await _service.ResumeCommuterAssignmentsAsync(Recover(next));Assert.Equal("Completed",HousingApplyProgress.Read(_draft)!.Status);
         Assert.Equal(2,JsonSerializer.Deserialize<List<HousingApplyProgress>>(_draft.ExtraProperties["HousingApplyHistoryV1"]!.ToString()!)!.Count);
     }
-    [Fact]public async Task All_rooms_already_assigned_still_checks_billing_without_duplicate_assignments()
+    [Fact]public async Task All_rooms_already_assigned_preserves_billing_without_duplicate_assignments()
     {
         await FailedCommuterRun();foreach(var room in JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!)foreach(var student in room.Occupants)_writer.Assigned[student.StudentUid]=(room.Building,room.Name);
         var preview=await _service.PreviewRecoveryAsync(1);Assert.Equal(0,preview.RemainingAssignments);_writer.Calls.Clear();
         await _service.ResumeCommuterAssignmentsAsync(Recover(preview));Assert.Empty(_writer.Calls);
-        await _billing.Received(113).ReconcileAsync(Arg.Any<int>(),268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+        await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
     }
-    [Fact]public async Task A_room_change_during_recovery_stops_before_reconciling_that_students_charges()
+    [Fact]public async Task A_room_change_during_recovery_final_verification_stops_without_touching_billing()
     {
         var preview=await FailedCommuterRun();
-        _billing.ReconcileAsync(1,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>()).Returns(_=>{_writer.Assigned[2]=_writer.RoomNames[20];return Task.CompletedTask;});
+        _writer.OnRead=id=>{if(id==2&&HousingApplyProgress.Read(_draft)!.Operations.Any(x=>x.StartsWith("Existing billing preserved for 1;")))_writer.Assigned[2]=_writer.RoomNames[20];};
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
-        await _billing.Received(1).ReconcileAsync(1,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
-        await _billing.DidNotReceive().ReconcileAsync(2,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
+        await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
         Assert.Equal(113,JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!.Sum(x=>x.Occupants.Count));Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
     }
     [Fact]public async Task Running_operation_cannot_be_recovered_or_archived()
@@ -240,22 +240,32 @@ public class HousingApplyTests
         var preview=await FailedCommuterRun();var progress=HousingApplyProgress.Read(_draft)!;progress.Status="Running";progress.Save(_draft);_writer.Calls.Clear();
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Empty(_writer.Calls);Assert.False(_draft.ExtraProperties.ContainsKey("HousingApplyHistoryV1"));
     }
-    [Fact]public async Task Billing_preflight_failure_does_not_claim_recovery_or_change_rooms()
+    [Fact]public async Task Reviewed_zero_charge_recovery_leaves_posted_and_manual_billing_untouched()
     {
-        var preview=await FailedCommuterRun();_writer.Calls.Clear();_billing.VerifyCanReconcileAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("blocked")));
-        await Assert.ThrowsAsync<InvalidOperationException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Empty(_writer.Calls);Assert.Equal(preview.RunId,HousingApplyProgress.Read(_draft)!.RunId);
+        var preview=await FailedCommuterRun();_writer.Calls.Clear();_billing.ClearReceivedCalls();
+        _billing.VerifyCanReconcileAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Existing non-CampusFlow housing charge")));
+        var result=await _service.ResumeCommuterAssignmentsAsync(Recover(preview));
+        Assert.Equal("Completed",result.ApplyStatus);Assert.Equal(112,_writer.Calls.Count);
+        Assert.Empty(_billing.ReceivedCalls());Assert.Equal(113,HousingApplyProgress.Read(_draft)!.Operations.Count(x=>x.StartsWith("Existing billing preserved")));
+    }
+    [Fact]public async Task Normal_apply_keeps_billing_safeguard_and_reports_it_before_claim_or_room_write()
+    {
+        Desired(x=>x[1].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));var plan=_draft.RoomsJson;
+        _billing.VerifyCanReconcileAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Existing non-CampusFlow housing charge")));
+        var error=await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));
+        Assert.Contains("before any assignment changed",error.Message);Assert.Contains("Existing non-CampusFlow",error.Message);Assert.Empty(_writer.Calls);Assert.Null(HousingApplyProgress.Read(_draft));Assert.Equal(plan,_draft.RoomsJson);
     }
 
     private sealed class Writer(Func<HousingApplyProgress?> progress):IElementsHousingAssignmentWriter
     {
-        public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
+        public Action<int>? OnRead;public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
         public void EnsureWriteEnabled(){}
         public List<HousingHistoricalAssignment> Historical=[];
         public bool FailHistorical;
         public Task<List<HousingHistoricalAssignment>> GetHistoricalAssignmentsAsync(int period,IReadOnlyCollection<int> ids,CancellationToken ct=default)=>Task.FromResult(Historical.Where(x=>x.PeriodId==period&&ids.Contains(x.StudentUid)).ToList());
         public Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment row,CancellationToken ct=default)
         {Claimed();if(FailHistorical)throw new InvalidOperationException("Historical deallocation unconfirmed");Calls.Add("historical");return Task.CompletedTask;}
-        public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default)=>Task.FromResult(Assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);
+        public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default){OnRead?.Invoke(studentUid);return Task.FromResult(Assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);}
         public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>Task.CompletedTask;
         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}
         public Task UpdateCapacitiesAsync(int p,IReadOnlyList<HousingCapacityChange> changes,CancellationToken ct=default){Claimed();Calls.Add(changes[0].Capacity>changes[0].PreviousCapacity?"increase":"decrease");return Task.CompletedTask;}
