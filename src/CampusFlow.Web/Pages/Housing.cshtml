@@ -53,7 +53,9 @@
     {
         @if (Model.Selection.SelectedHousingChoice.HasValue)
         {
-            <section class="housing-success"><i class="fa-solid fa-circle-check"></i><div><strong>Your selection has been recorded.</strong></div></section>
+            <section class="housing-success"><i class="fa-solid fa-circle-check"></i><div><strong>Your selection has been recorded.</strong>
+                <a class="housing-continue" asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId">Continue with bill approval <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            </div></section>
         }
         <section class="housing-term"><div><span>Selection period</span><strong>@(string.IsNullOrWhiteSpace(Model.Selection.TermName) ? "Upcoming term" : Model.Selection.TermName)</strong></div>@if(Model.Selection.TermStartDate.HasValue){<span>@Model.Selection.TermStartDate.Value.ToString("MMM d")–@Model.Selection.TermEndDate?.ToString("MMM d, yyyy")</span>}</section>
 
@@ -63,7 +65,6 @@
                 <div><span>Housing</span><strong>@HousingModel.ChoiceName(Model.Selection.SelectedHousingChoice.Value)</strong></div>
                 <div><span>Meal plan</span><strong>@(Model.Selection.SelectedMealPlanName ?? "No meal plan")</strong></div>
             </section>
-            <p><a asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId">Click here to continue with bill approval</a></p>
         }
         else
         {

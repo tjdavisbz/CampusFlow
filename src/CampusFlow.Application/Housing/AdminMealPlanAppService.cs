@@ -43,6 +43,13 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         var student = await _students.FindByExternalStudentIdAsync(externalStudentId)
             ?? throw new UserFriendlyException("That student could not be found.");
         var context = await _mealPlans.GetContextAsync(externalStudentId, termCalendarId);
+        if (!termCalendarId.HasValue)
+        {
+            var spring = context.Terms.SingleOrDefault(x =>
+                x.Name.Trim().Equals("Spring 2027", StringComparison.OrdinalIgnoreCase) && x.EndDate.Date >= DateTime.Today);
+            if (spring is not null && spring.TermCalendarId != context.SelectedTermCalendarId)
+                context = await _mealPlans.GetContextAsync(externalStudentId, spring.TermCalendarId);
+        }
         var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId)
             ?? throw new UserFriendlyException("Choose an available term before managing meal-plan assignments.");
         var localTermName = selectedTerm.StartDate.ToString("MMMM yyyy");
@@ -172,8 +179,21 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         if(!context.CanRemove || context.SelectedTermCalendarId!=input.TermCalendarId || !context.Terms.Any(x=>x.TermCalendarId==input.TermCalendarId) ||
             !context.Assignments.Any(x=>x.AssignmentId==input.AssignmentId&&x.MealPlanId==input.MealPlanId))
             throw new UserFriendlyException("The selected meal assignment changed. Refresh before removing it.");
+        var term = context.Terms.Single(x => x.TermCalendarId == input.TermCalendarId);
+        var termContext = await _mealPlans.GetContextAsync(input.ExternalStudentId, term.TermCalendarId);
+        var selectedTerm = termContext.Terms.Single(x => x.TermCalendarId == term.TermCalendarId);
+        var localTermName = selectedTerm.StartDate.ToString("MMMM yyyy");
+        var removedChoices = await _localSelections.GetListAsync(x =>
+            x.ExternalStudentId == input.ExternalStudentId && x.ExternalMealPlanId == input.MealPlanId &&
+            x.TermName == localTermName && x.TermStartDate == selectedTerm.StartDate && x.TermEndDate == selectedTerm.EndDate);
         try {await _removal.RemoveAsync(input.ExternalStudentId,input.TermCalendarId,input.AssignmentId,input.MealPlanId);}
         catch(Exception e){_logger.LogError(e,"Meal-plan removal could not be confirmed for assignment {AssignmentId}.",input.AssignmentId);throw new UserFriendlyException("Meal-plan removal could not be confirmed. Refresh and check Elements before retrying.");}
+        foreach (var choice in removedChoices)
+        {
+            await _localSelections.DeleteAsync(choice, autoSave: true);
+            _logger.LogInformation("Meal-plan choice {SelectionId} cleared after confirmed removal of assignment {AssignmentId} by administrator {UserId}.",
+                choice.Id, input.AssignmentId, CurrentUser.Id);
+        }
         _logger.LogWarning("Meal assignment {AssignmentId} removed for term {TermId} by administrator {UserId}.",input.AssignmentId,input.TermCalendarId,CurrentUser.Id);
     }
 

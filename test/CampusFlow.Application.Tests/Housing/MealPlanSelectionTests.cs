@@ -28,6 +28,8 @@ public class MealPlanSelectionTests
     private readonly IBillApprovalCompletionLookup _completion = Substitute.For<IBillApprovalCompletionLookup>();
     private readonly IClock _clock = Substitute.For<IClock>();
     private readonly IRepository<StudentHousingSelection, Guid> _selections = Substitute.For<IRepository<StudentHousingSelection, Guid>>();
+    private readonly IStudentInformationSystemMealPlanRemovalService _assignments = Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
+    private StudentHousingSelection? _stored;
 
     public MealPlanSelectionTests()
     {
@@ -58,24 +60,105 @@ public class MealPlanSelectionTests
                 new(3, "20 Meal Plan", "Spring", 315m, new(2027, 1, 1), new(2027, 5, 1)),
                 new(4, "12 Meal Plan", "Future", 1m, new(2028, 1, 1), new(2028, 5, 1))
             }, new StudentMealPlanTerm[] { new(270, "Spring 2027", new(2027, 1, 1), new(2027, 5, 1)) }, 270, Array.Empty<StudentHousingStatusOption>(), null));
-        StudentHousingSelection? stored = null;
+        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentMealPlanAssignment>());
         _selections.FindAsync(Arg.Any<Expression<Func<StudentHousingSelection, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromResult(stored));
+            .Returns(_ => Task.FromResult(_stored));
         _selections.InsertAsync(Arg.Any<StudentHousingSelection>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(call => { stored = call.Arg<StudentHousingSelection>(); return Task.FromResult(stored); });
+            .Returns(call => { _stored = call.Arg<StudentHousingSelection>(); return Task.FromResult(_stored); });
+        _sis.AssignAsync("10", Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
+                new StudentMealPlanAssignment[] { new(100, call.Arg<int>(), 270, "Selected plan", 315) });
+            return Task.CompletedTask;
+        });
         var lazy = Substitute.For<IAbpLazyServiceProvider>();
         var guids = Substitute.For<IGuidGenerator>(); guids.Create().Returns(_ => Guid.NewGuid());
         lazy.LazyGetRequiredService<IGuidGenerator>().Returns(guids);
         lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Substitute.For<ICurrentTenant>());
         _service = new(Substitute.For<IRepository<StudentProfile, Guid>>(), current, configurations,
             _selections, new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
-            _housing, terms, _clock, _completion);
+            _housing, terms, _clock, _completion, _assignments);
         _service.LazyServiceProvider = lazy;
     }
 
     private void Eligibility(string attendance, string? building) =>
         _housing.GetStudentEligibilityAsync(10, 270, Arg.Any<CancellationToken>())
             .Returns(new StudentHousingEligibility(attendance, "Main", building));
+
+    private void StoredPaidPlan(bool synced = true)
+    {
+        _stored = new(Guid.NewGuid(), null, Guid.NewGuid(), "10", "January 2027",
+            new(2027, 1, 1), new(2027, 5, 1), HousingChoice.Commuter, 3, "20 Meal Plan");
+        if (synced) _stored.MarkSynced();
+        else _stored.MarkPending("Assignment not confirmed");
+        Eligibility("Residential Undergraduate", "Commuter");
+    }
+
+    [Fact]
+    public async Task Previously_removed_paid_plan_is_not_shown_but_GET_retains_its_audit_record()
+    {
+        StoredPaidPlan();
+        var view = await _service.GetAsync("270");
+        Assert.Null(view.SelectedHousingChoice);
+        Assert.Null(view.SelectedMealPlanId);
+        await _selections.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!, default, default);
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task Removed_paid_choice_can_be_replaced_after_live_recheck()
+    {
+        StoredPaidPlan();
+        var original = _stored;
+        var result = await _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true });
+        Assert.Null(result.SelectedMealPlanId);
+        Assert.Equal("None", result.SelectedMealPlanName);
+        await _selections.Received(1).DeleteAsync(original!, true, Arg.Any<CancellationToken>());
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task An_existing_Elements_plan_blocks_reselection_even_without_a_local_choice()
+    {
+        Eligibility("Residential Undergraduate", "Commuter");
+        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
+            new StudentMealPlanAssignment[] { new(100, 3, 270, "20 Meal Plan", 315) });
+        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true }));
+        await _selections.DidNotReceiveWithAnyArgs().InsertAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task A_plan_in_another_term_does_not_make_the_removed_choice_current()
+    {
+        StoredPaidPlan();
+        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
+            new StudentMealPlanAssignment[] { new(100, 3, 269, "Other term", 315) });
+        Assert.Null((await _service.GetAsync("270")).SelectedHousingChoice);
+    }
+
+    [Fact]
+    public async Task Unconfirmed_assignment_is_never_automatically_discarded()
+    {
+        StoredPaidPlan(synced: false);
+        Assert.Equal(3, (await _service.GetAsync("270")).SelectedMealPlanId);
+        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true }));
+        await _selections.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!, default, default);
+    }
+
+    [Fact]
+    public async Task Unavailable_assignment_read_cannot_clear_a_choice_or_enable_reselection()
+    {
+        StoredPaidPlan();
+        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
+            Task.FromException<IReadOnlyList<StudentMealPlanAssignment>>(new InvalidOperationException("Unavailable")));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.GetAsync("270"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.SaveAsync(new()
+            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true }));
+        await _selections.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!, default, default);
+    }
 
     [Fact]
     public async Task No_choice_is_rejected_without_recording_None()
