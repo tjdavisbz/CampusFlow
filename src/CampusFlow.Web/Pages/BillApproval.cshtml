@@ -60,8 +60,11 @@
                 }
                 @if (!Model.RegistrationComplete || !Model.PdfAvailable && Model.LegacyApproval is null)
                 {
-                    <p>You can refresh this page to check your registration and agreement.</p>
-                    <a class="secondary" asp-page="/BillApproval" asp-route-term="@Model.TermCode">Refresh status</a>
+                    <p class="completion-status" role="status" aria-live="polite"
+                       data-completion-url="@Url.Page("/BillApproval", "CompletionStatus", new { term = Model.TermCode })"
+                       data-registration-complete="@(Model.RegistrationComplete ? "true" : "false")"
+                       data-pdf-available="@(Model.PdfAvailable ? "true" : "false")">This page will update automatically when your registration and agreement are ready.</p>
+                    <noscript><p>Check Bill Approval History later for your registration and agreement status.</p></noscript>
                 }
                 @if (Model.BookstoreUrl is not null)
                 {

@@ -52,7 +52,7 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
         if (!request.AllowCreate)
             throw new CampusFlow.BillApprovals.BillCompletionPreparationException("A document creation was already attempted. Retry can recover an existing record by approval reference; an administrator must confirm no record exists before allowing another creation.");
         var token = await GetAccessTokenAsync(cancellationToken);
-        // Elements requires the document type's configured description, including spacing.
+        // Resolve and validate the reporting document type before creating the per-term record.
         using var typesRequest = CreateRequest(HttpMethod.Get, "api/manager/lookup-table-options/doc-track-setup/documents", token);
         using var typesResponse = await _client.SendAsync(typesRequest, cancellationToken);
         typesResponse.EnsureSuccessStatusCode();
@@ -96,8 +96,8 @@ public sealed class ThesisElementsDocumentTrackingService : IStudentInformationS
                 ["docTrackId"] = 0,
                 ["studentUid"] = int.Parse(request.ExternalStudentId, CultureInfo.InvariantCulture),
                 ["docDate"] = acceptedAt,
-                // The documented custom-description mode does not rename the shared document type.
-                ["docNameId"] = 0,
+                // Keep the reporting type while giving this record its own term description.
+                ["docNameId"] = GetTrackingInt("DocumentNameId"),
                 ["docDescription"] = termDescription,
                 ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
                 ["comments"] = "CampusFlow approved bill - " + request.TermName,

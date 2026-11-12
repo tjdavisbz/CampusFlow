@@ -571,6 +571,27 @@ public class BillApprovalModel : CampusFlowPageModel
         return RedirectToPage(new { term });
     }
 
+    public sealed record CompletionStatus(bool RegistrationComplete, bool PdfAvailable, bool NeedsReview);
+
+    public async Task<IActionResult> OnGetCompletionStatusAsync([FromQuery] string? term)
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term) || term.Length > 32) return NotFound();
+        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
+        if (profile is null) return NotFound();
+        var approval = await _billApprovals.FindAsync(x =>
+            x.StudentProfileId == profile.Id && x.TermCode == term && x.AcceptedAt != null);
+        if (approval is null || !BillApprovalAcceptanceRules.IsApproved(approval.AcceptedAt, approval.Status)) return NotFound();
+        var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
+        var progress = BillApprovalCompletionProgress.Read(approval);
+        var needsReview = new[] { BillCompletionStep.Cleared, BillCompletionStep.Pdf }.Any(step =>
+            progress.Step(step).Status is BillCompletionStatus.Failed or BillCompletionStatus.Uncertain or BillCompletionStatus.Disabled);
+        return new JsonResult(new CompletionStatus(
+            BillApprovalStudentCompletion.RegistrationComplete(approval),
+            artifact?.PdfStatus == BillArtifactOperationStatus.Completed && !string.IsNullOrWhiteSpace(artifact.PdfBlobName),
+            needsReview || artifact?.PdfStatus == BillArtifactOperationStatus.Failed));
+    }
+
     public async Task<IActionResult> OnGetPdfAsync([FromQuery] string term)
     {
         if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term)) return NotFound();

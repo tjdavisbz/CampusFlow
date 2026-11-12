@@ -12,7 +12,7 @@ public class DocumentTermDescriptionTests
     [Theory]
     [InlineData("Spring 2027")]
     [InlineData("Fall 2027")]
-    public void Term_description_uses_documented_custom_mode_and_preserves_delivery_metadata(string term)
+    public void Term_description_preserves_the_reporting_document_type_and_delivery_metadata(string term)
     {
         var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -29,7 +29,7 @@ public class DocumentTermDescriptionTests
 
         var body = service.BuildDocumentBody(request, " Approved  Bill ");
 
-        Assert.Equal(0, body["docNameId"]!.GetValue<int>());
+        Assert.Equal(123, body["docNameId"]!.GetValue<int>());
         Assert.Equal("Approved Bill - " + term, body["docDescription"]!.GetValue<string>());
         Assert.Equal(approvalId.ToString("N"), body["reference"]!.GetValue<string>());
         Assert.Equal(10, body["studentUid"]!.GetValue<int>());
