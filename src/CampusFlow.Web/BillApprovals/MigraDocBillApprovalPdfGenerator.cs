@@ -35,6 +35,7 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         section.PageSetup.PageFormat = PageFormat.Letter;
         section.PageSetup.TopMargin = Unit.FromInch(.55);
         section.PageSetup.BottomMargin = Unit.FromInch(.55);
+        section.PageSetup.FooterDistance = Unit.FromInch(.25);
         section.PageSetup.LeftMargin = Unit.FromInch(.62);
         section.PageSetup.RightMargin = Unit.FromInch(.62);
 
@@ -77,6 +78,11 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         heading2.Font.Color = Color.FromRgb(80, 45, 127);
         heading2.ParagraphFormat.SpaceBefore = Unit.FromPoint(8);
         heading2.ParagraphFormat.SpaceAfter = Unit.FromPoint(4);
+        heading2.ParagraphFormat.KeepWithNext = true;
+        var agreementBody = document.Styles.AddStyle("AgreementBody", StyleNames.Normal);
+        agreementBody.Font.Size = 9.5;
+        agreementBody.ParagraphFormat.SpaceAfter = Unit.FromPoint(5);
+        agreementBody.ParagraphFormat.WidowControl = true;
     }
 
     private static void AddHeader(Section section, BillApproval approval, BillApprovalReviewSnapshot snapshot, string logoPath)
@@ -218,7 +224,22 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
         {
             if (block.Rows is not { Count: > 0 } rows)
             {
-                section.AddParagraph(block.Text, block.IsHeading ? StyleNames.Heading2 : StyleNames.Normal);
+                var paragraph = section.AddParagraph("", block.IsHeading ? StyleNames.Heading2 : "AgreementBody");
+                if (block.IsListItem)
+                {
+                    paragraph.Format.LeftIndent = Unit.FromPoint(12);
+                    paragraph.Format.FirstLineIndent = Unit.FromPoint(-8);
+                    paragraph.Format.SpaceAfter = Unit.FromPoint(2);
+                    paragraph.Format.KeepTogether = true;
+                }
+                if (block.Runs is null) paragraph.AddText(block.Text);
+                else foreach (var run in block.Runs)
+                {
+                    var text = paragraph.AddFormattedText(run.Text);
+                    if (run.Bold) text.Font.Bold = true;
+                    if (run.Italic) text.Font.Italic = true;
+                    if (run.Underline) text.Font.Underline = Underline.Single;
+                }
                 continue;
             }
             var columns = rows.Max(row => row.Count);
