@@ -24,8 +24,8 @@ public class ClearanceResetAppService(IRepository<ClearanceResetConfiguration,Gu
         var tenant=Tenant();var c=await configurations.FindAsync(x=>x.TenantId==tenant);var state=c?.Schedule()??new();
         bool ready;try{elements.EnsureRunEnabled();ready=true;}catch(InvalidOperationException){ready=false;}
         var query=await runs.GetQueryableAsync();var recent=await AsyncExecuter.ToListAsync(query.Where(x=>x.TenantId==tenant&&x.State!="Preview").OrderByDescending(x=>x.CreationTime).Take(10));
-        return new(){ManualExceptions=(c?.Exceptions()??[]).Select(x=>new ManualClearanceExceptionDto(x.StudentUid,x.TermId,x.Term,x.Reason,x.CreatedAtUtc)).ToList(),Enabled=state.Enabled&&state.PolicyVersion==2,CanEnable=ready,RunningRunId=c?.RunningRunId,NextRunAtUtc=state.NextRunAtUtc,LastStartedAtUtc=state.LastStartedAtUtc,
-            LastFinishedAtUtc=state.LastFinishedAtUtc,LastOutcome=state.Enabled&&state.PolicyVersion!=2?"The reset policy changed. Review a fresh preview, then explicitly enable the revised schedule.":state.LastOutcome,RecentRuns=recent.Select(Dto).ToList(),ReviewRuns=(await ClearanceResetRunner.Blockers(runs,tenant)).Select(Dto).ToList()};
+        return new(){ManualExceptions=(c?.Exceptions()??[]).Select(x=>new ManualClearanceExceptionDto(x.StudentUid,x.TermId,x.Term,x.Reason,x.CreatedAtUtc)).ToList(),Enabled=state.Enabled&&state.PolicyVersion==ClearanceResetSchedule.CurrentPolicyVersion,CanEnable=ready,RunningRunId=c?.RunningRunId,NextRunAtUtc=state.NextRunAtUtc,LastStartedAtUtc=state.LastStartedAtUtc,
+            LastFinishedAtUtc=state.LastFinishedAtUtc,LastOutcome=state.Enabled&&state.PolicyVersion!=ClearanceResetSchedule.CurrentPolicyVersion?"The reset policy changed. Review a fresh preview, then explicitly enable the revised schedule.":state.LastOutcome,RecentRuns=recent.Select(Dto).ToList(),ReviewRuns=(await ClearanceResetRunner.Blockers(runs,tenant)).Select(Dto).ToList()};
     }
     [DisableAuditing]
     public async Task<List<ManualClearanceTermDto>> GetExceptionTermsAsync()
@@ -106,7 +106,7 @@ public class ClearanceResetAppService(IRepository<ClearanceResetConfiguration,Gu
         else if(candidates.Count>0&&!ready)message="Preview only: clearance execution is disabled for this environment.";
         else if(candidates.Count>0)
         {var preview=new ClearanceResetRun(GuidGenerator.Create(),tenant);preview.MakePreview(candidates,actor,Clock.Now.ToUniversalTime());await runs.InsertAsync(preview,true);id=preview.Id;message=$"{candidates.Count} resets ready. Review before Run now. This preview expires in 15 minutes.";}
-        return new(id,candidates.Select(x=>new ClearanceResetPreviewRowDto(x.StudentUid,x.StudentId,x.Name,x.TermId,x.Term,"Cleared → blank")).ToList(),message);
+        return new(id,candidates.Select(x=>new ClearanceResetPreviewRowDto(x.StudentUid,x.StudentId,x.Name,x.TermId,x.Term,"Clear Cleared Status, Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason")).ToList(),message);
     }
     [DisableAuditing]
     [UnitOfWork(IsDisabled=true)]
@@ -117,7 +117,7 @@ public class ClearanceResetAppService(IRepository<ClearanceResetConfiguration,Gu
         using(var claim=units.Begin(requiresNew:true,isTransactional:true))
         {
             var preview=await runs.GetAsync(input.RunId);var c=await configurations.FindAsync(x=>x.TenantId==tenant);
-            if(preview.PolicyVersion!=2||preview.TenantId!=tenant||preview.PreviewOwner!=actor||preview.State!="Preview"||preview.PreviewExpiresAtUtc is null||Clock.Now.ToUniversalTime()>=preview.PreviewExpiresAtUtc||c?.RunningRunId is not null)
+            if(preview.PolicyVersion!=ClearanceResetSchedule.CurrentPolicyVersion||preview.TenantId!=tenant||preview.PreviewOwner!=actor||preview.State!="Preview"||preview.PreviewExpiresAtUtc is null||Clock.Now.ToUniversalTime()>=preview.PreviewExpiresAtUtc||c?.RunningRunId is not null)
                 throw new UserFriendlyException("This preview expired, was already used, belongs to another staff member, or a run is in progress. Create a fresh preview.");
             candidates=preview.PreviewCandidates();if(candidates.Count is <1 or >100)throw new UserFriendlyException("Create a new preview with 1–100 candidates.");
             await ReviewBlockers(input.ReviewedRunIds,tenant,actor);

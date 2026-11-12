@@ -49,7 +49,7 @@
     el('reviewed').onchange=controls;el('refresh').onclick=()=>work(refresh);
     el('toggle').onclick=()=>{
         if(!state)return;const enabled=!state.enabled;
-        if(enabled&&!confirm('Enable 15-minute clearance resets for Spring 2027 and later? Eligible Cleared student-term records with no Nelson courses will become Not Cleared. Transfer courses are excluded.'))return;
+        if(enabled&&!confirm('Enable 15-minute resets? For eligible Cleared records without an approved bill or manual exception, clear Cleared Status, Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason. Checkboxes will become unchecked.'))return;
         work(async()=>{state=await request('Schedule',{enabled,reviewedRunIds:el('reviewed').checked?(state.reviewRuns??[]).map(x=>x.id):[]});render();el('message').textContent=enabled?'Automatic resets enabled. The first check is scheduled in about 15 minutes.':'Automatic resets turned off. Any update already in progress will finish verification.';});
     };
     function resetPreview(){preview=null;el('preview-rows').replaceChildren();el('preview-message').textContent='Preview the affected records before running.';controls();}
@@ -62,7 +62,7 @@
     });
     el('run').onclick=()=>{
         if(!preview?.runId)return;const id=preview.runId;
-        if(!confirm(`Change ${preview.rows.length} reviewed student-term records from Cleared to blank now? Live approval and term checks run again before each update.`))return;
+        if(!confirm(`Reset the five listed fields for ${preview.rows.length} reviewed student-term records now? Cleared Status, Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason will be cleared; checkboxes will become unchecked. Live approval and term checks run again before each update.`))return;
         work(async()=>{
             preview.runId=null;el('preview-message').textContent='This preview has been used. Create a fresh preview before another run.';
             const results=await request('Run',{runId:id,reviewedRunIds:el('reviewed').checked?(state.reviewRuns??[]).map(x=>x.id):[]});

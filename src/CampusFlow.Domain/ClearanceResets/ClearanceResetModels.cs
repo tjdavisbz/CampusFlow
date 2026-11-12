@@ -37,6 +37,7 @@ public sealed class ClearanceResetConfiguration : FullAuditedAggregateRoot<Guid>
 }
 public sealed class ClearanceResetSchedule
 {
+    public const int CurrentPolicyVersion=3;
     public const int IntervalMinutes=15;
     public const int BatchLimit=100;
     public int PolicyVersion {get;set;}
@@ -47,12 +48,12 @@ public sealed class ClearanceResetSchedule
     public string LastOutcome {get;set;}="Automatic clearance resets have not run.";
     public Guid? ChangedBy {get;set;}
     public DateTime? ChangedAtUtc {get;set;}
-    public bool IsDue(DateTime now)=>PolicyVersion==2&&Enabled&&NextRunAtUtc.HasValue&&NextRunAtUtc<=now;
+    public bool IsDue(DateTime now)=>PolicyVersion==CurrentPolicyVersion&&Enabled&&NextRunAtUtc.HasValue&&NextRunAtUtc<=now;
     public void Configure(bool enabled,Guid actor,DateTime now)
     {
         if(actor==Guid.Empty)throw new InvalidOperationException("A signed-in staff member is required.");
-        if(enabled&&(!Enabled||PolicyVersion!=2))NextRunAtUtc=now.AddMinutes(IntervalMinutes);
-        if(enabled)PolicyVersion=2;
+        if(enabled&&(!Enabled||PolicyVersion!=CurrentPolicyVersion))NextRunAtUtc=now.AddMinutes(IntervalMinutes);
+        if(enabled)PolicyVersion=CurrentPolicyVersion;
         if(!enabled)NextRunAtUtc=null;
         Enabled=enabled;ChangedBy=actor;ChangedAtUtc=now;
     }
@@ -73,7 +74,7 @@ public sealed class ClearanceResetRun : FullAuditedAggregateRoot<Guid>,IMultiTen
     [NotMapped] public DateTime? PreviewExpiresAtUtc=>this.GetProperty<DateTime?>("PreviewExpiresAtUtc");
     public void MarkAutomatic()=>this.SetProperty("Automatic",true);
     public void MakePreview(List<ClearanceResetCandidate> candidates,Guid actor,DateTime now)
-    {if(actor==Guid.Empty)throw new InvalidOperationException("A signed-in staff member is required.");State="Preview";Summary="Preview only";this.SetProperty("PreviewOwner",actor);this.SetProperty("PreviewExpiresAtUtc",now.AddMinutes(15));this.SetProperty("PreviewCandidates",JsonSerializer.Serialize(candidates));this.SetProperty("ClearancePolicyVersion",2);}
+    {if(actor==Guid.Empty)throw new InvalidOperationException("A signed-in staff member is required.");State="Preview";Summary="Preview only";this.SetProperty("PreviewOwner",actor);this.SetProperty("PreviewExpiresAtUtc",now.AddMinutes(15));this.SetProperty("PreviewCandidates",JsonSerializer.Serialize(candidates));this.SetProperty("ClearancePolicyVersion",ClearanceResetSchedule.CurrentPolicyVersion);}
     public List<ClearanceResetCandidate> PreviewCandidates()=>JsonSerializer.Deserialize<List<ClearanceResetCandidate>>(this.GetProperty<string>("PreviewCandidates")??"[]")!;
     [NotMapped] public int PolicyVersion=>this.GetProperty<int>("ClearancePolicyVersion");
     public void StartPreview(){if(State!="Preview")throw new InvalidOperationException("Preview already used.");State="Running";Summary="Manual run in progress";}

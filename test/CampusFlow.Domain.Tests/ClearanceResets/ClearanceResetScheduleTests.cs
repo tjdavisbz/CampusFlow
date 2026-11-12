@@ -5,6 +5,13 @@ namespace CampusFlow.ClearanceResets.Tests;
 public class ClearanceResetScheduleTests
 {
     private static readonly DateTime Now=new(2026,11,7,20,0,0,DateTimeKind.Utc);
+    [Fact]public void Previously_enabled_policy_requires_explicit_reenable_for_the_expanded_fields()
+    {
+        var old=new ClearanceResetSchedule{Enabled=true,PolicyVersion=2,NextRunAtUtc=Now};
+        Assert.False(old.IsDue(Now));old.Configure(true,Guid.NewGuid(),Now);
+        Assert.Equal(ClearanceResetSchedule.CurrentPolicyVersion,old.PolicyVersion);
+        Assert.Equal(Now.AddMinutes(15),old.NextRunAtUtc);
+    }
     [Fact]public void Existing_and_new_configuration_defaults_off()
     {var c=new ClearanceResetConfiguration(Guid.NewGuid(),Guid.NewGuid());Assert.False(c.Schedule().Enabled);Assert.False(c.Schedule().IsDue(Now));}
     [Fact]public void Enabling_waits_fifteen_minutes_and_persists_audit_actor()

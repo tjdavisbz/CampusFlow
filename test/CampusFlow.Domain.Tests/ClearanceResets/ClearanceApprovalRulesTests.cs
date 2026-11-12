@@ -11,6 +11,6 @@ public class ClearanceApprovalRulesTests
     [Fact]public void Old_enabled_schedules_cannot_silently_adopt_the_broader_rule()
     {
         var now=DateTime.UtcNow;var old=new ClearanceResetSchedule{Enabled=true,NextRunAtUtc=now.AddHours(-1)};
-        Assert.False(old.IsDue(now));old.Configure(true,Guid.NewGuid(),now);Assert.False(old.IsDue(now.AddMinutes(14)));Assert.True(old.IsDue(now.AddMinutes(15)));Assert.Equal(2,old.PolicyVersion);
+        Assert.False(old.IsDue(now));old.Configure(true,Guid.NewGuid(),now);Assert.False(old.IsDue(now.AddMinutes(14)));Assert.True(old.IsDue(now.AddMinutes(15)));Assert.Equal(ClearanceResetSchedule.CurrentPolicyVersion,old.PolicyVersion);
     }
 }
