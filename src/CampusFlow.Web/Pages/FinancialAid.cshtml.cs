@@ -59,8 +59,8 @@ public class FinancialAidModel : CampusFlowPageModel
         x.Type == CampusFlow.Students.StudentViewClaimTypes.ExternalStudentId ||
         x.Type == CampusFlow.Web.Portals.FacultyViewClaimTypes.FacultyId ||
         x.Type == CampusFlow.AdvisorPortal.SchedulerViewClaimTypes.Email);
-    public decimal CurrentTermAwards =>
-        Terms.SingleOrDefault(x => x.TermCode == CurrentTermCode)?.TotalAmount ?? 0m;
+    public decimal? CurrentTermAwards =>
+        Terms.SingleOrDefault(x => x.TermCode == CurrentTermCode) is { } group ? group.TotalAmount : 0m;
     [Microsoft.AspNetCore.Mvc.TempData]
     public string? StatusMessage { get; set; }
     [Microsoft.AspNetCore.Mvc.TempData]
@@ -124,7 +124,7 @@ public class FinancialAidModel : CampusFlowPageModel
                 .Select(group => new AwardTermGroup(
                     group.Key.TermCode,
                     group.Key.TermName,
-                    group.Sum(x => x.Amount),
+                    FinancialAidDisplay.Total(group),
                     group.OrderByDescending(x => x.AwardDate).ThenBy(x => x.Description).ToArray()))
                 .ToArray();
             OpenTermCode = Terms.Any(x => x.TermCode == openTerm) ? openTerm : CurrentTermCode;
@@ -142,8 +142,7 @@ public class FinancialAidModel : CampusFlowPageModel
         }
     }
 
-    public static string FormatCurrency(decimal amount) =>
-        CampusFlow.Web.Formatting.UsdCurrency.Format(amount);
+    public static string FormatCurrency(decimal? amount) => FinancialAidDisplay.Currency(amount);
 
     internal static IReadOnlyList<StudentFinancialAidAward> StudentVisibleAwards(
         IEnumerable<StudentFinancialAidAward> awards) =>
@@ -229,6 +228,6 @@ public class FinancialAidModel : CampusFlowPageModel
     public sealed record AwardTermGroup(
         string TermCode,
         string TermName,
-        decimal TotalAmount,
+        decimal? TotalAmount,
         IReadOnlyList<StudentFinancialAidAward> Awards);
 }

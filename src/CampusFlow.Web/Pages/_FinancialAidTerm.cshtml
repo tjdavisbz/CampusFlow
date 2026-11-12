@@ -18,14 +18,14 @@
             <span>@available.Length available award@(available.Length == 1 ? "" : "s") in this semester</span>
             <button type="button" data-aid-accept-all data-external-term-id="@termIds[0]" data-term-code="@Model.TermCode"
                 data-term-name="@Model.TermName" data-award-ids="@string.Join(",", available.Select(x => x.ExternalAwardId))"
-                data-award-count="@available.Length" data-award-amount="@FinancialAidModel.FormatCurrency(available.Sum(x => x.Amount))">Accept all available awards</button>
+                data-award-count="@available.Length" data-award-amount="@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Total(available))">Accept all available awards</button>
         </div>
     }
     <div class="award-grid">
         @foreach (var award in Model.Awards)
         {
             <article class="award-card">
-                <div class="award-topline"><span>@award.AwardType</span><strong>@FinancialAidModel.FormatCurrency(award.Amount)</strong></div>
+                <div class="award-topline"><span>@award.AwardType</span><strong>@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Amount(award))</strong></div>
                 <h3>@award.Description</h3>
                 <div class="award-meta">
                     <span><i class="fa-regular fa-calendar"></i>@(award.AwardDate?.ToString("MMM d, yyyy") ?? "Date unavailable")</span>
@@ -51,8 +51,8 @@
                         }
                         else
                         {
-                            <button type="button" data-term-code="@Model.TermCode" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Accept</button>
-                            <button type="button" class="decline" data-term-code="@Model.TermCode" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Decline</button>
+                            <button type="button" data-term-code="@Model.TermCode" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Amount(award))">Accept</button>
+                            <button type="button" class="decline" data-term-code="@Model.TermCode" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Amount(award))">Decline</button>
                         }
                     </div>
                 </div>

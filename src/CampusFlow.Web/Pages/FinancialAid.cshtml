@@ -63,6 +63,7 @@
             <div><span>Selected term awards</span><strong>@FinancialAidModel.FormatCurrency(Model.CurrentTermAwards)</strong></div>
             <p>@(Model.CurrentTermName ?? "Selected academic term")</p>
         </section>
+        <p class="aid-note">Amounts shown are distribution amounts, after any applicable loan fees. An unavailable amount needs review by Financial Aid.</p>
 
         @if (Model.CurrentAndUpcomingTerms.Count > 0)
         {
