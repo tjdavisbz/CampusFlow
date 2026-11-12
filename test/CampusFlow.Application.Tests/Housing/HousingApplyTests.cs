@@ -153,6 +153,32 @@ public class HousingApplyTests
     }
     private static RecoverHousingDraftInput Recover(HousingRecoveryPreview preview)=>new()
     {PeriodId=preview.PeriodId,RunId=preview.RunId,Revision=preview.Revision,RecoveryRevision=preview.RecoveryRevision,Confirmed=true,Reason="Reviewed the live rooms and housing batch"};
+    [Fact] public async Task Reviewed_deleted_history_is_acknowledged_before_assignment_with_all_113_preserved()
+    {
+        await FailedCommuterRun();
+        _writer.Historical.Add(new(900,2,1,90,80,70,"Commuter","Old",true,true,true,null,null));
+        var preview=await _service.PreviewRecoveryAsync(1);Assert.Equal(1,preview.HistoricalAssignmentsToClear);
+        _writer.Calls.Clear();var desired=_draft.RoomsJson;
+        await _service.ResumeCommuterAssignmentsAsync(Recover(preview));
+        Assert.Equal("historical",_writer.Calls[0]);Assert.Equal("assign",_writer.Calls[1]);
+        Assert.Equal(112,_writer.Calls.Count(x=>x=="assign"));Assert.Equal(desired,_draft.RoomsJson);
+        Assert.Equal(113,JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!.Sum(x=>x.Occupants.Count));
+        Assert.Contains(HousingApplyProgress.Read(_draft)!.Operations,x=>x.StartsWith("Starting historical room deallocation"));
+    }
+    [Fact] public async Task Changed_historical_metadata_invalidates_the_reviewed_recovery_token()
+    {
+        var preview=await FailedCommuterRun();
+        _writer.Historical.Add(new(900,2,1,90,80,70,"Commuter","Old",true,true,true,null,null));_writer.Calls.Clear();
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
+        Assert.Empty(_writer.Calls);
+    }
+    [Fact] public async Task Unconfirmed_historical_deallocation_stops_before_the_next_assignment_and_preserves_plan()
+    {
+        await FailedCommuterRun();_writer.Historical.Add(new(900,2,1,90,80,70,"Commuter","Old",true,true,true,null,null));
+        var preview=await _service.PreviewRecoveryAsync(1);var desired=_draft.RoomsJson;_writer.Calls.Clear();_writer.FailHistorical=true;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
+        Assert.Empty(_writer.Calls);Assert.Equal(desired,_draft.RoomsJson);Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
+    }
     [Fact] public async Task Reviewed_recovery_skips_completed_rooms_retains_all_113_and_reconciles_every_affected_student()
     {
         var preview=await FailedCommuterRun();var desired=_draft.RoomsJson;var original=HousingApplyProgress.Read(_draft)!;
@@ -224,6 +250,11 @@ public class HousingApplyTests
     {
         public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
         public void EnsureWriteEnabled(){}
+        public List<HousingHistoricalAssignment> Historical=[];
+        public bool FailHistorical;
+        public Task<List<HousingHistoricalAssignment>> GetHistoricalAssignmentsAsync(int period,IReadOnlyCollection<int> ids,CancellationToken ct=default)=>Task.FromResult(Historical.Where(x=>x.PeriodId==period&&ids.Contains(x.StudentUid)).ToList());
+        public Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment row,CancellationToken ct=default)
+        {Claimed();if(FailHistorical)throw new InvalidOperationException("Historical deallocation unconfirmed");Calls.Add("historical");return Task.CompletedTask;}
         public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default)=>Task.FromResult(Assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);
         public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>Task.CompletedTask;
         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}

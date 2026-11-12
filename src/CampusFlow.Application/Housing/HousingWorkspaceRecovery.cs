@@ -43,7 +43,7 @@ public partial class HousingWorkspaceAppService
         }, input);
     }
 
-    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining)>
+    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining, List<HousingHistoricalAssignment> Historical)>
         PrepareRecoveryAsync(HousingAssignmentDraft draft)
     {
         _writer.EnsureWriteEnabled();
@@ -57,10 +57,14 @@ public partial class HousingWorkspaceAppService
         (List<int> Added, List<int> Remaining) plan;
         try { plan = HousingCommuterRecovery.Review(before, desired, current); }
         catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
+        List<HousingHistoricalAssignment> historical;
+        try { historical = await _writer.GetHistoricalAssignmentsAsync(draft.PeriodId, plan.Remaining); }
+        catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
         var identity = new
         {
             Tenant = Tenant(), User = CurrentUser.Id, draft.Id, draft.PeriodId, draft.ConcurrencyStamp,
             progress.RunId, draft.BaselineJson, draft.RoomsJson,
+            Historical = historical.OrderBy(x => x.StudentUid).ThenBy(x => x.AssignmentId).ToArray(),
             Rooms = current.OrderBy(x => x.Id).Select(room => new
             {
                 room.Id, room.Building, room.Name, room.Capacity,
@@ -72,7 +76,8 @@ public partial class HousingWorkspaceAppService
             PeriodId = draft.PeriodId, RunId = progress.RunId, Revision = draft.ConcurrencyStamp,
             RecoveryRevision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)))),
             SavedAssignments = desired.Sum(x => x.Occupants.Count), AlreadyAssigned = plan.Added.Count - plan.Remaining.Count,
-            RemainingAssignments = plan.Remaining.Count, Failure = HousingApplyFailure.Description(progress.FailureCode)
-        }, current, plan.Remaining);
+            RemainingAssignments = plan.Remaining.Count, HistoricalAssignmentsToClear = historical.Count,
+            Failure = HousingApplyFailure.Description(progress.FailureCode)
+        }, current, plan.Remaining, historical);
     }
 }

@@ -16,6 +16,10 @@ public interface IElementsHousingAssignmentWriter
         CancellationToken cancellationToken = default);
     Task DeallocateAsync(int studentUid, int periodId, int periodRoomId,
         CancellationToken cancellationToken = default);
+    Task<List<HousingHistoricalAssignment>> GetHistoricalAssignmentsAsync(int periodId, IReadOnlyCollection<int> studentUids,
+        CancellationToken cancellationToken = default);
+    Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment reviewed,
+        CancellationToken cancellationToken = default);
     Task AssignAsync(int studentUid, int periodId, int periodRoomId,
         CancellationToken cancellationToken = default);
 }
