@@ -205,13 +205,13 @@
             const preview = await request('Recovery', undefined, {periodId:state.periodId});
             if (preview.revision !== state.revision) { await reloadAfterFailure(); throw new Error('The saved run changed. Review recovery again.'); }
             recovery = preview;
-            el('recovery-counts').textContent = `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining · ${preview.historicalAssignmentsToClear || 0} deleted historical room records to deallocate first.`;
+            el('recovery-counts').textContent = `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining · ${preview.historicalAssignmentsToClear || 0} deleted historical room records to deallocate first. This recovery changes room assignments only; all existing billing charges are preserved.`;
             el('recovery-preview').hidden = false;
             message('Recovery reviewed. No Elements data was changed.');
         });
         el('resume').onclick = () => run(async () => {
             if (!recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim()) return;
-            if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. The saved plan and prior run history will be retained.`)) return;
+            if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. No billing charges will be added, replaced or deleted. The saved plan and prior run history will be retained.`)) return;
             try { state = await request('Resume', {...recovery, reason:el('recovery-reason').value.trim(), confirmed:true}); }
             catch (error) { await reloadAfterFailure(); throw error; }
             resetRecovery(); dirty = false; selected.clear(); render();
