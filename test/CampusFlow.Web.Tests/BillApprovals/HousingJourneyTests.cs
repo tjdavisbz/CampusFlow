@@ -20,7 +20,7 @@ public class HousingJourneyTests
         {
             Term = new(StudentInformationSystemProvider.ThesisElements, "270", "B27S", "Spring 2027", new(2027, 1, 1), new(2027, 5, 1)),
             HousingRequired = housingRequired, HasHousingAssignment = assigned, MealPlanEligible = mealEligible,
-            BillApprovalEnabled = true, MealPlanEnabled = true, MealPlanRequired = mealEligible
+            BillApprovalEnabled = true, MealPlanEnabled = true, MealPlanRequired = mealEligible, MealPlanSelected = true
         };
         journey.BuildSteps();
         Assert.Equal(housingRequired, journey.Steps.Any(x => x.Title == "Housing"));
@@ -28,6 +28,19 @@ public class HousingJourneyTests
         var bill = journey.Steps.Single(x => x.Title == "Bill approval");
         Assert.Equal(billBlocked, bill.Url is null);
         if (housingRequired) Assert.Contains("term=270", journey.Steps.Single(x => x.Title == "Housing").Url);
+    }
+    [Theory]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    [InlineData(false, false, false)]
+    public void Bill_step_requires_a_choice_only_for_meal_eligible_unapproved_students(bool approved,bool eligible,bool selected)
+    {
+        var journey=new IndexModel.RegistrationJourneyViewModel {
+            Term=new(StudentInformationSystemProvider.ThesisElements,"269","B27C","Spring 2027",new(2027,1,11),new(2027,4,30)),
+            BillApproved=approved,BillApprovalEnabled=true,HasHousingAssignment=true,MealPlanEligible=eligible,MealPlanSelected=selected};
+        journey.BuildSteps();var bill=journey.Steps.Single(x=>x.Title=="Bill approval");
+        Assert.Equal(!approved&&eligible&&!selected,bill.Url is null);
     }
     [Theory]
     [InlineData("Meal plans are not yet available for your assigned housing in this term.")]

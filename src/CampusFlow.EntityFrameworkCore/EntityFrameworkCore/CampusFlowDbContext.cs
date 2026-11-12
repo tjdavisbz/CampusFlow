@@ -57,6 +57,7 @@ public class CampusFlowDbContext :
     public DbSet<MealPlanConfiguration> MealPlanConfigurations { get; set; }
     public DbSet<StudentHousingSelection> StudentHousingSelections { get; set; }
     public DbSet<CampusFlow.MealPlanTaxes.MealPlanTaxCharge> MealPlanTaxCharges { get; set; }
+    public DbSet<MealPlanRemovalOperation> MealPlanRemovalOperations { get; set; }
     public DbSet<HousingAssignmentDraft> HousingAssignmentDrafts { get; set; }
     public DbSet<CostTypeConfiguration> CostTypeConfigurations { get; set; }
     public DbSet<CostTypeRun> CostTypeRuns { get; set; }
@@ -444,6 +445,17 @@ public class CampusFlowDbContext :
             b.Property(x=>x.BaseAmount).HasPrecision(18,2);
             b.Property(x=>x.TaxAmount).HasPrecision(18,2);
             b.HasIndex(x=>new{x.TenantId,x.AssignmentId}).IsUnique();
+        });
+        builder.Entity<MealPlanRemovalOperation>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "MealPlanRemovalOperations", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x=>x.TargetJson).IsRequired(); b.Property(x=>x.EntriesJson).IsRequired();
+            b.Property(x=>x.Reason).IsRequired().HasMaxLength(500);
+            b.Property(x=>x.State).IsRequired().HasMaxLength(40);
+            b.Property(x=>x.Stage).IsRequired().HasMaxLength(250);
+            b.HasIndex(x=>new{x.TenantId,x.AssignmentId}).IsUnique();
+            b.HasIndex(x=>new{x.TenantId,x.StudentUid,x.TermId,x.State});
         });
         builder.Entity<HousingAssignmentDraft>(b =>
         {

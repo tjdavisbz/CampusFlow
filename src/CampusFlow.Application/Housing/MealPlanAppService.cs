@@ -28,6 +28,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
     private readonly IClock _clock;
     private readonly IBillApprovalCompletionLookup _completion;
     private readonly IStudentInformationSystemMealPlanRemovalService _assignments;
+    private readonly IMealPlanRemovalCoordinator _removals;
 
     public MealPlanAppService(IRepository<StudentProfile, Guid> profiles,
         ICurrentStudentView currentStudentView,
@@ -36,7 +37,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         IEnumerable<IStudentInformationSystemMealPlanService> services,
         ILogger<MealPlanAppService> logger, IElementsHousingReader housing,
         IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion,
-        IStudentInformationSystemMealPlanRemovalService assignments)
+        IStudentInformationSystemMealPlanRemovalService assignments, IMealPlanRemovalCoordinator removals)
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
@@ -49,6 +50,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         _clock = clock;
         _completion = completion;
         _assignments = assignments;
+        _removals = removals;
     }
 
     public async Task<MealPlanSelectionDto> GetAsync(string? externalTermId = null)
@@ -127,6 +129,12 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
                 .Cast<MealPlanOptionDto>()
                 .ToList();
         }
+        if ((await _removals.PendingAsync(studentUid,termId)).Count > 0)
+        {
+            result.HasPendingRemoval = true; result.IsSelectionOpen = false; result.SelectedHousingChoice = null;
+            result.UnavailableReason = "A meal-plan removal needs Business Services review before you can select another plan or approve your bill.";
+            return result;
+        }
         result.UnavailableReason = result.IsLockedByBillApproval
             ? "Your bill is approved for this term. Contact Student Billing to request changes."
             : !result.MealPlanEligible
@@ -154,6 +162,9 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         if (!Enum.IsDefined(input.HousingChoice)) throw new UserFriendlyException("Choose a housing option.");
         var profile = await GetProfileAsync();
         var view = await GetAsync(input.ExternalTermId);
+        if (!int.TryParse(profile.ExternalStudentId,out var student) || !int.TryParse(view.ExternalTermId,out var termId)) throw new UserFriendlyException("Review the selected student and term.");
+        await using var lease=await _removals.LockAsync(student,termId);
+        view = await GetAsync(view.ExternalTermId);
         if (view.IsLockedByBillApproval)
             throw new UserFriendlyException("Your bill is approved for this term. Contact Student Billing to request changes.");
         if (!view.IsSelectionOpen || !view.MealPlanEligible || !view.HasHousingAssignment)

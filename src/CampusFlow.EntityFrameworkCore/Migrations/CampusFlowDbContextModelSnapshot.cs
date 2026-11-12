@@ -1775,11 +1775,11 @@ namespace CampusFlow.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
-                    b.Property<Guid>("StudentProfileId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("StudentNoteWrittenAt")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("StudentProfileId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("timestamp without time zone");
@@ -2090,6 +2090,9 @@ namespace CampusFlow.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AllowAllStudentsDuringWindow")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("AttendanceTypeMappingsJson")
                         .IsRequired()
                         .HasColumnType("text");
@@ -2130,15 +2133,12 @@ namespace CampusFlow.Migrations
                         .HasColumnType("text")
                         .HasColumnName("ExtraProperties");
 
-                    b.Property<bool>("IsDashboardDefault")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("AllowAllStudentsDuringWindow")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("GroupWindowsJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsDashboardDefault")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -2511,6 +2511,85 @@ namespace CampusFlow.Migrations
                     b.HasIndex("TenantId", "IsActive", "SortOrder");
 
                     b.ToTable("AppMealPlanConfigurations", (string)null);
+                });
+
+            modelBuilder.Entity("CampusFlow.Housing.MealPlanRemovalOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AssignmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("EntriesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("StudentUid")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("TenantId");
+
+                    b.Property<int>("TermId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "AssignmentId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "StudentUid", "TermId", "State");
+
+                    b.ToTable("AppMealPlanRemovalOperations", (string)null);
                 });
 
             modelBuilder.Entity("CampusFlow.Housing.StudentHousingSelection", b =>

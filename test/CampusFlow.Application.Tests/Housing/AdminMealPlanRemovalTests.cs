@@ -21,6 +21,7 @@ public class AdminMealPlanRemovalTests
     private readonly IStudentInformationSystemMealPlanRemovalService _removal=Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
     private readonly IStudentInformationSystemMealPlanService _plans=Substitute.For<IStudentInformationSystemMealPlanService>();
     private readonly AdminMealPlanAppService _service;
+    private readonly IMealPlanRemovalCoordinator _coordinator=MealPlanRemovalTestDouble.Create();
     private readonly Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid> _locals=Substitute.For<Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid>>();
     private readonly List<StudentHousingSelection> _choices=[];
     public AdminMealPlanRemovalTests()
@@ -34,9 +35,9 @@ public class AdminMealPlanRemovalTests
         var user=Substitute.For<ICurrentUser>();user.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
         _locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>())
             .Returns(call => _choices.Where(call.Arg<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>().Compile()).ToList());
-        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,_locals){LazyServiceProvider=lazy};
+        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,_locals,_coordinator){LazyServiceProvider=lazy};
     }
-    private static RemoveStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,AssignmentId=10,MealPlanId=20,Confirmed=true};
+    private static RemoveStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,AssignmentId=10,MealPlanId=20,Confirmed=true,ReviewRevision="review",Reason="Reviewed assignment and charges"};
     private StudentHousingSelection Choice(string student="123",int? plan=20,int year=2027)
     {
         var choice=new StudentHousingSelection(Guid.NewGuid(),null,Guid.NewGuid(),student,$"January {year}",
@@ -52,8 +53,8 @@ public class AdminMealPlanRemovalTests
     }
     [Fact]public async Task Failed_or_unconfirmed_external_removal_keeps_the_local_choice()
     {
-        Choice();_removal.RemoveAsync("123",269,10,20,Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Not confirmed")));
-        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.RemoveAsync(Input()));
+        Choice();_coordinator.RemoveAsync(Arg.Any<MealPlanRemovalTarget>(),"review",Arg.Any<string>()).Returns(Task.FromException(new InvalidOperationException("Not confirmed")));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>_service.RemoveAsync(Input()));
         await _locals.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!,default,default);
     }
     [Fact]public async Task Explicit_term_overrides_the_administrative_default()
@@ -74,7 +75,7 @@ public class AdminMealPlanRemovalTests
         await _plans.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
     }
     [Fact]public async Task Removal_never_changes_housing_status_or_assigns_a_new_plan()
-    {await _service.RemoveAsync(Input());await _removal.Received(1).RemoveAsync("123",269,10,20,Arg.Any<CancellationToken>());await _plans.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default);await _plans.DidNotReceiveWithAnyArgs().AssignAsync(default!,default);}
+    {await _service.RemoveAsync(Input());await _coordinator.Received(1).RemoveAsync(Arg.Is<MealPlanRemovalTarget>(x=>x.StudentUid==123&&x.TermId==269&&x.AssignmentId==10&&x.MealPlanId==20),"review","Reviewed assignment and charges");await _plans.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default);await _plans.DidNotReceiveWithAnyArgs().AssignAsync(default!,default);}
     [Fact]public async Task Missing_confirmation_is_rejected_before_removal()
     {var input=Input();input.Confirmed=false;await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.RemoveAsync(input));await _removal.DidNotReceiveWithAnyArgs().RemoveAsync(default!,default,default,default);}
     [Fact]public async Task Another_terms_assignment_cannot_be_removed()

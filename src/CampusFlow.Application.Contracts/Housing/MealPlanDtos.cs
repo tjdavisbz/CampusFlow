@@ -22,6 +22,7 @@ public sealed class MealPlanSelectionDto
     public bool IsSelectionOpen { get; set; }
     public string? UnavailableReason { get; set; }
     public bool IsLockedByBillApproval { get; set; }
+    public bool HasPendingRemoval { get; set; }
     public string StudentName { get; set; } = null!;
     public string StudentId { get; set; } = null!;
     public string AttendanceType { get; set; } = null!;

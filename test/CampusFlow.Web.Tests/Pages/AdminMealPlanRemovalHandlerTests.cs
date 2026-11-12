@@ -37,4 +37,28 @@ public class AdminMealPlanRemovalHandlerTests
         var result=await page.OnPostRemoveAsync();if(granted)Assert.IsType<BadRequestResult>(result);else Assert.IsType<ForbidResult>(result);
         await service.DidNotReceiveWithAnyArgs().RemoveAsync(default!);
     }
+    [Fact]
+    public async Task Removal_preview_requires_removal_permission_before_reading_financial_entries()
+    {
+        var service=Substitute.For<IAdminMealPlanAppService>();var auth=Substitute.For<IAuthorizationService>();
+        auth.AuthorizeAsync(Arg.Any<ClaimsPrincipal>(),Arg.Any<object?>(),CampusFlowPermissions.Admin.RemoveStudentMealPlan).Returns(AuthorizationResult.Failed());
+        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<IAuthorizationService>().Returns(auth);
+        var page=new AddStudentMealPlanModel(service,Substitute.For<ITenantThemeProvider>(),NullLogger<AddStudentMealPlanModel>.Instance)
+        {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
+        Assert.IsType<ForbidResult>(await page.OnPostPreviewRemovalAsync());
+        await service.DidNotReceiveWithAnyArgs().PreviewRemovalAsync(default!);
+    }
+    [Theory][InlineData("missing-preview")][InlineData("short-reason")][InlineData("unchecked")]
+    public async Task A_direct_old_or_unreviewed_removal_form_cannot_start_billing_cleanup(string invalid)
+    {
+        var service=Substitute.For<IAdminMealPlanAppService>();var auth=Substitute.For<IAuthorizationService>();
+        auth.AuthorizeAsync(Arg.Any<ClaimsPrincipal>(),Arg.Any<object?>(),CampusFlowPermissions.Admin.RemoveStudentMealPlan).Returns(AuthorizationResult.Success());
+        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<IAuthorizationService>().Returns(auth);
+        var input=new RemoveStudentMealPlanInput{ExternalStudentId="123",TermCalendarId=269,AssignmentId=10,MealPlanId=20,Confirmed=true,ReviewRevision="current",Reason="Student requested removal"};
+        if(invalid=="missing-preview")input.ReviewRevision="";else if(invalid=="short-reason")input.Reason="short";else input.Confirmed=false;
+        var page=new AddStudentMealPlanModel(service,Substitute.For<ITenantThemeProvider>(),NullLogger<AddStudentMealPlanModel>.Instance)
+        {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()},RemoveInput=input};
+        Assert.IsType<BadRequestResult>(await page.OnPostRemoveAsync());await service.DidNotReceiveWithAnyArgs().RemoveAsync(default!);
+    }
+
 }

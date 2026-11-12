@@ -136,6 +136,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public string TermName { get; private set; } = "Current term";
     public string? TermCode { get; private set; }
     public string? ExternalTermId { get; private set; }
+    private CampusFlow.Housing.MealPlanSelectionDto? _reviewedMealChoice;
     public bool IsUnavailable { get; private set; }
     public string? UnavailableReason { get; private set; }
     public IReadOnlyList<BillApprovalTermConfiguration> AvailableTerms { get; private set; } = [];
@@ -261,10 +262,17 @@ public class BillApprovalModel : CampusFlowPageModel
             var alreadyApproved = ExternalTermId is not null && approvedTerms.Contains(ExternalTermId);
             var housing = !alreadyApproved && profile.Provider == StudentInformationSystemProvider.ThesisElements
                 ? await _mealPlans.GetAsync(ExternalTermId) : null;
+            _reviewedMealChoice = housing;
             if (housing is { HousingRequired: true, HasHousingAssignment: false })
             {
                 IsUnavailable = true;
                 UnavailableReason = "A housing assignment is required before bill approval. Contact reslife@nelson.edu.";
+                return;
+            }
+            if (housing is { HasPendingRemoval: true } || housing is { MealPlanEligible: true, SelectedHousingChoice: null })
+            {
+                IsUnavailable = true;
+                UnavailableReason = housing.HasPendingRemoval ? housing.UnavailableReason : "Choose a meal plan on My Housing before approving your bill.";
                 return;
             }
 
@@ -365,6 +373,24 @@ public class BillApprovalModel : CampusFlowPageModel
         }
     }
 
+    private async Task<IAsyncDisposable?> LockMealReviewAsync(StudentProfile profile)
+    {
+        if(profile.Provider!=StudentInformationSystemProvider.ThesisElements)return null;
+        if(!int.TryParse(profile.ExternalStudentId,out var student) || !int.TryParse(ExternalTermId,out var term))
+            throw new InvalidOperationException("The meal review student or term is unavailable.");
+        return await LazyServiceProvider.LazyGetRequiredService<CampusFlow.ClearanceResets.IClearanceResetProtection>()
+            .AcquireAsync(student,term,HttpContext.RequestAborted);
+    }
+    private async Task<bool> MealChoiceStillReadyAsync()
+    {
+        if(_reviewedMealChoice is null)return true;
+        var current=await _mealPlans.GetAsync(ExternalTermId);
+        return !current.HasPendingRemoval && (!current.MealPlanEligible || current.SelectedHousingChoice.HasValue) &&
+            current.MealPlanEligible==_reviewedMealChoice.MealPlanEligible &&
+            current.SelectedHousingChoice==_reviewedMealChoice.SelectedHousingChoice &&
+            current.SelectedMealPlanId==_reviewedMealChoice.SelectedMealPlanId;
+    }
+
     public async Task<IActionResult> OnPostPaymentAsync([FromQuery] string? term = null)
     {
         InitialStep = "payment";
@@ -375,7 +401,10 @@ public class BillApprovalModel : CampusFlowPageModel
             return Unauthorized();
 
         if (IsUnavailable || string.IsNullOrWhiteSpace(ExternalTermId))
-            ModelState.AddModelError(string.Empty, "Your account information could not be loaded. No payment was made.");
+        { ModelState.AddModelError(string.Empty, "Your account information could not be loaded. No payment was made."); return Page(); }
+        await using var mealLease=await LockMealReviewAsync(profile);
+        if(!await MealChoiceStillReadyAsync())
+        { ModelState.AddModelError(string.Empty,"Your meal-plan selection changed or needs review. Reload your bill before paying."); return Page(); }
         if (string.IsNullOrEmpty(ReviewVersion) || ReviewVersion != CurrentReviewVersion)
             ModelState.AddModelError(string.Empty, "Your bill changed or needs a fresh review. Review the updated amounts before submitting payment.");
         if (!_payflowOptions.IsConfigured)
@@ -515,6 +544,9 @@ public class BillApprovalModel : CampusFlowPageModel
         }
         var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
         if (profile is null) return Unauthorized();
+        await using var mealLease=await LockMealReviewAsync(profile);
+        if(!await MealChoiceStillReadyAsync())
+        { ModelState.AddModelError(string.Empty,"Your meal-plan selection changed or needs review. Reload your bill before approving."); return Page(); }
         var approval = await _billApprovals.FindAsync(x =>
             x.StudentProfileId == profile.Id && x.ExternalTermId == ExternalTermId);
         if (approval?.AcceptedAt is not null)
