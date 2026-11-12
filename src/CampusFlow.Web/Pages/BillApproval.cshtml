@@ -108,7 +108,7 @@
                             <p>These loans are not included in expected financial aid and do not reduce the balance shown here.</p>
                             <ul>@foreach (var loan in Model.PendingLoans)
                             {
-                                <li><span>@loan.Description</span><strong>@BillApprovalModel.Currency(loan.Amount)</strong></li>
+                                <li><span>@loan.Description</span><strong>@FinancialAidDisplay.Currency(FinancialAidDisplay.Amount(loan))</strong></li>
                             }</ul>
                             <a asp-page="/FinancialAid" asp-route-term="@Model.ExternalTermId" asp-route-openTerm="@Model.TermCode">Review financial aid</a>
                             <p>Contact Financial Aid if you need help reviewing or accepting an award.</p>
