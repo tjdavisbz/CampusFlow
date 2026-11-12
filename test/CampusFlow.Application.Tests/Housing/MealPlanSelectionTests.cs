@@ -31,6 +31,7 @@ public class MealPlanSelectionTests
     private readonly IStudentInformationSystemMealPlanRemovalService _assignments = Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
     private StudentHousingSelection? _stored;
 
+    private readonly IMealPlanRemovalCoordinator _removals=MealPlanRemovalTestDouble.Create();
     public MealPlanSelectionTests()
     {
         var profile = new StudentProfile(Guid.NewGuid(), null, Guid.NewGuid(),
@@ -77,8 +78,19 @@ public class MealPlanSelectionTests
         lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Substitute.For<ICurrentTenant>());
         _service = new(Substitute.For<IRepository<StudentProfile, Guid>>(), current, configurations,
             _selections, new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
-            _housing, terms, _clock, _completion, _assignments);
+            _housing, terms, _clock, _completion, _assignments, _removals);
         _service.LazyServiceProvider = lazy;
+    }
+
+    [Fact]
+    public async Task Pending_administrative_removal_blocks_selection_until_cleanup_is_verified()
+    {
+        Eligibility("Residential Undergraduate","Commuter");
+        _removals.PendingAsync(10,270).Returns(new List<MealPlanRemovalTarget>{new(10,270,42,3,"Plan",315)});
+        var view=await _service.GetAsync("270");
+        Assert.True(view.HasPendingRemoval);Assert.False(view.IsSelectionOpen);Assert.Null(view.SelectedHousingChoice);Assert.Contains("Business Services review",view.UnavailableReason);
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.SaveAsync(new(){ExternalTermId="270",HousingChoice=HousingChoice.Commuter,ExternalMealPlanId=3}));
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
     }
 
     private void Eligibility(string attendance, string? building) =>

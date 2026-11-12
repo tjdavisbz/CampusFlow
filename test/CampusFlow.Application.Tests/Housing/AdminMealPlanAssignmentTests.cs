@@ -9,7 +9,7 @@ public class AdminMealPlanAssignmentTests
         var reader=Substitute.For<IStudentInformationSystemMealPlanRemovalService>();var lazy=Substitute.For<IAbpLazyServiceProvider>();var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);var user=Substitute.For<ICurrentUser>();user.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
         var locals=Substitute.For<Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid>>();
         locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new System.Collections.Generic.List<StudentHousingSelection>());
-        return(new AdminMealPlanAppService(new[]{student},new[]{plans},NullLogger<AdminMealPlanAppService>.Instance,reader,locals){LazyServiceProvider=lazy},plans,reader);
+        return(new AdminMealPlanAppService(new[]{student},new[]{plans},NullLogger<AdminMealPlanAppService>.Instance,reader,locals,MealPlanRemovalTestDouble.Create()){LazyServiceProvider=lazy},plans,reader);
     }
     static AssignStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,HousingStatusId=10,MealPlanId=20};
     [Theory] [InlineData(269,true)] [InlineData(268,false)] [InlineData(0,false)]

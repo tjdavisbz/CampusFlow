@@ -1,6 +1,7 @@
 @page "/Admin/BusinessServices/AddStudentMealPlan"
 @model CampusFlow.Web.Pages.Admin.BusinessServices.AddStudentMealPlanModel
 @using CampusFlow.Web.Menus
+@using System.Linq
 @using Volo.Abp.AspNetCore.Mvc.UI.Layout
 @inject IPageLayout PageLayout
 @{
@@ -52,20 +53,39 @@
                 <p class="notice">Removal of Elements meal-plan assignments is not enabled for this environment. Recorded No Meal Plan choices below can still be cleared.</p>
             }
             @if(Model.Context.Assignments.Count==0){<p>No assigned meal plans were returned for this term.</p>}
-            @foreach(var assignment in Model.Context.Assignments)
+            @foreach(var assignment in Model.Context.Assignments.Concat(Model.Context.PendingRemovals.Where(x=>!Model.Context.Assignments.Any(a=>a.AssignmentId==x.AssignmentId)).Select(x=>new CampusFlow.Housing.AdminMealPlanAssignmentDto(x.AssignmentId,x.MealPlanId,x.TermId,x.Name,x.Amount))))
             {
-                <article class="meal-card"><strong>@assignment.Name</strong><p>Assignment @assignment.AssignmentId · @(assignment.Amount.HasValue ? assignment.Amount.Value.ToString("C2") : "Amount unavailable")</p>
+                <article class="meal-card">
+                @if(Model.Context.PendingRemovals.Any(x=>x.AssignmentId==assignment.AssignmentId)){<p class="notice">Removal needs review. Meal selection and bill approval remain blocked until cleanup is verified.</p>}
+                <strong>@assignment.Name</strong><p>Assignment @assignment.AssignmentId · @(assignment.Amount.HasValue ? assignment.Amount.Value.ToString("C2") : "Amount unavailable")</p>
                 @if(Model.CanRemove && Model.Context.CanRemove)
                 {
-                    <p>Remove only this student's assignment for the selected term. Elements may retain its charge, so review and adjust billing separately. This does not request a refund or change housing status.</p>
-                    <form method="post" asp-page-handler="Remove">
+                    <p>Review the exact unposted meal-plan and sales-tax charges before removal. Posted, manual or ambiguous charges require a billing review. This does not request a refund or change housing status.</p>
+                    <form method="post" asp-page-handler="PreviewRemoval">
                         <input type="hidden" name="RemoveInput.ExternalStudentId" value="@Model.Context.Student.ExternalStudentId" />
                         <input type="hidden" name="RemoveInput.TermCalendarId" value="@assignment.TermCalendarId" />
                         <input type="hidden" name="RemoveInput.AssignmentId" value="@assignment.AssignmentId" />
                         <input type="hidden" name="RemoveInput.MealPlanId" value="@assignment.MealPlanId" />
-                        <label class="confirm-check"><input type="checkbox" name="RemoveInput.Confirmed" value="true" required /> I verified this student, term and assignment and intend to remove it.</label>
-                        <button type="submit" class="btn btn-danger">Remove assignment</button>
+                        <button type="submit">Review removal and charges</button>
                     </form>
+                    @if(Model.RemovalPreview is { } review && review.Target.AssignmentId==assignment.AssignmentId)
+                    {
+                        <div class="notice">
+                            <strong>Reviewed unposted charges</strong>
+                            @if(review.Entries.Count==0){<p>No matching unposted meal-plan or tax charges remain.</p>}
+                            else {<ul>@foreach(var entry in review.Entries){<li>@entry.Kind: @entry.Amount.ToString("C2") · batch entry @entry.Id</li>}</ul>}
+                        </div>
+                        <form method="post" asp-page-handler="Remove">
+                            <input type="hidden" name="RemoveInput.ExternalStudentId" value="@Model.Context.Student.ExternalStudentId" />
+                            <input type="hidden" name="RemoveInput.TermCalendarId" value="@assignment.TermCalendarId" />
+                            <input type="hidden" name="RemoveInput.AssignmentId" value="@assignment.AssignmentId" />
+                            <input type="hidden" name="RemoveInput.MealPlanId" value="@assignment.MealPlanId" />
+                            <input type="hidden" name="RemoveInput.ReviewRevision" value="@review.Revision" />
+                            <label>Reason <input name="RemoveInput.Reason" required minlength="10" maxlength="500" /></label>
+                            <label class="confirm-check"><input type="checkbox" name="RemoveInput.Confirmed" value="true" required /> I verified this student, term, assignment and the exact unposted charges above and intend to remove them.</label>
+                            <button type="submit" class="btn btn-danger">Remove assignment and reviewed charges</button>
+                        </form>
+                    }
                 }
                 else {<p>Removal requires the removal permission and enabled administrative removal setting.</p>}
                 </article>

@@ -55,7 +55,7 @@ public class BillApprovalAccessHandlerTests
     {
         var owner=Guid.NewGuid();var userId=Guid.NewGuid();var user=Substitute.For<ICurrentUser>();user.Id.Returns(userId);
         var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(owner);tenant.Name.Returns("nelson");
-        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>().Returns(_tax);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
+        var lazy=Substitute.For<IAbpLazyServiceProvider>();var protection=Substitute.For<CampusFlow.ClearanceResets.IClearanceResetProtection>();protection.AcquireAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<CancellationToken>()).Returns(Task.FromResult<IAsyncDisposable>(new MealLease()));lazy.LazyGetRequiredService<CampusFlow.ClearanceResets.IClearanceResetProtection>().Returns(protection);lazy.LazyGetRequiredService<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>().Returns(_tax);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
         var current=_current;
         current.GetProfileAsync(Arg.Any<CancellationToken>()).Returns(new StudentProfile(Guid.NewGuid(),owner,userId,new(StudentInformationSystemProvider.ThesisElements,"10","100","student@example.test","Test",null,"Student")));
         var termLookup=Substitute.For<IStudentInformationSystemTermLookup>();termLookup.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
@@ -84,6 +84,38 @@ public class BillApprovalAccessHandlerTests
             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
             Substitute.For<ILegacyBillApprovalLookup>(),_meal,_completion, Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>(),new[]{_aidDecisions})
         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
+    }
+
+    [Theory]
+    [InlineData("view")][InlineData("approve")][InlineData("pay")]
+    public async Task Missing_meal_choice_blocks_direct_entry_submission_and_payment_before_side_effects(string action)
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _meal.GetAsync("269").Returns(new MealPlanSelectionDto{ExternalTermId="269",MealPlanEligible=true,HasHousingAssignment=true});
+        if(action=="view")await _model.OnGetAsync("B27S");
+        else if(action=="approve")await _model.OnPostAsync("B27S");
+        else await _model.OnPostPaymentAsync("B27S");
+        Assert.True(_model.IsUnavailable);Assert.Contains("Choose a meal plan",_model.UnavailableReason);
+        Assert.Empty(_recalculation.ReceivedCalls());Assert.Empty(_tax.ReceivedCalls());
+        await _approvals.DidNotReceiveWithAnyArgs().InsertAsync(default!,default,default);
+        Assert.Empty(_gateway.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task An_explicit_No_Meal_Plan_choice_satisfies_the_bill_prerequisite()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _meal.GetAsync("269").Returns(new MealPlanSelectionDto{ExternalTermId="269",MealPlanEligible=true,HasHousingAssignment=true,SelectedHousingChoice=HousingChoice.Commuter});
+        await _model.OnGetAsync("B27S");Assert.False(_model.IsUnavailable);
+        await _recalculation.Received(1).RecalculateAsync("10","269",Arg.Any<Guid>(),Arg.Any<CancellationToken>());
+    }
+    [Fact]
+    public async Task Pending_removal_blocks_bill_review_even_if_a_stale_choice_is_returned()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _meal.GetAsync("269").Returns(new MealPlanSelectionDto{ExternalTermId="269",MealPlanEligible=true,HasHousingAssignment=true,SelectedHousingChoice=HousingChoice.Commuter,HasPendingRemoval=true,UnavailableReason="Business Services must finish the removal review."});
+        await _model.OnGetAsync("B27S");Assert.True(_model.IsUnavailable);Assert.Contains("finish the removal",_model.UnavailableReason);
+        Assert.Empty(_recalculation.ReceivedCalls());Assert.Empty(_tax.ReceivedCalls());
     }
 
     private async Task<BillApproval> AcceptedApproval(bool otherStudent = false)
@@ -374,4 +406,6 @@ public class BillApprovalAccessHandlerTests
         _current.IsImpersonating.Returns(!approved);
         await _model.OnGetAsync("B27S");Assert.Empty(_tax.ReceivedCalls());
     }
+    private sealed class MealLease:IAsyncDisposable {public ValueTask DisposeAsync()=>ValueTask.CompletedTask;}
+
 }

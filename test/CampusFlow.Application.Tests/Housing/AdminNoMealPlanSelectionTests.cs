@@ -51,7 +51,7 @@ public class AdminNoMealPlanSelectionTests
         var lazy = Substitute.For<IAbpLazyServiceProvider>();
         lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
         lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
-        _service = new(new[] { students }, new[] { _plans }, NullLogger<AdminMealPlanAppService>.Instance, _removal, _selections)
+        _service = new(new[] { students }, new[] { _plans }, NullLogger<AdminMealPlanAppService>.Instance, _removal, _selections, MealPlanRemovalTestDouble.Create())
             { LazyServiceProvider = lazy };
     }
 

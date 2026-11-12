@@ -44,6 +44,7 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
     public IReadOnlyList<AdminMealPlanStudentDto> Results { get; private set; } = [];
     public AdminMealPlanContextDto? Context { get; private set; }
     public AdminMealPlanOptionDto? Preview { get; private set; }
+    public MealPlanRemovalReview? RemovalPreview { get; private set; }
     public string? SearchError { get; private set; }
 
     public async Task OnGetAsync()
@@ -107,12 +108,24 @@ public class AddStudentMealPlanModel : CampusFlowPageModel
             term = Input.TermCalendarId });
     }
 
+    public async Task<IActionResult> OnPostPreviewRemovalAsync()
+    {
+        if(!(await AuthorizationService.AuthorizeAsync(User,CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded)return Forbid();
+        ModelState.Clear(); Student=RemoveInput.ExternalStudentId; Term=RemoveInput.TermCalendarId;
+        await OnGetAsync();
+        try { RemovalPreview=await _service.PreviewRemovalAsync(RemoveInput); }
+        catch(UserFriendlyException error) { Alerts.Warning(error.Message); }
+        return Page();
+    }
+
     public async Task<IActionResult> OnPostRemoveAsync()
     {
         if(!(await AuthorizationService.AuthorizeAsync(User,CampusFlowPermissions.Admin.RemoveStudentMealPlan)).Succeeded)return Forbid();
         if(!RemoveInput.Confirmed || RemoveInput.TermCalendarId<=0 || RemoveInput.AssignmentId<=0 || RemoveInput.MealPlanId<=0 || string.IsNullOrWhiteSpace(RemoveInput.ExternalStudentId))return BadRequest();
-        await _service.RemoveAsync(RemoveInput);
-        Alerts.Success("The meal-plan assignment was removed from Elements. Elements may retain the meal-plan charge and any sales tax. Review billing separately; no refund or housing-status change was requested.");
+        if(string.IsNullOrWhiteSpace(RemoveInput.ReviewRevision) || string.IsNullOrWhiteSpace(RemoveInput.Reason) || RemoveInput.Reason.Trim().Length is <10 or >500)return BadRequest();
+        try { await _service.RemoveAsync(RemoveInput); }
+        catch(UserFriendlyException error) { Alerts.Warning(error.Message); return RedirectToPage(new{student=RemoveInput.ExternalStudentId,term=RemoveInput.TermCalendarId}); }
+        Alerts.Success("The meal-plan assignment and reviewed unposted meal/tax charges were removed. No refund, posted transaction or housing-status change was made.");
         return RedirectToPage(new{student=RemoveInput.ExternalStudentId,term=RemoveInput.TermCalendarId});
     }
 

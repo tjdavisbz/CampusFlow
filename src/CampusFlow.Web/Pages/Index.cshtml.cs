@@ -401,7 +401,7 @@ public class IndexModel : CampusFlowPageModel
             journey.HasHousingAssignment = mealPlan.HasHousingAssignment;
             journey.MealPlanEligible = mealPlan.MealPlanEligible;
             journey.MealPlanUnavailableReason = mealPlan.UnavailableReason;
-            journey.MealPlanEnabled = mealPlan.Options.Values.Any(x => x.Count > 0);
+            journey.MealPlanEnabled = mealPlan.IsSelectionOpen && mealPlan.Options.Values.Any(x => x.Count > 0);
             journey.MealPlanRequired = journey.MealPlanEnabled;
             journey.MealPlanSelected = mealPlan.SelectedHousingChoice is not null;
         }
@@ -519,6 +519,8 @@ public class IndexModel : CampusFlowPageModel
                 ? new("Bill approval", "Your previous balance needs attention before bill approval.", "disabled", null, "Balance required")
                 : HousingRequired && !HasHousingAssignment
                 ? new("Bill approval", "A housing assignment is required before bill approval.", "disabled", null, "Housing required")
+                : MealPlanEligible && !MealPlanSelected
+                ? new("Bill approval", "Choose a meal plan before approving your bill.", "disabled", null, "Meal plan required")
                 : new("Bill approval", "Review your charges, payment choice, and agreement.", "action", billUrl, "Review bill"));
         }
 

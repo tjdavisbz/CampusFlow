@@ -20,14 +20,15 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
     private readonly ILogger<AdminMealPlanAppService> _logger;
     private readonly IStudentInformationSystemMealPlanRemovalService _removal;
     private readonly IRepository<StudentHousingSelection, Guid> _localSelections;
+    private readonly IMealPlanRemovalCoordinator _removals;
 
     public AdminMealPlanAppService(IEnumerable<IStudentInformationSystemStudentLookup> students,
         IEnumerable<IStudentInformationSystemMealPlanService> mealPlans, ILogger<AdminMealPlanAppService> logger,
-        IStudentInformationSystemMealPlanRemovalService removal, IRepository<StudentHousingSelection, Guid> localSelections)
+        IStudentInformationSystemMealPlanRemovalService removal, IRepository<StudentHousingSelection, Guid> localSelections, IMealPlanRemovalCoordinator removals)
     {
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
         _mealPlans = mealPlans.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
-        _logger = logger;_removal=removal;_localSelections=localSelections;
+        _logger = logger;_removal=removal;_localSelections=localSelections;_removals=removals;
     }
 
     public async Task<List<AdminMealPlanStudentDto>> SearchStudentsAsync(string query)
@@ -61,6 +62,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         {
             NoMealPlanSelections = localNoneSelections.Select(x =>
                 new AdminNoMealPlanSelectionDto(x.Id, x.SubmittedAt, x.ConcurrencyStamp)).ToList(),
+            PendingRemovals = await _removals.PendingAsync(int.Parse(externalStudentId), selectedTerm.TermCalendarId),
             CanRemove=_removal.IsEnabled,
             Assignments=(await _removal.GetAssignmentsAsync(externalStudentId)).Where(x=>x.TermCalendarId==context.SelectedTermCalendarId)
                 .Select(x=>new AdminMealPlanAssignmentDto(x.AssignmentId,x.MealPlanId,x.TermCalendarId,x.Name,x.Amount)).ToList(),
@@ -97,7 +99,10 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
     [Audited]
     public async Task AssignAsync(AssignStudentMealPlanInput input)
     {
+        if (!int.TryParse(input.ExternalStudentId,out var student) || student<=0 || input.TermCalendarId<=0) throw new UserFriendlyException("Review the student and term.");
+        await using var lease=await _removals.LockAsync(student,input.TermCalendarId);
         var context = await GetContextAsync(input.ExternalStudentId, input.TermCalendarId);
+        if(context.PendingRemovals.Count>0)throw new UserFriendlyException("Finish the saved meal-plan removal review before assigning another plan.");
         if (context.SelectedTermCalendarId != input.TermCalendarId)
             throw new UserFriendlyException("That term is no longer available.");
         var housingStatus = context.HousingStatuses.SingleOrDefault(x => x.Id == input.HousingStatusId)
@@ -175,10 +180,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
     public async Task RemoveAsync(RemoveStudentMealPlanInput input)
     {
         if(CurrentTenant.Id is null || !input.Confirmed)throw new UserFriendlyException("Select a university and confirm the reviewed meal-plan removal.");
-        var context=await GetContextAsync(input.ExternalStudentId,input.TermCalendarId);
-        if(!context.CanRemove || context.SelectedTermCalendarId!=input.TermCalendarId || !context.Terms.Any(x=>x.TermCalendarId==input.TermCalendarId) ||
-            !context.Assignments.Any(x=>x.AssignmentId==input.AssignmentId&&x.MealPlanId==input.MealPlanId))
-            throw new UserFriendlyException("The selected meal assignment changed. Refresh before removing it.");
+        var (context,target)=await RemovalTarget(input);
         var term = context.Terms.Single(x => x.TermCalendarId == input.TermCalendarId);
         var termContext = await _mealPlans.GetContextAsync(input.ExternalStudentId, term.TermCalendarId);
         var selectedTerm = termContext.Terms.Single(x => x.TermCalendarId == term.TermCalendarId);
@@ -186,8 +188,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
         var removedChoices = await _localSelections.GetListAsync(x =>
             x.ExternalStudentId == input.ExternalStudentId && x.ExternalMealPlanId == input.MealPlanId &&
             x.TermName == localTermName && x.TermStartDate == selectedTerm.StartDate && x.TermEndDate == selectedTerm.EndDate);
-        try {await _removal.RemoveAsync(input.ExternalStudentId,input.TermCalendarId,input.AssignmentId,input.MealPlanId);}
-        catch(Exception e){_logger.LogError(e,"Meal-plan removal could not be confirmed for assignment {AssignmentId}.",input.AssignmentId);throw new UserFriendlyException("Meal-plan removal could not be confirmed. Refresh and check Elements before retrying.");}
+        await _removals.RemoveAsync(target,input.ReviewRevision,input.Reason);
         foreach (var choice in removedChoices)
         {
             await _localSelections.DeleteAsync(choice, autoSave: true);
@@ -195,6 +196,25 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
                 choice.Id, input.AssignmentId, CurrentUser.Id);
         }
         _logger.LogWarning("Meal assignment {AssignmentId} removed for term {TermId} by administrator {UserId}.",input.AssignmentId,input.TermCalendarId,CurrentUser.Id);
+    }
+
+    [Authorize(CampusFlowPermissions.Admin.RemoveStudentMealPlan)]
+    public async Task<MealPlanRemovalReview> PreviewRemovalAsync(RemoveStudentMealPlanInput input)
+    {
+        var (_,target)=await RemovalTarget(input);
+        return await _removals.ReviewAsync(target);
+    }
+    private async Task<(AdminMealPlanContextDto Context,MealPlanRemovalTarget Target)> RemovalTarget(RemoveStudentMealPlanInput input)
+    {
+        if(CurrentTenant.Id is null || !int.TryParse(input.ExternalStudentId,out var student) || student<=0 || input.TermCalendarId<=0 || input.AssignmentId<=0 || input.MealPlanId<=0)
+            throw new UserFriendlyException("Review one student, term and assignment before removal.");
+        var context=await GetContextAsync(input.ExternalStudentId,input.TermCalendarId);
+        if(!context.CanRemove || context.SelectedTermCalendarId!=input.TermCalendarId)
+            throw new UserFriendlyException("Meal removal is unavailable for this student and term.");
+        var pending=context.PendingRemovals.SingleOrDefault(x=>x.AssignmentId==input.AssignmentId && x.MealPlanId==input.MealPlanId);
+        var assignment=context.Assignments.SingleOrDefault(x=>x.AssignmentId==input.AssignmentId && x.MealPlanId==input.MealPlanId);
+        var target=pending ?? (assignment?.Amount is decimal amount ? new MealPlanRemovalTarget(student,input.TermCalendarId,assignment.AssignmentId,assignment.MealPlanId,assignment.Name,amount) : null);
+        return (context,target ?? throw new UserFriendlyException("The selected meal assignment changed. Refresh before removing it."));
     }
 
     private static AdminMealPlanStudentDto MapStudent(StudentInformationSystemStudent student) => new()
