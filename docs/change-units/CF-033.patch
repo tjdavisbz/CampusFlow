@@ -1,0 +1,218 @@
+diff --git a/src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs b/src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs
+index e2a46d4..aeb0b42 100644
+--- a/src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs
++++ b/src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs
+@@ -7,7 +7,10 @@ using HtmlAgilityPack;
+ namespace CampusFlow.Web.BillApprovals;
+ 
+ internal sealed record AgreementPdfBlock(string Text, bool IsHeading = false,
+-    IReadOnlyList<IReadOnlyList<string>>? Rows = null);
++    IReadOnlyList<IReadOnlyList<string>>? Rows = null,
++    IReadOnlyList<AgreementPdfRun>? Runs = null, bool IsListItem = false);
++
++internal sealed record AgreementPdfRun(string Text, bool Bold = false, bool Italic = false, bool Underline = false);
+ 
+ internal static class AgreementPdfContent
+ {
+@@ -29,27 +32,72 @@ internal static class AgreementPdfContent
+             if (rows.Count > 0) yield return new("", Rows: rows);
+             yield break;
+         }
+-        if (Regex.IsMatch(node.Name, "^h[1-6]$"))
++        var isHeading = Regex.IsMatch(node.Name, "^h[1-6]$");
++        // Word-pasted agreements can wrap the whole document in an h3. A heading
++        // containing paragraphs or lists is a container, not one giant heading.
++        var containsBlocks = node.Descendants().Any(IsBlock);
++        if (isHeading && !containsBlocks)
+         {
+-            var text = Text(node);
+-            if (text.Length > 0) yield return new(text, true);
++            var runs = Runs(node);
++            var text = string.Concat(runs.Select(x => x.Text));
++            if (text.Length > 0) yield return new(text, true, Runs: runs);
+             yield break;
+         }
+-        if (node.Name is "p" or "li" || !node.Descendants().Any(child => child.Name is "p" or "div" or "table" or "li" || Regex.IsMatch(child.Name, "^h[1-6]$")))
++        if (node.Name is "p" or "li" || !containsBlocks)
+         {
+-            var text = Text(node);
+-            if (text.Length > 0) yield return new((node.Name == "li" ? "- " : "") + text);
++            var runs = Runs(node).ToList();
++            var text = string.Concat(runs.Select(x => x.Text));
++            if (text.Length == 0) yield break;
++            // Word exports these section labels as bold paragraphs, not heading tags.
++            var label = node.Name == "p" && text.EndsWith(":", StringComparison.Ordinal) &&
++                runs.Where(x => !string.IsNullOrWhiteSpace(x.Text)).All(x => x.Bold);
++            var listItem = node.Name == "li";
++            if (listItem) { text = "- " + text; runs.Insert(0, new("- ")); }
++            yield return new(text, label, Runs: runs, IsListItem: listItem);
+             yield break;
+         }
+         foreach (var child in node.ChildNodes)
+             foreach (var block in Blocks(child)) yield return block;
+     }
+ 
+-    private static string Text(HtmlNode node)
++    private static bool IsBlock(HtmlNode node) =>
++        node.Name is "p" or "div" or "table" or "li" or "ul" or "ol" or "section" or "article" or "blockquote" ||
++        Regex.IsMatch(node.Name, "^h[1-6]$");
++
++    private static string Text(HtmlNode node) => string.Concat(Runs(node).Select(x => x.Text));
++
++    private static IReadOnlyList<AgreementPdfRun> Runs(HtmlNode node)
++    {
++        var runs = new List<AgreementPdfRun>();
++        foreach (var run in InlineRuns(node))
++        {
++            var text = Regex.Replace(run.Text, @"\s+", " ");
++            if (runs.Count == 0 || runs[^1].Text.EndsWith(' ')) text = text.TrimStart();
++            if (text.Length > 0) runs.Add(run with { Text = text });
++        }
++        if (runs.Count > 0)
++        {
++            runs[^1] = runs[^1] with { Text = runs[^1].Text.TrimEnd() };
++            if (runs[^1].Text.Length == 0) runs.RemoveAt(runs.Count - 1);
++        }
++        return runs;
++    }
++
++    private static IEnumerable<AgreementPdfRun> InlineRuns(HtmlNode node,
++        bool bold = false, bool italic = false, bool underline = false)
+     {
+-        if (node.NodeType == HtmlNodeType.Comment || node.Name is "script" or "style") return "";
+-        if (node.NodeType == HtmlNodeType.Text) return HtmlEntity.DeEntitize(node.InnerText);
+-        // Cell paragraphs and line breaks stay in the same refund row, separated by spaces.
+-        return Regex.Replace(string.Join(" ", node.ChildNodes.Select(Text)), @"\s+", " ").Trim();
++        if (node.NodeType == HtmlNodeType.Comment || node.Name is "script" or "style" or "head") yield break;
++        if (node.NodeType == HtmlNodeType.Text)
++        {
++            yield return new(HtmlEntity.DeEntitize(node.InnerText), bold, italic, underline);
++            yield break;
++        }
++        if (node.Name == "br") { yield return new(" "); yield break; }
++        foreach (var child in node.ChildNodes)
++            foreach (var run in InlineRuns(child, bold || node.Name is "b" or "strong",
++                         italic || node.Name is "i" or "em", underline || node.Name == "u"))
++                yield return run;
++        // Keep separate cell paragraphs together on one refund row, without joining words.
++        if (IsBlock(node)) yield return new(" ");
+     }
+ }
+diff --git a/src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs b/src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs
+index 8e2e1af..7eceda8 100644
+--- a/src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs
++++ b/src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs
+@@ -35,6 +35,7 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
+         section.PageSetup.PageFormat = PageFormat.Letter;
+         section.PageSetup.TopMargin = Unit.FromInch(.55);
+         section.PageSetup.BottomMargin = Unit.FromInch(.55);
++        section.PageSetup.FooterDistance = Unit.FromInch(.25);
+         section.PageSetup.LeftMargin = Unit.FromInch(.62);
+         section.PageSetup.RightMargin = Unit.FromInch(.62);
+ 
+@@ -77,6 +78,11 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
+         heading2.Font.Color = Color.FromRgb(80, 45, 127);
+         heading2.ParagraphFormat.SpaceBefore = Unit.FromPoint(8);
+         heading2.ParagraphFormat.SpaceAfter = Unit.FromPoint(4);
++        heading2.ParagraphFormat.KeepWithNext = true;
++        var agreementBody = document.Styles.AddStyle("AgreementBody", StyleNames.Normal);
++        agreementBody.Font.Size = 9.5;
++        agreementBody.ParagraphFormat.SpaceAfter = Unit.FromPoint(5);
++        agreementBody.ParagraphFormat.WidowControl = true;
+     }
+ 
+     private static void AddHeader(Section section, BillApproval approval, BillApprovalReviewSnapshot snapshot, string logoPath)
+@@ -218,7 +224,22 @@ public sealed class MigraDocBillApprovalPdfGenerator : IBillApprovalPdfGenerator
+         {
+             if (block.Rows is not { Count: > 0 } rows)
+             {
+-                section.AddParagraph(block.Text, block.IsHeading ? StyleNames.Heading2 : StyleNames.Normal);
++                var paragraph = section.AddParagraph("", block.IsHeading ? StyleNames.Heading2 : "AgreementBody");
++                if (block.IsListItem)
++                {
++                    paragraph.Format.LeftIndent = Unit.FromPoint(12);
++                    paragraph.Format.FirstLineIndent = Unit.FromPoint(-8);
++                    paragraph.Format.SpaceAfter = Unit.FromPoint(2);
++                    paragraph.Format.KeepTogether = true;
++                }
++                if (block.Runs is null) paragraph.AddText(block.Text);
++                else foreach (var run in block.Runs)
++                {
++                    var text = paragraph.AddFormattedText(run.Text);
++                    if (run.Bold) text.Font.Bold = true;
++                    if (run.Italic) text.Font.Italic = true;
++                    if (run.Underline) text.Font.Underline = Underline.Single;
++                }
+                 continue;
+             }
+             var columns = rows.Max(row => row.Count);
+diff --git a/test/CampusFlow.Web.Tests/BillApprovals/AgreementPdfContentTests.cs b/test/CampusFlow.Web.Tests/BillApprovals/AgreementPdfContentTests.cs
+new file mode 100644
+index 0000000..1bfaddb
+--- /dev/null
++++ b/test/CampusFlow.Web.Tests/BillApprovals/AgreementPdfContentTests.cs
+@@ -0,0 +1,64 @@
++using System.Linq;
++using CampusFlow.Web.BillApprovals;
++using Xunit;
++
++namespace CampusFlow.BillApprovals;
++
++public class AgreementPdfContentTests
++{
++    [Fact]
++    public void Word_heading_wrapper_preserves_paragraphs_labels_and_individual_refund_deadlines()
++    {
++        var blocks = AgreementPdfContent.Read("""
++            <h3><p class="MsoNoSpacing"><b><u><span>Federal Funds:<o:p></o:p></span></u></b></p>
++            <p><span>I agree to these terms.</span></p>
++            <p><b>Refund dates:</b></p><p><b>Main Session:</b></p>
++            <ul><li><span>100% Tuition Refund Deadline = Friday, January 22, 2027</span></li>
++            <li><span>75% Tuition Refund Deadline = Friday, January 29, 2027</span></li></ul>
++            <p><b>Failure to Pay:</b></p><p>Following terms still apply.</p></h3>
++            """);
++
++        Assert.Equal(8, blocks.Count);
++        Assert.Equal("Federal Funds:", blocks[0].Text);
++        Assert.True(blocks[0].IsHeading);
++        Assert.False(blocks[1].IsHeading);
++        Assert.DoesNotContain(blocks[1].Runs!, x => x.Bold);
++        Assert.True(blocks[4].IsListItem);
++        Assert.Equal("- 100% Tuition Refund Deadline = Friday, January 22, 2027", blocks[4].Text);
++        Assert.Equal("- 75% Tuition Refund Deadline = Friday, January 29, 2027", blocks[5].Text);
++        Assert.True(blocks[6].IsHeading);
++        Assert.Equal("Following terms still apply.", blocks[7].Text);
++        Assert.All(blocks, block => Assert.Equal(block.Text, string.Concat(block.Runs!.Select(x => x.Text))));
++    }
++
++    [Fact]
++    public void Inline_emphasis_and_punctuation_are_preserved_without_making_body_text_a_heading()
++    {
++        var block = Assert.Single(AgreementPdfContent.Read(
++            "<p><b>Important:</b> keep <u>this</u> copy (<i>including</i> <strong>dates</strong>).</p>"));
++        Assert.False(block.IsHeading);
++        Assert.Equal("Important: keep this copy (including dates).", block.Text);
++        Assert.Contains(block.Runs!, x => x.Text == "Important:" && x.Bold);
++        Assert.Contains(block.Runs!, x => x.Text == "this" && x.Underline);
++        Assert.Contains(block.Runs!, x => x.Text == "including" && x.Italic);
++        Assert.Contains(block.Runs!, x => x.Text == "dates" && x.Bold);
++    }
++
++    [Fact]
++    public void A_real_heading_remains_a_heading_while_nested_document_sections_remain_separate()
++    {
++        var blocks = AgreementPdfContent.Read("<h2>Terms</h2><h3><div><p>First paragraph.</p><p>Second paragraph.</p></div></h3>");
++        Assert.Equal(new[] { "Terms", "First paragraph.", "Second paragraph." }, blocks.Select(x => x.Text));
++        Assert.True(blocks[0].IsHeading);
++        Assert.All(blocks.Skip(1), x => Assert.False(x.IsHeading));
++    }
++
++    [Fact]
++    public void Refund_table_cells_keep_paragraphs_on_one_row_and_do_not_join_adjacent_words()
++    {
++        var table = Assert.Single(AgreementPdfContent.Read(
++            "<table><tr><td>100%</td><td><p>Friday, January <b>22</b>, 2027</p><p>Last refund day</p></td></tr></table>"));
++        Assert.Equal("100%", table.Rows![0][0]);
++        Assert.Equal("Friday, January 22, 2027 Last refund day", table.Rows[0][1]);
++    }
++}

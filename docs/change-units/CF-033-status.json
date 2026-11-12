@@ -1,0 +1,52 @@
+{
+  "unit": "CF-033",
+  "scope": "Approved-bill PDF: preserve paragraphs, inline emphasis and section headings in Word-pasted heading wrappers; show each refund deadline on a separate single line; separate footers from body text.",
+  "state": "committed-pushed-deployed-both",
+  "branch": "codex/cf-033-approved-bill-pdf",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow",
+  "sourceBase": "0a706a1ec21871c06f9cf75bcde2b9205031122e",
+  "commit": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+    "branch": "codex/cf-033-approved-bill-pdf",
+    "deploymentId": "22c17c98-55f8-47ad-8b15-cd35a595e8e3",
+    "deployedAtUtc": "2026-11-12T04:22:12.0316327Z",
+    "verifiedAtUtc": "2026-11-12T04:24:17.798452+00:00",
+    "verification": "CF-033-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+    "branch": "codex/cf-033-production-release",
+    "deploymentId": "6aafca9f-33e6-4722-8025-8d510876b8fe",
+    "deployedAtUtc": "2026-11-12T04:25:43.0075032Z",
+    "verifiedAtUtc": "2026-11-12T04:27:46.537414+00:00",
+    "verification": "CF-033-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "updatedAtUtc": "2026-11-12T04:28:29.084958+00:00",
+  "verification": "CF-033-verification.json",
+  "sourcePatch": "CF-033.patch",
+  "previewPath": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow/output/pdf/Approved-Bill-Spring-2027-layout-preview.pdf",
+  "previewGeneratedFromExistingAcceptedSnapshot": true,
+  "newBillApprovedOrReset": false,
+  "recalculationTaxEmailOrUploadInvoked": false,
+  "savedProductionAgreementOrPdfChanged": false,
+  "privateSnapshotAndPreviewExcludedFromGit": true,
+  "remainingChecks": [
+    "Staff acceptance of a newly generated PDF; stored historical PDFs retain their existing bytes."
+  ],
+  "sourcePatchSha256": "4ec75a6121b38f08fac137b36891a65f9782cd3f09239fb79009ad2e2d8d0dbe",
+  "productionBranch": "codex/cf-033-production-release",
+  "productionBase": "a1f1692ffb6fbbac7b0b0f21254fc0c0e93270bb",
+  "productionCommit": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "reviewedPreviewApprovedForDeployment": true,
+  "removalNotes": "Revert only CF-033 from the target current release and rebuild while preserving later units. No database rollback; previously generated PDF files remain unchanged.",
+  "existingApprovedPdfFilesReplaced": false
+}

@@ -351,5 +351,13 @@
     "details": "CF-032-status.json",
     "originalContext": "Latest screenshot email reported November 11 6:10 AM Central; exact failed POST retained at 6:02 AM.",
     "note": "The prior read-only page load did not test final submission. Reset retained a deleted approval occupying an unfiltered unique index; the filtered index permits replacement while preserving history."
+  },
+  "cf033FollowUp": {
+    "updatedAtUtc": "2026-11-12T04:28:29.084958+00:00",
+    "topic": "Approved-bill PDF agreement and refund-date formatting",
+    "state": "committed-pushed-deployed-both",
+    "details": "CF-033-status.json",
+    "previewReviewed": true,
+    "historicalPdfFilesUnchanged": true
   }
 }

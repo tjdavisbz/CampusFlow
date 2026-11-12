@@ -217,3 +217,6 @@ For each future unit record ID, scope, branch/base/commit, dependencies, artifac
 
 
 **CF-032 is deployed to nonprod and production (November 11, 2026).** Bill-approval resets can be followed by new approvals repeatedly. The unique index excludes deleted history while allowing only one active approval per student account/term. Existing approval rows, snapshots and artifacts are retained. Repeated reset/reapproval passed in nonprod; 312 nonprod and 323 production persistence tests, plus 27 shared bill/reset handler tests, passed. Jeff should retry his signed-in production submission. [Status](CF-032-status.json), [verification](CF-032-verification.json). Nonprod writable impersonation remains a separate proposal; payment settings are unchanged.
+
+
+**CF-033 is deployed to nonprod and production (November 11, 2026, Central).** Approved-bill PDFs preserve Word-pasted paragraphs, section headings and inline emphasis. The reviewed preview keeps all eight refund deadlines on individual lines, unchanged wording and financial-page text. All 342 portal tests passed for each source variant. No database migration, approval/reset, email or historical-file replacement was performed. Newly generated PDFs use the new layout. [Status](CF-033-status.json), [verification](CF-033-verification.json).

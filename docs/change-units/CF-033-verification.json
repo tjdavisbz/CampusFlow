@@ -1,0 +1,86 @@
+{
+  "unit": "CF-033",
+  "webTestsPassed": 342,
+  "focusedTestsPassed": 16,
+  "actualPreview": {
+    "pages": 3,
+    "financialPageTextUnchanged": true,
+    "agreementWordingUnchanged": true,
+    "allEightRefundDatesOnSingleLines": true,
+    "refundLines": [
+      {
+        "page": 2,
+        "top": 499.4,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 512.5,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 525.5,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 538.6,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 575.2,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 588.2,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 624.8,
+        "completeDateOnSameLine": true
+      },
+      {
+        "page": 2,
+        "top": 637.8,
+        "completeDateOnSameLine": true
+      }
+    ],
+    "textInsidePageMargins": true,
+    "liveWrites": false,
+    "pdfSha256": "1748efe6489ad0ff285f4855f216263ca1d37f0de648c498fa7e735baa664c14"
+  },
+  "allThreePagesVisuallyReviewed": true,
+  "productionLikeDejaVuFontsUsedInOfflinePreview": true,
+  "noPrivateFinancialSnapshotInSourceOrPatch": true,
+  "noLiveDataMutationOrDelivery": true,
+  "checkedAtUtc": "2026-11-12T04:07:01.212220+00:00",
+  "productionWebTestsPassed": 342,
+  "nonprodWebTestsPassed": 342,
+  "releaseBuildsPassedBoth": true,
+  "userAuthorizedDeploymentBoth": true,
+  "sourceFilesOnly": [
+    "src/CampusFlow.Web/BillApprovals/AgreementPdfContent.cs",
+    "src/CampusFlow.Web/BillApprovals/MigraDocBillApprovalPdfGenerator.cs",
+    "test/CampusFlow.Web.Tests/BillApprovals/AgreementPdfContentTests.cs"
+  ],
+  "state": "committed-pushed-deployed-both",
+  "updatedAtUtc": "2026-11-12T04:28:29.084958+00:00",
+  "committed": true,
+  "pushed": true,
+  "deployedTo": [
+    "nonprod",
+    "production"
+  ],
+  "deploymentVerification": {
+    "nonprod": "CF-033-nonprod-deployment-verification.json",
+    "production": "CF-033-production-deployment-verification.json"
+  },
+  "schemaMigrationRequired": false,
+  "existingApprovedPdfFilesReplaced": false,
+  "sourceAndPreviewPrivateDataExcludedFromGit": true,
+  "noBillingWorkflowExecutedByDeployment": true
+}

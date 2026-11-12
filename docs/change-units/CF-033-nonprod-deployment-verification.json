@@ -1,0 +1,178 @@
+{
+  "environment": "nonprod",
+  "units": [
+    "CF-033"
+  ],
+  "releaseCommit": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "branch": "codex/cf-033-approved-bill-pdf",
+  "unitSourceCommits": {
+    "CF-033": "41fb45b1a9c7669ee44723db1ddfeb99da86d221"
+  },
+  "deploymentId": "22c17c98-55f8-47ad-8b15-cd35a595e8e3",
+  "deploymentCompletedAtUtc": "2026-11-12T04:22:12.0316327Z",
+  "verifiedAtUtc": "2026-11-12T04:24:17.798452+00:00",
+  "verified": true,
+  "matchedFiles": [
+    "CampusFlow.Application.Contracts.dll",
+    "CampusFlow.Application.dll",
+    "CampusFlow.Domain.Shared.dll",
+    "CampusFlow.Domain.dll",
+    "CampusFlow.EntityFrameworkCore.dll",
+    "CampusFlow.HttpApi.dll",
+    "CampusFlow.Web.dll"
+  ],
+  "preservedFiles": [
+    "CampusFlow.Web.deps.json",
+    "Pages/Admin/Chapel/Attendance.css",
+    "Pages/Admin/Chapel/Attendance.js",
+    "Pages/BillApproval.js",
+    "wwwroot/global-styles.css",
+    "Pages/Advisor/Advisor.css",
+    "Pages/DegreeAudit.css",
+    "Pages/DegreeAudit.js",
+    "Pages/Admin/AdminConfiguration.css",
+    "Pages/FinancialAid.js",
+    "Pages/FinancialAid.css",
+    "CampusFlow.Web.runtimeconfig.json",
+    "Azure.Identity.dll",
+    "Azure.Core.dll",
+    "Azure.Communication.Email.dll",
+    "Pages/Admin/StudentBilling/CostTypes.js",
+    "Pages/Admin/StudentBilling/ClearanceResets.js",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.br",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/all.css.gz",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.br",
+    "wwwroot/libs/@fortawesome/fontawesome-free/css/v4-shims.css.gz",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2",
+    "wwwroot/libs/@fortawesome/fontawesome-free/webfonts/fa-v4compatibility.woff2",
+    "Pages/Admin/BusinessServices/AddStudentMealPlan.css",
+    "Pages/Admin/FinancialAid/ReconcileAwardCodes.css",
+    "Pages/BillApproval.css",
+    "wwwroot/images/tenants/nelson/judah-celebrating.jpg",
+    "CampusFlow.Web.staticwebassets.endpoints.json",
+    "Pages/Admin/Housing/Assignments.css",
+    "Pages/Admin/Housing/Assignments.js",
+    "Pages/Housing.css"
+  ],
+  "fontsAndEarlierStaticRoutesPreserved": true,
+  "staticEndpointManifestPreserved": true,
+  "connectionsCertificatesPhysicalConfigurationPreserved": true,
+  "settingsChanged": false,
+  "permissionsChanged": false,
+  "otherEnvironmentPreserved": true,
+  "unrelatedRootRuntimeFilesPreserved": 282,
+  "healthAndPublicAssets": {
+    "/health-status": {
+      "status": 200,
+      "contentType": "application/json"
+    },
+    "/": {
+      "status": 302,
+      "expectedMicrosoftLoginChallenge": true
+    },
+    "/Pages/Admin/Chapel/Attendance.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/Chapel/Attendance.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/BillApproval.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Advisor/Advisor.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/DegreeAudit.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/DegreeAudit.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Admin/AdminConfiguration.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/FinancialAid.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/FinancialAid.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/StudentBilling/CostTypes.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Admin/StudentBilling/ClearanceResets.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Admin/BusinessServices/AddStudentMealPlan.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/FinancialAid/ReconcileAwardCodes.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/BillApproval.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/images/tenants/nelson/judah-celebrating.jpg": {
+      "status": 200,
+      "contentType": "image/jpeg"
+    },
+    "/Pages/Admin/Housing/Assignments.css": {
+      "status": 200,
+      "contentType": "text/css"
+    },
+    "/Pages/Admin/Housing/Assignments.js": {
+      "status": 200,
+      "contentType": "application/javascript"
+    },
+    "/Pages/Housing.css": {
+      "status": 200,
+      "contentType": "text/css"
+    }
+  },
+  "anonymousProtectedRouteChallenges": {
+    "/Admin/FinancialAid/ReconcileAwardCodes": 302,
+    "/Admin/Housing/Assignments": 302,
+    "/Admin/Housing/Assignments?handler=Recovery&periodId=2": 302,
+    "/Admin/BusinessServices/AddStudentMealPlan": 302,
+    "/Admin/StudentBilling/CostTypes": 302,
+    "/Admin/StudentBilling/ClearanceResets": 302,
+    "/Admin/StudentBilling/ResetIndividualBillApproval": 302,
+    "/BillApproval": 302,
+    "/FinancialAid": 302,
+    "/Account/MicrosoftLogin": 302
+  },
+  "tests": {
+    "web": 342
+  },
+  "testTotal": 342,
+  "automaticClearanceResetsEnabled": false,
+  "productionCostTypeExistingScheduleWillResume": true,
+  "authenticatedStaffAcceptancePerformed": false,
+  "productionStudentDataWritesManuallyPerformedByDeployment": false,
+  "housingRecoveryExecuted": false,
+  "excludedPausedUnits": [
+    "CF-028"
+  ],
+  "impersonationUnchanged": true,
+  "approvalRowsPreserved": true,
+  "schemaMigrationApplied": false,
+  "existingApprovedPdfFilesReplaced": false
+}
