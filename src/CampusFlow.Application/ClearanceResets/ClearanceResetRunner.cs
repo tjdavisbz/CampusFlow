@@ -27,7 +27,7 @@ public class ClearanceResetRunner(IRepository<ClearanceResetConfiguration,Guid> 
             using var claim=units.Begin(requiresNew:true,isTransactional:true);
             var config=await configurations.FindAsync(x=>x.TenantId==owner);if(config is null)return false;
             var state=config.Schedule();
-            if(state.Enabled&&state.PolicyVersion!=2){state.Pause("Policy changed: review a fresh preview before enabling the revised reset rule.");config.Save(state);await configurations.UpdateAsync(config,true);await claim.CompleteAsync();return false;}
+            if(state.Enabled&&state.PolicyVersion!=ClearanceResetSchedule.CurrentPolicyVersion){state.Pause("Policy changed: review a fresh preview before enabling the revised reset rule.");config.Save(state);await configurations.UpdateAsync(config,true);await claim.CompleteAsync();return false;}
             if(!state.IsDue(Now)||config.RunningRunId.HasValue)return false;
             elements.EnsureRunEnabled();
             if((await Blockers(runs,owner)).Count>0)

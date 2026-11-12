@@ -24,13 +24,15 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
     private readonly Func<ClearanceResetCandidate,Mapping,CancellationToken,Task<bool>> _eligible;
     private string? _token;
     private readonly IClearanceResetProtection _protection;
+    private readonly Func<CancellationToken,Task> _verifyFields;
     internal sealed record Mapping(string Property,int LookupNumber,int Cleared,int Blank);
     public ElementsClearanceResetService(IConfiguration configuration,IClearanceResetProtection protection)
-    {_configuration=configuration;_http=SharedClient;_find=FindAsync;_eligible=EligibleAsync;_protection=protection;}
+    {_configuration=configuration;_http=SharedClient;_find=FindAsync;_eligible=EligibleAsync;_protection=protection;_verifyFields=VerifyResetFieldsAsync;}
     internal ElementsClearanceResetService(IConfiguration configuration,HttpClient http,
         Func<Mapping,CancellationToken,Task<List<ClearanceResetCandidate>>> find,
-        Func<ClearanceResetCandidate,Mapping,CancellationToken,Task<bool>> eligible,IClearanceResetProtection protection)
-    {_configuration=configuration;_http=http;_find=find;_eligible=eligible;_protection=protection;}
+        Func<ClearanceResetCandidate,Mapping,CancellationToken,Task<bool>> eligible,IClearanceResetProtection protection,
+        Func<CancellationToken,Task>? verifyFields=null)
+    {_configuration=configuration;_http=http;_find=find;_eligible=eligible;_protection=protection;_verifyFields=verifyFields??(_=>Task.CompletedTask);}
     private string Setting(string name)=>_configuration[Prefix+name]??throw new InvalidOperationException("Missing Elements configuration.");
     public void EnsureRunEnabled()
     {
@@ -76,7 +78,32 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
         if(blanks.Length!=1)throw new InvalidOperationException("The blank clearance option is missing or ambiguous.");
         return new("uDefLookup"+cleared[0].Number,cleared[0].Number,cleared[0].Id,0);
     }
-    private async Task<Mapping> MappingAsync(CancellationToken ct)=>ResolveMapping((await Read("api/financial-aid/student-status/user-defined-select-items",ct)).AsObject());
+    private async Task<Mapping> MappingAsync(CancellationToken ct)
+    {
+        var map=ResolveMapping((await Read("api/financial-aid/student-status/user-defined-select-items",ct)).AsObject());
+        if(map.Property!="uDefLookup2")throw new InvalidOperationException("The clearance field configuration changed. Review field definitions before resetting.");
+        await _verifyFields(ct);return map;
+    }
+    internal static void ValidateResetFields(IReadOnlyList<(string Property,string Label)> fields)
+    {
+        (string Property,string Label)[] expected=[("UDefLookup2","Cleared Status"),("uDefDate1","Disable Blackboard"),
+            ("uDefBit2","Payment Plan?"),("uDefBit1","Non-Returning"),("uDefFreeForm1","Non-Returning Reason")];
+        foreach(var field in expected)
+        {
+            var matches=fields.Where(x=>string.Equals(x.Property,field.Property,StringComparison.OrdinalIgnoreCase)).ToArray();
+            if(matches.Length!=1||!string.Equals(matches[0].Label.Trim(),field.Label,StringComparison.OrdinalIgnoreCase)||
+                fields.Count(x=>string.Equals(x.Label.Trim(),field.Label,StringComparison.OrdinalIgnoreCase))!=1)
+                throw new InvalidOperationException("The status field configuration changed. No reset was sent; review the field labels.");
+        }
+    }
+    private async Task VerifyResetFieldsAsync(CancellationToken ct)
+    {
+        await using var c=await Open(ct);
+        await using var q=new SqlCommand("SELECT FieldPhysicalName,FieldDisplayName FROM dbo.CAMSUserDefinedRefFlds WHERE CAMSModuleID=12",c){CommandTimeout=30};
+        await using var r=await q.ExecuteReaderAsync(ct);var fields=new List<(string,string)>();
+        while(await r.ReadAsync(ct))fields.Add((r.GetString(0).Trim(),r.IsDBNull(1)?"":r.GetString(1).Trim()));
+        ValidateResetFields(fields);
+    }
     public async Task<List<ClearanceResetCandidate>> FindCandidatesAsync(CancellationToken ct=default)
     {EnsureEnvironment();var candidates=await _find(await MappingAsync(ct),ct);var protectedKeys=await _protection.ProtectedAsync(candidates,ct);return candidates.Where(x=>!protectedKeys.Contains((x.StudentUid,x.TermId))).ToList();}
     public async Task<ClearanceResetResult> ResetIfEligibleAsync(ClearanceResetCandidate candidate,Func<ClearanceResetAttempt,Task<bool>> recordBeforeWrite,CancellationToken ct=default)
@@ -91,6 +118,9 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
         var current=(await Read(route,ct)).AsObject();if(!JsonNode.DeepEquals(before,current))return Result("Skipped: term fields changed during verification.");
         if(!await _eligible(candidate,map,ct))return Result("Skipped: source records changed during verification.");
         var desired=ThesisElementsBillClearanceService.BuildBlankUpdate(current,candidate.StatusId,map.Property,map.Blank);
+        // Elements accepts an empty reason but rejects JSON null for this text field.
+        desired["uDefDate1"]=null;desired["uDefFreeForm1"]="";
+        desired["uDefBit1"]=false;desired["uDefBit2"]=false;
         if(!await recordBeforeWrite(new(candidate,before.ToJsonString(),desired.ToJsonString())))return Result("Skipped: automatic resets were turned off.");
         if(await _protection.IsProtectedAsync(candidate,ct))return Result("Skipped: approval or manual exception changed before dispatch.");
         using var patch=await Request(HttpMethod.Patch,"api/financial-aid/student-status/user-defined",ct);patch.Content=new StringContent(desired.ToJsonString(),Encoding.UTF8,"application/json");
@@ -109,7 +139,7 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
     {
         async Task<T> Unique<T>(string sql)
         {await using var q=new SqlCommand(sql,c){CommandTimeout=30};await using var r=await q.ExecuteReaderAsync(ct);if(!await r.ReadAsync(ct)||r.IsDBNull(0))throw new InvalidOperationException("Clearance reset scope is missing.");var value=(T)r.GetValue(0);if(await r.ReadAsync(ct))throw new InvalidOperationException("Clearance reset scope is ambiguous.");return value;}
-        var boundary=(await Unique<string>("SELECT Term FROM dbo.TermCalendar WHERE LTRIM(RTRIM(TextTerm))='Spring 2027'")).Trim();
+        var boundary=(await Unique<string>("SELECT Term FROM dbo.TermCalendar WHERE LTRIM(RTRIM(TextTerm))='Fall 2026'")).Trim();
         if(boundary.Length==0)throw new InvalidOperationException("Invalid clearance reset scope.");return boundary;
     }
     internal const string CandidateSql="""
@@ -145,7 +175,7 @@ public sealed class ElementsClearanceResetService:IClearanceResetElements,ITrans
         await using var c=await Open(ct);var scope=await Scope(c,ct);var filter=new ClearanceResetCandidate(studentUid,termId,0,"","",0);
         var sql=CandidateSql.Replace(" AND S.StudentStatusID=@Status","");
         await using var q=Command(c,new Mapping("uDefLookup2",2,1,0),scope,filter,false);q.CommandText=sql;
-        await using var reader=await q.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))throw new InvalidOperationException("No unique Spring 2027-or-later student term status was found.");
+        await using var reader=await q.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))throw new InvalidOperationException("No eligible unique student term status was found.");
         var result=new ClearanceResetCandidate(reader.GetInt32(0),reader.GetInt32(1),reader.GetInt32(2),reader.GetString(3).Trim(),reader.GetString(4).Trim(),0,reader.GetString(5).Trim(),reader.GetString(6).Trim());
         if(await reader.ReadAsync(ct))throw new InvalidOperationException("The student term status is ambiguous.");return result;
     }

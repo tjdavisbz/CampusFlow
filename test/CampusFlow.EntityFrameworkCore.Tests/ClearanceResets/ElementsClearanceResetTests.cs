@@ -52,13 +52,34 @@ public class ElementsClearanceResetTests
     }
     private static ElementsClearanceResetService Service(Handler h,Protection? p=null,Func<Task<bool>>? eligible=null,IConfiguration? config=null)=>
         new(config??Config(),new HttpClient(h),(_,_)=>Task.FromResult(new List<ClearanceResetCandidate>{Candidate}),(_,_,_)=>eligible?.Invoke()??Task.FromResult(true),p??new());
-    [Fact]public async Task No_bill_allows_an_explicit_blank_only_patch_under_the_shared_lease()
+    [Fact]public async Task No_bill_resets_exactly_the_five_reviewed_fields_under_the_shared_lease()
     {
         var h=new Handler();var p=new Protection();var before=h.Current.DeepClone().AsObject();
         var result=await Service(h,p).ResetIfEligibleAsync(Candidate,a=>{Assert.Null(h.Patch);Assert.Equal(0,p.Released);Assert.True(JsonNode.Parse(a.DesiredJson)!.AsObject().ContainsKey("uDefLookup2"));Assert.Equal(0,JsonNode.Parse(a.DesiredJson)!["uDefLookup2"]!.GetValue<int>());return Task.FromResult(true);});
         Assert.Equal("Verified blank",result.Outcome);Assert.True(h.Patch!.ContainsKey("uDefLookup2"));Assert.Equal(0,h.Patch["uDefLookup2"]!.GetValue<int>());
-        foreach(var field in before.Where(x=>x.Key!="uDefLookup2"))Assert.True(JsonNode.DeepEquals(field.Value,h.Patch[field.Key]),field.Key);
+        Assert.Null(h.Patch["uDefDate1"]);Assert.Equal("",h.Patch["uDefFreeForm1"]!.GetValue<string>());
+        Assert.False(h.Patch["uDefBit1"]!.GetValue<bool>());Assert.False(h.Patch["uDefBit2"]!.GetValue<bool>());
+        string[] changed=["uDefLookup2","uDefDate1","uDefFreeForm1","uDefBit1","uDefBit2"];
+        foreach(var field in before.Where(x=>!changed.Contains(x.Key)))Assert.True(JsonNode.DeepEquals(field.Value,h.Patch[field.Key]),field.Key);
         Assert.Equal(1,p.Leases);Assert.Equal(1,p.Released);
+    }
+    private static List<(string Property,string Label)> Labels()=>[("UDefLookup2","Cleared Status"),
+        ("uDefDate1","Disable Blackboard"),("uDefBit2","Payment Plan?"),("uDefBit1","Non-Returning"),("uDefFreeForm1","Non-Returning Reason")];
+    [Fact]public void Reviewed_field_types_are_mapped_by_verified_configuration_labels()
+    {ElementsClearanceResetService.ValidateResetFields(Labels());}
+    [Fact]public void Renamed_missing_or_duplicate_field_definitions_fail_closed()
+    {
+        var fields=Labels();fields[1]=("uDefDate1","Different field");Assert.Throws<InvalidOperationException>(()=>ElementsClearanceResetService.ValidateResetFields(fields));
+        fields=Labels();fields.RemoveAt(1);Assert.Throws<InvalidOperationException>(()=>ElementsClearanceResetService.ValidateResetFields(fields));
+        fields=Labels();fields.Add(("uDefDate2","Disable Blackboard"));Assert.Throws<InvalidOperationException>(()=>ElementsClearanceResetService.ValidateResetFields(fields));
+    }
+    [Fact]public async Task A_field_configuration_check_failure_prevents_all_writes()
+    {
+        var h=new Handler();var service=new ElementsClearanceResetService(Config(),new HttpClient(h),
+            (_,_)=>Task.FromResult(new List<ClearanceResetCandidate>{Candidate}),(_,_,_)=>Task.FromResult(true),new Protection(),
+            _=>Task.FromException(new InvalidOperationException("Labels changed")));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>service.ResetIfEligibleAsync(Candidate,_=>Task.FromResult(true)));
+        Assert.Null(h.Patch);
     }
     [Fact]public async Task Approved_or_manually_exempt_records_are_excluded_from_preview_and_execution()
     {

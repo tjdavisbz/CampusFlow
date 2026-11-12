@@ -5,15 +5,15 @@
 <main id="clearance-resets" data-read-only="@Model.IsReadOnlyView.ToString().ToLowerInvariant()" class="container py-4">
 @Html.AntiForgeryToken()
 <h1>Automatic clearance resets</h1>
-<p>Keep Elements clearance consistent with approved bills and authorized manual-clearance exceptions for Spring 2027 and later.</p>
+<p>Keep Elements student-status fields consistent with approved bills and authorized manual-clearance exceptions.</p>
 @if(Model.IsReadOnlyView){<div class="alert alert-warning" role="alert">Exit the current student, faculty or scheduler view before changing this schedule.</div>}
 <section class="card my-3" aria-labelledby="clearance-purpose"><div class="card-body">
 <h2 id="clearance-purpose">What this job does</h2>
-<p>Every 15 minutes, checks student records for Spring 2027 and all later terms. If a term’s status is <strong>Cleared</strong> and there is neither an approved bill nor an authorized manual-clearance exception for that student and term, resets it to <strong>blank (Select one)</strong>.</p>
-<p>Course enrollment does not prevent a reset. Current and qualifying legacy bill approvals are protected, including approvals whose documents or notifications are still processing. Earlier terms are outside this job’s scope.</p>
+<p>Every 15 minutes, checks student records. If a term’s status is <strong>Cleared</strong> and there is neither an approved bill nor an authorized manual-clearance exception for that student and term, clears <strong>Cleared Status, Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason</strong>. Date and text fields become blank, the status becomes <strong>Select one</strong>, and checkboxes become unchecked.</p>
+<p>Course enrollment does not prevent a reset. Current and qualifying legacy bill approvals are protected, including approvals whose documents or notifications are still processing.</p>
 <p>The checks use the chronological term sequence and recheck approval, exception and live clearance information before each update. Each run handles up to 100 candidates; remaining candidates wait for a later run.</p>
-<p>Only Cleared is reset. Not Cleared, Attendance Type, Supported, Blackboard restrictions, payment-plan and non-returning fields are preserved. A manual exception does not approve a bill or change Elements; staff must set manual clearance separately.</p>
-<p class="mb-0">This changes the student’s Elements clearance and can affect billing clearance. Review the recent results below after enabling it.</p>
+<p>Not Cleared and unrelated student-status fields are preserved. A manual exception does not approve a bill or change Elements; staff must set manual clearance separately.</p>
+<p class="mb-0">This changes the student’s billing and registration status fields and can remove a Blackboard restriction. Review the preview and recent results before enabling it.</p>
 </div></section>
 <section class="card my-3" aria-labelledby="clearance-schedule"><div class="card-body">
 <h2 id="clearance-schedule">Automatic schedule</h2>
