@@ -1,0 +1,107 @@
+{
+  "unit": "CF-038",
+  "verifiedAtUtc": "2026-11-12T06:29:22.478175+00:00",
+  "tests": {
+    "domain": 331,
+    "application": 136,
+    "entityframeworkcore": 322,
+    "web": 352
+  },
+  "testTotal": 1141,
+  "localHousingBrowserScenarios": 7,
+  "combinedLocalBrowserScenarios": 42,
+  "productionReadOnlyQualification": {
+    "environment": "production",
+    "readOnly": true,
+    "studentNamesOrIdsExported": false,
+    "savedAssignments": 113,
+    "originalPlanHashMatches": true,
+    "alreadyAssigned": 1,
+    "remainingAssignments": 112,
+    "historicalAssignmentsToClear": 112,
+    "unassignedWithoutHistoricalConflict": 0,
+    "allHistoricalMetadataQualified": true,
+    "housingOrBillingWrites": false
+  },
+  "nonprodActualAdapterCanary": {
+    "environment": "nonprod",
+    "syntheticIdentityVerified": true,
+    "isolatedPeriodCreated": true,
+    "testPeriodId": 19,
+    "sequence": [
+      {
+        "stage": "isolated-zero-rent-configuration",
+        "configured": true
+      },
+      {
+        "stage": "assign",
+        "httpStatus": 200,
+        "success": true
+      },
+      {
+        "stage": "isolated-zero-rent-configuration",
+        "configured": true
+      },
+      {
+        "stage": "historical-deleted-assignments",
+        "count": 1
+      },
+      {
+        "stage": "writer-after-reinitialize",
+        "hasActiveAssignment": false
+      },
+      {
+        "stage": "assign",
+        "httpStatus": 409,
+        "success": false
+      },
+      {
+        "stage": "reviewed-historical-preview",
+        "count": 1
+      },
+      {
+        "stage": "reviewed-writer-deallocation",
+        "acknowledged": true
+      },
+      {
+        "stage": "assign",
+        "httpStatus": 200,
+        "success": true
+      },
+      {
+        "stage": "new-assignment-readback",
+        "verified": true
+      }
+    ],
+    "isolatedPeriodRemoved": true,
+    "productionWrites": false,
+    "billingWrites": false
+  },
+  "nonprodFixtureCleanup": {
+    "environment": "nonprod",
+    "ownedMasterFixtureInactive": true,
+    "activeScratchPeriods": 0,
+    "activeScratchAssignments": 0,
+    "physicalRemovalRejectedByVendor": true,
+    "productionWrites": false,
+    "nonzeroSyntheticHousingBatchRows": 0
+  },
+  "originalPlanHash": "aadce5f7df6ec49a1a1302bab047112aa16f4a265e93537b1bb1967f9ffe900a",
+  "originalBackupSha256": "4050848dcf87eb307ed0583941c07ecd0c98441b32ba3fe919c7782140e07ff2",
+  "productionRecoveryExecuted": false,
+  "schemaMigrationRequired": false,
+  "newDependencies": false,
+  "supportedRecovery": "Explicitly reviewed exact deleted commuter assignment, room and property; null-or-zero rent only. No active moves or priced residential history.",
+  "manualStaffAcceptanceRequired": "Review recovery preview, then explicitly Resume; do not Refresh away the saved draft.",
+  "rollback": "Revert CF-038 code while preserving later units. Code rollback does not reverse a staff-initiated assignment/deallocation; use operation history for any reviewed data repair.",
+  "deployedTo": [
+    "nonprod",
+    "production"
+  ],
+  "committed": true,
+  "pushed": true,
+  "deploymentVerification": {
+    "nonprod": "CF-034-038-nonprod-deployment-verification.json",
+    "production": "CF-034-038-production-deployment-verification.json"
+  }
+}

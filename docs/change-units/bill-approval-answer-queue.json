@@ -1,439 +1,232 @@
 {
-  "updatedAtUtc": "2026-11-12T04:28:29.084958+00:00",
-  "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-5.pdf",
+  "updatedAtUtc": "2026-11-12T06:51:28.360688+00:00",
+  "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-6.pdf",
   "purpose": "Preserve answers and decisions for TJ\u2019s requested later consolidated summary; not sent to Jeff.",
-  "currentReview": "Jeff-bill-approval-review-2026-11-10.json",
-  "numberingNote": "12 populated outstanding issues, item 13 blank. Needs Review has 11 entries. Resolved section retains its own historical numbering. Do not map the previous PDF item numbers to this version.",
+  "currentReview": "Jeff-bill-approval-review-2026-11-11-v6.json",
+  "numberingNote": "12 populated outstanding issues; 13 blank. Six Needs Review entries. Resolved section has separate historical numbering.",
   "answers": [
     {
       "item": "1",
       "topic": "Forgot Password / Activate Account",
-      "answer": "Prepared standalone recovery work and legacy verification data remain paused. Neither portal has the page deployed or enabled. The user excluded a signed-in Change Password page and any login landing-page change. The older promise in green in this document does not override the explicit pause.",
-      "nextStep": "Resume only when the user requests it; supported hybrid reset backend, scoped permissions and controlled test remain pending.",
-      "decision": null,
       "changeUnits": [
         "CF-028"
       ],
-      "state": "paused-by-user-not-deployed"
+      "state": "paused-by-user-not-deployed",
+      "answer": "Keep paused. Standalone recovery only; no login-flow or signed-in password page changes.",
+      "nextStep": "Resume only at TJ\u2019s request.",
+      "decision": null
     },
     {
       "item": "2",
-      "topic": "Clearance reset: expand fields and earlier terms",
-      "answer": "Jeff confirms the core manual reset worked. Revision 2 uses valid same-student/same-term current or qualifying legacy approved bills and audited manual exceptions, regardless of courses, and resets Cleared to blank. The lower bound remains Spring 2027, not Fall 2026. The other four fields are preserved. Automatic execution is available but has not been staff tested; last recorded preference is off.",
-      "nextStep": "Keep the proven core separate from the requested extension. Define an exact earlier-term boundary and protection for legitimate field values before implementation.",
-      "decision": "Choose exact earlier-term scope and reliable approval history; specify reset values, one-time versus repeated cleanup, and exceptions for Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason. These affect access, billing and historical records.",
+      "topic": "Expand clearance reset fields and earlier terms",
       "changeUnits": [
-        "CF-018"
+        "CF-018",
+        "CF-037"
       ],
-      "state": "core-staff-test-passed-extension-needs-policy"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "Eligible Cleared records without a qualifying same-term approved bill or audited manual exception reset all five specified fields. Cleared Status becomes blank. Existing already-blank or Not Cleared rows are not blanket repaired. Automatic scheduling remains off until explicitly enabled.",
+      "nextStep": "Preview the expanded reset and test the reviewed result; explicitly enable scheduling only when ready.",
+      "decision": null
     },
     {
       "item": "3",
-      "topic": "Housing Apply partially succeeds then blocks retries",
-      "answer": "Production aggregate readback confirms all 113 unique saved desired assignments and the original plan hash remain intact. Apply recorded one verified room assignment, stopped at the next assignment, and recorded no charge reconciliation. The failed target has no active assignment in either read source. Nonprod isolated assignment tests showed missing rent setup can reject assignments, but production commuter setup exists with zero per-person rates, so that is not established as this failure\u2019s cause. CF-031 now provides a read-only recovery review and explicitly confirmed resume for additive commuter runs, skipping verified completed assignments while preserving the 113-entry plan and prior history. It retains safe error categories and blocks Refresh of a partial run. CF-031 is committed and deployed in both environments; this does not establish the original rejection cause.",
-      "nextStep": "Jeff should use Review recovery first. Confirm the preserved 113-entry plan and current assignments/billing before any explicit Resume. Resume affects the batch, not only his account; original vendor rejection is not yet confirmed fixed.",
-      "decision": null,
-      "changeUnits": [
-        "CF-006",
-        "CF-023",
-        "CF-031"
-      ],
-      "state": "recovery-deployed-original-vendor-failure-open",
-      "investigation": "housing-partial-apply-investigation-2026-11-10.json"
+      "topic": "Loan acceptance shows Not available",
+      "changeUnits": [],
+      "state": "held-awaiting-affected-student-id",
+      "answer": "User requests holding the individual case until an affected student ID is available. Source has no global award-acceptance disable switch. Aggregate reporting found 984 Spring 2027 loans passing the current gate, 304 locked awards and zero sent to billing; this is not an end-to-end test of affected sessions.",
+      "nextStep": "Ask for affected student ID and selected term if the issue recurs; inspect live award and decision state before changing eligibility.",
+      "decision": "Affected student ID and selected term; TJ previously said he would ask Jeff."
     },
     {
       "item": "4",
-      "topic": "Term in approved-bill document tracking description",
-      "answer": "Deployed CF-029 uses the documented docNameId=0 custom-description mode for new records. The nonprod synthetic test verified Approved Bill - Spring 2027 in the Billing reporting view, PDF byte roundtrip and stable retry recovery; all synthetic documents removed. Shared document type and old approvals are unchanged.",
-      "nextStep": "Deployed to production and nonprod; Jeff can retest the updated behavior in production.",
-      "decision": null,
+      "topic": "Housing Apply conflicts with existing commuter assignments",
       "changeUnits": [
-        "CF-004",
-        "CF-029"
+        "CF-006",
+        "CF-023",
+        "CF-031",
+        "CF-038"
       ],
-      "state": "deployed-both-awaiting-staff-retest"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "All 113 desired assignments are retained. One is already assigned; 112 remaining assignments qualify for reviewed recovery of deleted commuter history left by period reinitialization. Exact conflict and recovery passed an isolated nonprod live test. No production Apply/Resume was executed.",
+      "nextStep": "Housing Assignments: Review recovery preview, verify the complete 113-entry plan, then explicitly Resume. Do not Refresh away the draft.",
+      "decision": null
     },
     {
       "item": "5",
-      "topic": "Use Distribution Amount for bill-approval aid totals",
-      "answer": "Deployed CF-029 reads Elements EstimatedAmount, which the vendor UI maps to Distribution Amount, for bill review totals, payment calculations, fingerprint and snapshot/PDF. Gross Amount remains the Financial Aid acceptance/display amount; missing/negative net blocks review and zero does not fall back to gross.",
-      "nextStep": "Deployed to production and nonprod; Jeff can retest the updated behavior in production.",
-      "decision": null,
+      "topic": "Unaccepted loan amounts on bill review",
       "changeUnits": [
-        "CF-003",
-        "CF-014",
-        "CF-016",
-        "CF-029"
+        "CF-029",
+        "CF-034"
       ],
-      "state": "deployed-both-awaiting-staff-retest"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "Bill-review unaccepted-loan amounts use net distribution amounts from Elements; missing or negative net values show Amount unavailable. Acceptance rules and API decision amounts are unchanged.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     },
     {
       "item": "6",
-      "topic": "Housing tile incomplete despite commuter assignment",
-      "answer": "Existing policy counts any active selected-term housing assignment, including Commuter. Code derives assignment presence from the housing reader building name. A Distance Graduate tile marked complete alone does not prove that assignment was detected because housing may be optional. The approved read-only production Home test loads with course selection complete and bill review available; no housing-required meal-plan step is shown for the current account context.",
-      "nextStep": "The recorded test account has no active Spring 2027 assignment in either replica at this check (nonprod has Fall housing). Confirm exact account, environment and selected term if this differs from what staff see; do not change the eligibility rule merely to mark optional housing complete.",
-      "decision": null,
+      "topic": "Financial Aid page distribution amounts",
       "changeUnits": [
-        "CF-001",
-        "CF-021"
+        "CF-029",
+        "CF-034"
       ],
-      "state": "reported-bug-needs-student-term-readback"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "Financial Aid cards, totals and confirmation displays use net distribution amounts consistently. Missing amounts prevent an inaccurate total; zero is retained. Award decision values are unchanged.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     },
     {
       "item": "7",
-      "topic": "Submitting meal form without choosing records None",
-      "answer": "Deployed CF-030 requires explicit radio intent, rejects missing/invalid/conflicting input server-side and disables submission until selection. Intentional None stays valid for eligible commuters.",
-      "nextStep": "Deployed to production and nonprod; Jeff can retest the updated behavior in production.",
-      "decision": null,
+      "topic": "Admin meal-plan default term",
       "changeUnits": [
-        "CF-001",
-        "CF-020",
-        "CF-030"
+        "CF-003",
+        "CF-030",
+        "CF-035"
       ],
-      "state": "deployed-both-awaiting-staff-retest"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "Meal-plan administration defaults to Spring 2027 while available and not ended. Explicit selected term takes precedence; the global/student term is unchanged.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     },
     {
       "item": "8",
-      "topic": "No Meal Plan is invisible and cannot be cleared",
-      "answer": "Deployed CF-030 lists local No Meal Plan choices and adds an audited clear action using the existing removal permission, reason, confirmation and concurrency/ownership checks. It preserves history and requires an index-only migration to allow reselection. No fake Elements plan or charge is created. An actual selected-term Elements meal assignment blocks clearing into another choice, preventing duplicate selection.",
-      "nextStep": "Deployed to production and nonprod; Jeff can retest the updated behavior in production.",
-      "decision": null,
+      "topic": "Make Continue with bill approval prominent",
       "changeUnits": [
-        "CF-001",
-        "CF-015",
-        "CF-030"
+        "CF-030",
+        "CF-035"
       ],
-      "state": "deployed-both-awaiting-staff-retest"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "A prominent Continue with bill approval action appears beside the meal-plan success message and preserves the selected term.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     },
     {
       "item": "9",
-      "topic": "Continue registration after meal-plan selection",
-      "answer": "Deployed CF-030 adds a clear link to Home after recorded meal selection and retains the selected term.",
-      "nextStep": "Deployed to production and nonprod; Jeff can retest the updated behavior in production.",
-      "decision": null,
+      "topic": "Approved Bill document name and term description",
       "changeUnits": [
-        "CF-001",
-        "CF-030"
+        "CF-004",
+        "CF-029",
+        "CF-036"
       ],
-      "state": "deployed-both-awaiting-staff-retest"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "New approved-bill documents retain the Approved Bill document category plus a term-specific description. Nonprod actual-service creation, retry reuse and cleanup passed. Existing documents are not renamed.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     },
     {
       "item": "10",
-      "topic": "Bill-approval page returns 500",
-      "answer": "Retained production audit records identify POST failures on final bill approval, including 6:02 AM Central on November 11. Elements recalculation completed. Staff reset retained a deleted approval occupying the unfiltered tenant/account/term unique key. CF-032 reproduces that PostgreSQL 23505 conflict and changes only the index to exclude deleted rows, preserving historical agreements and artifacts. The fixed regression verifies repeated resets and one active approval. CF-032 is now committed, pushed and deployed in nonprod and production; migration row hashes verify all existing approvals/history unchanged.",
-      "nextStep": "Successful approved-bill artifact and notification observed after CF-032; PDF layout feedback is CF-033.",
-      "decision": "Fresh own-session retest and failure time are needed; production environment is already confirmed.",
+      "topic": "Approved-bill PDF formatting",
       "changeUnits": [
-        "CF-032"
+        "CF-033"
       ],
-      "state": "cf032-production-approval-observed",
-      "investigation": "CF-032-verification.json"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "CF-033 fixes Word-pasted paragraph/list/heading formatting and refund-date rows. Deployed to both portals; stored historical PDFs retain their bytes.",
+      "nextStep": "Retest a newly generated PDF; previous attachment remains an old file.",
+      "decision": null
     },
     {
       "item": "11",
-      "topic": "Meal-plan delete still absent after access grant",
-      "answer": "Jeff Francis\u2019s active staff account jfrancis has both role-based and direct grants for opening Manage Student Meal Plans and for removing/clearing choices, in production and nonprod. The granting role is CampusFlow Business Services Manager. CF-030 is deployed for local No Meal Plan choices; no access changes were needed or made.",
-      "nextStep": "Jeff should retest with his staff account and selected term. If the control remains missing, inspect session/read-only context and the actual local choice or Elements assignment; do not assume missing grants.",
-      "decision": null,
+      "topic": "Post-approval pending text and Refresh status",
       "changeUnits": [
-        "CF-015",
-        "CF-023",
-        "CF-030"
+        "CF-024",
+        "CF-036"
       ],
-      "state": "permissions-confirmed-both-environments-awaiting-ui-retest",
-      "accessVerification": "CF-030-Jeff-meal-plan-access-verification.json"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "Completion status refreshes automatically for a bounded interval without the manual Refresh link. Genuine pending/failure states remain visible; the status check performs no billing, approval, tax or email writes.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     },
     {
       "item": "12",
-      "topic": "Loan acceptance shows Not available",
-      "answer": "Current code displays Not available for a nonpositive amount, locked award, sent-to-billing award or cancelled status. There is no mobile-only gate. The positive anticipated-loan screenshot makes a lock plausible, but it is not proof of the underlying flags.",
-      "nextStep": "TJ will ask Jeff for affected student ID when updating the Google Doc; inspect that award before changing eligibility gates.",
-      "decision": "Which student had the loan marked Not available? Student ID is sufficient; TJ has not received it yet.",
+      "topic": "Removed meal plan remains in student portal",
       "changeUnits": [
-        "CF-014",
-        "CF-016"
+        "CF-006",
+        "CF-015",
+        "CF-030",
+        "CF-035"
       ],
-      "state": "awaiting-student-id-from-Jeff"
+      "state": "deployed-both-awaiting-staff-retest",
+      "answer": "Confirmed Elements meal-plan removal reconciles the exact saved paid choice. Current assignments are rechecked before replacement; pending/unconfirmed choices and approved-bill locks are preserved. No automatic tax reversal or refund is promised.",
+      "nextStep": "Staff retest in production; report the student, term and observed result if an issue remains.",
+      "decision": null
     }
   ],
   "needsReview": [
     {
       "item": "R1",
-      "topic": "Housing Apply versus complete batch rebuild",
-      "state": "answer-available",
-      "changeUnits": [
-        "CF-006"
-      ],
-      "assessment": "Apply handles changes; it does not rebuild the entire batch or repair missing charges on unchanged assignments.",
-      "nextStep": "Answer the behavior question; a previewable missing-charge audit/repair is separate scope.",
-      "decision": null,
-      "pdfPages": [
-        8
-      ]
+      "topic": "Housing batch changes and missing-charge audit",
+      "answer": "Apply changes rather than rebuild the full batch. A guarantee to repair arbitrary missing charges is separate audit/reconciliation scope."
     },
     {
       "item": "R2",
       "topic": "Rent Per Person versus Housing description",
-      "state": "answer-and-elements-configuration",
-      "changeUnits": [
-        "CF-006"
-      ],
-      "assessment": "Manually added Elements descriptions pass through. Portal-generated base housing lines use Housing and intentional single-room fees are separate.",
-      "nextStep": "Explain and inspect Elements configuration before promising a label change.",
-      "decision": null,
-      "pdfPages": [
-        8
-      ]
+      "answer": "Review Elements transaction descriptions; do not rename source accounting data merely for a display request."
     },
     {
       "item": "R3",
-      "topic": "Completion congratulations and textbook navigation",
-      "state": "deployed-awaiting-staff-retest",
+      "topic": "Housing assignment/charge sync and separate single-room fee",
+      "answer": "CF-038 housing recovery is deployed for explicit staff preview and Resume; the 113-entry plan is retained. Single-room fee behavior still needs staff verification.",
+      "state": "deployed-both-staff-recovery-test-pending",
       "changeUnits": [
-        "CF-024"
+        "CF-038"
       ],
-      "assessment": "Congratulations/heading, student-friendly completion detail, textbook-link wording and illustration changes are recorded deployed. Vendor course-list prefill is not proven.",
-      "nextStep": "Retest current output; vendor must confirm active catalog term and expected course identifiers for prefill.",
-      "decision": null,
-      "pdfPages": [
-        8,
-        9
-      ]
+      "nextStep": "Review the preserved housing recovery preview and explicitly Resume if correct. Confirm the separate single-room fee independently."
     },
     {
       "item": "R4",
-      "topic": "Refund percentages/date formatting in PDF",
-      "state": "cf033-deployed-both-preview-reviewed",
-      "changeUnits": [
-        "CF-024",
-        "CF-033"
-      ],
-      "assessment": "CF-033 fixes the real Word-pasted heading wrapper, preserving paragraphs/inline emphasis and separate refund-date lines. The reviewed three-page preview retains all wording and financial-page text; all eight deadlines fit on single lines. Committed and deployed both environments. Stored historical PDFs are unchanged.",
-      "nextStep": "Review the next newly generated PDF. Do not expect an existing archived PDF download to change automatically.",
-      "decision": null,
-      "pdfPages": [
-        9,
-        10
-      ]
+      "topic": "Meal tile eligibility",
+      "answer": "Existing policy is Residential Undergraduate OR Oaks_MAIN OR active housing assignment, excluding AIC. Retest actual account and selected term."
     },
     {
       "item": "R5",
-      "topic": "Bookstore legal name and purchasing amount",
-      "state": "deployed-awaiting-staff-retest",
-      "changeUnits": [
-        "CF-024"
-      ],
-      "assessment": "Legal-name email and legacy initial voucher rule are recorded deployed: the larger of $500 or available credit. Actual purchases are charged.",
-      "nextStep": "Verify the next legitimate notification; no test email sent in this review.",
-      "decision": null,
-      "pdfPages": [
-        10,
-        11
-      ]
+      "topic": "Regular versus commuter catalogs",
+      "answer": "Commuter assignment selects commuter options; other eligible assigned housing selects regular options. Retest."
     },
     {
       "item": "R6",
-      "topic": "Separate meal-plan sales tax",
-      "state": "deployed-awaiting-staff-retest",
-      "changeUnits": [
-        "CF-027"
-      ],
-      "assessment": "Separate 8.25% tax is recorded enabled for writable unapproved Spring 2027+ reviews, with dedicated batch and durable audit. Meal assignment removal is not proof of tax reversal.",
-      "nextStep": "Staff retest; avoid duplicate implementation or retroactive approved-bill changes.",
-      "decision": null,
-      "pdfPages": [
-        11
-      ]
-    },
-    {
-      "item": "R7",
-      "topic": "Cost-type unmapped, cutoff and automatic runs",
-      "state": "answer-with-policy-question",
-      "changeUnits": [
-        "CF-005",
-        "CF-017",
-        "CF-026"
-      ],
-      "assessment": "Unmapped means skipped unchanged. Term end dates determine the cutoff, not course dates or billing authorization. Fifteen-minute automation exists; latest release verification records production enabled and a completed no-change cycle, nonprod off.",
-      "nextStep": "Answer existing behavior; an authorized-term or Fall 2026 freeze needs a separate policy.",
-      "decision": "Should Fall 2026 or authorized terms be frozen before their term end date?",
-      "pdfPages": [
-        11,
-        12
-      ]
-    },
-    {
-      "item": "R8",
-      "topic": "Admin housing sync and separate single fee",
-      "state": "recovery-deployed-original-vendor-failure-open",
-      "changeUnits": [
-        "CF-006",
-        "CF-023",
-        "CF-031"
-      ],
-      "assessment": "Separate intentional-single fee is implemented, but housing sync cannot be called resolved while the partial Apply remains.",
-      "nextStep": "Use the reviewed recovery path under outstanding item 3; retain the separate single-fee design.",
-      "decision": null,
-      "pdfPages": [
-        12
-      ]
-    },
-    {
-      "item": "R9",
-      "topic": "Who sees meal-plan tile",
-      "state": "implemented-needs-targeted-retest",
-      "changeUnits": [
-        "CF-001",
-        "CF-015"
-      ],
-      "assessment": "Existing policy includes Residential Undergraduate, Oaks_MAIN or an assigned dorm, excludes AIC.",
-      "nextStep": "Retest specific selected-term cases; link the housing detection investigation to outstanding item 6.",
-      "decision": null,
-      "pdfPages": [
-        12,
-        13
-      ]
-    },
-    {
-      "item": "R10",
-      "topic": "Commuter versus residential catalog",
-      "state": "partial-staff-confirmation",
-      "changeUnits": [
-        "CF-001",
-        "CF-020"
-      ],
-      "assessment": "Jeff now confirms he can reach commuter choices. Catalog matching is recorded deployed; that does not resolve accidental None or missing local-choice management.",
-      "nextStep": "Keep catalog acceptance distinct from outstanding items 7\u20139.",
-      "decision": null,
-      "pdfPages": [
-        13
-      ]
-    },
-    {
-      "item": "R11",
-      "topic": "Meal-plan price reference",
-      "state": "reference-not-new-coding",
-      "changeUnits": [
-        "CF-001",
-        "CF-027"
-      ],
-      "assessment": "The seven quoted prices and tax breakdown remain reference data.",
-      "nextStep": "Use as acceptance reference; tax posting is tracked separately under R6.",
-      "decision": null,
-      "pdfPages": [
-        13,
-        14,
-        15,
-        16
-      ]
+      "topic": "Meal pricing reference",
+      "answer": "Reference prices include separate 8.25% tax. CF-027 is deployed; this section is a pricing reference, not a new authorization to post charges."
     }
   ],
   "proposedGroups": [
     {
-      "name": "Bill approval and financial aid",
+      "name": "Aid display",
       "items": [
-        4,
-        5,
-        10,
-        12
+        "5",
+        "6"
       ],
-      "scope": "Diagnose the 500 and unavailable loan action first; add net distribution amounts and supported term document labeling. Keep fixes independently reviewable.",
-      "newUnitAssigned": true,
-      "preparedUnit": "CF-029"
+      "note": "Keep acceptance payloads and permissions unchanged."
     },
     {
-      "name": "Student housing/meal workflow and admin selection management",
+      "name": "Meal-plan workflow",
       "items": [
-        6,
-        7,
-        8,
-        9,
-        11
+        "7",
+        "8",
+        "12"
       ],
-      "scope": "Assignment detection, explicit meal choice, visible/resettable local None choice, continuation navigation and effective removal access.",
-      "newUnitAssigned": true,
-      "preparedUnit": "CF-030"
+      "note": "Default term, continuation action and authoritative selection reconciliation."
     },
     {
-      "name": "Bulk housing Apply reconciliation",
+      "name": "Approval completion and document tracking",
       "items": [
-        3
+        "9",
+        "11"
       ],
-      "scope": "Reviewed recovery for additive commuter assignments and safe failure diagnostics. Original rejection still needs a controlled staff retest; preserve all 113 saved assignments.",
-      "newUnitAssigned": true,
-      "preparedUnit": "CF-031"
+      "note": "Investigate API metadata and retain truthful completion states."
     },
     {
-      "name": "Clearance extension",
+      "name": "Commuter assignment moves",
       "items": [
-        2
+        "4"
       ],
-      "scope": "Separate policy-dependent work for older terms and four additional fields; preserve current approved-bill/manual-exception core.",
-      "newUnitAssigned": false
+      "note": "Protect saved 113 assignments; separately review live moves and billing."
     },
     {
-      "name": "Account recovery",
+      "name": "Clearance policy extension",
       "items": [
-        1
+        "2"
       ],
-      "scope": "CF-028 remains paused by user and excluded from billing work.",
-      "newUnitAssigned": false
-    }
-  ],
-  "documentHistory": [
-    {
-      "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-3.pdf",
-      "answers": [
-        {
-          "item": "8a",
-          "topic": "Unmapped",
-          "answer": "No matching saved enabled rule was found; the record is skipped unchanged. Invalid target lookup results are separate."
-        },
-        {
-          "item": "8b",
-          "topic": "Cost-type term cutoff",
-          "answer": "Uses TermCalendar term end dates, not individual course dates or billing authorization. Includes the earliest qualifying unended term and later terms; no enrollment requirement.",
-          "decision": "Whether to freeze authorized billing terms or set a Spring 2027 lower bound; no policy change implemented."
-        },
-        {
-          "item": "8c",
-          "topic": "Automatic cost-type updates",
-          "answer": "CF-017 provides optional 15-minute automatic updates. November 9 deployment checks found production enabled and nonprod off; those preferences and saved rules were preserved. Production has a stale next-run timestamp and no active claim, recorded for separate worker investigation; do not claim automatic cycles were verified.",
-          "observation": "CF-018-021-cost-type-schedule-observation.json"
-        },
-        {
-          "item": "9",
-          "topic": "Housing batch reconciliation",
-          "answer": "Apply reconciles recognized unposted charge lines for students with changed room/rate/single choices. It does not rebuild the whole batch or repair missing charges on unchanged assignments. Refresh does not change Elements billing.",
-          "decision": "A previewable missing-charge audit/repair would be separate functionality."
-        },
-        {
-          "item": "2",
-          "topic": "Commuter rooms",
-          "answer": "Read-only production verification found 20 active master rooms but one Spring 2027 period room. Nineteen master rooms are missing from that period. Configure the period in Elements, then refresh CampusFlow.",
-          "caution": "Review assignments and vendor conflict checks before any reinitialization; no production room changes authorized/performed by this development task."
-        },
-        {
-          "item": "7",
-          "topic": "Meal-plan opening dates",
-          "answer": "Meal selection shares the selected term\u2019s bill-approval opening/test-student controls. There is no separate meal-plan date window. CF-020 fixes the verified plan-name mismatch; nonprod still needs Spring term setup."
-        },
-        {
-          "item": "1",
-          "topic": "Cleared reset staff feedback and additional carried-over fields",
-          "answer": "CF-018 revision 2 is committed and deployed to nonprod and production. Spring 2027+ Cleared resets to blank when the same student/term has neither a valid current/qualifying legacy approved bill nor an audited manual exception. Courses no longer determine eligibility; other user-defined fields remain preserved. Automatic resets remain off pending fresh staff preview and explicit enablement.",
-          "decision": "The manual exception is explicitly authorized and implemented. Define separate timing/policy for Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason; these remain preserved. Prior staff changes require exact audit before any correction.",
-          "feedback": "CF-018-staff-feedback-2026-11-08.json",
-          "verification": "CF-018-021-production-deployment-verification.json"
-        }
-      ],
-      "archivedAtUtc": "2026-11-10T01:03:10.036845+00:00"
-    },
-    {
-      "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-4.pdf",
-      "snapshotFile": "bill-approval-answer-queue-before-2026-11-10-review.json",
-      "currentReview": "Jeff-bill-approval-review-2026-11-09.json",
-      "archivedAtUtc": "2026-11-11T01:27:23.284689+00:00"
+      "note": "Blocked on policy, not included in display fixes."
     }
   ],
   "heldChangeUnits": [
@@ -443,80 +236,45 @@
       "source": "CF-028-status.json"
     }
   ],
-  "notYetDiagnosed": [
-    3,
-    6,
-    10,
-    11,
-    12
-  ],
-  "remainingInvestigation": [
+  "historicalVersions": [
     {
-      "item": "2",
-      "topic": "Clearance reset: expand fields and earlier terms",
-      "nextStep": "Keep the proven core separate from the requested extension. Define an exact earlier-term boundary and protection for legitimate field values before implementation.",
-      "decision": "Choose exact earlier-term scope and reliable approval history; specify reset values, one-time versus repeated cleanup, and exceptions for Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason. These affect access, billing and historical records."
-    },
-    {
-      "item": "3",
-      "topic": "Housing Apply partially succeeds then blocks retries",
-      "nextStep": "Jeff should use Review recovery first. Confirm the preserved 113-entry plan and current assignments/billing before any explicit Resume. Resume affects the batch, not only his account; original vendor rejection is not yet confirmed fixed.",
-      "decision": null
-    },
-    {
-      "item": "6",
-      "topic": "Housing tile incomplete despite commuter assignment",
-      "nextStep": "The recorded test account has no active Spring 2027 assignment in either replica at this check (nonprod has Fall housing). Confirm exact account, environment and selected term if this differs from what staff see; do not change the eligibility rule merely to mark optional housing complete.",
-      "decision": null
-    },
-    {
-      "item": "10",
-      "topic": "Bill-approval page returns 500",
-      "nextStep": "Ask Jeff to retry in his own signed-in production student session and supply selected term and approximate time if it fails, then trace only that exception.",
-      "decision": "Fresh own-session retest and failure time are needed; production environment is already confirmed."
-    },
-    {
-      "item": "11",
-      "topic": "Meal-plan delete still absent after access grant",
-      "nextStep": "Jeff should retest with his staff account and selected term. If the control remains missing, inspect session/read-only context and the actual local choice or Elements assignment; do not assume missing grants.",
-      "decision": null
-    },
-    {
-      "item": "12",
-      "topic": "Loan acceptance shows Not available",
-      "nextStep": "TJ will ask Jeff for affected student ID when updating the Google Doc; inspect that award before changing eligibility gates.",
-      "decision": "Which student had the loan marked Not available? Student ID is sufficient; TJ has not received it yet."
+      "sourceDocument": "/Users/tjdavis/Downloads/Spring 2027 Approve Your Bill Issues & Questions_-5.pdf",
+      "snapshotFile": "bill-approval-answer-queue-before-2026-11-11-v6-review.json",
+      "currentReview": "Jeff-bill-approval-review-2026-11-10.json",
+      "archivedAtUtc": "2026-11-12T04:36:10.382777+00:00"
     }
   ],
   "remainingDecisionsAndExternalWork": [
-    "Choose exact earlier-term scope and reliable approval history; specify reset values, one-time versus repeated cleanup, and exceptions for Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason. These affect access, billing and historical records.",
-    "Fresh own-session retest and failure time are needed; production environment is already confirmed.",
-    "Which student had the loan marked Not available? Student ID is sufficient; TJ has not received it yet.",
-    "Should Fall 2026 or authorized terms be frozen before their term end date?"
+    "Affected student ID and selected term for held loan item 3.",
+    "Staff review and explicit Resume of housing recovery; saved 113-entry plan retained.",
+    "CF-028 remains paused; Microsoft permissions/writeback setup and controlled testing remain pending when resumed."
   ],
   "codingReadiness": {
     "reviewOnly": false,
     "newFollowupsIdentified": true,
     "newFixesImplemented": true,
-    "liveFailuresReproduced": false,
-    "previousDeployedUnitsRemainDeployed": true,
-    "cf028Paused": true,
     "preparedUnits": [
-      "CF-029",
-      "CF-030",
-      "CF-031"
+      "CF-034",
+      "CF-035",
+      "CF-036",
+      "CF-037",
+      "CF-038"
     ],
-    "combinedVerificationComplete": true,
-    "combinedVerification": "CF-029-031-combined-verification.json",
-    "deployedPreparedUnits": [
-      "CF-029",
-      "CF-030",
-      "CF-031"
+    "committed": true,
+    "deployed": true,
+    "verification": "CF-034-038-combined-verification.json",
+    "cf028Paused": true,
+    "housingIssueNotClaimedFixed": false,
+    "committedUnits": [
+      "CF-034",
+      "CF-035",
+      "CF-036",
+      "CF-037",
+      "CF-038"
     ],
-    "deploymentVerification": {
-      "nonprod": "CF-029-031-nonprod-deployment-verification.json",
-      "production": "CF-029-031-production-deployment-verification.json"
-    }
+    "pushed": true,
+    "housingStaffRecoveryRequired": true,
+    "productionHousingRecoveryExecuted": false
   },
   "googleDocUpdatedExternally": false,
   "googleDocUpdateGuidance": {
@@ -530,7 +288,23 @@
     ],
     "preserveExistingQuestionNumbers": true,
     "doNotMarkEveryItemResolvedBeforeStaffRetest": true,
-    "doNotRefreshOrRetryHousingBeforeReconciliation": true
+    "doNotRefreshOrRetryHousingBeforeReconciliation": true,
+    "latestDeploymentVerified": true,
+    "source": "CF-034-038-combined-verification.json",
+    "productionHousingRecoveryNotExecuted": true
   },
-  "previousReleaseReadinessSnapshot": "bill-approval-answer-queue-before-2026-11-10-review.json"
+  "previousReleaseReadinessSnapshot": "bill-approval-answer-queue-before-2026-11-11-v6-review.json",
+  "clearanceDecision": {
+    "startingTerm": "Fall 2026",
+    "showCutoffOnPage": false,
+    "blankRepresentations": {
+      "ClearedStatus": 0,
+      "DisableBlackboard": null,
+      "NonReturningReason": "",
+      "PaymentPlan": false,
+      "NonReturning": false
+    },
+    "eligibility": "Existing Cleared status, no qualifying approved bill or manual exception."
+  },
+  "googleDocEditingInstruction": "DO NOT edit the Google Doc. TJ will update it using the item statuses supplied in chat."
 }

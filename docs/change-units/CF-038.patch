@@ -1,0 +1,478 @@
+diff --git a/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs b/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs
+index dc15cfe..3902ff5 100644
+--- a/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs
++++ b/src/CampusFlow.Application/Housing/HousingWorkspaceAppService.cs
+@@ -189,6 +189,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
+         CheckRevision(draft, input.Revision);
+         List<HousingWorkspaceRoom>? recoveryCurrent = null;
+         List<int>? recoveryRemaining = null;
++        List<HousingHistoricalAssignment> recoveryHistorical = [];
+         if (recovery is null) EnsureEditable(draft);
+         else
+         {
+@@ -197,6 +198,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
+                 throw new UserFriendlyException("The recovery preview changed. Review the live assignments again; the saved plan is unchanged.");
+             recoveryCurrent = review.Current;
+             recoveryRemaining = review.Remaining;
++            recoveryHistorical = review.Historical;
+         }
+         var before = Read(draft.BaselineJson);
+         var after = Read(draft.RoomsJson);
+@@ -313,6 +315,12 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
+             if(decreases.Count>0){await Record("Starting capacity decreases");await _writer.UpdateCapacitiesAsync(input.PeriodId,decreases);await Record("Capacity decreases verified");}
+             foreach(var id in roomWriteIds.Where(newAssignments.ContainsKey))
+             {
++                foreach (var historical in recoveryHistorical.Where(x => x.StudentUid == id))
++                {
++                    await Record($"Starting historical room deallocation for {id}, deleted room {historical.PeriodRoomId}");
++                    await _writer.ClearHistoricalAssignmentAsync(historical);
++                    await Record($"Historical room deallocation acknowledged for {id}, deleted room {historical.PeriodRoomId}");
++                }
+                 await Record($"Starting room assignment for {id}");var room=newAssignments[id].room;await _writer.AssignAsync(id,input.PeriodId,room.Id);
+                 var confirmed=await _writer.GetAssignedRoomAsync(id,input.PeriodId);
+                 if(confirmed is null||!SameRoom(confirmed.Value,room))throw new InvalidOperationException("New room assignment was not confirmed.");
+diff --git a/src/CampusFlow.Application/Housing/HousingWorkspaceRecovery.cs b/src/CampusFlow.Application/Housing/HousingWorkspaceRecovery.cs
+index 79d47a1..695c04d 100644
+--- a/src/CampusFlow.Application/Housing/HousingWorkspaceRecovery.cs
++++ b/src/CampusFlow.Application/Housing/HousingWorkspaceRecovery.cs
+@@ -43,7 +43,7 @@ public partial class HousingWorkspaceAppService
+         }, input);
+     }
+ 
+-    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining)>
++    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining, List<HousingHistoricalAssignment> Historical)>
+         PrepareRecoveryAsync(HousingAssignmentDraft draft)
+     {
+         _writer.EnsureWriteEnabled();
+@@ -57,10 +57,14 @@ public partial class HousingWorkspaceAppService
+         (List<int> Added, List<int> Remaining) plan;
+         try { plan = HousingCommuterRecovery.Review(before, desired, current); }
+         catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
++        List<HousingHistoricalAssignment> historical;
++        try { historical = await _writer.GetHistoricalAssignmentsAsync(draft.PeriodId, plan.Remaining); }
++        catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
+         var identity = new
+         {
+             Tenant = Tenant(), User = CurrentUser.Id, draft.Id, draft.PeriodId, draft.ConcurrencyStamp,
+             progress.RunId, draft.BaselineJson, draft.RoomsJson,
++            Historical = historical.OrderBy(x => x.StudentUid).ThenBy(x => x.AssignmentId).ToArray(),
+             Rooms = current.OrderBy(x => x.Id).Select(room => new
+             {
+                 room.Id, room.Building, room.Name, room.Capacity,
+@@ -72,7 +76,8 @@ public partial class HousingWorkspaceAppService
+             PeriodId = draft.PeriodId, RunId = progress.RunId, Revision = draft.ConcurrencyStamp,
+             RecoveryRevision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity)))),
+             SavedAssignments = desired.Sum(x => x.Occupants.Count), AlreadyAssigned = plan.Added.Count - plan.Remaining.Count,
+-            RemainingAssignments = plan.Remaining.Count, Failure = HousingApplyFailure.Description(progress.FailureCode)
+-        }, current, plan.Remaining);
++            RemainingAssignments = plan.Remaining.Count, HistoricalAssignmentsToClear = historical.Count,
++            Failure = HousingApplyFailure.Description(progress.FailureCode)
++        }, current, plan.Remaining, historical);
+     }
+ }
+diff --git a/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs b/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs
+index ec1f17b..c78c063 100644
+--- a/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs
++++ b/src/CampusFlow.Domain.Shared/Housing/HousingWorkspaceModels.cs
+@@ -92,6 +92,7 @@ public class HousingRecoveryPreview
+     public int SavedAssignments { get; set; }
+     public int AlreadyAssigned { get; set; }
+     public int RemainingAssignments { get; set; }
++    public int HistoricalAssignmentsToClear { get; set; }
+     public string Failure { get; set; } = "";
+ }
+ 
+diff --git a/src/CampusFlow.Domain/Housing/HousingHistoricalAssignment.cs b/src/CampusFlow.Domain/Housing/HousingHistoricalAssignment.cs
+new file mode 100644
+index 0000000..59612a5
+--- /dev/null
++++ b/src/CampusFlow.Domain/Housing/HousingHistoricalAssignment.cs
+@@ -0,0 +1,19 @@
++using System;
++
++namespace CampusFlow.Housing;
++
++public sealed record HousingHistoricalAssignment(
++    int AssignmentId, int StudentUid, int PeriodId, int PeriodRoomId, int PropertyId, int OriginalRoomId,
++    string Building, string Room, bool AssignmentDeleted, bool RoomDeleted, bool PropertyDeleted,
++    decimal? RoomRate, decimal? PerPersonRate)
++{
++    public void EnsureRecoverable()
++    {
++        if (AssignmentId <= 0 || StudentUid <= 0 || PeriodId <= 0 || PeriodRoomId <= 0 || PropertyId <= 0 ||
++            OriginalRoomId <= 0 || string.IsNullOrWhiteSpace(Room) ||
++            !AssignmentDeleted || !RoomDeleted || !PropertyDeleted ||
++            !StudentHousingEligibility.IsCommuterBuilding(Building) ||
++            RoomRate.GetValueOrDefault() != 0 || PerPersonRate.GetValueOrDefault() != 0)
++            throw new ArgumentException("Historical recovery requires a deleted, uncharged commuter assignment, room and property. Review other history in Elements.");
++    }
++}
+diff --git a/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingAssignmentWriter.cs b/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingAssignmentWriter.cs
+index 2353cf3..f1519cd 100644
+--- a/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingAssignmentWriter.cs
++++ b/src/CampusFlow.Domain/StudentInformationSystems/IElementsHousingAssignmentWriter.cs
+@@ -16,6 +16,10 @@ public interface IElementsHousingAssignmentWriter
+         CancellationToken cancellationToken = default);
+     Task DeallocateAsync(int studentUid, int periodId, int periodRoomId,
+         CancellationToken cancellationToken = default);
++    Task<List<HousingHistoricalAssignment>> GetHistoricalAssignmentsAsync(int periodId, IReadOnlyCollection<int> studentUids,
++        CancellationToken cancellationToken = default);
++    Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment reviewed,
++        CancellationToken cancellationToken = default);
+     Task AssignAsync(int studentUid, int periodId, int periodRoomId,
+         CancellationToken cancellationToken = default);
+ }
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs
+index 9a43f7d..5627939 100644
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingAssignmentWriter.cs
+@@ -27,17 +27,20 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
+     private readonly IMemoryCache _cache;
+     private readonly HttpClient _client;
+     private readonly Func<int,int,int,int,string,CancellationToken,Task<bool>> _deletedAssignment;
++    private readonly Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>> _historicalAssignments;
+ 
+     public ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache)
+         : this(configuration, cache, SharedHttpClient) { }
+ 
+     internal ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache, HttpClient client,
+-        Func<int,int,int,int,string,CancellationToken,Task<bool>>? deletedAssignment = null)
++        Func<int,int,int,int,string,CancellationToken,Task<bool>>? deletedAssignment = null,
++        Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>>? historicalAssignments = null)
+     {
+         _configuration = configuration;
+         _cache = cache;
+         _client = client;
+         _deletedAssignment = deletedAssignment ?? IsDeletedAssignmentAsync;
++        _historicalAssignments = historicalAssignments ?? ReadHistoricalAssignmentsAsync;
+     }
+ 
+     public void EnsureWriteEnabled()
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingHistoricalAssignments.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingHistoricalAssignments.cs
+new file mode 100644
+index 0000000..f6cde26
+--- /dev/null
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ElementsHousingHistoricalAssignments.cs
+@@ -0,0 +1,76 @@
++using System;
++using System.Collections.Generic;
++using System.Data;
++using System.Linq;
++using System.Threading;
++using System.Threading.Tasks;
++using CampusFlow.Housing;
++using Microsoft.Data.SqlClient;
++using Microsoft.Extensions.Configuration;
++
++namespace CampusFlow.StudentInformationSystems;
++
++public sealed partial class ElementsHousingAssignmentWriter
++{
++    public async Task<List<HousingHistoricalAssignment>> GetHistoricalAssignmentsAsync(int periodId,
++        IReadOnlyCollection<int> studentUids, CancellationToken cancellationToken = default)
++    {
++        EnsureWriteEnabled();
++        if (periodId <= 0 || studentUids.Any(x => x <= 0)) throw new ArgumentException("A valid period and reviewed students are required.");
++        if (studentUids.Count == 0) return [];
++        var rows = await _historicalAssignments(periodId, studentUids, cancellationToken);
++        if (rows.Any(x => x.PeriodId != periodId || !studentUids.Contains(x.StudentUid)) ||
++            rows.Select(x => x.AssignmentId).Distinct().Count() != rows.Count ||
++            rows.GroupBy(x => (x.StudentUid, x.PeriodRoomId)).Any(x => x.Count() != 1))
++            throw new InvalidOperationException("Historical assignment identities are ambiguous. No historical deallocation was sent.");
++        foreach (var row in rows) row.EnsureRecoverable();
++        return rows;
++    }
++
++    public async Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment reviewed,
++        CancellationToken cancellationToken = default)
++    {
++        reviewed.EnsureRecoverable();
++        var current = await GetHistoricalAssignmentsAsync(reviewed.PeriodId, [reviewed.StudentUid], cancellationToken);
++        if (!current.Contains(reviewed))
++            throw new InvalidOperationException("The reviewed historical assignment changed. Review recovery again.");
++        if (await GetAssignedRoomAsync(reviewed.StudentUid, reviewed.PeriodId, cancellationToken) is not null)
++            throw new InvalidOperationException("A live room assignment now exists. Historical recovery cannot deallocate an active assignment.");
++        // Reinitialization marks the old row deleted but leaves a vendor-side allocation
++        // conflict. Explicitly deallocating that exact old room clears the conflict.
++        await DeallocateAsync(reviewed.StudentUid, reviewed.PeriodId, reviewed.PeriodRoomId, cancellationToken);
++        if (await GetAssignedRoomAsync(reviewed.StudentUid, reviewed.PeriodId, cancellationToken) is not null)
++            throw new InvalidOperationException("A live assignment changed during historical recovery. Check Elements before retrying.");
++    }
++
++    private async Task<List<HousingHistoricalAssignment>> ReadHistoricalAssignmentsAsync(int periodId,
++        IReadOnlyCollection<int> students, CancellationToken cancellationToken)
++    {
++        await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
++        await connection.OpenAsync(cancellationToken);
++        var rows = new List<HousingHistoricalAssignment>();
++        foreach (var chunk in students.Distinct().Chunk(1000))
++        {
++            var parameters = chunk.Select((_, i) => "@Student" + i).ToArray();
++            var sql = """
++                SELECT a.HousingPeriodRoomAssignmentID,a.StudentUID,a.HousingPeriodID,r.HousingPeriodRoomID,
++                       p.HousingPeriodPropertyID,r.OriginalRoomID,p.PropertyName,r.RoomName,
++                       a.IsDeleted,r.IsDeleted,p.IsDeleted,r.RoomRate,r.PerPersonRate
++                FROM StudentLife.HousingPeriodRoomAssignments a
++                JOIN StudentLife.HousingPeriodRooms r ON r.HousingPeriodRoomID=a.HousingPeriodRoomID AND r.HousingPeriodID=a.HousingPeriodID
++                JOIN StudentLife.HousingPeriodProperties p ON p.HousingPeriodPropertyID=r.HousingPeriodPropertyID AND p.HousingPeriodID=a.HousingPeriodID
++                WHERE a.HousingPeriodID=@Period AND (r.IsDeleted=1 OR p.IsDeleted=1)
++                """ + " AND a.StudentUID IN (" + string.Join(",", parameters) + ") ORDER BY a.StudentUID,a.HousingPeriodRoomAssignmentID";
++            await using var command = new SqlCommand(sql, connection) { CommandTimeout = 60 };
++            command.Parameters.Add("@Period", SqlDbType.Int).Value = periodId;
++            for (var i = 0; i < chunk.Length; i++) command.Parameters.Add(parameters[i], SqlDbType.Int).Value = chunk[i];
++            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
++            while (await reader.ReadAsync(cancellationToken))
++                rows.Add(new(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3),
++                    reader.GetInt32(4), reader.IsDBNull(5) ? 0 : reader.GetInt32(5), reader.GetString(6).Trim(), reader.GetString(7).Trim(),
++                    reader.GetBoolean(8), reader.GetBoolean(9), reader.GetBoolean(10),
++                    reader.IsDBNull(11) ? null : reader.GetDecimal(11), reader.IsDBNull(12) ? null : reader.GetDecimal(12)));
++        }
++        return rows;
++    }
++}
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml
+index 44e995f..2127599 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.cshtml
+@@ -33,6 +33,7 @@
+             <h2 id="housing-recovery-title">Review a partial apply</h2>
+             <p id="housing-recovery-failure"></p>
+             <p>The saved assignments are retained. Recovery supports added commuter assignments only. Moves, removals, capacity changes, residential charges or conflicting live assignments need administrator review.</p>
++            <p>If a period was reinitialized, recovery can explicitly deallocate its reviewed deleted commuter records before applying the remaining assignments. Active room assignments are preserved. The preview shows how many historical records require this step.</p>
+             <button id="housing-review-recovery" type="button" class="btn btn-outline-primary">Review recovery</button>
+             <div id="housing-recovery-preview" hidden>
+                 <p id="housing-recovery-counts"></p>
+diff --git a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
+index 932bd9a..871aac6 100644
+--- a/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
++++ b/src/CampusFlow.Web/Pages/Admin/Housing/Assignments.js
+@@ -205,13 +205,13 @@
+             const preview = await request('Recovery', undefined, {periodId:state.periodId});
+             if (preview.revision !== state.revision) { await reloadAfterFailure(); throw new Error('The saved run changed. Review recovery again.'); }
+             recovery = preview;
+-            el('recovery-counts').textContent = `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining.`;
++            el('recovery-counts').textContent = `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining · ${preview.historicalAssignmentsToClear || 0} deleted historical room records to deallocate first.`;
+             el('recovery-preview').hidden = false;
+             message('Recovery reviewed. No Elements data was changed.');
+         });
+         el('resume').onclick = () => run(async () => {
+             if (!recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim()) return;
+-            if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? Already completed assignments will be checked and skipped. The saved plan and prior run history will be retained.`)) return;
++            if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. The saved plan and prior run history will be retained.`)) return;
+             try { state = await request('Resume', {...recovery, reason:el('recovery-reason').value.trim(), confirmed:true}); }
+             catch (error) { await reloadAfterFailure(); throw error; }
+             resetRecovery(); dirty = false; selected.clear(); render();
+diff --git a/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs b/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
+index 230cf89..de8ef1c 100644
+--- a/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/HousingApplyTests.cs
+@@ -153,6 +153,32 @@ public class HousingApplyTests
+     }
+     private static RecoverHousingDraftInput Recover(HousingRecoveryPreview preview)=>new()
+     {PeriodId=preview.PeriodId,RunId=preview.RunId,Revision=preview.Revision,RecoveryRevision=preview.RecoveryRevision,Confirmed=true,Reason="Reviewed the live rooms and housing batch"};
++    [Fact] public async Task Reviewed_deleted_history_is_acknowledged_before_assignment_with_all_113_preserved()
++    {
++        await FailedCommuterRun();
++        _writer.Historical.Add(new(900,2,1,90,80,70,"Commuter","Old",true,true,true,null,null));
++        var preview=await _service.PreviewRecoveryAsync(1);Assert.Equal(1,preview.HistoricalAssignmentsToClear);
++        _writer.Calls.Clear();var desired=_draft.RoomsJson;
++        await _service.ResumeCommuterAssignmentsAsync(Recover(preview));
++        Assert.Equal("historical",_writer.Calls[0]);Assert.Equal("assign",_writer.Calls[1]);
++        Assert.Equal(112,_writer.Calls.Count(x=>x=="assign"));Assert.Equal(desired,_draft.RoomsJson);
++        Assert.Equal(113,JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!.Sum(x=>x.Occupants.Count));
++        Assert.Contains(HousingApplyProgress.Read(_draft)!.Operations,x=>x.StartsWith("Starting historical room deallocation"));
++    }
++    [Fact] public async Task Changed_historical_metadata_invalidates_the_reviewed_recovery_token()
++    {
++        var preview=await FailedCommuterRun();
++        _writer.Historical.Add(new(900,2,1,90,80,70,"Commuter","Old",true,true,true,null,null));_writer.Calls.Clear();
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
++        Assert.Empty(_writer.Calls);
++    }
++    [Fact] public async Task Unconfirmed_historical_deallocation_stops_before_the_next_assignment_and_preserves_plan()
++    {
++        await FailedCommuterRun();_writer.Historical.Add(new(900,2,1,90,80,70,"Commuter","Old",true,true,true,null,null));
++        var preview=await _service.PreviewRecoveryAsync(1);var desired=_draft.RoomsJson;_writer.Calls.Clear();_writer.FailHistorical=true;
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));
++        Assert.Empty(_writer.Calls);Assert.Equal(desired,_draft.RoomsJson);Assert.Equal("Needs review",HousingApplyProgress.Read(_draft)!.Status);
++    }
+     [Fact] public async Task Reviewed_recovery_skips_completed_rooms_retains_all_113_and_reconciles_every_affected_student()
+     {
+         var preview=await FailedCommuterRun();var desired=_draft.RoomsJson;var original=HousingApplyProgress.Read(_draft)!;
+@@ -224,6 +250,11 @@ public class HousingApplyTests
+     {
+         public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
+         public void EnsureWriteEnabled(){}
++        public List<HousingHistoricalAssignment> Historical=[];
++        public bool FailHistorical;
++        public Task<List<HousingHistoricalAssignment>> GetHistoricalAssignmentsAsync(int period,IReadOnlyCollection<int> ids,CancellationToken ct=default)=>Task.FromResult(Historical.Where(x=>x.PeriodId==period&&ids.Contains(x.StudentUid)).ToList());
++        public Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment row,CancellationToken ct=default)
++        {Claimed();if(FailHistorical)throw new InvalidOperationException("Historical deallocation unconfirmed");Calls.Add("historical");return Task.CompletedTask;}
+         public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default)=>Task.FromResult(Assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);
+         public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>Task.CompletedTask;
+         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}
+diff --git a/test/CampusFlow.Domain.Tests/Housing/HousingHistoricalAssignmentTests.cs b/test/CampusFlow.Domain.Tests/Housing/HousingHistoricalAssignmentTests.cs
+new file mode 100644
+index 0000000..8e7224e
+--- /dev/null
++++ b/test/CampusFlow.Domain.Tests/Housing/HousingHistoricalAssignmentTests.cs
+@@ -0,0 +1,36 @@
++using System;
++using CampusFlow.Housing;
++using Xunit;
++
++namespace CampusFlow.Housing.Tests;
++
++public class HousingHistoricalAssignmentTests
++{
++    private static HousingHistoricalAssignment Row() => new(1, 10, 2, 100, 20, 30,
++        "Commuter", "1", true, true, true, null, null);
++
++    [Fact] public void Deleted_commuter_history_with_empty_legacy_rates_is_supported() => Row().EnsureRecoverable();
++
++    [Theory]
++    [InlineData("active-assignment")]
++    [InlineData("active-room")]
++    [InlineData("active-property")]
++    [InlineData("residential")]
++    [InlineData("room-rate")]
++    [InlineData("person-rate")]
++    [InlineData("identity")]
++    public void Active_noncommuter_priced_or_unidentified_history_is_not_automatically_cleared(string change)
++    {
++        var row = change switch
++        {
++            "active-assignment" => Row() with { AssignmentDeleted = false },
++            "active-room" => Row() with { RoomDeleted = false },
++            "active-property" => Row() with { PropertyDeleted = false },
++            "residential" => Row() with { Building = "Bridges" },
++            "room-rate" => Row() with { RoomRate = 1 },
++            "person-rate" => Row() with { PerPersonRate = 1 },
++            _ => Row() with { OriginalRoomId = 0 }
++        };
++        Assert.Throws<ArgumentException>(row.EnsureRecoverable);
++    }
++}
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingHistoricalAssignmentWriterTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingHistoricalAssignmentWriterTests.cs
+new file mode 100644
+index 0000000..ab6ccc8
+--- /dev/null
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/Housing/HousingHistoricalAssignmentWriterTests.cs
+@@ -0,0 +1,91 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Net;
++using System.Net.Http;
++using System.Text;
++using System.Text.Json.Nodes;
++using System.Threading;
++using System.Threading.Tasks;
++using CampusFlow.Housing;
++using CampusFlow.StudentInformationSystems;
++using Microsoft.Extensions.Caching.Memory;
++using Microsoft.Extensions.Configuration;
++using Xunit;
++
++namespace CampusFlow.EntityFrameworkCore.Tests.Housing;
++
++public class HousingHistoricalAssignmentWriterTests
++{
++    private static HousingHistoricalAssignment Row() => new(1,10,2,900,21,2100,"Commuter","Old",true,true,true,null,null);
++    private sealed class Handler : HttpMessageHandler
++    {
++        public bool Active, FailDeallocation;
++        public readonly List<JsonObject> Writes = [];
++        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
++        {
++            JsonNode data;
++            var path = request.RequestUri!.AbsolutePath;
++            if (request.Method == HttpMethod.Post)
++            {
++                Assert.EndsWith("/deallocate",path);
++                Writes.Add(JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject());
++                if (FailDeallocation) return Response(HttpStatusCode.Conflict,new JsonObject());
++                data = new JsonObject { ["success"] = true };
++            }
++            else if (path.Contains("Authenticate")) data = new JsonObject { ["token"] = "test" };
++            else if (path.Contains("get-assigned-rooms")) data = Active
++                ? new JsonArray(new JsonObject { ["housingPeriodID"]=2,["housingPeriodPropertyID"]=21,["roomID"]=2100,["building"]="Commuter",["roomName"]="New" })
++                : new JsonArray();
++            else data = new JsonObject { ["housingPeriodPropertyID"]=21,["housingPeriodID"]=2,["propertyName"]="Commuter",
++                ["rooms"]=new JsonArray(new JsonObject { ["housingPeriodRoomID"]=999,["housingPeriodID"]=2,["roomName"]="New" }) };
++            return Response(HttpStatusCode.OK,data);
++        }
++        private static HttpResponseMessage Response(HttpStatusCode status,JsonNode data) => new(status)
++        { Content=new StringContent(new JsonObject { ["isSuccess"]=status==HttpStatusCode.OK,["data"]=data }.ToJsonString(),Encoding.UTF8,"application/json") };
++    }
++    private static ElementsHousingAssignmentWriter Writer(Handler handler,Func<List<HousingHistoricalAssignment>> history)
++    {
++        var values=new Dictionary<string,string?> {
++            ["Housing:EnableNonProductionWrites"]="true",["App:EnvironmentLabel"]="NON-PRODUCTION",
++            ["StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl"]="https://app-elm-nonprod-usc-integrationapi.azurewebsites.net",
++            ["StudentInformationSystems:Providers:ThesisElements:Api:RegistrationBaseUrl"]="https://np-usc-gateway.thesiscloud.com",
++            ["StudentInformationSystems:Providers:ThesisElements:Api:TenantHost"]="el-np-nel.thesiscloud.com",
++            ["StudentInformationSystems:Providers:ThesisElements:Api:Username"]="test",["StudentInformationSystems:Providers:ThesisElements:Api:Password"]="test",
++            ["ConnectionStrings:ThesisElementsReadOnly"]="Server=sql-elm-nonprod-usc-replica.database.windows.net;Database=EL-NP-NEL-DB;" };
++        return new(new ConfigurationBuilder().AddInMemoryCollection(values).Build(),new MemoryCache(new MemoryCacheOptions()),
++            new HttpClient(handler),historicalAssignments:(_,_,_)=>Task.FromResult(history()));
++    }
++    [Fact] public async Task Preview_is_read_only_and_deallocation_targets_only_the_exact_old_room()
++    {
++        var handler=new Handler();var writer=Writer(handler,()=>[Row()]);
++        Assert.Single(await writer.GetHistoricalAssignmentsAsync(2,[10]));Assert.Empty(handler.Writes);
++        await writer.ClearHistoricalAssignmentAsync(Row());
++        var write=Assert.Single(handler.Writes);
++        Assert.Equal(900,write["housingPeriodRoomId"]!.GetValue<int>());Assert.Equal(2,write["housingPeriodId"]!.GetValue<int>());
++        Assert.Equal(10,Assert.Single(write["studentUIds"]!.AsArray())!.GetValue<int>());
++    }
++    [Fact] public async Task A_live_assignment_blocks_historical_deallocation()
++    {
++        var handler=new Handler { Active=true };var writer=Writer(handler,()=>[Row()]);
++        await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.ClearHistoricalAssignmentAsync(Row()));Assert.Empty(handler.Writes);
++    }
++    [Fact] public async Task Changed_history_blocks_deallocation_before_dispatch()
++    {
++        var handler=new Handler();var writer=Writer(handler,()=>[Row() with { AssignmentId=2 }]);
++        await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.ClearHistoricalAssignmentAsync(Row()));Assert.Empty(handler.Writes);
++    }
++    [Theory] [InlineData("student")] [InlineData("period")] [InlineData("duplicate")]
++    public async Task Unscoped_or_ambiguous_history_is_rejected(string problem)
++    {
++        var rows=problem=="student"?new List<HousingHistoricalAssignment>{Row() with {StudentUid=11}}:
++            problem=="period"?[Row() with {PeriodId=3}]:[Row(),Row() with {AssignmentId=2}];
++        var handler=new Handler();var writer=Writer(handler,()=>rows);
++        await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.GetHistoricalAssignmentsAsync(2,[10]));Assert.Empty(handler.Writes);
++    }
++    [Fact] public async Task Failed_vendor_deallocation_is_not_retried_or_treated_as_success()
++    {
++        var handler=new Handler { FailDeallocation=true };var writer=Writer(handler,()=>[Row()]);
++        await Assert.ThrowsAsync<HousingRequestException>(()=>writer.ClearHistoricalAssignmentAsync(Row()));Assert.Single(handler.Writes);
++    }
++}
+diff --git a/test/browser/housing-recovery.cjs b/test/browser/housing-recovery.cjs
+index 9b4f429..0872ab4 100644
+--- a/test/browser/housing-recovery.cjs
++++ b/test/browser/housing-recovery.cjs
+@@ -19,7 +19,7 @@ try{for(const scenario of [{width:320,mode:'success'},{width:390,mode:'success'}
+   if(handler==='Periods')return route.fulfill({json:[{id:2,name:'Spring 2027'}]});
+   if(handler==='Setup')return route.fulfill({json:{periodId:2,masterCommuterRoomCount:20,periodCommuterRoomCount:20,missingCommuterRooms:[]}});
+   if(handler==='Draft')return route.fulfill({json:state});
+-  if(handler==='Recovery'){if(mode==='unsupported')return route.fulfill({status:409,json:{error:{message:'Elements contains an unexpected assignment. The saved plan was preserved.'}}});return route.fulfill({json:{periodId:2,runId:'run',revision:'original',recoveryRevision:'reviewed',savedAssignments:113,alreadyAssigned:1,remainingAssignments:112}});}
++  if(handler==='Recovery'){if(mode==='unsupported')return route.fulfill({status:409,json:{error:{message:'Elements contains an unexpected assignment. The saved plan was preserved.'}}});return route.fulfill({json:{periodId:2,runId:'run',revision:'original',recoveryRevision:'reviewed',savedAssignments:113,alreadyAssigned:1,remainingAssignments:112,historicalAssignmentsToClear:111}});}
+   if(handler==='Resume'){const data=req.postDataJSON();assert.equal(data.confirmed,true);assert.equal(data.reason,'Reviewed rooms and batch');assert.equal(data.recoveryRevision,'reviewed');assert.equal(data.runId,'run');
+    if(mode==='success'){state={...state,applyStatus:'Completed',revision:'done'};return route.fulfill({json:state});}
+    state={...state,revision:'new-review',applyRunId:'new-run'};return route.fulfill({status:409,json:{error:{message:mode==='stale'?'The recovery preview changed. Review again.':'The apply did not finish. The saved plan is retained.'}}});}
+@@ -31,10 +31,10 @@ try{for(const scenario of [{width:320,mode:'success'},{width:390,mode:'success'}
+  if(mode==='unsupported'){await page.waitForFunction(()=>document.querySelector('#housing-message').textContent.includes('unexpected'));assert.equal(await page.locator('#housing-resume').isDisabled(),true);}
+  else{
+   await page.waitForFunction(()=>document.querySelector('#housing-recovery-counts').textContent.includes('112 remaining'));
+-  assert.equal(calls.filter(x=>x.method==='POST').length,0);assert.equal(await page.locator('#housing-resume').isDisabled(),true);
++  assert.match(await page.locator('#housing-recovery-counts').innerText(),/111 deleted historical room records/);assert.equal(calls.filter(x=>x.method==='POST').length,0);assert.equal(await page.locator('#housing-resume').isDisabled(),true);
+   await page.fill('#housing-recovery-reason','Reviewed rooms and batch');assert.equal(await page.locator('#housing-resume').isDisabled(),true);await page.check('#housing-recovery-confirmed');assert.equal(await page.locator('#housing-resume').isDisabled(),false);
+   if(process.env.CAMPUSFLOW_SCREENSHOT_DIR&&mode==='success'&&[390,1440].includes(width)){fs.mkdirSync(process.env.CAMPUSFLOW_SCREENSHOT_DIR,{recursive:true});await page.locator('#housing-recovery').screenshot({path:path.join(process.env.CAMPUSFLOW_SCREENSHOT_DIR,`recovery-${width}.png`)});}
+-  page.once('dialog',d=>d.accept());await page.click('#housing-resume');await page.waitForFunction(()=>{const t=document.querySelector('#housing-message').textContent;return t.includes('applied and verified')||t.includes('did not finish')||t.includes('preview changed');});
++  let confirmation;page.once('dialog',d=>{confirmation=d.message();return d.accept();});await page.click('#housing-resume');assert.match(confirmation,/111 reviewed deleted historical room records/);await page.waitForFunction(()=>{const t=document.querySelector('#housing-message').textContent;return t.includes('applied and verified')||t.includes('did not finish')||t.includes('preview changed');});
+   assert.equal(calls.filter(x=>x.handler==='Resume').length,1);
+   if(mode==='success')assert.match(await page.locator('#housing-summary').innerText(),/Completed/);
+   else {assert.equal(await page.locator('#housing-resume').isDisabled(),true);assert.equal(await page.locator('#housing-recovery-preview').isHidden(),true);}

@@ -1,0 +1,64 @@
+{
+  "unit": "CF-034",
+  "scope": "Distribution amounts on Financial Aid cards, totals and confirmations, plus bill-review loans awaiting acceptance; original award decision values and eligibility preserved.",
+  "documentItems": [
+    "5",
+    "6"
+  ],
+  "sourceDocument": "Spring 2027 Approve Your Bill Issues & Questions_-6.pdf",
+  "state": "committed-pushed-deployed-both",
+  "branch": "codex/cf-034-038-nonprod-release",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow",
+  "sourceBase": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "productionBase": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "commit": "9ee3e4008df5f236f5536dbd5d1e728a25ec8dc1",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "dc40bc294caf5591a269dd4b6a7505d607659abe",
+    "unitCommit": "9ee3e4008df5f236f5536dbd5d1e728a25ec8dc1",
+    "branch": "codex/cf-034-038-nonprod-release",
+    "deploymentId": "50dfa273-64c6-419d-b9c7-20e0023c918b",
+    "deployedAtUtc": "2026-11-12T06:30:14.9662864Z",
+    "verifiedAtUtc": "2026-11-12T06:32:06.046849+00:00",
+    "verification": "CF-034-038-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "109727c093d5432d18cada97fcb90787bdd77878",
+    "unitCommit": "27ac7d6b0c8f972e5b0e8ef9592a6de2cb46267c",
+    "branch": "codex/cf-034-038-production-release",
+    "deploymentId": "7c6a5162-b1e9-4e76-bd08-bfca3e4c0038",
+    "deployedAtUtc": "2026-11-12T06:36:27.1119735Z",
+    "verifiedAtUtc": "2026-11-12T06:50:52.615006+00:00",
+    "verification": "CF-034-038-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "verification": "CF-034-038-combined-verification.json",
+  "sourcePatch": "CF-034.patch",
+  "sourcePatchSha256": "263f158486a31cf72fae94fae486dc12af9ec06d5934d113e7dba8904247a95c",
+  "files": [
+    "src/CampusFlow.Web/Pages/FinancialAidDisplay.cs",
+    "src/CampusFlow.Web/Pages/FinancialAid.cshtml",
+    "src/CampusFlow.Web/Pages/FinancialAid.cshtml.cs",
+    "src/CampusFlow.Web/Pages/_FinancialAidTerm.cshtml",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml",
+    "test/CampusFlow.Web.Tests/Pages/FinancialAidDisplayTests.cs"
+  ],
+  "dependencies": [
+    "Existing verified CF-033 environment baseline; no other newly prepared unit required."
+  ],
+  "notes": [
+    "Missing or negative Elements net values show Amount unavailable; totals do not silently omit missing values or substitute gross. Zero is retained.",
+    "No award decision, amount, eligibility, billing or stored snapshot is changed."
+  ],
+  "updatedAtUtc": "2026-11-12T06:51:28.360688+00:00",
+  "promotionNotes": "Deployed on isolated environment-specific release branches. For later promotion/removal, select this unit and verify the current target release; preserve unrelated units, settings and assets.",
+  "removalNotes": "Revert only this unit from the current target release. Preserve later/unrelated units and any stored historical records. Data side effects are not reversed by code removal.",
+  "sourceParent": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "staffAcceptancePending": true
+}

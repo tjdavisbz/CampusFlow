@@ -1,0 +1,96 @@
+{
+  "nonprod": {
+    "readOnly": true,
+    "costTypeEnabledPreferenceAndRulesPreserved": true,
+    "clearanceScheduleRemainsOff": true,
+    "clearanceConfigurationPreserved": true,
+    "before": [
+      {
+        "kind": "costType",
+        "enabled": false,
+        "nextRunAtUtc": null,
+        "policyVersion": null,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "rulesHash": "f2ee1dade702273e896ab3ee4b3f5db0c30283d045d026209b72ca917109edb3"
+      },
+      {
+        "kind": "clearance",
+        "enabled": false,
+        "nextRunAtUtc": null,
+        "policyVersion": null,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "6273769e8b38f6047089e0e26b8a3232bba4bba80a0bbffa300eb9ee8ead845b",
+        "rulesHash": null
+      }
+    ],
+    "after": [
+      {
+        "kind": "costType",
+        "enabled": false,
+        "nextRunAtUtc": null,
+        "policyVersion": null,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "rulesHash": "f2ee1dade702273e896ab3ee4b3f5db0c30283d045d026209b72ca917109edb3"
+      },
+      {
+        "kind": "clearance",
+        "enabled": false,
+        "nextRunAtUtc": null,
+        "policyVersion": null,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "6273769e8b38f6047089e0e26b8a3232bba4bba80a0bbffa300eb9ee8ead845b",
+        "rulesHash": null
+      }
+    ],
+    "checkedAtUtc": "2026-11-12T06:50:48.535796Z"
+  },
+  "production": {
+    "readOnly": true,
+    "costTypeEnabledPreferenceAndRulesPreserved": true,
+    "clearanceScheduleRemainsOff": true,
+    "clearanceConfigurationPreserved": true,
+    "before": [
+      {
+        "kind": "costType",
+        "enabled": true,
+        "nextRunAtUtc": "2026-11-12T06:29:09.9207684Z",
+        "policyVersion": null,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "cce9dedfa347ce117f96bd23ff289eafd20365ced4abc5e5c5c19095ede7e855",
+        "rulesHash": "9f3ff9d3245b58d2c867b704fc6c60061411a26b9edd3d319c952c557e4a15a1"
+      },
+      {
+        "kind": "clearance",
+        "enabled": false,
+        "nextRunAtUtc": null,
+        "policyVersion": 0,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "225870bd10e82157abedc0ffad584c18b7a6b444310b5cce68e698ed84f6035e",
+        "rulesHash": null
+      }
+    ],
+    "after": [
+      {
+        "kind": "costType",
+        "enabled": true,
+        "nextRunAtUtc": "2026-11-12T06:59:48.8153517Z",
+        "policyVersion": null,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "28fec2b384b55c10cce24118a9028ee2eff85e55852426060835984e9e3d70d2",
+        "rulesHash": "9f3ff9d3245b58d2c867b704fc6c60061411a26b9edd3d319c952c557e4a15a1"
+      },
+      {
+        "kind": "clearance",
+        "enabled": false,
+        "nextRunAtUtc": null,
+        "policyVersion": 0,
+        "hasRunningClaim": false,
+        "extraPropertiesHash": "225870bd10e82157abedc0ffad584c18b7a6b444310b5cce68e698ed84f6035e",
+        "rulesHash": null
+      }
+    ],
+    "checkedAtUtc": "2026-11-12T06:50:49.678271Z"
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "verifiedAtUtc": "2026-11-12T06:51:28.360688+00:00",
+  "branch": "codex/cf-034-038-nonprod-release",
+  "sourceBase": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "productionBase": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "units": [
+    "CF-034",
+    "CF-035",
+    "CF-036",
+    "CF-037",
+    "CF-038"
+  ],
+  "testCounts": {
+    "domain": 331,
+    "application": 136,
+    "entityframeworkcore": 322,
+    "web": 352
+  },
+  "uniqueSuiteTestsPassed": 1141,
+  "browserScenarios": {
+    "aidWorkflow": 4,
+    "mealChoice": 4,
+    "mealContinuation": 4,
+    "completionStatus": 5,
+    "clearanceWorkflow": 18,
+    "housingRecovery": 7
+  },
+  "localBrowserScenariosPassed": 42,
+  "browserScope": "Synthetic local pages using repository scripts, CSS and markup fragments; no signed-in live staff acceptance claimed. Phone/desktop layouts verified.",
+  "releaseBuildPassed": true,
+  "releaseBuildPath": "/private/tmp/campusflow-cf034-037-publish",
+  "individualPatchesApplyAgainstBothBaselines": true,
+  "combinedPatchesRecreateEveryChangedFile": true,
+  "eachSelectedUnitSeparatelyPublished": false,
+  "noSchemaMigrationRequired": true,
+  "newPackageDependencies": false,
+  "nonprodCanaries": {
+    "documentMetadata": {
+      "environment": "nonprod",
+      "syntheticIdentityVerified": true,
+      "namedAndTermVerified": true,
+      "recovered": true,
+      "removed": true,
+      "productionWrites": false,
+      "billApprovalOrEmailInvoked": false
+    },
+    "fiveFieldReset": {
+      "environment": "nonprod",
+      "syntheticIdentityVerified": true,
+      "fall2026ScopeVerified": true,
+      "auditCaptured": true,
+      "resetVerified": true,
+      "restored": true,
+      "unrelatedFieldsPreserved": true,
+      "productionWrites": false,
+      "scheduleEnabled": false
+    }
+  },
+  "productionWritesPerformed": false,
+  "schedulesEnabled": false,
+  "deploymentPerformed": true,
+  "commitCreated": true,
+  "cf028RemainsPaused": true,
+  "housingPlanOrAssignmentsChanged": false,
+  "privateSnapshotsAndCredentialsExcluded": true,
+  "materialLimitations": [
+    "Signed-in staff acceptance remains; deployment verification is not staff acceptance.",
+    "Item 3 held pending affected student ID and term.",
+    "Housing recovery requires staff review of the 113-entry plan and explicit Resume; no production Apply or recovery executed by deployment.",
+    "Existing approved-bill documents/PDFs are not backfilled.",
+    "Clearance extension applies to eligible Cleared records only; already-blank and Not Cleared records are not blanket repaired.",
+    "Meal-plan removal does not automatically reverse taxes or issue refunds."
+  ],
+  "originalHousingBackupSha256": "4050848dcf87eb307ed0583941c07ecd0c98441b32ba3fe919c7782140e07ff2",
+  "originalHousingBackupUnchanged": true,
+  "patchCredentialPatternScanPassed": true,
+  "productionTestCounts": {
+    "domain": 331,
+    "application": 131,
+    "entityframeworkcore": 333,
+    "web": 352
+  },
+  "productionUniqueSuiteTestsPassed": 1147,
+  "committed": true,
+  "pushed": true,
+  "deploymentVerification": {
+    "nonprod": "CF-034-038-nonprod-deployment-verification.json",
+    "production": "CF-034-038-production-deployment-verification.json"
+  },
+  "releaseBuildPaths": {
+    "nonprod": "/private/tmp/campusflow-cf034-038-release/publish-nonprod",
+    "production": "/private/tmp/campusflow-cf034-038-release/publish-production"
+  },
+  "allChangedSourceFilesIdenticalAcrossEnvironmentVariants": true,
+  "nonprodActualHousingAdapterCanary": {
+    "environment": "nonprod",
+    "syntheticIdentityVerified": true,
+    "isolatedPeriodCreated": true,
+    "testPeriodId": 19,
+    "sequence": [
+      {
+        "stage": "isolated-zero-rent-configuration",
+        "configured": true
+      },
+      {
+        "stage": "assign",
+        "httpStatus": 200,
+        "success": true
+      },
+      {
+        "stage": "isolated-zero-rent-configuration",
+        "configured": true
+      },
+      {
+        "stage": "historical-deleted-assignments",
+        "count": 1
+      },
+      {
+        "stage": "writer-after-reinitialize",
+        "hasActiveAssignment": false
+      },
+      {
+        "stage": "assign",
+        "httpStatus": 409,
+        "success": false
+      },
+      {
+        "stage": "reviewed-historical-preview",
+        "count": 1
+      },
+      {
+        "stage": "reviewed-writer-deallocation",
+        "acknowledged": true
+      },
+      {
+        "stage": "assign",
+        "httpStatus": 200,
+        "success": true
+      },
+      {
+        "stage": "new-assignment-readback",
+        "verified": true
+      }
+    ],
+    "isolatedPeriodRemoved": true,
+    "productionWrites": false,
+    "billingWrites": false
+  },
+  "nonprodHousingFixtureCleanup": {
+    "environment": "nonprod",
+    "ownedMasterFixtureInactive": true,
+    "activeScratchPeriods": 0,
+    "activeScratchAssignments": 0,
+    "physicalRemovalRejectedByVendor": true,
+    "productionWrites": false,
+    "nonzeroSyntheticHousingBatchRows": 0
+  },
+  "productionReadOnlyHousingQualification": {
+    "environment": "production",
+    "readOnly": true,
+    "studentNamesOrIdsExported": false,
+    "savedAssignments": 113,
+    "originalPlanHashMatches": true,
+    "alreadyAssigned": 1,
+    "remainingAssignments": 112,
+    "historicalAssignmentsToClear": 112,
+    "unassignedWithoutHistoricalConflict": 0,
+    "allHistoricalMetadataQualified": true,
+    "housingOrBillingWrites": false
+  },
+  "browserFontVerification": [
+    {
+      "environment": "nonprod",
+      "iconsVerified": 4,
+      "fontsLoaded": true
+    },
+    {
+      "environment": "production",
+      "iconsVerified": 4,
+      "fontsLoaded": true
+    }
+  ],
+  "automationVerification": "CF-034-038-automation-verification.json",
+  "productionHousingRecoveryExecuted": false,
+  "googleDocEdited": false
+}

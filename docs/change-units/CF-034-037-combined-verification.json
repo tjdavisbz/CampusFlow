@@ -1,0 +1,76 @@
+{
+  "verifiedAtUtc": "2026-11-12T05:15:26.963630+00:00",
+  "branch": "codex/cf-034-037-bill-followups",
+  "sourceBase": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "productionBase": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "units": [
+    "CF-034",
+    "CF-035",
+    "CF-036",
+    "CF-037"
+  ],
+  "testCounts": {
+    "domain": 323,
+    "application": 133,
+    "persistence": 315,
+    "web": 352
+  },
+  "uniqueSuiteTestsPassed": 1123,
+  "browserScenarios": {
+    "aidWorkflow": 4,
+    "mealChoice": 4,
+    "mealContinuation": 4,
+    "completionStatus": 5,
+    "clearanceWorkflow": 18
+  },
+  "localBrowserScenariosPassed": 35,
+  "browserScope": "Synthetic local pages using repository scripts, CSS and markup fragments; no signed-in live staff acceptance claimed. Phone/desktop layouts verified.",
+  "releaseBuildPassed": true,
+  "releaseBuildPath": "/private/tmp/campusflow-cf034-037-publish",
+  "individualPatchesApplyAgainstBothBaselines": true,
+  "combinedPatchesRecreateEveryChangedFile": true,
+  "eachSelectedUnitSeparatelyPublished": false,
+  "noSchemaMigrationRequired": true,
+  "newPackageDependencies": false,
+  "nonprodCanaries": {
+    "documentMetadata": {
+      "environment": "nonprod",
+      "syntheticIdentityVerified": true,
+      "namedAndTermVerified": true,
+      "recovered": true,
+      "removed": true,
+      "productionWrites": false,
+      "billApprovalOrEmailInvoked": false
+    },
+    "fiveFieldReset": {
+      "environment": "nonprod",
+      "syntheticIdentityVerified": true,
+      "fall2026ScopeVerified": true,
+      "auditCaptured": true,
+      "resetVerified": true,
+      "restored": true,
+      "unrelatedFieldsPreserved": true,
+      "productionWrites": false,
+      "scheduleEnabled": false
+    }
+  },
+  "productionWritesPerformed": false,
+  "schedulesEnabled": false,
+  "deploymentPerformed": false,
+  "commitCreated": false,
+  "cf028RemainsPaused": true,
+  "housingPlanOrAssignmentsChanged": false,
+  "privateSnapshotsAndCredentialsExcluded": true,
+  "materialLimitations": [
+    "Signed-in staff acceptance remains after deployment.",
+    "Item 3 held pending affected student ID; reporting gates are not universally closed.",
+    "Housing item 4 remains open; no guessed move/rebase fix or production recovery executed.",
+    "Existing approved-bill documents are not backfilled.",
+    "Clearance expansion retains Cleared eligibility and does not blanket-clear already-blank or Not Cleared records."
+  ],
+  "originalHousingBackupSha256": "4050848dcf87eb307ed0583941c07ecd0c98441b32ba3fe919c7782140e07ff2",
+  "originalHousingBackupUnchanged": true,
+  "patchCredentialPatternScanPassed": true,
+  "supersededBy": "CF-034-038-combined-verification.json",
+  "historicalPreCommitVerification": true
+}

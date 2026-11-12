@@ -1,0 +1,23 @@
+{
+  "updatedAtUtc": "2026-11-12T05:15:26.963630+00:00",
+  "sourceReview": "Jeff-bill-approval-review-2026-11-11-v6.json",
+  "preparedUnits": [
+    "CF-034",
+    "CF-035",
+    "CF-036",
+    "CF-037"
+  ],
+  "deployedUnitsFromLatestList": [
+    "CF-033 item 10"
+  ],
+  "paused": [
+    "CF-028 item 1"
+  ],
+  "held": [
+    "Item 3 pending student ID"
+  ],
+  "stillOpen": [
+    "Item 4 housing conflict"
+  ],
+  "googleDocUpdatedExternally": false
+}

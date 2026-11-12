@@ -1,0 +1,349 @@
+diff --git a/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs b/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs
+--- a/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs
++++ b/src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs
+@@ -43,6 +43,13 @@
+         var student = await _students.FindByExternalStudentIdAsync(externalStudentId)
+             ?? throw new UserFriendlyException("That student could not be found.");
+         var context = await _mealPlans.GetContextAsync(externalStudentId, termCalendarId);
++        if (!termCalendarId.HasValue)
++        {
++            var spring = context.Terms.SingleOrDefault(x =>
++                x.Name.Trim().Equals("Spring 2027", StringComparison.OrdinalIgnoreCase) && x.EndDate.Date >= DateTime.Today);
++            if (spring is not null && spring.TermCalendarId != context.SelectedTermCalendarId)
++                context = await _mealPlans.GetContextAsync(externalStudentId, spring.TermCalendarId);
++        }
+         var selectedTerm = context.Terms.SingleOrDefault(x => x.TermCalendarId == context.SelectedTermCalendarId)
+             ?? throw new UserFriendlyException("Choose an available term before managing meal-plan assignments.");
+         var localTermName = selectedTerm.StartDate.ToString("MMMM yyyy");
+@@ -172,8 +179,21 @@
+         if(!context.CanRemove || context.SelectedTermCalendarId!=input.TermCalendarId || !context.Terms.Any(x=>x.TermCalendarId==input.TermCalendarId) ||
+             !context.Assignments.Any(x=>x.AssignmentId==input.AssignmentId&&x.MealPlanId==input.MealPlanId))
+             throw new UserFriendlyException("The selected meal assignment changed. Refresh before removing it.");
++        var term = context.Terms.Single(x => x.TermCalendarId == input.TermCalendarId);
++        var termContext = await _mealPlans.GetContextAsync(input.ExternalStudentId, term.TermCalendarId);
++        var selectedTerm = termContext.Terms.Single(x => x.TermCalendarId == term.TermCalendarId);
++        var localTermName = selectedTerm.StartDate.ToString("MMMM yyyy");
++        var removedChoices = await _localSelections.GetListAsync(x =>
++            x.ExternalStudentId == input.ExternalStudentId && x.ExternalMealPlanId == input.MealPlanId &&
++            x.TermName == localTermName && x.TermStartDate == selectedTerm.StartDate && x.TermEndDate == selectedTerm.EndDate);
+         try {await _removal.RemoveAsync(input.ExternalStudentId,input.TermCalendarId,input.AssignmentId,input.MealPlanId);}
+         catch(Exception e){_logger.LogError(e,"Meal-plan removal could not be confirmed for assignment {AssignmentId}.",input.AssignmentId);throw new UserFriendlyException("Meal-plan removal could not be confirmed. Refresh and check Elements before retrying.");}
++        foreach (var choice in removedChoices)
++        {
++            await _localSelections.DeleteAsync(choice, autoSave: true);
++            _logger.LogInformation("Meal-plan choice {SelectionId} cleared after confirmed removal of assignment {AssignmentId} by administrator {UserId}.",
++                choice.Id, input.AssignmentId, CurrentUser.Id);
++        }
+         _logger.LogWarning("Meal assignment {AssignmentId} removed for term {TermId} by administrator {UserId}.",input.AssignmentId,input.TermCalendarId,CurrentUser.Id);
+     }
+ 
+diff --git a/src/CampusFlow.Application/Housing/MealPlanAppService.cs b/src/CampusFlow.Application/Housing/MealPlanAppService.cs
+--- a/src/CampusFlow.Application/Housing/MealPlanAppService.cs
++++ b/src/CampusFlow.Application/Housing/MealPlanAppService.cs
+@@ -27,6 +27,7 @@
+     private readonly IRepository<BillApprovalTermConfiguration, Guid> _terms;
+     private readonly IClock _clock;
+     private readonly IBillApprovalCompletionLookup _completion;
++    private readonly IStudentInformationSystemMealPlanRemovalService _assignments;
+ 
+     public MealPlanAppService(IRepository<StudentProfile, Guid> profiles,
+         ICurrentStudentView currentStudentView,
+@@ -34,7 +35,8 @@
+         IRepository<StudentHousingSelection, Guid> selections,
+         IEnumerable<IStudentInformationSystemMealPlanService> services,
+         ILogger<MealPlanAppService> logger, IElementsHousingReader housing,
+-        IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion)
++        IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion,
++        IStudentInformationSystemMealPlanRemovalService assignments)
+     {
+         _profiles = profiles;
+         _currentStudentView = currentStudentView;
+@@ -46,6 +48,7 @@
+         _terms = terms;
+         _clock = clock;
+         _completion = completion;
++        _assignments = assignments;
+     }
+ 
+     public async Task<MealPlanSelectionDto> GetAsync(string? externalTermId = null)
+@@ -87,6 +90,15 @@
+         var selection = string.IsNullOrWhiteSpace(result.TermName)
+             ? null
+             : await _selections.FindAsync(x => x.StudentProfileId == profile.Id && x.TermName == result.TermName);
++        if (selection is { ExternalMealPlanId: not null, SyncedToStudentInformationSystem: true } &&
++            profile.Provider == StudentInformationSystemProvider.ThesisElements)
++        {
++            var assigned = (await _assignments.GetAssignmentsAsync(profile.ExternalStudentId))
++                .Where(x => x.TermCalendarId == termId).ToArray();
++            if (assigned.Length == 0) selection = null; // Read-only reconciliation; retain the prior choice for audit.
++            else if (!assigned.Any(x => x.MealPlanId == selection.ExternalMealPlanId))
++                throw new UserFriendlyException("Your meal-plan assignment has changed. Contact Student Billing to review it before choosing another plan.");
++        }
+         result.SelectedHousingChoice = selection?.HousingChoice;
+         result.SelectedMealPlanId = selection?.ExternalMealPlanId;
+         result.SelectedMealPlanName = selection?.MealPlanName;
+@@ -156,6 +168,18 @@
+             throw new UserFriendlyException("A housing selection period is not available.");
+         var selection = await _selections.FindAsync(x =>
+             x.StudentProfileId == profile.Id && x.TermName == view.TermName);
++        if (profile.Provider == StudentInformationSystemProvider.ThesisElements)
++        {
++            var assigned = await _assignments.GetAssignmentsAsync(profile.ExternalStudentId);
++            if (assigned.Any(x => x.TermCalendarId.ToString(System.Globalization.CultureInfo.InvariantCulture) == view.ExternalTermId))
++                throw new UserFriendlyException("A meal plan is already assigned for this term. Contact Student Billing before choosing another plan.");
++            if (selection is { ExternalMealPlanId: not null, SyncedToStudentInformationSystem: true })
++            {
++                // Replace only a choice whose removal has just been verified in live Elements.
++                await _selections.DeleteAsync(selection, autoSave: true);
++                selection = null;
++            }
++        }
+         if (selection is not null)
+             throw new UserFriendlyException("Your housing and meal plan selection has already been recorded.");
+ 
+diff --git a/src/CampusFlow.Web/Pages/Housing.cshtml b/src/CampusFlow.Web/Pages/Housing.cshtml
+--- a/src/CampusFlow.Web/Pages/Housing.cshtml
++++ b/src/CampusFlow.Web/Pages/Housing.cshtml
+@@ -53,7 +53,9 @@
+     {
+         @if (Model.Selection.SelectedHousingChoice.HasValue)
+         {
+-            <section class="housing-success"><i class="fa-solid fa-circle-check"></i><div><strong>Your selection has been recorded.</strong></div></section>
++            <section class="housing-success"><i class="fa-solid fa-circle-check"></i><div><strong>Your selection has been recorded.</strong>
++                <a class="housing-continue" asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId">Continue with bill approval <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
++            </div></section>
+         }
+         <section class="housing-term"><div><span>Selection period</span><strong>@(string.IsNullOrWhiteSpace(Model.Selection.TermName) ? "Upcoming term" : Model.Selection.TermName)</strong></div>@if(Model.Selection.TermStartDate.HasValue){<span>@Model.Selection.TermStartDate.Value.ToString("MMM d")–@Model.Selection.TermEndDate?.ToString("MMM d, yyyy")</span>}</section>
+ 
+@@ -63,7 +65,6 @@
+                 <div><span>Housing</span><strong>@HousingModel.ChoiceName(Model.Selection.SelectedHousingChoice.Value)</strong></div>
+                 <div><span>Meal plan</span><strong>@(Model.Selection.SelectedMealPlanName ?? "No meal plan")</strong></div>
+             </section>
+-            <p><a asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId">Click here to continue with bill approval</a></p>
+         }
+         else
+         {
+diff --git a/src/CampusFlow.Web/Pages/Housing.css b/src/CampusFlow.Web/Pages/Housing.css
+--- a/src/CampusFlow.Web/Pages/Housing.css
++++ b/src/CampusFlow.Web/Pages/Housing.css
+@@ -9,3 +9,7 @@
+ .housing-current{margin-top:28px;background:#fff;border:1px solid #e0e4eb;border-radius:24px;padding:28px 34px;box-shadow:0 16px 36px #1e274211}.housing-current>p{margin:16px 0 0}.housing-current-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:18px}.housing-current-grid>div{padding:18px;border-radius:16px;background:color-mix(in srgb,var(--tenant-primary) 5%,#fff)}.housing-current-grid span,.housing-current-grid strong{display:block}.housing-current-grid span{color:var(--tenant-primary);font-size:.82rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.housing-current-grid strong{margin-top:8px}
+ @media(max-width:850px){.housing-page{padding:20px 16px 60px}.housing-hero{padding:30px 24px;align-items:flex-start;flex-direction:column}.housing-student{width:100%}.housing-section,.housing-current{padding:26px 20px}.choice-grid,.plan-grid,.housing-selection-summary,.housing-current-grid{grid-template-columns:1fr}.plan-card{grid-template-columns:1fr}.housing-term{align-items:flex-start;flex-direction:column}}
+ .housing-submit:disabled { opacity: .5; cursor: default; }
++.housing-success>div{flex:1;text-align:center}
++.housing-continue{display:inline-flex;align-items:center;justify-content:center;gap:12px;margin-top:18px;padding:14px 22px;border-radius:12px;background:var(--tenant-primary);color:#fff;font-size:1.1rem;font-weight:750;text-decoration:none;max-width:100%;text-align:center}
++.housing-continue:hover,.housing-continue:focus-visible{color:#fff;background:var(--tenant-primary-dark);text-decoration:underline}
++.housing-continue i{font-size:1rem;color:inherit}
+diff --git a/test/CampusFlow.Application.Tests/Housing/AdminMealPlanRemovalTests.cs b/test/CampusFlow.Application.Tests/Housing/AdminMealPlanRemovalTests.cs
+--- a/test/CampusFlow.Application.Tests/Housing/AdminMealPlanRemovalTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/AdminMealPlanRemovalTests.cs
+@@ -21,6 +21,8 @@
+     private readonly IStudentInformationSystemMealPlanRemovalService _removal=Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
+     private readonly IStudentInformationSystemMealPlanService _plans=Substitute.For<IStudentInformationSystemMealPlanService>();
+     private readonly AdminMealPlanAppService _service;
++    private readonly Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid> _locals=Substitute.For<Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid>>();
++    private readonly List<StudentHousingSelection> _choices=[];
+     public AdminMealPlanRemovalTests()
+     {
+         var students=Substitute.For<IStudentInformationSystemStudentLookup>();students.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
+@@ -30,11 +32,47 @@
+         _removal.IsEnabled.Returns(true);_removal.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(new StudentMealPlanAssignment[]{new(10,20,269,"Spring plan",100),new(11,21,268,"Fall plan",100)});
+         var lazy=Substitute.For<IAbpLazyServiceProvider>();var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
+         var user=Substitute.For<ICurrentUser>();user.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
+-        var locals=Substitute.For<Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid>>();
+-        locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new List<StudentHousingSelection>());
+-        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,locals){LazyServiceProvider=lazy};
++        _locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>())
++            .Returns(call => _choices.Where(call.Arg<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>().Compile()).ToList());
++        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,_locals){LazyServiceProvider=lazy};
+     }
+     private static RemoveStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,AssignmentId=10,MealPlanId=20,Confirmed=true};
++    private StudentHousingSelection Choice(string student="123",int? plan=20,int year=2027)
++    {
++        var choice=new StudentHousingSelection(Guid.NewGuid(),null,Guid.NewGuid(),student,$"January {year}",
++            new(year,1,1),new(year,5,1),HousingChoice.Commuter,plan,"Plan");
++        choice.MarkSynced();_choices.Add(choice);return choice;
++    }
++    [Fact]public async Task Confirmed_removal_soft_deletes_only_matching_student_term_and_paid_plan_choices()
++    {
++        var matching=Choice();Choice("456");Choice(plan:null);Choice(plan:21);Choice(year:2026);
++        await _service.RemoveAsync(Input());
++        await _locals.Received(1).DeleteAsync(matching,true,Arg.Any<CancellationToken>());
++        Assert.Single(_locals.ReceivedCalls(),x=>x.GetMethodInfo().Name=="DeleteAsync");
++    }
++    [Fact]public async Task Failed_or_unconfirmed_external_removal_keeps_the_local_choice()
++    {
++        Choice();_removal.RemoveAsync("123",269,10,20,Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Not confirmed")));
++        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.RemoveAsync(Input()));
++        await _locals.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!,default,default);
++    }
++    [Fact]public async Task Explicit_term_overrides_the_administrative_default()
++    {
++        await _service.GetContextAsync("123",268);
++        await _plans.Received(1).GetContextAsync("123",268,Arg.Any<CancellationToken>());
++        await _plans.DidNotReceive().GetContextAsync("123",269,Arg.Any<CancellationToken>());
++    }
++    [Fact]public async Task Missing_term_defaults_administration_to_Spring_2027_without_changing_the_service_default()
++    {
++        var terms=new StudentMealPlanTerm[]{new(268,"Fall 2026",new(2026,8,1),new(2026,12,1)),
++            new(269,"Spring 2027",new(2027,1,1),DateTime.Today.AddYears(1))};
++        _plans.GetContextAsync("123",Arg.Any<int?>(),Arg.Any<CancellationToken>()).Returns(call=>
++            new StudentMealPlanContext("Commuter",[],terms,call.Arg<int?>()??268,[],null));
++        Assert.Equal(269,(await _service.GetContextAsync("123")).SelectedTermCalendarId);
++        await _plans.Received(1).GetContextAsync("123",null,Arg.Any<CancellationToken>());
++        await _plans.Received(1).GetContextAsync("123",269,Arg.Any<CancellationToken>());
++        await _plans.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
++    }
+     [Fact]public async Task Removal_never_changes_housing_status_or_assigns_a_new_plan()
+     {await _service.RemoveAsync(Input());await _removal.Received(1).RemoveAsync("123",269,10,20,Arg.Any<CancellationToken>());await _plans.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default);await _plans.DidNotReceiveWithAnyArgs().AssignAsync(default!,default);}
+     [Fact]public async Task Missing_confirmation_is_rejected_before_removal()
+diff --git a/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs b/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs
+--- a/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs
++++ b/test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs
+@@ -28,6 +28,8 @@
+     private readonly IBillApprovalCompletionLookup _completion = Substitute.For<IBillApprovalCompletionLookup>();
+     private readonly IClock _clock = Substitute.For<IClock>();
+     private readonly IRepository<StudentHousingSelection, Guid> _selections = Substitute.For<IRepository<StudentHousingSelection, Guid>>();
++    private readonly IStudentInformationSystemMealPlanRemovalService _assignments = Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
++    private StudentHousingSelection? _stored;
+ 
+     public MealPlanSelectionTests()
+     {
+@@ -58,24 +60,105 @@
+                 new(3, "20 Meal Plan", "Spring", 315m, new(2027, 1, 1), new(2027, 5, 1)),
+                 new(4, "12 Meal Plan", "Future", 1m, new(2028, 1, 1), new(2028, 5, 1))
+             }, new StudentMealPlanTerm[] { new(270, "Spring 2027", new(2027, 1, 1), new(2027, 5, 1)) }, 270, Array.Empty<StudentHousingStatusOption>(), null));
+-        StudentHousingSelection? stored = null;
++        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentMealPlanAssignment>());
+         _selections.FindAsync(Arg.Any<Expression<Func<StudentHousingSelection, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+-            .Returns(_ => Task.FromResult(stored));
++            .Returns(_ => Task.FromResult(_stored));
+         _selections.InsertAsync(Arg.Any<StudentHousingSelection>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+-            .Returns(call => { stored = call.Arg<StudentHousingSelection>(); return Task.FromResult(stored); });
++            .Returns(call => { _stored = call.Arg<StudentHousingSelection>(); return Task.FromResult(_stored); });
++        _sis.AssignAsync("10", Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>
++        {
++            _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
++                new StudentMealPlanAssignment[] { new(100, call.Arg<int>(), 270, "Selected plan", 315) });
++            return Task.CompletedTask;
++        });
+         var lazy = Substitute.For<IAbpLazyServiceProvider>();
+         var guids = Substitute.For<IGuidGenerator>(); guids.Create().Returns(_ => Guid.NewGuid());
+         lazy.LazyGetRequiredService<IGuidGenerator>().Returns(guids);
+         lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Substitute.For<ICurrentTenant>());
+         _service = new(Substitute.For<IRepository<StudentProfile, Guid>>(), current, configurations,
+             _selections, new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
+-            _housing, terms, _clock, _completion);
++            _housing, terms, _clock, _completion, _assignments);
+         _service.LazyServiceProvider = lazy;
+     }
+ 
+     private void Eligibility(string attendance, string? building) =>
+         _housing.GetStudentEligibilityAsync(10, 270, Arg.Any<CancellationToken>())
+             .Returns(new StudentHousingEligibility(attendance, "Main", building));
++
++    private void StoredPaidPlan(bool synced = true)
++    {
++        _stored = new(Guid.NewGuid(), null, Guid.NewGuid(), "10", "January 2027",
++            new(2027, 1, 1), new(2027, 5, 1), HousingChoice.Commuter, 3, "20 Meal Plan");
++        if (synced) _stored.MarkSynced();
++        else _stored.MarkPending("Assignment not confirmed");
++        Eligibility("Residential Undergraduate", "Commuter");
++    }
++
++    [Fact]
++    public async Task Previously_removed_paid_plan_is_not_shown_but_GET_retains_its_audit_record()
++    {
++        StoredPaidPlan();
++        var view = await _service.GetAsync("270");
++        Assert.Null(view.SelectedHousingChoice);
++        Assert.Null(view.SelectedMealPlanId);
++        await _selections.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!, default, default);
++        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
++    }
++
++    [Fact]
++    public async Task Removed_paid_choice_can_be_replaced_after_live_recheck()
++    {
++        StoredPaidPlan();
++        var original = _stored;
++        var result = await _service.SaveAsync(new()
++            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true });
++        Assert.Null(result.SelectedMealPlanId);
++        Assert.Equal("None", result.SelectedMealPlanName);
++        await _selections.Received(1).DeleteAsync(original!, true, Arg.Any<CancellationToken>());
++        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!, default, default);
++    }
++
++    [Fact]
++    public async Task An_existing_Elements_plan_blocks_reselection_even_without_a_local_choice()
++    {
++        Eligibility("Residential Undergraduate", "Commuter");
++        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
++            new StudentMealPlanAssignment[] { new(100, 3, 270, "20 Meal Plan", 315) });
++        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
++            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true }));
++        await _selections.DidNotReceiveWithAnyArgs().InsertAsync(default!, default, default);
++    }
++
++    [Fact]
++    public async Task A_plan_in_another_term_does_not_make_the_removed_choice_current()
++    {
++        StoredPaidPlan();
++        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
++            new StudentMealPlanAssignment[] { new(100, 3, 269, "Other term", 315) });
++        Assert.Null((await _service.GetAsync("270")).SelectedHousingChoice);
++    }
++
++    [Fact]
++    public async Task Unconfirmed_assignment_is_never_automatically_discarded()
++    {
++        StoredPaidPlan(synced: false);
++        Assert.Equal(3, (await _service.GetAsync("270")).SelectedMealPlanId);
++        await Assert.ThrowsAsync<UserFriendlyException>(() => _service.SaveAsync(new()
++            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true }));
++        await _selections.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!, default, default);
++    }
++
++    [Fact]
++    public async Task Unavailable_assignment_read_cannot_clear_a_choice_or_enable_reselection()
++    {
++        StoredPaidPlan();
++        _assignments.GetAssignmentsAsync("10", Arg.Any<CancellationToken>()).Returns(
++            Task.FromException<IReadOnlyList<StudentMealPlanAssignment>>(new InvalidOperationException("Unavailable")));
++        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.GetAsync("270"));
++        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.SaveAsync(new()
++            { ExternalTermId = "270", HousingChoice = HousingChoice.Commuter, SelectNoMealPlan = true }));
++        await _selections.DidNotReceiveWithAnyArgs().DeleteAsync(default(StudentHousingSelection)!, default, default);
++    }
+ 
+     [Fact]
+     public async Task No_choice_is_rejected_without_recording_None()
+diff --git a/test/browser/meal-plan-continuation.cjs b/test/browser/meal-plan-continuation.cjs
+new file mode 100644
+--- /dev/null
++++ b/test/browser/meal-plan-continuation.cjs
+@@ -0,0 +1,23 @@
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const { chromium } = require(process.env.CAMPUSFLOW_PLAYWRIGHT_PATH || 'playwright');
++const root = path.resolve(__dirname, '../..');
++const housing = fs.readFileSync(path.join(root, 'src/CampusFlow.Web/Pages/Housing.cshtml'), 'utf8');
++const success = housing.match(/<section class="housing-success">[\s\S]*?<\/section>/)[0]
++    .replace('asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId"', 'href="/Index?term=269"');
++const css = fs.readFileSync(path.join(root, 'src/CampusFlow.Web/Pages/Housing.css'), 'utf8');
++
++(async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.CHAPEL_TEST_BROWSER||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});try{
++        for (const width of [320,390,768,1440]) {
++            const p = await browser.newPage({viewport:{width,height:900}});
++            await p.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;--tenant-primary:#502d7f;--tenant-primary-dark:#38205a;--tenant-text:#111;--tenant-body-font:Arial}${css}</style><main class="housing-page">${success}</main>`);
++            assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
++            const link = p.getByRole('link',{name:/Continue with bill approval/});
++            assert.equal(await link.getAttribute('href'),'/Index?term=269');
++            assert.ok((await link.boundingBox()).height>=44);
++            if ([390,1440].includes(width)) await p.screenshot({path:`/private/tmp/campusflow-cf034-036-tests/meal-continue-${width}.png`,fullPage:true});
++            console.log(`PASS meal-plan success action: selected term, touch target and layout at ${width}px`);
++            await p.close();
++        }
++}finally{await browser.close();}})().catch(error=>{console.error(error);process.exit(1);});

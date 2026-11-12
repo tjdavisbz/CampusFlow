@@ -1,0 +1,295 @@
+diff --git a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs
+--- a/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs
++++ b/src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs
+@@ -52,7 +52,7 @@
+         if (!request.AllowCreate)
+             throw new CampusFlow.BillApprovals.BillCompletionPreparationException("A document creation was already attempted. Retry can recover an existing record by approval reference; an administrator must confirm no record exists before allowing another creation.");
+         var token = await GetAccessTokenAsync(cancellationToken);
+-        // Elements requires the document type's configured description, including spacing.
++        // Resolve and validate the reporting document type before creating the per-term record.
+         using var typesRequest = CreateRequest(HttpMethod.Get, "api/manager/lookup-table-options/doc-track-setup/documents", token);
+         using var typesResponse = await _client.SendAsync(typesRequest, cancellationToken);
+         typesResponse.EnsureSuccessStatusCode();
+@@ -96,8 +96,8 @@
+                 ["docTrackId"] = 0,
+                 ["studentUid"] = int.Parse(request.ExternalStudentId, CultureInfo.InvariantCulture),
+                 ["docDate"] = acceptedAt,
+-                // The documented custom-description mode does not rename the shared document type.
+-                ["docNameId"] = 0,
++                // Keep the reporting type while giving this record its own term description.
++                ["docNameId"] = GetTrackingInt("DocumentNameId"),
+                 ["docDescription"] = termDescription,
+                 ["docStatusId"] = GetTrackingInt("DocumentStatusId"),
+                 ["comments"] = "CampusFlow approved bill - " + request.TermName,
+diff --git a/src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs b/src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs
+--- a/src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs
++++ b/src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs
+@@ -5,7 +5,7 @@
+ public static class BillApprovalStudentCompletion
+ {
+     public const string CompleteMessage = "Your bill has been approved, and your registration is complete!";
+-    public const string PendingMessage = "Your bill has been approved. We are finishing your registration; contact Student Billing if this message remains.";
++    public const string PendingMessage = "Your bill has been approved. We are finishing your registration.";
+     public static bool RegistrationComplete(BillApproval approval) =>
+         BillApprovalAcceptanceRules.IsApproved(approval.AcceptedAt, approval.Status) &&
+         BillApprovalCompletionProgress.Read(approval).Step(BillCompletionStep.Cleared).Status == BillCompletionStatus.Completed;
+diff --git a/src/CampusFlow.Web/Pages/BillApproval.cshtml b/src/CampusFlow.Web/Pages/BillApproval.cshtml
+--- a/src/CampusFlow.Web/Pages/BillApproval.cshtml
++++ b/src/CampusFlow.Web/Pages/BillApproval.cshtml
+@@ -60,8 +60,11 @@
+                 }
+                 @if (!Model.RegistrationComplete || !Model.PdfAvailable && Model.LegacyApproval is null)
+                 {
+-                    <p>You can refresh this page to check your registration and agreement.</p>
+-                    <a class="secondary" asp-page="/BillApproval" asp-route-term="@Model.TermCode">Refresh status</a>
++                    <p class="completion-status" role="status" aria-live="polite"
++                       data-completion-url="@Url.Page("/BillApproval", "CompletionStatus", new { term = Model.TermCode })"
++                       data-registration-complete="@(Model.RegistrationComplete ? "true" : "false")"
++                       data-pdf-available="@(Model.PdfAvailable ? "true" : "false")">This page will update automatically when your registration and agreement are ready.</p>
++                    <noscript><p>Check Bill Approval History later for your registration and agreement status.</p></noscript>
+                 }
+                 @if (Model.BookstoreUrl is not null)
+                 {
+diff --git a/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs b/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs
+--- a/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/BillApproval.cshtml.cs
+@@ -571,6 +571,27 @@
+         return RedirectToPage(new { term });
+     }
+ 
++    public sealed record CompletionStatus(bool RegistrationComplete, bool PdfAvailable, bool NeedsReview);
++
++    public async Task<IActionResult> OnGetCompletionStatusAsync([FromQuery] string? term)
++    {
++        Response.Headers.CacheControl = "no-store";
++        if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term) || term.Length > 32) return NotFound();
++        var profile = await _currentStudentView.GetProfileAsync(HttpContext.RequestAborted);
++        if (profile is null) return NotFound();
++        var approval = await _billApprovals.FindAsync(x =>
++            x.StudentProfileId == profile.Id && x.TermCode == term && x.AcceptedAt != null);
++        if (approval is null || !BillApprovalAcceptanceRules.IsApproved(approval.AcceptedAt, approval.Status)) return NotFound();
++        var artifact = await _artifacts.FindAsync(x => x.BillApprovalId == approval.Id);
++        var progress = BillApprovalCompletionProgress.Read(approval);
++        var needsReview = new[] { BillCompletionStep.Cleared, BillCompletionStep.Pdf }.Any(step =>
++            progress.Step(step).Status is BillCompletionStatus.Failed or BillCompletionStatus.Uncertain or BillCompletionStatus.Disabled);
++        return new JsonResult(new CompletionStatus(
++            BillApprovalStudentCompletion.RegistrationComplete(approval),
++            artifact?.PdfStatus == BillArtifactOperationStatus.Completed && !string.IsNullOrWhiteSpace(artifact.PdfBlobName),
++            needsReview || artifact?.PdfStatus == BillArtifactOperationStatus.Failed));
++    }
++
+     public async Task<IActionResult> OnGetPdfAsync([FromQuery] string term)
+     {
+         if (CurrentUser.Id is null || string.IsNullOrWhiteSpace(term)) return NotFound();
+diff --git a/src/CampusFlow.Web/Pages/BillApproval.js b/src/CampusFlow.Web/Pages/BillApproval.js
+--- a/src/CampusFlow.Web/Pages/BillApproval.js
++++ b/src/CampusFlow.Web/Pages/BillApproval.js
+@@ -1,4 +1,39 @@
+ document.addEventListener('DOMContentLoaded', () => {
++    const completion = document.querySelector('[data-completion-url]');
++    if (completion) {
++        let attempts = 0;
++        let failures = 0;
++        const delayed = () => {
++            completion.textContent = 'Your approval is saved. Processing is taking longer than expected. Check Bill Approval History later, or contact Student Billing if it does not finish.';
++        };
++        const checkCompletion = async () => {
++            if (++attempts > 24) { delayed(); return; }
++            try {
++                const response = await fetch(completion.dataset.completionUrl, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } });
++                if (response.status === 404) {
++                    completion.textContent = 'Your approval status has changed. Open Bill Approval History to review the current status.';
++                    return;
++                }
++                if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Status unavailable');
++                const status = await response.json();
++                if (typeof status.registrationComplete !== 'boolean' || typeof status.pdfAvailable !== 'boolean' || typeof status.needsReview !== 'boolean') throw new Error('Invalid status');
++                failures = 0;
++                if (String(status.registrationComplete) !== completion.dataset.registrationComplete ||
++                    String(status.pdfAvailable) !== completion.dataset.pdfAvailable) {
++                    window.location.reload();
++                    return;
++                }
++                if (status.needsReview) {
++                    completion.textContent = 'Your bill approval is saved. Student Billing needs to review the remaining registration or agreement steps.';
++                    return;
++                }
++            } catch {
++                if (++failures >= 3) { delayed(); return; }
++            }
++            window.setTimeout(checkCompletion, 5000);
++        };
++        window.setTimeout(checkCompletion, 3000);
++    }
+     const steps = [...document.querySelectorAll('[data-step]')];
+     const nav = [...document.querySelectorAll('[data-step-target]')];
+     const show = name => {
+diff --git a/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs b/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs
+--- a/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs
++++ b/test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs
+@@ -12,7 +12,7 @@
+     [Theory]
+     [InlineData("Spring 2027")]
+     [InlineData("Fall 2027")]
+-    public void Term_description_uses_documented_custom_mode_and_preserves_delivery_metadata(string term)
++    public void Term_description_preserves_the_reporting_document_type_and_delivery_metadata(string term)
+     {
+         var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+         {
+@@ -29,7 +29,7 @@
+ 
+         var body = service.BuildDocumentBody(request, " Approved  Bill ");
+ 
+-        Assert.Equal(0, body["docNameId"]!.GetValue<int>());
++        Assert.Equal(123, body["docNameId"]!.GetValue<int>());
+         Assert.Equal("Approved Bill - " + term, body["docDescription"]!.GetValue<string>());
+         Assert.Equal(approvalId.ToString("N"), body["reference"]!.GetValue<string>());
+         Assert.Equal(10, body["studentUid"]!.GetValue<int>());
+diff --git a/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs b/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs
+--- a/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs
++++ b/test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs
+@@ -49,6 +49,7 @@
+     private readonly IRepository<AgreementTemplate,Guid> _agreements=Substitute.For<IRepository<AgreementTemplate,Guid>>();
+     private readonly IRepository<PaymentPlanPolicy,Guid> _policies=Substitute.For<IRepository<PaymentPlanPolicy,Guid>>();
+     private readonly IRepository<BillApproval,Guid> _approvals=Substitute.For<IRepository<BillApproval,Guid>>();
++    private readonly IRepository<BillApprovalArtifact,Guid> _artifacts=Substitute.For<IRepository<BillApprovalArtifact,Guid>>();
+ 
+     public BillApprovalAccessHandlerTests()
+     {
+@@ -78,11 +79,68 @@
+             new[]{termLookup},new[]{schedule},new[]{_billing},new[]{aid},new[]{_planLookup},
+             Array.Empty<IStudentInformationSystemDocumentTrackingService>(),Array.Empty<IStudentInformationSystemPaymentPostingService>(),
+             _taxConfiguration,_agreements,_policies,
+-            terms,_approvals,Substitute.For<IRepository<BillApprovalArtifact,Guid>>(),Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
++            terms,_approvals,_artifacts,Substitute.For<IBlobContainer<BillApprovalPdfContainer>>(),
+             Substitute.For<IBillApprovalPdfGenerator>(),Substitute.For<IGuidGenerator>(),clock,Substitute.For<IRepository<PayflowPayment,Guid>>(),
+             _gateway,Options.Create(new PayflowOptions()),NullLogger<CampusFlow.Web.Pages.BillApprovalModel>.Instance,
+             Substitute.For<ILegacyBillApprovalLookup>(),_meal,_completion, Substitute.For<CampusFlow.Web.Students.IStudentTermSelection>(), new[]{_recalculation}, Substitute.For<Volo.Abp.BackgroundJobs.IBackgroundJobManager>(),new[]{_aidDecisions})
+         {LazyServiceProvider=lazy,PageContext=new PageContext{HttpContext=new DefaultHttpContext()}};
++    }
++
++    private async Task<BillApproval> AcceptedApproval(bool otherStudent = false)
++    {
++        var profile = (await _current.GetProfileAsync())!;
++        var approval = new BillApproval(Guid.NewGuid(), profile.TenantId!.Value, Guid.NewGuid(),
++            otherStudent ? Guid.NewGuid() : profile.Id, "10", "100", "269", "B27S", "Spring 2027");
++        approval.Accept(Guid.NewGuid(), 1, "<p>Accepted terms</p>", DateTime.UtcNow, null, null);
++        _approvals.FindAsync(Arg.Any<Expression<Func<BillApproval, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
++            .Returns(call => call.Arg<Expression<Func<BillApproval, bool>>>().Compile()(approval) ? approval : null);
++        return approval;
++    }
++
++    [Fact]
++    public async Task Completion_poll_reads_only_current_students_saved_status_without_running_work()
++    {
++        var approval = await AcceptedApproval();
++        var progress = new BillApprovalCompletionProgress();
++        progress.Step(BillCompletionStep.Cleared).Status = BillCompletionStatus.Completed;
++        progress.Save(approval);
++        var artifact = new BillApprovalArtifact(Guid.NewGuid(), approval.TenantId, approval.Id);
++        artifact.MarkPdfCompleted("bill.pdf", "private-blob", "hash", DateTime.UtcNow);
++        _artifacts.FindAsync(Arg.Any<Expression<Func<BillApprovalArtifact, bool>>>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
++            .Returns(artifact);
++        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.JsonResult>(await _model.OnGetCompletionStatusAsync("B27S"));
++        Assert.Equal(new BillApprovalModel.CompletionStatus(true, true, false), result.Value);
++        Assert.Equal("no-store", _model.Response.Headers.CacheControl);
++        Assert.Empty(_recalculation.ReceivedCalls());
++        Assert.Empty(_tax.ReceivedCalls());
++        Assert.Empty(_meal.ReceivedCalls());
++        Assert.Empty(_billing.ReceivedCalls());
++        await _approvals.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default, default);
++    }
++
++    [Theory]
++    [InlineData(true, "B27S")]
++    [InlineData(false, "B26F")]
++    public async Task Completion_poll_cannot_read_another_student_or_terms_approval(bool otherStudent, string term)
++    {
++        await AcceptedApproval(otherStudent);
++        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(await _model.OnGetCompletionStatusAsync(term));
++        Assert.Empty(_artifacts.ReceivedCalls());
++    }
++
++    [Theory]
++    [InlineData(BillCompletionStatus.Pending, false)]
++    [InlineData(BillCompletionStatus.Failed, true)]
++    [InlineData(BillCompletionStatus.Uncertain, true)]
++    public async Task Completion_poll_distinguishes_pending_from_review_without_claiming_completion(BillCompletionStatus state, bool needsReview)
++    {
++        var approval = await AcceptedApproval();
++        var progress = new BillApprovalCompletionProgress();
++        progress.Step(BillCompletionStep.Cleared).Status = state;
++        progress.Step(BillCompletionStep.Cleared).Error = "Private vendor error must not be returned";
++        progress.Save(approval);
++        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.JsonResult>(await _model.OnGetCompletionStatusAsync("B27S"));
++        Assert.Equal(new BillApprovalModel.CompletionStatus(false, false, needsReview), result.Value);
+     }
+ 
+     [Fact]
+diff --git a/test/browser/bill-completion-status.cjs b/test/browser/bill-completion-status.cjs
+new file mode 100644
+--- /dev/null
++++ b/test/browser/bill-completion-status.cjs
+@@ -0,0 +1,62 @@
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const { chromium } = require(process.env.CAMPUSFLOW_PLAYWRIGHT_PATH || 'playwright');
++const root = path.resolve(__dirname, '../..');
++const script = fs.readFileSync(path.join(root, 'src/CampusFlow.Web/Pages/BillApproval.js'), 'utf8');
++const source = fs.readFileSync(path.join(root, 'src/CampusFlow.Web/Pages/BillApproval.cshtml'), 'utf8');
++const pending = source.match(/<p class="completion-status"[\s\S]*?<\/p>/)[0]
++    .replace(/data-completion-url="[^\n]+/, 'data-completion-url="/BillApproval?handler=CompletionStatus&amp;term=B27S"')
++    .replace(/data-registration-complete="[^\n]+/, 'data-registration-complete="false"')
++    .replace(/data-pdf-available="[^\n]+?>/, 'data-pdf-available="false">');
++
++(async () => {
++    const browser = await chromium.launch({ headless: true, executablePath: process.env.CHAPEL_TEST_BROWSER || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' });
++    try {
++        for (const [name, response, text, expectedCalls] of [
++            ['review', {registrationComplete:false,pdfAvailable:false,needsReview:true}, /needs to review/, 1],
++            ['reset', null, /status has changed/, 1],
++            ['network', 'error', /taking longer/, 3],
++            ['pending', {registrationComplete:false,pdfAvailable:false,needsReview:false}, /taking longer/, 24]
++        ]) {
++            const page = await browser.newPage();
++            await page.clock.install();
++            await page.route('http://completion.test/**', route => route.fulfill({contentType:'text/html',body:pending}));
++            await page.goto('http://completion.test/BillApproval?term=B27S');
++            await page.evaluate(value => {
++                window.calls = [];
++                window.fetch = async (url, options) => {
++                    window.calls.push({url, options});
++                    if (value === 'error') throw new Error('Offline');
++                    return {status:value === null ? 404 : 200,ok:value !== null,headers:new Headers({'content-type':'application/json'}),json:async()=>value};
++                };
++            }, response);
++            await page.addScriptTag({content:script});
++            await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
++            await page.clock.runFor(130001);
++            assert.match(await page.locator('[data-completion-url]').textContent(), text);
++            const calls = await page.evaluate(() => window.calls);
++            assert.equal(calls.length, expectedCalls);
++            assert.ok(calls.every(x => x.url.endsWith('term=B27S') && x.options.cache === 'no-store' && !x.options.method));
++            await page.clock.runFor(60000);
++            assert.equal(await page.evaluate(() => window.calls.length), expectedCalls);
++            console.log(`PASS completion ${name}: bounded read-only polling, selected term and truthful status`);
++            await page.close();
++        }
++        const page = await browser.newPage();
++        await page.clock.install();
++        let navigations = 0;
++        await page.route('http://completion.test/**', route => { navigations++; return route.fulfill({contentType:'text/html',body:pending}); });
++        await page.goto('http://completion.test/BillApproval?term=B27S');
++        await page.evaluate(() => {window.fetch=async()=>({status:200,ok:true,headers:new Headers({'content-type':'application/json'}),json:async()=>({registrationComplete:true,pdfAvailable:true,needsReview:false})});});
++        await page.addScriptTag({content:script});
++        await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
++        const reload = page.waitForEvent('framenavigated');
++        await page.clock.runFor(3001);
++        await reload;
++        assert.equal(navigations,2);
++        console.log('PASS verified completion refreshes the page without submitting approval or retrying completion work');
++        await page.close();
++
++    } finally { await browser.close(); }
++})().catch(error=>{console.error(error);process.exit(1);});

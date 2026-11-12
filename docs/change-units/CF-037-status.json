@@ -1,0 +1,71 @@
+{
+  "unit": "CF-037",
+  "scope": "Reset Cleared Status, Disable Blackboard, Payment Plan?, Non-Returning and Non-Returning Reason together for eligible Cleared student-term records without approved bills or audited manual exceptions.",
+  "documentItems": [
+    "2"
+  ],
+  "sourceDocument": "Spring 2027 Approve Your Bill Issues & Questions_-6.pdf",
+  "state": "committed-pushed-deployed-both",
+  "branch": "codex/cf-034-038-nonprod-release",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow",
+  "sourceBase": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "productionBase": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "commit": "986ca081ab38a3c98252f39fdd032ad2c95bb346",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "dc40bc294caf5591a269dd4b6a7505d607659abe",
+    "unitCommit": "986ca081ab38a3c98252f39fdd032ad2c95bb346",
+    "branch": "codex/cf-034-038-nonprod-release",
+    "deploymentId": "50dfa273-64c6-419d-b9c7-20e0023c918b",
+    "deployedAtUtc": "2026-11-12T06:30:14.9662864Z",
+    "verifiedAtUtc": "2026-11-12T06:32:06.046849+00:00",
+    "verification": "CF-034-038-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "109727c093d5432d18cada97fcb90787bdd77878",
+    "unitCommit": "8b3a9bcb112ea4db430a4473d53d35aa7a54d0ff",
+    "branch": "codex/cf-034-038-production-release",
+    "deploymentId": "7c6a5162-b1e9-4e76-bd08-bfca3e4c0038",
+    "deployedAtUtc": "2026-11-12T06:36:27.1119735Z",
+    "verifiedAtUtc": "2026-11-12T06:50:52.615006+00:00",
+    "verification": "CF-034-038-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "verification": "CF-034-038-combined-verification.json",
+  "sourcePatch": "CF-037.patch",
+  "sourcePatchSha256": "a81e61f6b7f3453d46919a7cc1e11f14fd1e19a3f1900e83d64e4bc1fbf34004",
+  "files": [
+    "src/CampusFlow.Domain/ClearanceResets/ClearanceResetModels.cs",
+    "src/CampusFlow.Application/ClearanceResets/ClearanceResetRunner.cs",
+    "src/CampusFlow.Application/ClearanceResets/ClearanceResetAppService.cs",
+    "src/CampusFlow.EntityFrameworkCore/ClearanceResets/ElementsClearanceResetService.cs",
+    "src/CampusFlow.Web/Pages/Admin/StudentBilling/ClearanceResets.cshtml",
+    "src/CampusFlow.Web/Pages/Admin/StudentBilling/ClearanceResets.js",
+    "test/CampusFlow.Domain.Tests/ClearanceResets/ClearanceApprovalRulesTests.cs",
+    "test/CampusFlow.Domain.Tests/ClearanceResets/ClearanceResetScheduleTests.cs",
+    "test/CampusFlow.EntityFrameworkCore.Tests/ClearanceResets/ElementsClearanceResetTests.cs",
+    "test/browser/clearance-reset-workflow.cjs"
+  ],
+  "dependencies": [
+    "Existing verified CF-033 environment baseline; no other newly prepared unit required."
+  ],
+  "notes": [
+    "User authorized Fall 2026 as internal lower bound, blank values and no cutoff wording on screen. Existing chronological Term comparison is retained.",
+    "Physical fields and labels are validated against configuration before preview/write. Empty string is required for Non-Returning Reason: the live API rejects JSON null. Date resets to null, Cleared lookup to verified blank 0, checkboxes to false.",
+    "Eligibility still requires Cleared; Not Cleared, already-blank statuses and unrelated fields are preserved. No blanket repair of previous cleared-to-blank rows is performed. Such historical repair requires the prior audit and current-value review.",
+    "Policy version 3 invalidates old manual previews and prevents old enabled schedules from silently adopting broader writes. Explicit re-enabling starts after 15 minutes; defaults stay off.",
+    "Same-student/term current and qualifying legacy approvals, manual exceptions, shared lease, live double-check, exact readback and pre-write audit remain.",
+    "No automatic schedule was enabled. Reverting code does not restore fields already cleared; use recorded before snapshots under a reviewed data correction."
+  ],
+  "updatedAtUtc": "2026-11-12T06:51:28.360688+00:00",
+  "promotionNotes": "Deployed on isolated environment-specific release branches. For later promotion/removal, select this unit and verify the current target release; preserve unrelated units, settings and assets.",
+  "removalNotes": "Revert only this unit from the current target release. Preserve later/unrelated units and any stored historical records. Data side effects are not reversed by code removal.",
+  "sourceParent": "25c99efaef181abbcb9e3d47c0dd6aa512e2a73d",
+  "staffAcceptancePending": true
+}

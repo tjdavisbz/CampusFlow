@@ -1,0 +1,178 @@
+diff --git a/src/CampusFlow.Web/Pages/FinancialAidDisplay.cs b/src/CampusFlow.Web/Pages/FinancialAidDisplay.cs
+new file mode 100644
+--- /dev/null
++++ b/src/CampusFlow.Web/Pages/FinancialAidDisplay.cs
+@@ -0,0 +1,28 @@
++using System.Collections.Generic;
++using CampusFlow.StudentInformationSystems;
++
++namespace CampusFlow.Web.Pages;
++
++// Presentation only: award decisions must retain the provider's original Amount.
++public static class FinancialAidDisplay
++{
++    public static decimal? Amount(StudentFinancialAidAward award) =>
++        award.Provider == StudentInformationSystemProvider.ThesisElements
++            ? award.DistributionAmount is >= 0m ? award.DistributionAmount : null
++            : award.Amount;
++
++    public static decimal? Total(IEnumerable<StudentFinancialAidAward> awards)
++    {
++        decimal total = 0;
++        foreach (var award in awards)
++        {
++            if (Amount(award) is not { } amount) return null;
++            total += amount;
++        }
++        return total;
++    }
++
++    public static string Currency(decimal? amount) => amount.HasValue
++        ? Formatting.UsdCurrency.Format(amount.Value)
++        : "Amount unavailable";
++}
+diff --git a/src/CampusFlow.Web/Pages/FinancialAid.cshtml b/src/CampusFlow.Web/Pages/FinancialAid.cshtml
+--- a/src/CampusFlow.Web/Pages/FinancialAid.cshtml
++++ b/src/CampusFlow.Web/Pages/FinancialAid.cshtml
+@@ -63,6 +63,7 @@
+             <div><span>Selected term awards</span><strong>@FinancialAidModel.FormatCurrency(Model.CurrentTermAwards)</strong></div>
+             <p>@(Model.CurrentTermName ?? "Selected academic term")</p>
+         </section>
++        <p class="aid-note">Amounts shown are distribution amounts, after any applicable loan fees. An unavailable amount needs review by Financial Aid.</p>
+ 
+         @if (Model.CurrentAndUpcomingTerms.Count > 0)
+         {
+diff --git a/src/CampusFlow.Web/Pages/FinancialAid.cshtml.cs b/src/CampusFlow.Web/Pages/FinancialAid.cshtml.cs
+--- a/src/CampusFlow.Web/Pages/FinancialAid.cshtml.cs
++++ b/src/CampusFlow.Web/Pages/FinancialAid.cshtml.cs
+@@ -59,8 +59,8 @@
+         x.Type == CampusFlow.Students.StudentViewClaimTypes.ExternalStudentId ||
+         x.Type == CampusFlow.Web.Portals.FacultyViewClaimTypes.FacultyId ||
+         x.Type == CampusFlow.AdvisorPortal.SchedulerViewClaimTypes.Email);
+-    public decimal CurrentTermAwards =>
+-        Terms.SingleOrDefault(x => x.TermCode == CurrentTermCode)?.TotalAmount ?? 0m;
++    public decimal? CurrentTermAwards =>
++        Terms.SingleOrDefault(x => x.TermCode == CurrentTermCode) is { } group ? group.TotalAmount : 0m;
+     [Microsoft.AspNetCore.Mvc.TempData]
+     public string? StatusMessage { get; set; }
+     [Microsoft.AspNetCore.Mvc.TempData]
+@@ -124,7 +124,7 @@
+                 .Select(group => new AwardTermGroup(
+                     group.Key.TermCode,
+                     group.Key.TermName,
+-                    group.Sum(x => x.Amount),
++                    FinancialAidDisplay.Total(group),
+                     group.OrderByDescending(x => x.AwardDate).ThenBy(x => x.Description).ToArray()))
+                 .ToArray();
+             OpenTermCode = Terms.Any(x => x.TermCode == openTerm) ? openTerm : CurrentTermCode;
+@@ -142,8 +142,7 @@
+         }
+     }
+ 
+-    public static string FormatCurrency(decimal amount) =>
+-        CampusFlow.Web.Formatting.UsdCurrency.Format(amount);
++    public static string FormatCurrency(decimal? amount) => FinancialAidDisplay.Currency(amount);
+ 
+     internal static IReadOnlyList<StudentFinancialAidAward> StudentVisibleAwards(
+         IEnumerable<StudentFinancialAidAward> awards) =>
+@@ -229,6 +228,6 @@
+     public sealed record AwardTermGroup(
+         string TermCode,
+         string TermName,
+-        decimal TotalAmount,
++        decimal? TotalAmount,
+         IReadOnlyList<StudentFinancialAidAward> Awards);
+ }
+diff --git a/src/CampusFlow.Web/Pages/_FinancialAidTerm.cshtml b/src/CampusFlow.Web/Pages/_FinancialAidTerm.cshtml
+--- a/src/CampusFlow.Web/Pages/_FinancialAidTerm.cshtml
++++ b/src/CampusFlow.Web/Pages/_FinancialAidTerm.cshtml
+@@ -18,14 +18,14 @@
+             <span>@available.Length available award@(available.Length == 1 ? "" : "s") in this semester</span>
+             <button type="button" data-aid-accept-all data-external-term-id="@termIds[0]" data-term-code="@Model.TermCode"
+                 data-term-name="@Model.TermName" data-award-ids="@string.Join(",", available.Select(x => x.ExternalAwardId))"
+-                data-award-count="@available.Length" data-award-amount="@FinancialAidModel.FormatCurrency(available.Sum(x => x.Amount))">Accept all available awards</button>
++                data-award-count="@available.Length" data-award-amount="@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Total(available))">Accept all available awards</button>
+         </div>
+     }
+     <div class="award-grid">
+         @foreach (var award in Model.Awards)
+         {
+             <article class="award-card">
+-                <div class="award-topline"><span>@award.AwardType</span><strong>@FinancialAidModel.FormatCurrency(award.Amount)</strong></div>
++                <div class="award-topline"><span>@award.AwardType</span><strong>@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Amount(award))</strong></div>
+                 <h3>@award.Description</h3>
+                 <div class="award-meta">
+                     <span><i class="fa-regular fa-calendar"></i>@(award.AwardDate?.ToString("MMM d, yyyy") ?? "Date unavailable")</span>
+@@ -51,8 +51,8 @@
+                         }
+                         else
+                         {
+-                            <button type="button" data-term-code="@Model.TermCode" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Accept</button>
+-                            <button type="button" class="decline" data-term-code="@Model.TermCode" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(award.Amount)">Decline</button>
++                            <button type="button" data-term-code="@Model.TermCode" data-aid-decision="Accept" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Amount(award))">Accept</button>
++                            <button type="button" class="decline" data-term-code="@Model.TermCode" data-aid-decision="Decline" data-award-id="@award.ExternalAwardId" data-award-name="@award.Description" data-award-amount="@FinancialAidModel.FormatCurrency(FinancialAidDisplay.Amount(award))">Decline</button>
+                         }
+                     </div>
+                 </div>
+diff --git a/src/CampusFlow.Web/Pages/BillApproval.cshtml b/src/CampusFlow.Web/Pages/BillApproval.cshtml
+--- a/src/CampusFlow.Web/Pages/BillApproval.cshtml
++++ b/src/CampusFlow.Web/Pages/BillApproval.cshtml
+@@ -108,7 +108,7 @@
+                             <p>These loans are not included in expected financial aid and do not reduce the balance shown here.</p>
+                             <ul>@foreach (var loan in Model.PendingLoans)
+                             {
+-                                <li><span>@loan.Description</span><strong>@BillApprovalModel.Currency(loan.Amount)</strong></li>
++                                <li><span>@loan.Description</span><strong>@FinancialAidDisplay.Currency(FinancialAidDisplay.Amount(loan))</strong></li>
+                             }</ul>
+                             <a asp-page="/FinancialAid" asp-route-term="@Model.ExternalTermId" asp-route-openTerm="@Model.TermCode">Review financial aid</a>
+                             <p>Contact Financial Aid if you need help reviewing or accepting an award.</p>
+diff --git a/test/CampusFlow.Web.Tests/Pages/FinancialAidDisplayTests.cs b/test/CampusFlow.Web.Tests/Pages/FinancialAidDisplayTests.cs
+new file mode 100644
+--- /dev/null
++++ b/test/CampusFlow.Web.Tests/Pages/FinancialAidDisplayTests.cs
+@@ -0,0 +1,45 @@
++using System;
++using CampusFlow.StudentInformationSystems;
++using CampusFlow.Web.Pages;
++using Xunit;
++
++namespace CampusFlow.Pages;
++
++public sealed class FinancialAidDisplayTests
++{
++    private static StudentFinancialAidAward Award(decimal? net) =>
++        new(StudentInformationSystemProvider.ThesisElements, "1", "269", "2027S", "Spring 2027",
++            DateTime.Today, "UNSUB", "Anticipated", "Loan", 1000m, false, null, null,
++            IsLoan: true, DistributionAmount: net);
++
++    [Fact]
++    public void Display_uses_net_without_changing_award_decisions_or_gross_amount()
++    {
++        var award = Award(989.43m);
++        Assert.Equal(989.43m, FinancialAidDisplay.Amount(award));
++        Assert.Equal(1000m, award.Amount);
++        Assert.True(FinancialAidRules.CanDecide(award));
++        Assert.True(FinancialAidRules.IsLoanAwaitingAcceptance(award));
++        Assert.False(FinancialAidRules.IncludeInBillApproval(award));
++    }
++
++    [Theory]
++    [InlineData(null)]
++    [InlineData(-1)]
++    public void Missing_or_invalid_net_is_not_substituted_with_gross_or_a_partial_total(int? net)
++    {
++        var award = Award(net);
++        Assert.Null(FinancialAidDisplay.Amount(award));
++        Assert.Null(FinancialAidDisplay.Total([Award(989.43m), award]));
++        Assert.Equal("Amount unavailable", FinancialAidDisplay.Currency(FinancialAidDisplay.Amount(award)));
++        Assert.True(FinancialAidRules.CanDecide(award));
++    }
++
++    [Fact]
++    public void Zero_is_a_real_net_amount_and_totals_match_cards()
++    {
++        Assert.Equal(0m, FinancialAidDisplay.Amount(Award(0m)));
++        Assert.Equal(989.43m, FinancialAidDisplay.Total([Award(0m), Award(989.43m)]));
++        Assert.Equal(0m, FinancialAidDisplay.Total([]));
++    }
++}

@@ -1,0 +1,68 @@
+{
+  "unit": "CF-036",
+  "scope": "Retain Approved Bill document type with term-specific description on new records; automatically refresh completion status without a manual Refresh link.",
+  "documentItems": [
+    "9",
+    "11"
+  ],
+  "sourceDocument": "Spring 2027 Approve Your Bill Issues & Questions_-6.pdf",
+  "state": "committed-pushed-deployed-both",
+  "branch": "codex/cf-034-038-nonprod-release",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow",
+  "sourceBase": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "productionBase": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "commit": "25c99efaef181abbcb9e3d47c0dd6aa512e2a73d",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "dc40bc294caf5591a269dd4b6a7505d607659abe",
+    "unitCommit": "25c99efaef181abbcb9e3d47c0dd6aa512e2a73d",
+    "branch": "codex/cf-034-038-nonprod-release",
+    "deploymentId": "50dfa273-64c6-419d-b9c7-20e0023c918b",
+    "deployedAtUtc": "2026-11-12T06:30:14.9662864Z",
+    "verifiedAtUtc": "2026-11-12T06:32:06.046849+00:00",
+    "verification": "CF-034-038-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "109727c093d5432d18cada97fcb90787bdd77878",
+    "unitCommit": "b9975e52293d46898629dae07819a81dd3a907b0",
+    "branch": "codex/cf-034-038-production-release",
+    "deploymentId": "7c6a5162-b1e9-4e76-bd08-bfca3e4c0038",
+    "deployedAtUtc": "2026-11-12T06:36:27.1119735Z",
+    "verifiedAtUtc": "2026-11-12T06:50:52.615006+00:00",
+    "verification": "CF-034-038-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "verification": "CF-034-038-combined-verification.json",
+  "sourcePatch": "CF-036.patch",
+  "sourcePatchSha256": "2ec9dd149dc7fd521c6da493f33ae84aeee16e42d9ce21a8da865a28e1d37799",
+  "files": [
+    "src/CampusFlow.EntityFrameworkCore/StudentInformationSystems/ThesisElementsDocumentTrackingService.cs",
+    "src/CampusFlow.Web/BillApprovals/BillApprovalStudentCompletion.cs",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml",
+    "src/CampusFlow.Web/Pages/BillApproval.cshtml.cs",
+    "src/CampusFlow.Web/Pages/BillApproval.js",
+    "test/CampusFlow.EntityFrameworkCore.Tests/BillApprovals/DocumentTermDescriptionTests.cs",
+    "test/CampusFlow.Web.Tests/BillApprovals/BillApprovalAccessHandlerTests.cs",
+    "test/browser/bill-completion-status.cjs"
+  ],
+  "dependencies": [
+    "Existing verified CF-033 environment baseline; no other newly prepared unit required."
+  ],
+  "notes": [
+    "Nonprod actual behavior supports named document ID plus custom description despite the Swagger restriction. The actual changed service verified both reporting fields, stable retry identity and cleanup.",
+    "New documents only: existing custom-description records are not backfilled. Existing recovery by approval reference is preserved.",
+    "Status endpoint binds to current student and term, returns only three booleans and no-store, and performs no billing refresh, tax, approval, job retry or email operation.",
+    "Polling is bounded to two minutes or three failures; changed approval and true failure/pending states remain visible. No registration-complete claim is made without verified clearance."
+  ],
+  "updatedAtUtc": "2026-11-12T06:51:28.360688+00:00",
+  "promotionNotes": "Deployed on isolated environment-specific release branches. For later promotion/removal, select this unit and verify the current target release; preserve unrelated units, settings and assets.",
+  "removalNotes": "Revert only this unit from the current target release. Preserve later/unrelated units and any stored historical records. Data side effects are not reversed by code removal.",
+  "sourceParent": "d45c1075794b57f7a0634700eefabe234f8f73d9",
+  "staffAcceptancePending": true
+}

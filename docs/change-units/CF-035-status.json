@@ -1,0 +1,68 @@
+{
+  "unit": "CF-035",
+  "scope": "Spring 2027 default for meal-plan administration while available; prominent continuation action; reconcile removed paid meal choices and permit guarded reselection.",
+  "documentItems": [
+    "7",
+    "8",
+    "12"
+  ],
+  "sourceDocument": "Spring 2027 Approve Your Bill Issues & Questions_-6.pdf",
+  "state": "committed-pushed-deployed-both",
+  "branch": "codex/cf-034-038-nonprod-release",
+  "worktree": "/Users/tjdavis/.codex/worktrees/cf029-031-nonprod-release/CampusFlow",
+  "sourceBase": "41fb45b1a9c7669ee44723db1ddfeb99da86d221",
+  "productionBase": "7a37fd84c7b1ee518674449463e09f26037b16bf",
+  "commit": "d45c1075794b57f7a0634700eefabe234f8f73d9",
+  "pushed": true,
+  "nonprod": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "dc40bc294caf5591a269dd4b6a7505d607659abe",
+    "unitCommit": "d45c1075794b57f7a0634700eefabe234f8f73d9",
+    "branch": "codex/cf-034-038-nonprod-release",
+    "deploymentId": "50dfa273-64c6-419d-b9c7-20e0023c918b",
+    "deployedAtUtc": "2026-11-12T06:30:14.9662864Z",
+    "verifiedAtUtc": "2026-11-12T06:32:06.046849+00:00",
+    "verification": "CF-034-038-nonprod-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "production": {
+    "deployed": true,
+    "codeDeployed": true,
+    "releaseCommit": "109727c093d5432d18cada97fcb90787bdd77878",
+    "unitCommit": "1c42cd06a2b37880d7891fe6b36a560737e8a45d",
+    "branch": "codex/cf-034-038-production-release",
+    "deploymentId": "7c6a5162-b1e9-4e76-bd08-bfca3e4c0038",
+    "deployedAtUtc": "2026-11-12T06:36:27.1119735Z",
+    "verifiedAtUtc": "2026-11-12T06:50:52.615006+00:00",
+    "verification": "CF-034-038-production-deployment-verification.json",
+    "staffAcceptancePending": true
+  },
+  "schemaMigrationRequired": false,
+  "verification": "CF-034-038-combined-verification.json",
+  "sourcePatch": "CF-035.patch",
+  "sourcePatchSha256": "738aed91fd13ba5ea9907d18cd7be2cc5b20115c5da0f523e814cecb1e47885f",
+  "files": [
+    "src/CampusFlow.Application/Housing/AdminMealPlanAppService.cs",
+    "src/CampusFlow.Application/Housing/MealPlanAppService.cs",
+    "src/CampusFlow.Web/Pages/Housing.cshtml",
+    "src/CampusFlow.Web/Pages/Housing.css",
+    "test/CampusFlow.Application.Tests/Housing/AdminMealPlanRemovalTests.cs",
+    "test/CampusFlow.Application.Tests/Housing/MealPlanSelectionTests.cs",
+    "test/browser/meal-plan-continuation.cjs"
+  ],
+  "dependencies": [
+    "Existing verified CF-033 environment baseline; no other newly prepared unit required."
+  ],
+  "notes": [
+    "Explicit admin term overrides the default. The global/student current term is unchanged.",
+    "Confirmed admin assignment removal soft-deletes only the matching local paid choice. Previously removed choices are hidden only after a live absence check; GET preserves audit rows. POST rechecks assignments before replacing an old choice.",
+    "Pending or unconfirmed choices are preserved. Current assignments, existing bill approval, missing live source and unrelated term/student records cannot be bypassed.",
+    "Existing RemoveStudentMealPlan permission is retained. Removal does not promise tax reversal, a refund or general ledger adjustment."
+  ],
+  "updatedAtUtc": "2026-11-12T06:51:28.360688+00:00",
+  "promotionNotes": "Deployed on isolated environment-specific release branches. For later promotion/removal, select this unit and verify the current target release; preserve unrelated units, settings and assets.",
+  "removalNotes": "Revert only this unit from the current target release. Preserve later/unrelated units and any stored historical records. Data side effects are not reversed by code removal.",
+  "sourceParent": "9ee3e4008df5f236f5536dbd5d1e728a25ec8dc1",
+  "staffAcceptancePending": true
+}
