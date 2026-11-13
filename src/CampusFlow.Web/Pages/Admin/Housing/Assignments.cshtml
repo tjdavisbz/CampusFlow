@@ -30,14 +30,14 @@
     @if (Model.CanApplyToElements)
     {
         <section id="housing-recovery" class="alert alert-warning" hidden aria-labelledby="housing-recovery-title">
-            <h2 id="housing-recovery-title">Review a partial apply</h2>
+            <h2 id="housing-recovery-title">Review an interrupted apply</h2>
             <p id="housing-recovery-failure"></p>
             <p>The saved assignments are retained. Recovery supports added commuter assignments only. Moves, removals, capacity changes, residential charges or conflicting live assignments need administrator review.</p>
             <p>If a period was reinitialized, recovery can explicitly deallocate its reviewed deleted commuter records before applying the remaining assignments. Active room assignments are preserved. The preview shows how many historical records require this step.</p>
             <button id="housing-review-recovery" type="button" class="btn btn-outline-primary">Review recovery</button>
             <div id="housing-recovery-preview" hidden>
                 <p id="housing-recovery-counts"></p>
-                <p>Already completed assignments will be checked and skipped. The remaining assignments will be submitted. CampusFlow will check and reconcile the affected students’ unposted managed housing batch entries to no housing charge; manual and posted entries remain protected.</p>
+                <p>Already completed assignments will be checked and skipped. Resume finishes the remaining commuter assignments in the background and preserves all existing billing charges. You may leave this page and return to check progress. Do not click Apply afterward; no separate Apply is needed.</p>
                 <label>Review reason <textarea id="housing-recovery-reason" class="form-control" maxlength="500" rows="2"></textarea></label>
                 <label class="d-block"><input id="housing-recovery-confirmed" type="checkbox" /> I reviewed the live assignments and housing batch and want to resume this saved plan.</label>
                 <button id="housing-resume" type="button" class="btn btn-danger" disabled>Resume remaining commuter assignments</button>

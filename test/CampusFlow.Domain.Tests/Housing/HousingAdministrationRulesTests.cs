@@ -29,7 +29,8 @@ public class HousingAdministrationRulesTests
         var now=DateTime.UtcNow;var draft=new HousingAssignmentDraft(Guid.NewGuid(),Guid.NewGuid(),1,"[]",now);
         new HousingApplyProgress{RunId=Guid.NewGuid(),StartedAt=now}.Save(draft);
         Assert.Throws<InvalidOperationException>(()=>HousingApplyProgress.EnsureEditable(draft,now,refreshing:true));
-        HousingApplyProgress.EnsureEditable(draft,now.AddMinutes(31),refreshing:true);
+        Assert.True(HousingApplyProgress.Read(draft)!.CanRecover(now.AddMinutes(31)));
+        Assert.Throws<InvalidOperationException>(()=>HousingApplyProgress.EnsureEditable(draft,now.AddMinutes(31),refreshing:true));
     }
     [Fact]public void Completed_apply_allows_new_draft_edits()
     {var now=DateTime.UtcNow;var draft=new HousingAssignmentDraft(Guid.NewGuid(),Guid.NewGuid(),1,"[]",now);new HousingApplyProgress{Status="Completed"}.Save(draft);HousingApplyProgress.EnsureEditable(draft,now);}

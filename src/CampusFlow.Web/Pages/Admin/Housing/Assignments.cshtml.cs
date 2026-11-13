@@ -6,12 +6,15 @@ using Volo.Abp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using CampusFlow.Web.Housing;
+using Volo.Abp.BackgroundJobs;
 
 namespace CampusFlow.Web.Pages.Admin.Housing;
 
 [Authorize(CampusFlowPermissions.Admin.HousingAssignments)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfiguration configuration) : CampusFlowPageModel
+public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfiguration configuration,
+    IHousingRecoveryDispatcher recovery,IBackgroundJobStore jobs) : CampusFlowPageModel
 {
     public string EnvironmentName =>
         string.Equals(configuration["App:EnvironmentLabel"], "NON-PRODUCTION", StringComparison.OrdinalIgnoreCase)
@@ -35,8 +38,13 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
     }
     public async Task<JsonResult> OnPostResumeAsync([FromBody] RecoverHousingDraftInput input)
     {
-        try { return new(await workspace.ResumeCommuterAssignmentsAsync(input)); }
+        try { return new(await recovery.QueueAsync(input)); }
         catch (UserFriendlyException error) { return new(new { error = new { message = error.Message } }) { StatusCode = 409 }; }
+    }
+    public async Task<JsonResult> OnGetRecoveryStatusAsync(int periodId,string? jobId=null)
+    {
+        var pending=Guid.TryParse(jobId,out var id) && await jobs.FindAsync(id) is not null;
+        return new(new { pending,state=await workspace.GetAsync(periodId) });
     }
     public async Task<JsonResult> OnPostSaveAsync([FromBody] HousingWorkspaceState input) => new(await workspace.SaveAsync(input));
     public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input)

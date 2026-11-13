@@ -292,9 +292,11 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             else
             {
                 var previous = HousingApplyProgress.Read(latest);
-                if (previous?.Status != "Needs review" || previous.RunId != recovery.RunId ||
+                if (previous is null || !previous.CanRecover(Clock.Now) || previous.RunId != recovery.RunId ||
                     previous.BeforeJson != latest.BaselineJson || previous.DesiredJson != latest.RoomsJson)
                     throw new UserFriendlyException("Housing recovery ownership changed. Review again.");
+                if(previous.IsInterrupted(Clock.Now))
+                { previous.Status="Needs review";previous.FailureCode="Interrupted";previous.FinishedAt=Clock.Now; }
                 HousingApplyProgress.Archive(latest, previous);
             }
             if(latest.RoomsJson!=draft.RoomsJson||latest.BaselineJson!=draft.BaselineJson ||
@@ -491,8 +493,17 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                    room.Occupants.Select(x => x.StudentUid).Order()
                        .SequenceEqual(found.Occupants.Select(x => x.StudentUid).Order());
         });
-    private static HousingWorkspaceState Map(HousingAssignmentDraft x) => new()
-    { Id = x.Id, PeriodId = x.PeriodId, Revision = x.ConcurrencyStamp, RefreshedAt = x.RefreshedAt, Rooms = Read(x.RoomsJson), ApplyStatus = HousingApplyProgress.Read(x)?.Status,
-        ApplyRunId = HousingApplyProgress.Read(x)?.RunId,
-        ApplyFailure = HousingApplyProgress.Read(x)?.Status == "Needs review" ? HousingApplyFailure.Description(HousingApplyProgress.Read(x)?.FailureCode) : null };
+    private HousingWorkspaceState Map(HousingAssignmentDraft x)
+    {
+        var progress=HousingApplyProgress.Read(x);var dispatch=HousingRecoveryDispatch.Read(x);
+        var active=dispatch?.IsActive(x,Clock.Now)==true;
+        return new()
+        { Id=x.Id,PeriodId=x.PeriodId,Revision=x.ConcurrencyStamp,RefreshedAt=x.RefreshedAt,Rooms=Read(x.RoomsJson),
+            ApplyStatus=active?"Running":progress?.Status,ApplyRunId=progress?.RunId,
+            ApplyFailure=progress?.IsInterrupted(Clock.Now)==true?"The previous recovery stopped reporting progress. Review the live assignments before resuming the saved plan.":progress?.Status=="Needs review"?HousingApplyFailure.Description(progress.FailureCode):null,
+            RecoveryAvailable=!active && progress?.CanRecover(Clock.Now)==true,
+            RecoveryJobId=dispatch?.Id,RecoveryJobStatus=dispatch?.Status,RecoveryJobMessage=dispatch?.Message,
+            RecoveryAssignmentsVerified=progress?.Operations.Count(o=>o.StartsWith("Room assignment verified for ",StringComparison.Ordinal))??0
+        };
+    }
 }
