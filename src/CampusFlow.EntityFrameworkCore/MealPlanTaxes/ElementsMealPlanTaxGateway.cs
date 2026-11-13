@@ -22,9 +22,10 @@ public sealed class ElementsMealPlanTaxGateway:IElementsMealPlanTaxGateway,ITran
     private readonly IStudentInformationSystemMealPlanRemovalService _assignments;
     private readonly IElementsMealPlanTaxReadModel _read;
     private readonly HttpClient _client;
-    public ElementsMealPlanTaxGateway(IConfiguration config,IMemoryCache cache,IStudentInformationSystemMealPlanRemovalService assignments,IElementsMealPlanTaxReadModel read):this(config,cache,assignments,read,SharedClient){}
-    internal ElementsMealPlanTaxGateway(IConfiguration config,IMemoryCache cache,IStudentInformationSystemMealPlanRemovalService assignments,IElementsMealPlanTaxReadModel read,HttpClient client)
-    {_config=config;_cache=cache;_assignments=assignments;_read=read;_client=client;}
+    private readonly IElementsMealPlanBatchService? _batches;
+    public ElementsMealPlanTaxGateway(IConfiguration config,IMemoryCache cache,IStudentInformationSystemMealPlanRemovalService assignments,IElementsMealPlanTaxReadModel read,IElementsMealPlanBatchService batches):this(config,cache,assignments,read,SharedClient,batches){}
+    internal ElementsMealPlanTaxGateway(IConfiguration config,IMemoryCache cache,IStudentInformationSystemMealPlanRemovalService assignments,IElementsMealPlanTaxReadModel read,HttpClient client,IElementsMealPlanBatchService? batches=null)
+    {_config=config;_cache=cache;_assignments=assignments;_read=read;_client=client;_batches=batches;}
     public async Task<IReadOnlyList<MealPlanTaxTarget>> TargetsAsync(int studentUid,int termId,CancellationToken ct=default)
     {
         MealPlanTaxEnvironment.Validate(_config);
@@ -39,6 +40,7 @@ public sealed class ElementsMealPlanTaxGateway:IElementsMealPlanTaxGateway,ITran
             if(targets.Any(x=>x.AssignmentId==row.AssignmentId))throw new InvalidOperationException("Duplicate meal assignments require review.");targets.Add(target);
         }
         if(targets.Count>0)await _read.DestinationAsync(ct);
+        if(_batches is not null)foreach(var target in targets)await _batches.EnsureAsync(target,ct);
         return targets;
     }
     public async Task<string?> FindAsync(MealPlanTaxTarget target,CancellationToken ct=default)

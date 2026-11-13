@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using CampusFlow.MealPlanTaxes;
 using Volo.Abp.DependencyInjection;
 
 namespace CampusFlow.StudentInformationSystems;
@@ -25,15 +26,17 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
     private readonly HttpClient _client;
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
+    private readonly IElementsMealPlanBatchService? _batches;
 
-    public ThesisElementsMealPlanService(IConfiguration configuration, IMemoryCache cache)
-        : this(configuration, cache, SharedClient) { }
+    public ThesisElementsMealPlanService(IConfiguration configuration, IMemoryCache cache, IElementsMealPlanBatchService batches)
+        : this(configuration, cache, SharedClient, batches) { }
 
-    internal ThesisElementsMealPlanService(IConfiguration configuration, IMemoryCache cache, HttpClient client)
+    internal ThesisElementsMealPlanService(IConfiguration configuration, IMemoryCache cache, HttpClient client, IElementsMealPlanBatchService? batches = null)
     {
         _configuration = configuration;
         _cache = cache;
         _client = client;
+        _batches = batches;
     }
 
     public StudentInformationSystemProvider Provider => StudentInformationSystemProvider.ThesisElements;
@@ -130,6 +133,7 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
             throw new InvalidOperationException($"Elements meal-plan assignment failed ({(int)response.StatusCode}).");
         if (JsonNode.Parse(body)?["isSuccess"]?.GetValue<bool>() != true)
             throw new InvalidOperationException("Elements did not accept the meal-plan assignment.");
+        if (_batches is not null) await _batches.AfterAssignmentAsync(studentUid, mealPlanId, cancellationToken);
     }
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)

@@ -34,6 +34,12 @@ public class MealPlanTaxGatewayTests
     }
     [Fact]public async Task Targets_only_selected_term_paid_assignments()
     {var(gateway,_,_,_)=Setup();Assert.Equal(Target,Assert.Single(await gateway.TargetsAsync(10,269)));}
+    [Fact]public async Task Bill_review_reconciles_existing_base_and_tax_before_looking_for_a_tax_reference()
+    {
+        var(_,http,reader,assignments)=Setup();var batches=Substitute.For<IElementsMealPlanBatchService>();
+        var gateway=new ElementsMealPlanTaxGateway(new ConfigurationBuilder().AddInMemoryCollection(Settings()).Build(),new MemoryCache(new MemoryCacheOptions()),assignments,reader,new HttpClient(http),batches);
+        Assert.Equal(Target,Assert.Single(await gateway.TargetsAsync(10,269)));await batches.Received(1).EnsureAsync(Target,Arg.Any<CancellationToken>());
+    }
     [Fact]public async Task Earlier_terms_are_read_only_and_do_not_load_assignments()
     {var(gateway,http,_,assignments)=Setup();Assert.Empty(await gateway.TargetsAsync(10,268));await assignments.DidNotReceiveWithAnyArgs().GetAssignmentsAsync(default!,default);Assert.Empty(http.Posts);}
     [Fact]public async Task Existing_verified_tax_is_never_created_again()

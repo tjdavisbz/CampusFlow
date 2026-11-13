@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
 using Microsoft.Extensions.Caching.Memory;
+using CampusFlow.MealPlanTaxes;
+using NSubstitute;
 using Xunit;
 namespace CampusFlow.EntityFrameworkCore.Tests.Housing;
 public class MealPlanIntegrationRoutingTests
@@ -13,6 +15,14 @@ public class MealPlanIntegrationRoutingTests
     {
         var handler=new Handler();var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:MealPlan:IntegrationToken","test");
         var service=new ThesisElementsMealPlanService(HousingCapacityWriterTests.Config(),cache,new HttpClient(handler));await service.AssignAsync("123",20);Assert.Equal(1,handler.Calls);
+    }
+    [Fact]public async Task Successful_assignment_is_followed_by_shared_batch_reconciliation()
+    {
+        var handler=new Handler();using var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:MealPlan:IntegrationToken","test");
+        var batches=Substitute.For<IElementsMealPlanBatchService>();
+        var service=new ThesisElementsMealPlanService(HousingCapacityWriterTests.Config(),cache,new HttpClient(handler),batches);
+        await service.AssignAsync("123",20);Assert.Equal(1,handler.Calls);
+        await batches.Received(1).AfterAssignmentAsync(123,20,Arg.Any<CancellationToken>());
     }
     private sealed class Handler:HttpMessageHandler
     {

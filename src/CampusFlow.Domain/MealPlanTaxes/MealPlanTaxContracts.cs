@@ -41,7 +41,7 @@ public interface IMealPlanTaxCoordinator
     Task EnsureForBillReviewAsync(string studentUid,string termId,CancellationToken ct=default);
 }
 
-public sealed record MealPlanTaxDestination(int BatchId,int DocumentId,int ArTypeId);
+public sealed record MealPlanTaxDestination(int BatchId,int DocumentId,int ArTypeId,int SharedBatchId=0,int LegacyBatchId=0);
 public sealed record MealPlanTaxReportedCharge(string? PostedId,string? BatchId);
 public interface IElementsMealPlanTaxReadModel
 {

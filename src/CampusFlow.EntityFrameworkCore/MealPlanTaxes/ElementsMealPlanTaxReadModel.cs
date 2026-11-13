@@ -26,7 +26,9 @@ public sealed class ElementsMealPlanTaxReadModel(IConfiguration config):IElement
     }
     public async Task<MealPlanTaxDestination> DestinationAsync(CancellationToken ct=default)
     {
-        var batch=config.GetValue<int>("MealPlanTax:BatchMasterId");var document=config.GetValue<int>("MealPlanTax:TransactionDocumentId");
+        var legacy=config.GetValue<int>("MealPlanTax:BatchMasterId");
+        var shared=config.GetValue<int>("MealPlans:SharedBatchMasterId");
+        var batch=shared>0?shared:legacy;var document=config.GetValue<int>("MealPlanTax:TransactionDocumentId");
         if(batch<=0||document<=0)throw new InvalidOperationException("Configure the dedicated meal-tax batch and tax document before enabling tax.");
         await using var c=await Open(ct);await using var q=new SqlCommand("""
             SELECT COUNT(*) FROM dbo.BatchMaster WHERE BatchMasterID=@Batch
@@ -34,9 +36,9 @@ public sealed class ElementsMealPlanTaxReadModel(IConfiguration config):IElement
             SELECT COALESCE(ARTypeID,0) FROM dbo.TransDoc WHERE TransDocID=@Doc
                 AND LTRIM(RTRIM(TransDoc))='TAX' AND LTRIM(RTRIM(Description))='Texas State Sales Tax'
                 AND CONVERT(varchar(10),ActiveFlag) IN ('1','Yes','True') AND ReportFlag='Yes';
-            """,c);q.Parameters.AddWithValue("@Batch",batch);q.Parameters.AddWithValue("@Comment",MealPlanTaxEnvironment.BatchComment);q.Parameters.AddWithValue("@Doc",document);
+            """,c);q.Parameters.AddWithValue("@Batch",batch);q.Parameters.AddWithValue("@Comment",shared>0?"Meal Plan Charges":MealPlanTaxEnvironment.BatchComment);q.Parameters.AddWithValue("@Doc",document);
         await using var rows=await q.ExecuteReaderAsync(ct);if(!await rows.ReadAsync(ct)||rows.GetInt32(0)!=1)throw new InvalidOperationException("The dedicated meal-tax batch is not open or its identity changed.");
-        await rows.NextResultAsync(ct);if(!await rows.ReadAsync(ct))throw new InvalidOperationException("The approved sales-tax transaction document is unavailable.");var ar=Convert.ToInt32(rows.GetValue(0));if(await rows.ReadAsync(ct))throw new InvalidOperationException("The tax document is ambiguous.");return new(batch,document,ar);
+        await rows.NextResultAsync(ct);if(!await rows.ReadAsync(ct))throw new InvalidOperationException("The approved sales-tax transaction document is unavailable.");var ar=Convert.ToInt32(rows.GetValue(0));if(await rows.ReadAsync(ct))throw new InvalidOperationException("The tax document is ambiguous.");return new(batch,document,ar,shared,legacy!=batch?legacy:0);
     }
     public async Task<MealPlanTaxReportedCharge> ReadAsync(MealPlanTaxTarget target,MealPlanTaxDestination destination,CancellationToken ct=default)
     {
