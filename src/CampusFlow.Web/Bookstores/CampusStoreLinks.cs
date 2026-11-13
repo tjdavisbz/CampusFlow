@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using CampusFlow.StudentInformationSystems;
 using Microsoft.Extensions.Configuration;
@@ -16,9 +17,12 @@ public static class CampusStoreLinks
         var storeId = section["StoreId"];
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(storeId)) return null;
 
-        var offeringIds = courses.Select(x => x.ExternalCourseOfferingId)
-            .Where(x => long.TryParse(x, out _))
-            .Select(x => x.PadLeft(15, '0'))
+        // Online lookup uses registration CRNs. The POS export's fixed-width
+        // zero padding is a different contract and prevents Spring course lookup.
+        var offeringIds = courses.Select(x =>
+                long.TryParse(x.ExternalCourseOfferingId, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0
+                    ? id.ToString(CultureInfo.InvariantCulture) : null)
+            .OfType<string>()
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         if (offeringIds.Length == 0) return null;
