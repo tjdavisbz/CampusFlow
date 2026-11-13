@@ -51,8 +51,8 @@ public class FinancialAidRulesTests
     {var a=Award() with {Amount=amount};Assert.False(FinancialAidRules.IncludeInBillApproval(a));Assert.False(FinancialAidRules.CanDecide(a));}
     [Fact] public void Billed_aid_is_not_double_counted_or_accepted_again()
     {var a=Award() with {IsSentToBilling=true};Assert.False(FinancialAidRules.IncludeInBillApproval(a));Assert.False(FinancialAidRules.CanDecide(a));}
-    [Fact] public void Locked_awards_and_recorded_decisions_are_not_bulk_candidates()
-    {Assert.False(FinancialAidRules.CanDecide(Award() with {IsLocked=true}));Assert.False(FinancialAidRules.CanDecide(Award() with {StudentAccepted=0}));Assert.False(FinancialAidRules.CanDecide(Award() with {StudentAccepted=1}));Assert.True(FinancialAidRules.CanDecide(Award()));}
+    [Fact] public void A_lock_allows_student_decisions_but_does_not_reopen_recorded_decisions()
+    {Assert.True(FinancialAidRules.CanDecide(Award() with {IsLocked=true}));Assert.False(FinancialAidRules.CanDecide(Award() with {IsLocked=true,StudentAccepted=0}));Assert.False(FinancialAidRules.CanDecide(Award() with {IsLocked=true,StudentAccepted=1}));Assert.True(FinancialAidRules.CanDecide(Award()));}
     [Fact] public void Other_providers_keep_their_existing_pending_aid_behavior()
     {var provider=Array.Find(Enum.GetValues<StudentInformationSystemProvider>(),x=>x!=StudentInformationSystemProvider.ThesisElements);Assert.True(FinancialAidRules.IncludeInBillApproval(Award() with {Provider=provider,IsLoan=null}));}
     [Theory]
@@ -73,11 +73,12 @@ public class FinancialAidRulesTests
         if(expected)Assert.False(FinancialAidRules.IncludeInBillApproval(award));
     }
     [Fact]
-    public void A_locked_pending_loan_can_be_explained_without_offering_an_acceptance_action()
+    public void A_locked_pending_loan_offers_a_decision_without_counting_unaccepted_aid_in_the_bill()
     {
         var award=Award() with {IsLoan=true,IsLocked=true};
         Assert.True(FinancialAidRules.IsLoanAwaitingAcceptance(award));
-        Assert.False(FinancialAidRules.CanDecide(award));
+        Assert.True(FinancialAidRules.CanDecide(award));
+        Assert.False(FinancialAidRules.IncludeInBillApproval(award));
     }
     static StudentFinancialAidAward Award()=>new(StudentInformationSystemProvider.ThesisElements,"1","269","B27C","Spring 2027",DateTime.Today,"Grant","Guarantee","Grant",100,false,null,null,false);
 }
