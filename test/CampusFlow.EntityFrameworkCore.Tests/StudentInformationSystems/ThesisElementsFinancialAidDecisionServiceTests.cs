@@ -27,11 +27,13 @@ public sealed class ThesisElementsFinancialAidDecisionServiceTests
         """)!.AsObject();
 
     [Theory]
-    [InlineData(StudentFinancialAidDecision.Accept)]
-    [InlineData(StudentFinancialAidDecision.Decline)]
-    public void Decision_uses_write_date_name_and_preserves_every_other_field(StudentFinancialAidDecision decision)
+    [InlineData(StudentFinancialAidDecision.Accept,false)]
+    [InlineData(StudentFinancialAidDecision.Decline,false)]
+    [InlineData(StudentFinancialAidDecision.Accept,true)]
+    [InlineData(StudentFinancialAidDecision.Decline,true)]
+    public void Decision_uses_write_date_name_and_preserves_every_other_field(StudentFinancialAidDecision decision,bool locked)
     {
-        var award=Award();var original=(JsonObject)award.DeepClone();
+        var award=Award();award["lock"]=locked;var original=(JsonObject)award.DeepClone();
         var body=ThesisElementsFinancialAidDecisionService.BuildDecisionBody(award,decision);
         Assert.False(body.ContainsKey("distributionDate"));
         Assert.Equal("2026-10-20T00:00:00",body["transDate"]!.GetValue<string>());
@@ -76,16 +78,34 @@ public sealed class ThesisElementsFinancialAidDecisionServiceTests
         else await service.SubmitDecisionAsync("456","123",StudentFinancialAidDecision.Accept);
         Assert.Equal(1,handler.Writes);Assert.Equal(2,handler.Reads);
     }
-    [Theory] [InlineData("lock")] [InlineData("sentToBilling")] [InlineData("awardStatus")]
+    [Theory] [InlineData("sentToBilling")] [InlineData("awardStatus")]
     public void Live_noneditable_awards_are_rejected_even_if_the_replica_was_stale(string field)
-    {var award=Award();if(field=="lock")award[field]=true;else if(field=="sentToBilling")award[field]="Yes";else award[field]="Cancelled";Assert.Throws<InvalidOperationException>(()=>ThesisElementsFinancialAidDecisionService.BuildDecisionBody(award,StudentFinancialAidDecision.Accept));}
+    {var award=Award();award["lock"]=true;if(field=="sentToBilling")award[field]="Yes";else award[field]="Cancelled";Assert.Throws<InvalidOperationException>(()=>ThesisElementsFinancialAidDecisionService.BuildDecisionBody(award,StudentFinancialAidDecision.Accept));}
+    [Theory]
+    [InlineData(StudentFinancialAidDecision.Accept,false)]
+    [InlineData(StudentFinancialAidDecision.Decline,false)]
+    [InlineData(StudentFinancialAidDecision.Accept,true)]
+    public async Task Locked_awards_support_both_decisions_and_an_unexpected_unlock_fails_verification(StudentFinancialAidDecision decision,bool corruptLock)
+    {
+        var handler=new AwardHandler(false,true,decision,corruptLock);
+        var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>
+        { ["StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl"]="https://example.invalid",
+          ["StudentInformationSystems:Providers:ThesisElements:Api:TenantHost"]="test.invalid",
+          ["StudentInformationSystems:Providers:ThesisElements:Api:Module"]="FinancialAid"}).Build();
+        using var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:FinancialAid:ApiToken","test");
+        var service=new ThesisElementsFinancialAidDecisionService(config,cache,new HttpClient(handler));
+        if(corruptLock)await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SubmitDecisionAsync("456","123",decision,default,"269"));
+        else await service.SubmitDecisionAsync("456","123",decision,default,"269");
+        Assert.Equal(1,handler.Writes);Assert.Equal(2,handler.Reads);
+    }
     [Fact] public async Task An_award_moved_to_another_term_is_not_updated()
     {
         var handler=new AwardHandler(false);var config=new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{["StudentInformationSystems:Providers:ThesisElements:Api:BaseUrl"]="https://example.invalid",["StudentInformationSystems:Providers:ThesisElements:Api:TenantHost"]="test.invalid",["StudentInformationSystems:Providers:ThesisElements:Api:Module"]="FinancialAid"}).Build();var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:FinancialAid:ApiToken","test");var service=new ThesisElementsFinancialAidDecisionService(config,cache,new HttpClient(handler));await Assert.ThrowsAsync<InvalidOperationException>(()=>service.SubmitDecisionAsync("456","123",StudentFinancialAidDecision.Accept,default,"268"));Assert.Equal(0,handler.Writes);
     }
-    private sealed class AwardHandler(bool corrupt):HttpMessageHandler
+    private sealed class AwardHandler(bool corrupt,bool locked=false,StudentFinancialAidDecision decision=StudentFinancialAidDecision.Accept,bool corruptLock=false):HttpMessageHandler
     {
-        public int Writes;public int Reads;private readonly JsonObject _award=Award();
+        public int Writes;public int Reads;private readonly JsonObject _award=MakeAward(locked);
+        private static JsonObject MakeAward(bool locked){var award=Award();award["lock"]=locked;return award;}
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
         {
             if(request.Method==HttpMethod.Put)
@@ -93,7 +113,9 @@ public sealed class ThesisElementsFinancialAidDecisionServiceTests
                 Writes++;var body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(token))!.AsObject();
                 Assert.False(body.ContainsKey("distributionDate"));Assert.Equal(_award["distributionDate"]!.GetValue<string>(),body["transDate"]!.GetValue<string>());
                 Assert.True(body["codaei"]!.GetValue<bool>());
-                _award["studentAccepted"]=true;if(corrupt)_award["codaei"]=false;
+                Assert.Equal(locked,body["lock"]!.GetValue<bool>());
+                Assert.Equal((int)decision,body["studentAccepted"]!.GetValue<int>());
+                _award["studentAccepted"]=decision==StudentFinancialAidDecision.Accept;if(corrupt)_award["codaei"]=false;if(corruptLock)_award["lock"]=false;
                 return Response(new JsonObject{["isSuccess"]=true});
             }
             Reads++;return Response(new JsonObject{["isSuccess"]=true,["data"]=new JsonObject{["getFinancialAwardDetails"]=new JsonArray(_award.DeepClone())}});

@@ -120,8 +120,7 @@ public sealed class ThesisElementsFinancialAidDecisionService : IStudentInformat
             throw new InvalidOperationException("Only positive awards can be accepted or declined in the portal.");
         }
         var billed = award["sentToBilling"]?.ToString().Trim();
-        if (award["lock"]?.GetValue<bool>() == true ||
-            string.Equals(billed, "Yes", StringComparison.OrdinalIgnoreCase) || string.Equals(billed, "True", StringComparison.OrdinalIgnoreCase) || billed == "1" ||
+        if (string.Equals(billed, "Yes", StringComparison.OrdinalIgnoreCase) || string.Equals(billed, "True", StringComparison.OrdinalIgnoreCase) || billed == "1" ||
             award["awardStatus"]?.GetValue<string>()?.Contains("Cancel", StringComparison.OrdinalIgnoreCase) == true)
             throw new InvalidOperationException("This award must be reviewed by the Financial Aid Office.");
         if (!award.ContainsKey("distributionDate"))

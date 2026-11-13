@@ -41,7 +41,7 @@
                         {
                             <span class="decision-recorded">Read-only view</span>
                         }
-                        else if (award.Amount <= 0 || award.IsLocked || award.IsSentToBilling || award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
+                        else if (award.Amount <= 0 || award.IsSentToBilling || award.AwardStatus.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
                         {
                             <span class="decision-recorded unavailable"><i class="fa-solid fa-ban"></i> Not available</span>
                         }
