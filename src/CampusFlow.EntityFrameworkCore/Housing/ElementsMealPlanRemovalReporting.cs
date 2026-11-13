@@ -21,10 +21,14 @@ public sealed partial class ElementsMealPlanRemovalGateway
         foreach (var row in rows)
         {
             var isBase = row.Document == baseDocument && row.Debit == target.Amount && target.Amount > 0 &&
-                row.ArType == 0 && row.Reference == "" && row.Description == "Meal Plan" && row.BatchComment == "Meal Plan Charges" && row.SourceModule == 15;
-            var isTax = row.Document == tax.DocumentId && row.Batch == tax.BatchId && row.ArType == tax.ArTypeId &&
+                row.ArType == 0 && row.Reference == "" && row.Description == "Meal Plan" && row.BatchComment == "Meal Plan Charges" &&
+                (row.SourceModule == 15 || row.SourceModule == 2 && row.Batch == tax.SharedBatchId && tax.SharedBatchId > 0);
+            var taxBatch = row.SourceModule == 2 && (
+                tax.SharedBatchId > 0 && row.Batch == tax.SharedBatchId && row.BatchComment == "Meal Plan Charges" ||
+                (row.Batch == tax.LegacyBatchId || tax.SharedBatchId == 0 && row.Batch == tax.BatchId) && row.BatchComment == MealPlanTaxEnvironment.BatchComment);
+            var isTax = row.Document == tax.DocumentId && taxBatch && row.ArType == tax.ArTypeId &&
                 row.Reference == $"CFMT-{target.TermId}-{target.StudentUid}-{target.AssignmentId}" &&
-                row.Debit == MealPlanTaxRules.Amount(target.Amount) && row.Debit > 0 && row.Description == "Meal plan sales tax (8.25%)" && row.BatchComment == MealPlanTaxEnvironment.BatchComment && row.SourceModule == 2;
+                row.Debit == MealPlanTaxRules.Amount(target.Amount) && row.Debit > 0 && row.Description == "Meal plan sales tax (8.25%)";
             if (row.Id <= 0 || row.Batch <= 0 || row.Credit != 0 || row.BatchStatus != "Open" || !row.TermBased || !isBase && !isTax)
                 throw new InvalidOperationException("A manual, changed or unrelated meal/tax charge needs Business Services review. No further removal was sent.");
             entries.Add(new(row.Id, row.Batch, row.Document, row.ArType, row.Debit, row.Reference, row.Description, isBase ? "meal plan" : "sales tax"));
@@ -55,10 +59,13 @@ public sealed partial class ElementsMealPlanRemovalGateway
             FROM dbo.BillingBatch b LEFT JOIN dbo.BatchMaster m ON m.BatchMasterID=b.BatchMasterID
             WHERE b.OwnerUID=@Student AND b.TermCalendarID=@Term AND b.TransDocID IN (@BaseDoc,@TaxDoc)
                 AND (COALESCE(b.Debits,0)<>0 OR COALESCE(b.Credits,0)<>0);
-            SELECT BatchMasterID FROM dbo.BatchMaster WHERE Comment='Meal Plan Charges' AND Status='Open' AND SourceModuleID=15 AND TermBased=1;
+            SELECT BatchMasterID FROM dbo.BatchMaster WHERE Status='Open' AND TermBased=1 AND
+                (Comment='Meal Plan Charges' AND SourceModuleID=15 OR
+                 BatchMasterID=@Legacy AND Comment='CampusFlow meal-plan sales tax' AND SourceModuleID=2);
             """, connection) { CommandTimeout = 60 };
         q.Parameters.Add("@Student", SqlDbType.Int).Value = target.StudentUid; q.Parameters.Add("@Term", SqlDbType.Int).Value = target.TermId;
         q.Parameters.Add("@BaseDoc", SqlDbType.Int).Value = baseDocument; q.Parameters.Add("@TaxDoc", SqlDbType.Int).Value = tax.DocumentId;
+        q.Parameters.Add("@Legacy", SqlDbType.Int).Value = tax.LegacyBatchId;
         await using var rows = await q.ExecuteReaderAsync();
         if (!await rows.ReadAsync() || rows.GetInt32(0) != 0)
             throw new InvalidOperationException("A meal-plan or tax charge is already posted. Student Billing must review an adjustment; this removal will not delete posted transactions.");

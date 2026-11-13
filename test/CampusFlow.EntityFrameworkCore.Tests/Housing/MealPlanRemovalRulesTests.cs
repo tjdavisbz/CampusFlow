@@ -33,4 +33,14 @@ public class MealPlanRemovalRulesTests
     }
     [Fact]public void Duplicate_matching_entries_require_review()
     {Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(Target,165,Tax,[Base(),Base() with{Id=3}]));}
+    [Fact]public void Shared_meal_batch_and_legacy_tax_remain_reviewable_without_accepting_other_cashier_batches()
+    {
+        var destination=new MealPlanTaxDestination(300,261,8047,300,200);
+        var meal=Base() with{Batch=300,SourceModule=2};
+        var tax=SalesTax() with{Batch=300,BatchComment="Meal Plan Charges"};
+        Assert.Equal(2,ElementsMealPlanRemovalGateway.Classify(Target,165,destination,[meal,tax]).Count);
+        Assert.Equal(2,ElementsMealPlanRemovalGateway.Classify(Target,165,destination,[Base(),SalesTax()]).Count);
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(Target,165,destination,[meal with{Batch=301}]));
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(Target,165,destination,[tax with{Batch=301}]));
+    }
 }
