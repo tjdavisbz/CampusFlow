@@ -66,6 +66,11 @@ public class HousingWorkspaceState
     public string? ApplyStatus { get; set; }
     public Guid? ApplyRunId { get; set; }
     public string? ApplyFailure { get; set; }
+    public bool RecoveryAvailable { get; set; }
+    public Guid? RecoveryJobId { get; set; }
+    public string? RecoveryJobStatus { get; set; }
+    public string? RecoveryJobMessage { get; set; }
+    public int RecoveryAssignmentsVerified { get; set; }
     public List<HousingWorkspaceRoom> Rooms { get; set; } = [];
 }
 

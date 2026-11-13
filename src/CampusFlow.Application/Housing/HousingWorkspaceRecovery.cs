@@ -48,7 +48,9 @@ public partial class HousingWorkspaceAppService
     {
         _writer.EnsureWriteEnabled();
         var progress = HousingApplyProgress.Read(draft);
-        if (progress?.Status != "Needs review" || progress.FinishedAt is null ||
+        var dispatch=HousingRecoveryDispatch.Read(draft);
+        if (progress is null || !progress.CanRecover(Clock.Now) ||
+            dispatch?.IsActive(draft,Clock.Now)==true && (dispatch.Id!=HousingRecoveryDispatch.CurrentExecutionId || dispatch.UserId!=CurrentUser.Id) ||
             progress.BeforeJson != draft.BaselineJson || progress.DesiredJson != draft.RoomsJson)
             throw new UserFriendlyException("Recovery requires a stopped partial apply and its unchanged saved plan. A running or replaced plan cannot be resumed.");
         var before = Read(draft.BaselineJson);
@@ -62,8 +64,10 @@ public partial class HousingWorkspaceAppService
         catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
         var identity = new
         {
-            Policy = "commuter-assignments-preserve-billing-v2",
-            Tenant = Tenant(), User = CurrentUser.Id, draft.Id, draft.PeriodId, draft.ConcurrencyStamp,
+            Policy = "commuter-assignments-preserve-billing-background-v3",
+            // Queue status changes the concurrency stamp without changing the reviewed plan.
+            // Explicit revision checks still protect queue/claim; the hash binds every live input.
+            Tenant = Tenant(), User = CurrentUser.Id, draft.Id, draft.PeriodId,
             progress.RunId, draft.BaselineJson, draft.RoomsJson,
             Historical = historical.OrderBy(x => x.StudentUid).ThenBy(x => x.AssignmentId).ToArray(),
             Rooms = current.OrderBy(x => x.Id).Select(room => new

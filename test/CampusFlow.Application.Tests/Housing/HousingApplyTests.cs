@@ -240,6 +240,28 @@ public class HousingApplyTests
         var preview=await FailedCommuterRun();var progress=HousingApplyProgress.Read(_draft)!;progress.Status="Running";progress.Save(_draft);_writer.Calls.Clear();
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ResumeCommuterAssignmentsAsync(Recover(preview)));Assert.Empty(_writer.Calls);Assert.False(_draft.ExtraProperties.ContainsKey("HousingApplyHistoryV1"));
     }
+    [Fact]public async Task Stale_running_recovery_retains_113_assignments_and_resumes_only_the_remaining_students()
+    {
+        await FailedCommuterRun();var progress=HousingApplyProgress.Read(_draft)!;
+        progress.Status="Running";progress.FinishedAt=null;progress.UpdatedAt=progress.StartedAt.AddMinutes(-31);progress.Save(_draft);
+        foreach(var room in JsonSerializer.Deserialize<List<HousingWorkspaceRoom>>(_draft.RoomsJson)!)
+            foreach(var student in room.Occupants.Where(x=>x.StudentUid<=51))_writer.Assigned[student.StudentUid]=(room.Building,room.Name);
+        var desired=_draft.RoomsJson;_writer.Calls.Clear();_billing.ClearReceivedCalls();var state=await _service.GetAsync(1);
+        Assert.True(state!.RecoveryAvailable);Assert.Equal("Running",state.ApplyStatus);
+        var preview=await _service.PreviewRecoveryAsync(1);Assert.Equal(51,preview.AlreadyAssigned);Assert.Equal(62,preview.RemainingAssignments);
+        var result=await _service.ResumeCommuterAssignmentsAsync(Recover(preview));
+        Assert.Equal("Completed",result.ApplyStatus);Assert.Equal(desired,_draft.RoomsJson);Assert.Equal(62,_writer.Calls.Count(x=>x=="assign"));
+        Assert.Empty(_billing.ReceivedCalls());
+    }
+    [Fact]public async Task Active_background_dispatch_blocks_a_second_review_but_its_owned_worker_can_resume()
+    {
+        var preview=await FailedCommuterRun();var user=_service.LazyServiceProvider.LazyGetRequiredService<ICurrentUser>();
+        var dispatch=new HousingRecoveryDispatch{Id=Guid.NewGuid(),UserId=user.Id!.Value,StartedAt=HousingApplyProgress.Read(_draft)!.StartedAt};dispatch.Save(_draft);
+        Assert.False((await _service.GetAsync(1))!.RecoveryAvailable);
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.PreviewRecoveryAsync(1));
+        using(HousingRecoveryDispatch.EnterExecution(dispatch.Id))
+        {var result=await _service.ResumeCommuterAssignmentsAsync(Recover(preview));Assert.Equal(113,result.Rooms.Sum(x=>x.Occupants.Count));}
+    }
     [Fact]public async Task Reviewed_zero_charge_recovery_leaves_posted_and_manual_billing_untouched()
     {
         var preview=await FailedCommuterRun();_writer.Calls.Clear();_billing.ClearReceivedCalls();

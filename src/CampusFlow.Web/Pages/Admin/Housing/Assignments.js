@@ -4,7 +4,7 @@
     const el = name => document.getElementById('housing-' + name);
     let state = null, dirty = false, busy = false, selectedRoom = null, loadedPeriod = '';
     let recovery = null;
-    const blocked = () => ['Running','Needs review'].includes(state?.applyStatus);
+    const blocked = () => ['Queued','Running','Needs review'].includes(state?.applyStatus);
     const selected = new Set();
     const rates = ['Unreviewed','Standard','AIC Triple Room','Savell Triple Occupancy'];
     function message(text, error = false) { el('message').textContent = text; el('message').dataset.error = error; }
@@ -23,13 +23,13 @@
     }
     function controls() {
         el('period').disabled = busy;
-        el('refresh').disabled = busy || !el('period').value || state?.applyStatus === 'Needs review';
+        el('refresh').disabled = busy || !el('period').value || blocked();
         ['save','preview'].forEach(x => el(x).disabled = busy || !state || blocked());
-        if (el('apply')) el('apply').disabled = busy || !state || ['Running','Needs review'].includes(state.applyStatus);
+        if (el('apply')) el('apply').disabled = busy || !state || blocked();
         el('clear').disabled = busy || !state || !selected.size || blocked();
         el('rows').querySelectorAll('input,select,button').forEach(x => x.disabled = busy || blocked());
         if (el('recovery')) {
-            el('recovery').hidden = state?.applyStatus !== 'Needs review';
+            el('recovery').hidden = !(state?.recoveryAvailable ?? state?.applyStatus === 'Needs review');
             el('recovery-failure').textContent = state?.applyFailure || 'The last operation could not be confirmed. Review live Elements data.';
             el('review-recovery').disabled = busy;
             el('resume').disabled = busy || !recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim();
@@ -46,7 +46,7 @@
         if (!response.ok) throw new Error(data?.error?.message || data?.message || 'The request failed. Your unsaved draft is still here.');
         return data;
     }
-    async function run(action) { if (busy) return; busy = true; controls(); try { await action(); } catch (e) { message(e.message, true); } finally { busy = false; controls(); } }
+    async function run(action) { if (busy) return; busy = true; root.setAttribute('aria-busy','true'); controls(); try { await action(); } catch (e) { message(e.message, true); } finally { busy = false; root.setAttribute('aria-busy','false'); controls(); } }
     function changed() { dirty = true; el('changes').hidden = true; summary(); }
     function summary() {
         capacityWarning();
@@ -174,7 +174,12 @@
         if (dirty && !confirm('Discard unsaved edits and open the selected period?')) { el('period').value = loadedPeriod; return; }
         const next = el('period').value;
         resetRecovery();
-        try { const draft = next ? await request('Draft', undefined, {periodId:next}) : null; state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next); }
+        try {
+            const draft = next ? await request('Draft', undefined, {periodId:next}) : null;
+            state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next);
+            if (state?.recoveryJobStatus === 'Running' && !state.recoveryAvailable)
+                await watchRecovery({dispatchId:state.recoveryJobId,periodId:state.periodId});
+        }
         catch (e) { el('period').value = loadedPeriod; throw e; }
     });
     el('refresh').onclick = () => run(async () => {
@@ -197,6 +202,40 @@
         } catch { state.applyStatus = 'Needs review'; }
         resetRecovery(); render();
     }
+    async function watchRecovery(ticket) {
+        const periodId = ticket.periodId ?? state.periodId;
+        message('Commuter recovery is running in the background. You may leave and return. No separate Apply is needed.');
+        for (let poll = 0; poll < 600; poll++) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            let status;
+            try { status = await request('RecoveryStatus', undefined, {periodId, ...(ticket.jobId ? {jobId:ticket.jobId} : {})}); }
+            catch {
+                await reloadAfterFailure();
+                throw new Error('Recovery status could not be checked. Work may still be running in the background. Your saved plan is retained; reload this period to check before trying again.');
+            }
+            if (!status.state || status.state.id !== state.id) throw new Error('The saved recovery plan changed. Reload this period before continuing.');
+            state = status.state; render();
+            if (state.recoveryJobId === ticket.dispatchId) {
+                if (state.recoveryJobStatus === 'Completed' && state.applyStatus === 'Completed') {
+                    message('The saved commuter plan was applied and verified. Existing billing and prior run history were preserved. No separate Apply is needed.');
+                    return;
+                }
+                if (state.recoveryJobStatus === 'Failed') {
+                    resetRecovery();render();
+                    throw new Error(state.recoveryJobMessage || 'Recovery stopped. The saved plan is retained. Review recovery before another attempt.');
+                }
+                if (state.recoveryAvailable) {
+                    resetRecovery();render();
+                    throw new Error('Recovery stopped reporting progress. Review the live assignments before resuming the retained saved plan.');
+                }
+                message(`Commuter recovery is running in the background. ${state.recoveryAssignmentsVerified || 0} assignments verified in this run; earlier completed assignments are skipped. No separate Apply is needed.`);
+            } else if (ticket.jobId && !status.pending) {
+                resetRecovery();render();
+                throw new Error('Recovery could not start because the saved run or your access changed. The plan is retained. Review recovery again.');
+            } else message('Commuter recovery is queued. The saved plan is retained. You may leave and return; no separate Apply is needed.');
+        }
+        throw new Error('Recovery is taking longer than expected. Work may still be running. Your saved plan is retained; reload this period to check its status.');
+    }
     if (el('review-recovery')) {
         el('recovery-confirmed').onchange = controls;
         el('recovery-reason').oninput = controls;
@@ -212,10 +251,12 @@
         el('resume').onclick = () => run(async () => {
             if (!recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim()) return;
             if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. No billing charges will be added, replaced or deleted. The saved plan and prior run history will be retained.`)) return;
-            try { state = await request('Resume', {...recovery, reason:el('recovery-reason').value.trim(), confirmed:true}); }
+            let ticket;
+            message('Starting commuter recovery in the background. No separate Apply is needed.');
+            try { ticket = await request('Resume', {...recovery, reason:el('recovery-reason').value.trim(), confirmed:true}); }
             catch (error) { await reloadAfterFailure(); throw error; }
-            resetRecovery(); dirty = false; selected.clear(); render();
-            message('The saved commuter plan was applied and verified. Prior run history was retained.');
+            state = ticket.state; resetRecovery(); dirty = false; selected.clear(); render();
+            await watchRecovery(ticket);
         });
     }
     el('save').onclick = () => run(save);

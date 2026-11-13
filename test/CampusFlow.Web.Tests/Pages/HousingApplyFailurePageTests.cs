@@ -1,6 +1,8 @@
 using System.Threading.Tasks;
 using CampusFlow.Housing;
 using CampusFlow.Web.Pages.Admin.Housing;
+using CampusFlow.Web.Housing;
+using Volo.Abp.BackgroundJobs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Configuration;
@@ -10,28 +12,30 @@ using Xunit;
 namespace CampusFlow.Pages;
 public class HousingApplyFailurePageTests
 {
+    private static AssignmentsModel Page(IHousingWorkspaceAppService service,IHousingRecoveryDispatcher? dispatcher=null)=>
+        new(service,new ConfigurationBuilder().Build(),dispatcher??Substitute.For<IHousingRecoveryDispatcher>(),Substitute.For<IBackgroundJobStore>());
     [Fact]public async Task Recovery_handlers_use_explicit_preview_and_resume_without_refresh_or_save()
     {
         var service=Substitute.For<IHousingWorkspaceAppService>();var preview=new HousingRecoveryPreview{PeriodId=2,SavedAssignments=113,AlreadyAssigned=1,RemainingAssignments=112};
         service.PreviewRecoveryAsync(2).Returns(preview);
-        var page=new AssignmentsModel(service,new ConfigurationBuilder().Build());Assert.Same(preview,(await page.OnGetRecoveryAsync(2)).Value);
+        var dispatcher=Substitute.For<IHousingRecoveryDispatcher>();var page=Page(service,dispatcher);Assert.Same(preview,(await page.OnGetRecoveryAsync(2)).Value);
         var input=new RecoverHousingDraftInput{PeriodId=2,Confirmed=true,Reason="Reviewed"};await page.OnPostResumeAsync(input);
-        await service.Received(1).ResumeCommuterAssignmentsAsync(input);await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
+        await dispatcher.Received(1).QueueAsync(input);await service.DidNotReceiveWithAnyArgs().ResumeCommuterAssignmentsAsync(default!);await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
     }
     [Fact]public async Task Recovery_conflicts_are_safe_actionable_responses()
     {
-        var service=Substitute.For<IHousingWorkspaceAppService>();service.ResumeCommuterAssignmentsAsync(Arg.Any<RecoverHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new UserFriendlyException("Review the current recovery preview.")));
-        var page=new AssignmentsModel(service,new ConfigurationBuilder().Build());var response=await page.OnPostResumeAsync(new(){PeriodId=2});Assert.Equal(409,response.StatusCode);
+        var service=Substitute.For<IHousingWorkspaceAppService>();var dispatcher=Substitute.For<IHousingRecoveryDispatcher>();dispatcher.QueueAsync(Arg.Any<RecoverHousingDraftInput>()).Returns(Task.FromException<QueuedHousingRecovery>(new UserFriendlyException("Review the current recovery preview.")));
+        var page=Page(service,dispatcher);var response=await page.OnPostResumeAsync(new(){PeriodId=2});Assert.Equal(409,response.StatusCode);
         await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);
     }
     [Fact]public async Task Known_preflight_failure_is_actionable_and_never_refreshes_or_saves_the_draft()
     {
         var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new UserFriendlyException("A student has a new Elements assignment. Review the saved draft.")));
-        var page=new AssignmentsModel(service,new ConfigurationBuilder().Build());var result=await page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true});Assert.Equal(409,result.StatusCode);Assert.Contains("new Elements assignment",System.Text.Json.JsonSerializer.Serialize(result.Value));await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
+        var page=Page(service);var result=await page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true});Assert.Equal(409,result.StatusCode);Assert.Contains("new Elements assignment",System.Text.Json.JsonSerializer.Serialize(result.Value));await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
     }
     [Fact]public async Task Unexpected_failures_are_not_exposed_to_the_browser()
     {
-        var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new System.InvalidOperationException("private internal detail")));var page=new AssignmentsModel(service,new ConfigurationBuilder().Build());await Assert.ThrowsAsync<System.InvalidOperationException>(()=>page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true}));
+        var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new System.InvalidOperationException("private internal detail")));var page=Page(service);await Assert.ThrowsAsync<System.InvalidOperationException>(()=>page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true}));
     }
 }
 public class MealPlanSearchMetadataTests:CampusFlowWebTestBase

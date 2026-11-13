@@ -19,6 +19,8 @@ public class HousingApplyProgress
     public string BeforeJson { get; set; } = "[]";
     public string DesiredJson { get; set; } = "[]";
     public List<string> Operations { get; set; } = [];
+    public bool IsInterrupted(DateTime now) => Status == "Running" && now - (UpdatedAt ?? StartedAt) >= TimeSpan.FromMinutes(30);
+    public bool CanRecover(DateTime now) => Status == "Needs review" && FinishedAt is not null || IsInterrupted(now);
     public static HousingApplyProgress? Read(HousingAssignmentDraft draft) =>
         draft.ExtraProperties.TryGetValue("HousingApplyV1",out var value) && value is not null
             ? JsonSerializer.Deserialize<HousingApplyProgress>(value.ToString()!) : null;
@@ -34,7 +36,7 @@ public class HousingApplyProgress
     public static void EnsureEditable(HousingAssignmentDraft draft,DateTime now,bool refreshing=false)
     {
         var p=Read(draft);if(p is null||p.Status is "Completed" or "Reviewed")return;
-        if (refreshing && p.Status == "Needs review")
+        if (refreshing && (p.Status == "Needs review" || p.IsInterrupted(now)))
             throw new InvalidOperationException("This partial apply still has a saved plan. Review recovery to retain its assignments; Refresh cannot discard it.");
         if(!refreshing || (p.Status=="Running" && now-(p.UpdatedAt??p.StartedAt)<TimeSpan.FromMinutes(30)))
             throw new InvalidOperationException("A housing apply is running or needs review. Check live assignments and charges, then refresh after the operation has stopped before preparing another apply.");
