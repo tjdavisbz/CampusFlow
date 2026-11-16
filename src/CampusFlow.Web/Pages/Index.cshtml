@@ -33,7 +33,7 @@
     </style>
 }
 
-<main class="student-dashboard">
+<main class="student-dashboard" data-auto-open-mobile-menu="@Model.HasStudentAccess.ToString().ToLowerInvariant()">
     <section class="dashboard-welcome">
         <div>
             <div class="dashboard-eyebrow">@Model.InstitutionName</div>
