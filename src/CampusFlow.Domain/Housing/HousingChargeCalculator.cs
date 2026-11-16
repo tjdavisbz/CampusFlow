@@ -58,6 +58,16 @@ public static class HousingChargeCalculator
         }).ToList();
     }
 
+    public static IReadOnlyCollection<int> BillingDocumentIds(HousingPricingContext pricing)
+    {
+        // Elements' Housing_Fees table also contains meals, sales tax and tracking fees.
+        // Only the reviewed housing mappings may participate in housing reconciliation.
+        var names=GetRateDefinitions(pricing.TermCalendarId).Select(x=>x.FeeName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return pricing.Fees.Where(x=>names.Contains(x.Name.Trim())).Select(x=>x.TransactionDocumentId)
+            .Append(pricing.SingleTransactionDocumentId).Where(x=>x>0).Distinct().Order().ToArray();
+    }
+
     public static IReadOnlyList<HousingChargeLine> Quote(int termCalendarId, string building,
         string rateChoice, bool intentionalSingle, IReadOnlyCollection<HousingTermFee> feeMetadata,
         IReadOnlyCollection<HousingRateAmount> configuredRates,

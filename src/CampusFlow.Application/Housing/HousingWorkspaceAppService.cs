@@ -229,7 +229,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
         if (savedRates.Revision != input.RateRevision)
             throw new UserFriendlyException("Housing fee amounts changed since the preview. Review charges again before applying.");
         var configuredRates = savedRates.Rates;
-        var documents = pricing.Fees.Select(x=>x.TransactionDocumentId).Append(pricing.SingleTransactionDocumentId).Where(x=>x>0).Distinct().ToArray();
+        var documents = changedIds.Count>0 ? HousingChargeCalculator.BillingDocumentIds(pricing) : Array.Empty<int>();
         var proposedCharges = new Dictionary<int, IReadOnlyList<HousingChargeLine>>();
         foreach (var id in changedIds)
         {

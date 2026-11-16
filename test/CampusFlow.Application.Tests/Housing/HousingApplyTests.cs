@@ -66,6 +66,15 @@ public class HousingApplyTests
         await _billing.Received(1).ReconcileAsync(10,268,Arg.Is<IReadOnlyList<HousingChargeLine>>(x=>x.Count==2&&x[0].Amount==2500&&x[1].Amount==2125),Arg.Any<IReadOnlyCollection<int>>(),Arg.Any<CancellationToken>());
         Assert.Equal("Staff note",result.Rooms[0].Occupants[0].Notes);Assert.Equal("Completed",result.ApplyStatus);
     }
+    [Fact]public async Task Meal_and_tax_fees_in_the_Elements_housing_table_are_not_housing_conflicts_or_reconciliation_targets()
+    {
+        _reader.GetPricingAsync(1,Arg.Any<CancellationToken>()).Returns(new HousingPricingContext(268,
+            [new("Bridges/Teeter",137,2500),new("60 Meal Plan",165,715),new("60 Meal Plan Tax",261,58.99m),new("Regent Tenant (Tracking Only)",140,0)],243));
+        Desired(x=>x[0].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));
+        await _service.ApplyAssignmentsAsync(Input());
+        await _billing.Received(1).VerifyCanReconcileAsync(10,268,Arg.Is<IReadOnlyCollection<int>>(x=>x.Count==2&&x.Contains(137)&&x.Contains(243)),Arg.Any<CancellationToken>());
+        await _billing.Received(1).ReconcileAsync(10,268,Arg.Any<IReadOnlyList<HousingChargeLine>>(),Arg.Is<IReadOnlyCollection<int>>(x=>!x.Contains(165)&&!x.Contains(261)&&!x.Contains(140)),Arg.Any<CancellationToken>());
+    }
     [Fact]public async Task Capacity_only_apply_needs_no_fee_schedule_and_writes_no_billing()
     {
         Desired(x=>x[0].Capacity=3);_rates.FindAsync(Arg.Any<Expression<Func<HousingRateSchedule,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns((HousingRateSchedule?)null);

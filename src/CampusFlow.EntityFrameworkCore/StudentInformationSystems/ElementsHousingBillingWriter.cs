@@ -52,22 +52,10 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         if (studentUid <= 0 || termCalendarId is not (268 or 269) || housingDocumentIds.Count == 0 ||
             housingDocumentIds.Any(x => x <= 0))
             throw new InvalidOperationException("The housing billing scope is invalid.");
-        var batchId = ConfiguredBatchId();
+        var batchId = await ResolveBatchAsync(cancellationToken);
         var documents = housingDocumentIds.Distinct().Order().ToArray();
         await using var connection = new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
         await connection.OpenAsync(cancellationToken);
-        await using (var master = new SqlCommand("""
-            SELECT COUNT(*) FROM dbo.BatchMaster
-            WHERE BatchMasterID = @BatchMasterId AND BatchName = 'HousingCharges'
-              AND Comment = @BatchComment AND Status = 'Open'
-              AND SourceModuleID = 2 AND TermBased = 1;
-            """, connection))
-        {
-            master.Parameters.Add("@BatchMasterId", SqlDbType.Int).Value = batchId;
-            master.Parameters.Add("@BatchComment", SqlDbType.VarChar, 100).Value = BatchComment;
-            if ((int)(await master.ExecuteScalarAsync(cancellationToken) ?? 0) != 1)
-                throw new InvalidOperationException("The configured Elements Housing Charges batch is not open or does not match the approved batch.");
-        }
         var parameterNames = documents.Select((_, index) => "@Doc" + index).ToArray();
         await using var command = new SqlCommand($"""
             SELECT (SELECT COUNT(*) FROM dbo.Billing b
@@ -107,7 +95,7 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         if (desired.Count > 2 || desired.Any(x => x.Amount <= 0 || x.TransactionDocumentId <= 0))
             throw new InvalidOperationException("The proposed housing charge lines are invalid.");
         var token = await GetTokenAsync(cancellationToken);
-        var batchId = ConfiguredBatchId();
+        var batchId = await ResolveBatchAsync(cancellationToken);
         var existing = await GetEntriesAsync(token, studentUid, batchId, cancellationToken);
         var references = new[] { Reference(termCalendarId, studentUid, "BASE"),
             Reference(termCalendarId, studentUid, "SINGLE") };
@@ -170,6 +158,21 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
             throw new InvalidOperationException("An unrecognized housing charge is in the CampusFlow batch. Review it manually; it will not be replaced or deleted.");
     }
 
+    private async Task<int> ResolveBatchAsync(CancellationToken ct)
+    {
+        var configured=ConfiguredBatchId();
+        await using var connection=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
+        await connection.OpenAsync(ct);
+        await using var query=new SqlCommand("""
+            SELECT BatchMasterID,Comment,Status,SourceModuleID,TermBased FROM dbo.BatchMaster
+            WHERE BatchMasterID=@Configured OR (Comment=@Comment AND Status='Open' AND SourceModuleID=2 AND TermBased=1);
+            """,connection);
+        query.Parameters.AddWithValue("@Configured",configured);query.Parameters.AddWithValue("@Comment",BatchComment);
+        var batches=new List<SharedBillingBatchIdentity>();await using var rows=await query.ExecuteReaderAsync(ct);
+        while(await rows.ReadAsync(ct))batches.Add(new(rows.GetInt32(0),rows.IsDBNull(1)?"":rows.GetString(1),rows.IsDBNull(2)?"":rows.GetString(2),rows.IsDBNull(3)?0:rows.GetInt32(3),!rows.IsDBNull(4)&&Convert.ToBoolean(rows.GetValue(4))));
+        return SharedBillingBatchRules.Resolve(configured,BatchComment,batches);
+    }
+
     private async Task<IReadOnlyList<int>> FindBatchesByCommentAsync(string token, string comment,
         CancellationToken cancellationToken)
     {
@@ -189,7 +192,7 @@ public sealed class ElementsHousingBillingWriter : IElementsHousingBillingWriter
         await connection.OpenAsync(cancellationToken);
         await using var command = new SqlCommand("""
             SELECT BatchMasterID FROM dbo.BatchMaster
-            WHERE Comment = @Comment AND Status = 'Open' AND SourceModuleID = 2;
+            WHERE Comment = @Comment AND Status = 'Open' AND SourceModuleID IN (2,15);
             """, connection);
         command.Parameters.Add("@Comment", SqlDbType.VarChar, 100).Value = comment;
         var replicaMatches = new List<int>();
