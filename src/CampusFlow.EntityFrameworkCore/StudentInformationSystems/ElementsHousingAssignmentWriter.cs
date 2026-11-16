@@ -28,19 +28,25 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
     private readonly HttpClient _client;
     private readonly Func<int,int,int,int,string,CancellationToken,Task<bool>> _deletedAssignment;
     private readonly Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>> _historicalAssignments;
+    private readonly IElementsMigratedHousingReader _migratedHousing;
+    private readonly Func<int,int,CancellationToken,Task<bool>> _currentAssignmentExists;
 
     public ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache)
         : this(configuration, cache, SharedHttpClient) { }
 
     internal ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache, HttpClient client,
         Func<int,int,int,int,string,CancellationToken,Task<bool>>? deletedAssignment = null,
-        Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>>? historicalAssignments = null)
+        Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>>? historicalAssignments = null,
+        IElementsMigratedHousingReader? migratedHousing = null,
+        Func<int,int,CancellationToken,Task<bool>>? currentAssignmentExists = null)
     {
         _configuration = configuration;
         _cache = cache;
         _client = client;
         _deletedAssignment = deletedAssignment ?? IsDeletedAssignmentAsync;
         _historicalAssignments = historicalAssignments ?? ReadHistoricalAssignmentsAsync;
+        _migratedHousing = migratedHousing ?? new ElementsMigratedHousingReader(configuration);
+        _currentAssignmentExists = currentAssignmentExists ?? HasCurrentAssignmentAsync;
     }
 
     public void EnsureWriteEnabled()

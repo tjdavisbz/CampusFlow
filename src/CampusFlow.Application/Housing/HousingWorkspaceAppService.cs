@@ -9,6 +9,7 @@ using CampusFlow.Permissions;
 using CampusFlow.StudentInformationSystems;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Uow;
@@ -281,7 +282,15 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
 
         var touchedRoomIds=roomChangedIds.SelectMany(id=>new[]{oldAssignments.TryGetValue(id,out var old)?old.room.Id:0,newAssignments.TryGetValue(id,out var desired)?desired.room.Id:0})
             .Concat(capacityChanges.Select(x=>x.RoomId)).Where(x=>x>0).ToHashSet();
-        await _writer.VerifyRoomsAsync(input.PeriodId,(recoveryCurrent ?? before).Where(x=>touchedRoomIds.Contains(x.Id)).ToList());
+        try
+        {
+            await _writer.VerifyRoomsAsync(input.PeriodId,(recoveryCurrent ?? before).Where(x=>touchedRoomIds.Contains(x.Id)).ToList());
+        }
+        catch (InvalidOperationException error)
+        {
+            Logger.LogWarning(error,"Housing room verification stopped before the apply was claimed for period {PeriodId}.",input.PeriodId);
+            throw new UserFriendlyException("The Elements room or its occupants could not be verified. No assignments or charges were changed. Your saved plan is retained; review the current Elements assignments before trying again.");
+        }
         await preparation.CompleteAsync();
         var run=Guid.NewGuid();
         using(var claim=_unitOfWorkManager.Begin(requiresNew:true,isTransactional:true))
