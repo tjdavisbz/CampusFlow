@@ -45,6 +45,19 @@
         }
     </section>
 
+    @if (Model.Selection is not null)
+    {
+        <section class="housing-term"><div><span>Academic term</span><strong>@(string.IsNullOrWhiteSpace(Model.Selection.TermName) ? "Upcoming term" : Model.Selection.TermName)</strong></div>@if(Model.Selection.TermStartDate.HasValue){<span>@Model.Selection.TermStartDate.Value.ToString("MMM d")–@Model.Selection.TermEndDate?.ToString("MMM d, yyyy")</span>}</section>
+
+        @if (Model.Selection.SelectedHousingChoice.HasValue)
+        {
+            <section class="housing-selection-summary" aria-label="Recorded housing and meal plan">
+                <div><span>Housing</span><strong>@HousingModel.ChoiceName(Model.Selection.SelectedHousingChoice.Value)</strong></div>
+                <div><span>Meal plan</span><strong>@(Model.Selection.SelectedMealPlanName ?? "No meal plan")</strong></div>
+            </section>
+        }
+    }
+
     @if (Model.IsUnavailable || Model.Selection is null)
     {
         <section class="housing-message"><i class="fa-regular fa-circle-exclamation"></i><div><h2>Meal plan selection is unavailable</h2>
@@ -66,16 +79,7 @@
                 <a class="housing-continue" asp-page="/Index" asp-route-term="@Model.Selection.ExternalTermId">Continue with bill approval <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
             </div></section>
         }
-        <section class="housing-term"><div><span>Selection period</span><strong>@(string.IsNullOrWhiteSpace(Model.Selection.TermName) ? "Upcoming term" : Model.Selection.TermName)</strong></div>@if(Model.Selection.TermStartDate.HasValue){<span>@Model.Selection.TermStartDate.Value.ToString("MMM d")–@Model.Selection.TermEndDate?.ToString("MMM d, yyyy")</span>}</section>
-
-        @if (Model.Selection.SelectedHousingChoice.HasValue)
-        {
-            <section class="housing-selection-summary">
-                <div><span>Housing</span><strong>@HousingModel.ChoiceName(Model.Selection.SelectedHousingChoice.Value)</strong></div>
-                <div><span>Meal plan</span><strong>@(Model.Selection.SelectedMealPlanName ?? "No meal plan")</strong></div>
-            </section>
-        }
-        else
+        @if (!Model.Selection.SelectedHousingChoice.HasValue)
         {
         <form method="post" id="housing-form">
             <input type="hidden" asp-for="Input.ExternalTermId" />

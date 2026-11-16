@@ -273,7 +273,7 @@ public class BillApprovalModel : CampusFlowPageModel
             if (housing is { HasPendingRemoval: true } || housing is { MealPlanEligible: true, SelectedHousingChoice: null })
             {
                 IsUnavailable = true;
-                UnavailableReason = housing.HasPendingRemoval ? housing.UnavailableReason : "Choose a meal plan on My Housing before approving your bill.";
+                UnavailableReason = housing.HasPendingRemoval ? housing.UnavailableReason : "Choose a meal plan on Housing & Meal Plan before approving your bill.";
                 return;
             }
 
