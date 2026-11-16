@@ -116,7 +116,7 @@ public class CampusFlowMenuContributor : IMenuContributor
                 if (showHousing)
                 student.AddItem(new ApplicationMenuItem(
                     CampusFlowMenus.Housing,
-                    "My Housing",
+                    "Housing & Meal Plan",
                     "~/Housing",
                     icon: "fa fa-bed",
                     order: 5));
