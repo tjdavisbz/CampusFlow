@@ -33,6 +33,34 @@ public class MealPlanRemovalRulesTests
     }
     [Fact]public void Duplicate_matching_entries_require_review()
     {Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(Target,165,Tax,[Base(),Base() with{Id=3}]));}
+    [Fact]public void A_verified_zero_dollar_base_entry_is_reviewable_for_No_Meals()
+    {
+        var target=Target with{Name="No Meals",Amount=0};
+        var entry=Assert.Single(ElementsMealPlanRemovalGateway.Classify(target,165,Tax,[Base() with{Debit=0}]));
+        Assert.Equal(0,entry.Amount);Assert.Equal("meal plan",entry.Kind);
+        Assert.Empty(ElementsMealPlanRemovalGateway.Classify(target,165,Tax,[]));
+    }
+    [Theory][InlineData("credit")][InlineData("reference")][InlineData("description")][InlineData("batch")]
+    [InlineData("closed")][InlineData("module")][InlineData("amount")][InlineData("ar")][InlineData("term-based")]
+    public void Zero_dollar_entries_keep_the_same_ownership_and_billing_guards(string change)
+    {
+        var row=Base() with{Debit=0};row=change switch
+        {
+            "credit"=>row with{Credit=1},"reference"=>row with{Reference="manual"},
+            "description"=>row with{Description="Manual adjustment"},"batch"=>row with{BatchComment="Other"},
+            "closed"=>row with{BatchStatus="Closed"},"module"=>row with{SourceModule=1},
+            "amount"=>row with{Debit=715},"ar"=>row with{ArType=3},_=>row with{TermBased=false}
+        };
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(Target with{Name="No Meals",Amount=0},165,Tax,[row]));
+    }
+    [Fact]public void No_Meals_never_authorizes_a_paid_charge_tax_or_duplicate_zero_entries()
+    {
+        var target=Target with{Name="No Meals",Amount=0};
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(target,165,Tax,[Base()]));
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(target,165,Tax,[SalesTax()]));
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(target,165,Tax,[SalesTax() with{Debit=0}]));
+        Assert.Throws<InvalidOperationException>(()=>ElementsMealPlanRemovalGateway.Classify(target,165,Tax,[Base() with{Debit=0},Base() with{Id=3,Debit=0}]));
+    }
     [Fact]public void Shared_meal_batch_and_legacy_tax_remain_reviewable_without_accepting_other_cashier_batches()
     {
         var destination=new MealPlanTaxDestination(300,261,8047,300,200);

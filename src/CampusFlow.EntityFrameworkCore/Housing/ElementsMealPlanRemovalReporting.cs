@@ -11,6 +11,20 @@ namespace CampusFlow.Housing;
 
 public sealed partial class ElementsMealPlanRemovalGateway
 {
+    // Zero-dollar plans still have real batch identities. Include them in both
+    // pending and posted checks so a posted zero entry cannot look like deletion.
+    internal const string ReportedSql = """
+        SELECT COUNT(*) FROM dbo.Billing WHERE OwnerUID=@Student AND TermCalendarID=@Term
+            AND TransDocID IN (@BaseDoc,@TaxDoc)
+            AND COALESCE(Voided,'')<>'Yes' AND COALESCE(Reversing,'')<>'Yes';
+        SELECT b.BillingBatchID,b.BatchMasterID,b.TransDocID,COALESCE(b.ARTypeID,0),COALESCE(b.Debits,0),COALESCE(b.Credits,0),
+            COALESCE(b.RefNo,''),COALESCE(b.Description,''),COALESCE(m.Comment,''),COALESCE(m.Status,''),COALESCE(m.SourceModuleID,0),COALESCE(m.TermBased,0)
+        FROM dbo.BillingBatch b LEFT JOIN dbo.BatchMaster m ON m.BatchMasterID=b.BatchMasterID
+        WHERE b.OwnerUID=@Student AND b.TermCalendarID=@Term AND b.TransDocID IN (@BaseDoc,@TaxDoc);
+        SELECT BatchMasterID FROM dbo.BatchMaster WHERE Status='Open' AND TermBased=1 AND
+            (Comment='Meal Plan Charges' AND SourceModuleID=15 OR
+             BatchMasterID=@Legacy AND Comment='CampusFlow meal-plan sales tax' AND SourceModuleID=2);
+        """;
     internal sealed record ReportedRow(int Id, int Batch, int Document, int ArType, decimal Debit, decimal Credit,
         string Reference, string Description, string BatchComment, string BatchStatus, int SourceModule, bool TermBased);
     private sealed record ReportedReview(int BaseDocument, MealPlanTaxDestination Tax, List<int> Batches, List<MealPlanRemovalEntry> Entries);
@@ -20,7 +34,7 @@ public sealed partial class ElementsMealPlanRemovalGateway
         var entries = new List<MealPlanRemovalEntry>();
         foreach (var row in rows)
         {
-            var isBase = row.Document == baseDocument && row.Debit == target.Amount && target.Amount > 0 &&
+            var isBase = row.Document == baseDocument && row.Debit == target.Amount && target.Amount >= 0 &&
                 row.ArType == 0 && row.Reference == "" && row.Description == "Meal Plan" && row.BatchComment == "Meal Plan Charges" &&
                 (row.SourceModule == 15 || row.SourceModule == 2 && row.Batch == tax.SharedBatchId && tax.SharedBatchId > 0);
             var taxBatch = row.SourceModule == 2 && (
@@ -50,19 +64,7 @@ public sealed partial class ElementsMealPlanRemovalGateway
                 throw new InvalidOperationException("The meal-plan price, term or document changed. Review the assignment again.");
             baseDocument = r.GetInt32(0); if (baseDocument <= 0 || baseDocument == tax.DocumentId || await r.ReadAsync()) throw new InvalidOperationException("Meal-plan billing identity is ambiguous.");
         }
-        await using var q = new SqlCommand("""
-            SELECT COUNT(*) FROM dbo.Billing WHERE OwnerUID=@Student AND TermCalendarID=@Term
-                AND TransDocID IN (@BaseDoc,@TaxDoc) AND (COALESCE(Debits,0)<>0 OR COALESCE(Credits,0)<>0)
-                AND COALESCE(Voided,'')<>'Yes' AND COALESCE(Reversing,'')<>'Yes';
-            SELECT b.BillingBatchID,b.BatchMasterID,b.TransDocID,COALESCE(b.ARTypeID,0),COALESCE(b.Debits,0),COALESCE(b.Credits,0),
-                COALESCE(b.RefNo,''),COALESCE(b.Description,''),COALESCE(m.Comment,''),COALESCE(m.Status,''),COALESCE(m.SourceModuleID,0),COALESCE(m.TermBased,0)
-            FROM dbo.BillingBatch b LEFT JOIN dbo.BatchMaster m ON m.BatchMasterID=b.BatchMasterID
-            WHERE b.OwnerUID=@Student AND b.TermCalendarID=@Term AND b.TransDocID IN (@BaseDoc,@TaxDoc)
-                AND (COALESCE(b.Debits,0)<>0 OR COALESCE(b.Credits,0)<>0);
-            SELECT BatchMasterID FROM dbo.BatchMaster WHERE Status='Open' AND TermBased=1 AND
-                (Comment='Meal Plan Charges' AND SourceModuleID=15 OR
-                 BatchMasterID=@Legacy AND Comment='CampusFlow meal-plan sales tax' AND SourceModuleID=2);
-            """, connection) { CommandTimeout = 60 };
+        await using var q = new SqlCommand(ReportedSql, connection) { CommandTimeout = 60 };
         q.Parameters.Add("@Student", SqlDbType.Int).Value = target.StudentUid; q.Parameters.Add("@Term", SqlDbType.Int).Value = target.TermId;
         q.Parameters.Add("@BaseDoc", SqlDbType.Int).Value = baseDocument; q.Parameters.Add("@TaxDoc", SqlDbType.Int).Value = tax.DocumentId;
         q.Parameters.Add("@Legacy", SqlDbType.Int).Value = tax.LegacyBatchId;

@@ -143,6 +143,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public IReadOnlyList<StudentCourseScheduleItem> Courses { get; private set; } = [];
     public string? BookstoreUrl { get; private set; }
     public IReadOnlyList<StudentBillingTransaction> Charges { get; private set; } = [];
+    public IReadOnlyList<StudentBillingTransaction> DisplayCharges => BillApprovalChargeOrdering.ForDisplay(Charges);
     public IReadOnlyList<StudentFinancialAidAward> Aid { get; private set; } = [];
     public IReadOnlyList<StudentFinancialAidAward> PendingLoans { get; private set; } = [];
     public StudentPaymentPlan? PaymentPlan { get; private set; }
