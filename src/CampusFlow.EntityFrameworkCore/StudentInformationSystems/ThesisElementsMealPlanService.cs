@@ -117,11 +117,18 @@ public sealed class ThesisElementsMealPlanService : IStudentInformationSystemMea
             throw new InvalidOperationException($"Elements housing-status update failed ({(int)response.StatusCode}).");
     }
 
+    public async Task VerifyAssignmentAsync(string externalStudentId,int mealPlanId,CancellationToken cancellationToken=default)
+    {
+        if (!int.TryParse(externalStudentId, out var studentUid)||studentUid<=0||mealPlanId<=0)
+            throw new ArgumentException("The Thesis Elements student identifier is invalid.", nameof(externalStudentId));
+        if (_batches is not null) await _batches.VerifyDestinationAsync(cancellationToken);
+    }
     public async Task AssignAsync(string externalStudentId, int mealPlanId,
         CancellationToken cancellationToken = default)
     {
-        if (!int.TryParse(externalStudentId, out var studentUid))
-            throw new ArgumentException("The Thesis Elements student identifier is invalid.", nameof(externalStudentId));
+        // Recheck immediately before the vendor can create an assignment or base charge.
+        await VerifyAssignmentAsync(externalStudentId,mealPlanId,cancellationToken);
+        var studentUid=int.Parse(externalStudentId);
         var token = await GetTokenAsync(cancellationToken);
         using var request = CreateRequest(HttpMethod.Post,
             "/api/student-life/housing/meal-plan/assign-meal-plan", token);

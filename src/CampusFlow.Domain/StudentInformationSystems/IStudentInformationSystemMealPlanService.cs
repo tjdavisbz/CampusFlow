@@ -26,6 +26,7 @@ public interface IStudentInformationSystemMealPlanService
         CancellationToken cancellationToken = default);
     Task UpdateHousingStatusAsync(string externalStudentId, int termCalendarId, int housingStatusId,
         CancellationToken cancellationToken = default);
+    Task VerifyAssignmentAsync(string externalStudentId,int mealPlanId,CancellationToken cancellationToken=default);
     Task AssignAsync(string externalStudentId, int mealPlanId,
         CancellationToken cancellationToken = default);
 }

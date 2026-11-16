@@ -2,13 +2,16 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Volo.Abp;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.MultiTenancy;
 namespace CampusFlow.MealPlanTaxes;
 public sealed class MealPlanTaxCoordinator(IElementsMealPlanTaxGateway gateway,IMealPlanTaxChargeStore store,
-    ICurrentTenant tenant,ILogger<MealPlanTaxCoordinator> logger) : IMealPlanTaxCoordinator, ITransientDependency
+    ICurrentTenant tenant,ILogger<MealPlanTaxCoordinator> logger,IConfiguration configuration) : IMealPlanTaxCoordinator, ITransientDependency
 {
+    public Task EnsureForSelectionAsync(string studentUid,string termId,CancellationToken ct=default) =>
+        configuration.GetValue<bool>("MealPlanTax:Enabled") ? EnsureForBillReviewAsync(studentUid,termId,ct) : Task.CompletedTask;
     public async Task EnsureForBillReviewAsync(string studentUid,string termId,CancellationToken ct=default)
     {
         if(!tenant.Id.HasValue||!string.Equals(tenant.Name,"nelson",StringComparison.OrdinalIgnoreCase)||
@@ -29,8 +32,20 @@ public sealed class MealPlanTaxCoordinator(IElementsMealPlanTaxGateway gateway,I
                 if(existing is null)
                 {
                     if(!claim.MaySend)throw new InvalidOperationException("A prior tax attempt needs review; it will not be resent.");
-                    await gateway.CreateAsync(target,ct);
-                    existing=await gateway.FindAsync(target,ct)
+                    try { await gateway.CreateAsync(target,ct); }
+                    catch(MealPlanTaxWriteUnconfirmedException)
+                    {
+                        // Only a send-stage failure is eligible for read-only recovery.
+                        // Preflight/ownership failures must still stop the operation.
+                        for(var attempt=0;attempt<4;attempt++)
+                        {
+                            existing=await gateway.FindAsync(target,ct);
+                            if(existing is not null)break;
+                            if(attempt<3)await Task.Delay(1000,ct);
+                        }
+                        if(existing is null)throw;
+                    }
+                    existing??=await gateway.FindAsync(target,ct)
                         ?? throw new InvalidOperationException("The tax charge could not be confirmed.");
                 }
                 await gateway.ConfirmReportingAsync(target,ct);

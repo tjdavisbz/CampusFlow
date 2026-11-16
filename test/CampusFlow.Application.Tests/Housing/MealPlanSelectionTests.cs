@@ -30,6 +30,7 @@ public class MealPlanSelectionTests
     private readonly IRepository<StudentHousingSelection, Guid> _selections = Substitute.For<IRepository<StudentHousingSelection, Guid>>();
     private readonly IStudentInformationSystemMealPlanRemovalService _assignments = Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
     private StudentHousingSelection? _stored;
+    private readonly CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator _tax=Substitute.For<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>();
 
     private readonly IMealPlanRemovalCoordinator _removals=MealPlanRemovalTestDouble.Create();
     public MealPlanSelectionTests()
@@ -78,10 +79,43 @@ public class MealPlanSelectionTests
         lazy.LazyGetRequiredService<ICurrentTenant>().Returns(Substitute.For<ICurrentTenant>());
         _service = new(Substitute.For<IRepository<StudentProfile, Guid>>(), current, configurations,
             _selections, new[] { _sis }, NullLogger<MealPlanAppService>.Instance,
-            _housing, terms, _clock, _completion, _assignments, _removals);
+            _housing, terms, _clock, _completion, _assignments, _removals, _tax);
         _service.LazyServiceProvider = lazy;
     }
 
+    [Fact]
+    public async Task Missing_billing_setup_does_not_store_a_dead_end_pending_selection_or_assign_a_plan()
+    {
+        Eligibility("Residential Undergraduate","Commuter");
+        _sis.VerifyAssignmentAsync("10",3,Arg.Any<CancellationToken>()).Returns(Task.FromException(new CampusFlow.MealPlanTaxes.MealPlanBillingSetupException("Missing batch")));
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.SaveAsync(new(){ExternalTermId="270",HousingChoice=HousingChoice.Commuter,ExternalMealPlanId=3}));
+        Assert.Null(_stored);
+        await _sis.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
+        await _selections.DidNotReceiveWithAnyArgs().InsertAsync(default!,default,default);
+    }
+    [Fact]
+    public async Task Paid_selection_confirms_tax_before_it_is_marked_synced()
+    {
+        Eligibility("Residential Undergraduate","Commuter");
+        _tax.EnsureForSelectionAsync("10","270",Arg.Any<CancellationToken>()).Returns(_=>
+        {
+            Assert.False(_stored!.SyncedToStudentInformationSystem);
+            return Task.CompletedTask;
+        });
+        await _service.SaveAsync(new(){ExternalTermId="270",HousingChoice=HousingChoice.Commuter,ExternalMealPlanId=3});
+        await _tax.Received(1).EnsureForSelectionAsync("10","270",Arg.Any<CancellationToken>());
+        Assert.True(_stored!.SyncedToStudentInformationSystem);
+    }
+    [Fact]
+    public async Task Unconfirmed_tax_retains_selection_as_pending_without_reassigning()
+    {
+        Eligibility("Residential Undergraduate","Commuter");
+        _tax.EnsureForSelectionAsync("10","270",Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException("Tax not confirmed")));
+        await _service.SaveAsync(new(){ExternalTermId="270",HousingChoice=HousingChoice.Commuter,ExternalMealPlanId=3});
+        Assert.False(_stored!.SyncedToStudentInformationSystem);
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.SaveAsync(new(){ExternalTermId="270",HousingChoice=HousingChoice.Commuter,ExternalMealPlanId=3}));
+        await _sis.Received(1).AssignAsync("10",3,Arg.Any<CancellationToken>());
+    }
     [Fact]
     public async Task Pending_administrative_removal_blocks_selection_until_cleanup_is_verified()
     {

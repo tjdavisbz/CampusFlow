@@ -35,7 +35,7 @@ public class AdminMealPlanRemovalTests
         var user=Substitute.For<ICurrentUser>();user.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
         _locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>())
             .Returns(call => _choices.Where(call.Arg<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>().Compile()).ToList());
-        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,_locals,_coordinator){LazyServiceProvider=lazy};
+        _service=new([students],[_plans],NullLogger<AdminMealPlanAppService>.Instance,_removal,_locals,_coordinator,Substitute.For<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>()){LazyServiceProvider=lazy};
     }
     private static RemoveStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,AssignmentId=10,MealPlanId=20,Confirmed=true,ReviewRevision="review",Reason="Reviewed assignment and charges"};
     private StudentHousingSelection Choice(string student="123",int? plan=20,int year=2027)

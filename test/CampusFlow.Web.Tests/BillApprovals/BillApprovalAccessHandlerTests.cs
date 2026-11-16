@@ -102,6 +102,19 @@ public class BillApprovalAccessHandlerTests
     }
 
     [Fact]
+    public async Task Missing_meal_billing_setup_gives_an_actionable_message_without_approving_or_paying()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _taxConfiguration["MealPlanTax:Enabled"]="true";
+        _tax.EnsureForBillReviewAsync("10","269",Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new CampusFlow.MealPlanTaxes.MealPlanBillingSetupException("Private destination details")));
+        await _model.OnGetAsync("B27S");
+        Assert.True(_model.IsUnavailable);
+        Assert.Equal(CampusFlow.MealPlanTaxes.MealPlanBillingSetupException.StudentMessage,_model.UnavailableReason);
+        await _approvals.DidNotReceiveWithAnyArgs().InsertAsync(default!,default,default);
+        Assert.Empty(_gateway.ReceivedCalls());
+    }
+    [Fact]
     public async Task An_explicit_No_Meal_Plan_choice_satisfies_the_bill_prerequisite()
     {
         _term.ConfigureTestAccess(true,new[]{"100"});

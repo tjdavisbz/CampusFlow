@@ -2,16 +2,32 @@ using System;using System.Linq;using System.Threading;using System.Threading.Tas
 namespace CampusFlow.Application.Tests.Housing;
 public class AdminMealPlanAssignmentTests
 {
-    static(AdminMealPlanAppService app,IStudentInformationSystemMealPlanService plans,IStudentInformationSystemMealPlanRemovalService reader) Setup()
+    static(AdminMealPlanAppService app,IStudentInformationSystemMealPlanService plans,IStudentInformationSystemMealPlanRemovalService reader) Setup(CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator? tax=null)
     {
+        tax ??= Substitute.For<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>();
         var student=Substitute.For<IStudentInformationSystemStudentLookup>();student.Provider.Returns(StudentInformationSystemProvider.ThesisElements);student.FindByExternalStudentIdAsync("123",Arg.Any<CancellationToken>()).Returns(new StudentInformationSystemStudent(StudentInformationSystemProvider.ThesisElements,"123","test","student@example.test","Test",null,"Student"));
         var plans=Substitute.For<IStudentInformationSystemMealPlanService>();plans.Provider.Returns(StudentInformationSystemProvider.ThesisElements);plans.GetContextAsync("123",Arg.Any<int?>(),Arg.Any<CancellationToken>()).Returns(new StudentMealPlanContext("Commuter",new[]{new StudentMealPlanCatalogItem(20,"Plan","Plan",100,new(2027,1,11),new(2027,4,30))},new[]{new StudentMealPlanTerm(269,"Spring 2027",new(2027,1,11),new(2027,4,30))},269,new[]{new StudentHousingStatusOption(10,"Commuter")},10));
         var reader=Substitute.For<IStudentInformationSystemMealPlanRemovalService>();var lazy=Substitute.For<IAbpLazyServiceProvider>();var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);var user=Substitute.For<ICurrentUser>();user.Id.Returns(Guid.NewGuid());lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
         var locals=Substitute.For<Volo.Abp.Domain.Repositories.IRepository<StudentHousingSelection,Guid>>();
         locals.GetListAsync(Arg.Any<System.Linq.Expressions.Expression<Func<StudentHousingSelection,bool>>>(),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new System.Collections.Generic.List<StudentHousingSelection>());
-        return(new AdminMealPlanAppService(new[]{student},new[]{plans},NullLogger<AdminMealPlanAppService>.Instance,reader,locals,MealPlanRemovalTestDouble.Create()){LazyServiceProvider=lazy},plans,reader);
+        return(new AdminMealPlanAppService(new[]{student},new[]{plans},NullLogger<AdminMealPlanAppService>.Instance,reader,locals,MealPlanRemovalTestDouble.Create(),tax){LazyServiceProvider=lazy},plans,reader);
     }
     static AssignStudentMealPlanInput Input()=>new(){ExternalStudentId="123",TermCalendarId=269,HousingStatusId=10,MealPlanId=20};
+    [Fact]public async Task Missing_destination_is_reported_before_housing_status_or_assignment_changes()
+    {
+        var(a,p,r)=Setup();
+        p.VerifyAssignmentAsync("123",20,Arg.Any<CancellationToken>()).Returns(Task.FromException(new CampusFlow.MealPlanTaxes.MealPlanBillingSetupException("Restore the dedicated batch")));
+        var error=await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(Input()));Assert.Contains("Restore",error.Message);
+        await p.DidNotReceiveWithAnyArgs().AssignAsync(default!,default,default);
+        await p.DidNotReceiveWithAnyArgs().UpdateHousingStatusAsync(default!,default,default,default);
+    }
+    [Fact]public async Task Administrative_assignment_confirms_tax_for_the_selected_student_and_term()
+    {
+        var tax=Substitute.For<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>();var(a,p,r)=Setup(tax);
+        r.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentMealPlanAssignment>(),new[]{new StudentMealPlanAssignment(40,20,269,"Plan",100)});
+        await a.AssignAsync(Input());
+        await tax.Received(1).EnsureForSelectionAsync("123","269",Arg.Any<CancellationToken>());
+    }
     [Theory] [InlineData(269,true)] [InlineData(268,false)] [InlineData(0,false)]
     public async Task An_API_success_is_not_reported_as_success_without_the_requested_term_assignment(int returnedTerm,bool succeeds)
     {var(a,p,r)=Setup();r.GetAssignmentsAsync("123",Arg.Any<CancellationToken>()).Returns(Array.Empty<StudentMealPlanAssignment>(),returnedTerm==0?Array.Empty<StudentMealPlanAssignment>():new[]{new StudentMealPlanAssignment(40,20,returnedTerm,"Plan",100)});if(succeeds)await a.AssignAsync(Input());else{var e=await Assert.ThrowsAsync<UserFriendlyException>(()=>a.AssignAsync(Input()));Assert.Contains("could not be confirmed",e.Message);}await p.Received(1).AssignAsync("123",20,Arg.Any<CancellationToken>());}

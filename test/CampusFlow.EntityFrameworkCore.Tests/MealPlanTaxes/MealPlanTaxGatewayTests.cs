@@ -57,8 +57,15 @@ public class MealPlanTaxGatewayTests
     public async Task Cross_environment_or_disabled_flags_prevent_even_preflight_calls(string key,string value)
     {var settings=Settings();settings[key]=value;var(gateway,http,reader,_)=Setup(settings);await Assert.ThrowsAsync<InvalidOperationException>(()=>gateway.TargetsAsync(10,269));await reader.DidNotReceiveWithAnyArgs().IsInScopeAsync(default,default);Assert.Equal(0,http.Calls);}
     [Fact]public async Task A_lost_post_response_is_not_retried_by_the_gateway()
-    {var(gateway,http,_,_)=Setup();http.LosePost=true;await Assert.ThrowsAsync<HttpRequestException>(()=>gateway.CreateAsync(Target));Assert.Single(http.Posts);}
-    private static JsonObject Entry()=>new(){["billingBatchID"]=123,["batchMasterID"]=77,["studentUID"]=10,["termCalendarID"]=269,["transDOCID"]=261,["amount"]=204.19m,["refNo"]=Target.Reference};
+    {var(gateway,http,_,_)=Setup();http.LosePost=true;await Assert.ThrowsAsync<MealPlanTaxWriteUnconfirmedException>(()=>gateway.CreateAsync(Target));Assert.Single(http.Posts);}
+    [Theory][InlineData("arTypeID")][InlineData("description")][InlineData("debits")][InlineData("credits")]
+    public async Task A_tax_reference_with_changed_billing_fields_is_not_treated_as_confirmed(string field)
+    {
+        var(gateway,http,_,_)=Setup();var row=Entry();
+        row[field]=field=="description"?JsonValue.Create("Manual change"):JsonValue.Create(999);
+        http.Entries.Add(row);await Assert.ThrowsAsync<InvalidOperationException>(()=>gateway.FindAsync(Target));Assert.Empty(http.Posts);
+    }
+    private static JsonObject Entry()=>new(){["billingBatchID"]=123,["batchMasterID"]=77,["studentUID"]=10,["termCalendarID"]=269,["transDOCID"]=261,["amount"]=204.19m,["debits"]=204.19m,["credits"]=0m,["arTypeID"]=0,["description"]="Meal plan sales tax (8.25%)",["refNo"]=Target.Reference};
     private sealed class Handler:HttpMessageHandler
     {
         public int Calls;public bool LosePost;public JsonArray Entries=new();public List<(string Host,string Module,string Tenant,JsonObject Body)> Posts=[];

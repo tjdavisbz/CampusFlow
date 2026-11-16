@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CampusFlow.Permissions;
 using CampusFlow.StudentInformationSystems;
+using CampusFlow.MealPlanTaxes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
@@ -21,14 +22,16 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
     private readonly IStudentInformationSystemMealPlanRemovalService _removal;
     private readonly IRepository<StudentHousingSelection, Guid> _localSelections;
     private readonly IMealPlanRemovalCoordinator _removals;
+    private readonly IMealPlanTaxCoordinator _tax;
 
     public AdminMealPlanAppService(IEnumerable<IStudentInformationSystemStudentLookup> students,
         IEnumerable<IStudentInformationSystemMealPlanService> mealPlans, ILogger<AdminMealPlanAppService> logger,
-        IStudentInformationSystemMealPlanRemovalService removal, IRepository<StudentHousingSelection, Guid> localSelections, IMealPlanRemovalCoordinator removals)
+        IStudentInformationSystemMealPlanRemovalService removal, IRepository<StudentHousingSelection, Guid> localSelections, IMealPlanRemovalCoordinator removals, IMealPlanTaxCoordinator tax)
     {
         _students = students.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
         _mealPlans = mealPlans.Single(x => x.Provider == StudentInformationSystemProvider.ThesisElements);
         _logger = logger;_removal=removal;_localSelections=localSelections;_removals=removals;
+        _tax=tax;
     }
 
     public async Task<List<AdminMealPlanStudentDto>> SearchStudentsAsync(string query)
@@ -111,6 +114,8 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
             ?? throw new UserFriendlyException("That meal plan is no longer available.");
         if (context.Assignments.Any(x => x.MealPlanId == input.MealPlanId && x.TermCalendarId == input.TermCalendarId))
             throw new UserFriendlyException("This meal plan is already assigned for the selected term. Review the current assignment instead of adding it again.");
+        try { await _mealPlans.VerifyAssignmentAsync(input.ExternalStudentId,input.MealPlanId); }
+        catch(MealPlanBillingSetupException error) { throw new UserFriendlyException(error.Message); }
         try
         {
             await _mealPlans.UpdateHousingStatusAsync(input.ExternalStudentId, input.TermCalendarId,
@@ -122,6 +127,7 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
                 context.Student.StudentId);
             throw new UserFriendlyException("Elements could not update the housing status. No meal plan was assigned.");
         }
+        var assignmentConfirmed=false;
         try
         {
             await _mealPlans.AssignAsync(input.ExternalStudentId, input.MealPlanId);
@@ -138,10 +144,21 @@ public class AdminMealPlanAppService : CampusFlowAppService, IAdminMealPlanAppSe
                 if (attempt < 2) await Task.Delay(1000);
             }
             if (!verified) throw new InvalidOperationException("The requested meal assignment was not returned by Elements for the selected term.");
+            assignmentConfirmed=true;
+            await _tax.EnsureForSelectionAsync(input.ExternalStudentId,input.TermCalendarId.ToString(System.Globalization.CultureInfo.InvariantCulture));
             _logger.LogWarning(
                 "Housing status {HousingStatusId} ({HousingStatusName}) and meal plan {MealPlanId} ({MealPlanName}) were assigned to student {StudentId} for term {TermCalendarId} by administrator {UserId}.",
                 housingStatus.Id, housingStatus.Name, option.MealPlanId, option.Name, context.Student.StudentId,
                 input.TermCalendarId, CurrentUser.Id);
+        }
+        catch (MealPlanBillingSetupException exception)
+        {
+            _logger.LogWarning(exception,"Meal-plan billing setup requires staff review.");
+            throw new UserFriendlyException(exception.Message);
+        }
+        catch(UserFriendlyException) when(assignmentConfirmed)
+        {
+            throw new UserFriendlyException("The meal plan is assigned, but its billing could not be confirmed. Review the current assignment and charges before trying again; do not add another plan.");
         }
         catch (Exception exception)
         {

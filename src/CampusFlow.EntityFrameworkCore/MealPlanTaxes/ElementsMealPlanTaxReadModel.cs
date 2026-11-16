@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using CampusFlow.Housing;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,21 +26,26 @@ public sealed class ElementsMealPlanTaxReadModel(IConfiguration config):IElement
         await using var rows=await q.ExecuteReaderAsync(ct);if(!await rows.ReadAsync(ct)||rows.IsDBNull(0))throw new InvalidOperationException("The tax term cutoff could not be verified.");
         var included=rows.GetInt32(0)==1;if(await rows.ReadAsync(ct))throw new InvalidOperationException("The tax term cutoff is ambiguous.");return included;
     }
-    public async Task<MealPlanTaxDestination> DestinationAsync(CancellationToken ct=default)
+    public async Task<MealPlanTaxDestination> DestinationAsync(CancellationToken ct=default,bool requireOpenBatch=true)
     {
         var legacy=config.GetValue<int>("MealPlanTax:BatchMasterId");
         var shared=config.GetValue<int>("MealPlans:SharedBatchMasterId");
         var batch=shared>0?shared:legacy;var document=config.GetValue<int>("MealPlanTax:TransactionDocumentId");
-        if(batch<=0||document<=0)throw new InvalidOperationException("Configure the dedicated meal-tax batch and tax document before enabling tax.");
+        if(batch<=0||document<=0)throw new MealPlanBillingSetupException("Configure the meal-plan billing batch and tax document before enabling tax.");
         await using var c=await Open(ct);await using var q=new SqlCommand("""
-            SELECT COUNT(*) FROM dbo.BatchMaster WHERE BatchMasterID=@Batch
-                AND Comment=@Comment AND Status='Open' AND SourceModuleID=2 AND TermBased=1;
+            SELECT BatchMasterID,Comment,Status,SourceModuleID,TermBased FROM dbo.BatchMaster
+            WHERE BatchMasterID=@Batch OR (Comment=@Comment AND Status='Open' AND SourceModuleID=2 AND TermBased=1);
             SELECT COALESCE(ARTypeID,0) FROM dbo.TransDoc WHERE TransDocID=@Doc
                 AND LTRIM(RTRIM(TransDoc))='TAX' AND LTRIM(RTRIM(Description))='Texas State Sales Tax'
                 AND CONVERT(varchar(10),ActiveFlag) IN ('1','Yes','True') AND ReportFlag='Yes';
             """,c);q.Parameters.AddWithValue("@Batch",batch);q.Parameters.AddWithValue("@Comment",shared>0?"Meal Plan Charges":MealPlanTaxEnvironment.BatchComment);q.Parameters.AddWithValue("@Doc",document);
-        await using var rows=await q.ExecuteReaderAsync(ct);if(!await rows.ReadAsync(ct)||rows.GetInt32(0)!=1)throw new InvalidOperationException("The dedicated meal-tax batch is not open or its identity changed.");
-        await rows.NextResultAsync(ct);if(!await rows.ReadAsync(ct))throw new InvalidOperationException("The approved sales-tax transaction document is unavailable.");var ar=Convert.ToInt32(rows.GetValue(0));if(await rows.ReadAsync(ct))throw new InvalidOperationException("The tax document is ambiguous.");return new(batch,document,ar,shared,legacy!=batch?legacy:0);
+        await using var rows=await q.ExecuteReaderAsync(ct);
+        var batches=new List<SharedBillingBatchIdentity>();
+        while(await rows.ReadAsync(ct))batches.Add(new(rows.GetInt32(0),rows.IsDBNull(1)?"":rows.GetString(1),rows.IsDBNull(2)?"":rows.GetString(2),rows.IsDBNull(3)?0:rows.GetInt32(3),!rows.IsDBNull(4)&&Convert.ToBoolean(rows.GetValue(4))));
+        try { batch=SharedBillingBatchRules.Resolve(batch,shared>0?"Meal Plan Charges":MealPlanTaxEnvironment.BatchComment,batches,requireOpenBatch); }
+        catch(InvalidOperationException error){throw new MealPlanBillingSetupException(error.Message);}
+        if(shared>0)shared=batch;
+        await rows.NextResultAsync(ct);if(!await rows.ReadAsync(ct))throw new MealPlanBillingSetupException("The approved sales-tax transaction document is unavailable.");var ar=Convert.ToInt32(rows.GetValue(0));if(await rows.ReadAsync(ct))throw new MealPlanBillingSetupException("The tax document is ambiguous.");return new(batch,document,ar,shared,legacy!=batch?legacy:0);
     }
     public async Task<MealPlanTaxReportedCharge> ReadAsync(MealPlanTaxTarget target,MealPlanTaxDestination destination,CancellationToken ct=default)
     {

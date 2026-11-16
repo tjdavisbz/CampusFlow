@@ -60,6 +60,20 @@ public class SharedMealPlanBatchTests
         Assert.Equal(2475m,f.Http.Rows[0]["amount"]!.GetValue<decimal>());Assert.Equal(204.19m,f.Http.Rows[1]["amount"]!.GetValue<decimal>());
         Assert.All(f.Http.Puts,r=>{Assert.Equal("2026-11-12T12:00:00",r["transactionDate"]!.GetValue<string>());Assert.Equal(17,r["paymentPlanID"]!.GetValue<int>());});
     }
+    [Fact] public async Task Explicitly_unassigned_payment_plan_uses_the_required_zero_in_the_edit_request()
+    {
+        var f=new Fixture();f.Http.Rows[0]["paymentPlanHeaderID"]=null;
+        await f.Service.EnsureAsync(Target);
+        Assert.Equal(0,f.Http.Puts[0]["paymentPlanID"]!.GetValue<int>());
+        Assert.Equal(17,f.Http.Puts[1]["paymentPlanID"]!.GetValue<int>());
+        Assert.Equal(2,f.Http.Rows.Count);
+    }
+    [Theory][InlineData(-1)][InlineData("unrecognized")]
+    public async Task Invalid_payment_plan_identity_blocks_all_moves(object value)
+    {
+        var f=new Fixture();f.Http.Rows[0]["paymentPlanHeaderID"]=System.Text.Json.JsonSerializer.SerializeToNode(value);
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.EnsureAsync(Target));Assert.Empty(f.Http.Puts);
+    }
     [Fact] public async Task Different_students_and_terms_use_one_configured_destination()
     {
         var f=new Fixture();var other=new MealPlanTaxTarget(11,270,43,17,715m);
@@ -72,8 +86,27 @@ public class SharedMealPlanBatchTests
     [Fact] public async Task A_lost_successful_put_is_reconciled_by_id_instead_of_recreating_a_charge()
     {
         var f=new Fixture();f.Http.LoseNextPut=true;
-        await Assert.ThrowsAsync<HttpRequestException>(()=>f.Service.EnsureAsync(Target));await f.Service.EnsureAsync(Target);
+        await f.Service.EnsureAsync(Target);await f.Service.EnsureAsync(Target);
         Assert.Equal(2,f.Http.Puts.Count);Assert.Equal(2,f.Http.Rows.Count);Assert.All(f.Http.Rows,r=>Assert.Equal(300,r["batchMasterID"]!.GetValue<int>()));
+    }
+    [Fact]public async Task A_vendor_error_after_commit_is_accepted_only_after_exact_readback()
+    {
+        var f=new Fixture();f.Http.ErrorAfterCommitNextPut=true;
+        await f.Service.EnsureAsync(Target);await f.Service.EnsureAsync(Target);
+        Assert.Equal(2,f.Http.Puts.Count);Assert.Equal(2,f.Http.Rows.Count);
+        Assert.All(f.Http.Rows,r=>Assert.Equal(300,r["batchMasterID"]!.GetValue<int>()));
+    }
+    [Fact]public async Task A_rejected_edit_is_not_resent_or_reported_as_complete()
+    {
+        var f=new Fixture();f.Http.RejectNextPut=true;
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.EnsureAsync(Target));
+        Assert.Single(f.Http.Puts);Assert.Equal(100,f.Http.Rows[0]["batchMasterID"]!.GetValue<int>());
+    }
+    [Fact]public async Task An_error_reply_with_a_changed_financial_amount_cannot_be_treated_as_a_verified_move()
+    {
+        var f=new Fixture();f.Http.CorruptAfterCommit=true;
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>f.Service.EnsureAsync(Target));
+        Assert.Single(f.Http.Puts);
     }
     [Theory][InlineData("transDate")][InlineData("currencyTypeAmount")][InlineData("paymentPlanHeaderID")][InlineData("billingAllClear")]
     public async Task Missing_fields_block_all_moves_including_the_other_charge(string field)
@@ -124,6 +157,17 @@ public class SharedMealPlanBatchTests
         f.Assignments.GetAssignmentsAsync("11",Arg.Any<CancellationToken>()).Returns(new[]{new StudentMealPlanAssignment(43,16,269,"No meals",0m)});
         await f.Service.AfterAssignmentAsync(11,16);Assert.Equal(2,f.Http.Puts.Count);
     }
+    [Fact]public async Task A_brief_assignment_reporting_delay_retries_only_reads_before_billing_moves()
+    {
+        var f=new Fixture();var reads=0;
+        f.Assignments.GetAssignmentsAsync("10",Arg.Any<CancellationToken>()).Returns(_=>
+        {
+            if(++reads==1)throw new InvalidOperationException("Reporting is behind the live assignment");
+            return new[]{new StudentMealPlanAssignment(42,9,269,"Plan",2475m)};
+        });
+        await f.Service.AfterAssignmentAsync(10,9);
+        Assert.True(reads>=3);Assert.Equal(2,f.Http.Puts.Count);
+    }
     private static JsonObject Row(MealPlanTaxTarget t,int id,int batch,bool tax)=>new()
     {
         ["billingBatchID"]=id,["batchMasterID"]=batch,["studentUID"]=t.StudentUid,["termCalendarID"]=t.TermId,["transDOCID"]=tax?261:165,
@@ -138,7 +182,7 @@ public class SharedMealPlanBatchTests
         public readonly List<JsonObject> Rows=[];
         public readonly List<JsonObject> Puts=[];
         public JsonObject? ExtraLiveRow;
-        public bool LoseNextPut;public int Calls;
+        public bool LoseNextPut,ErrorAfterCommitNextPut,RejectNextPut,CorruptAfterCommit;public int Calls;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
         {
             Calls++;JsonNode data;
@@ -153,7 +197,10 @@ public class SharedMealPlanBatchTests
             {
                 Assert.Equal(HttpMethod.Put,request.Method);Assert.Equal("np-usc-gateway.thesiscloud.com",request.RequestUri.Host);
                 var body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject();Puts.Add(body);
+                if(RejectNextPut){RejectNextPut=false;return new(HttpStatusCode.BadRequest){Content=new StringContent("{\"isSuccess\":false,\"data\":[]}")};}
                 var row=Rows.Single(r=>r["billingBatchID"]!.GetValue<int>()==body["billingBatchID"]!.GetValue<int>());row["batchMasterID"]=body["batchMasterID"]!.DeepClone();
+                if(CorruptAfterCommit){row["amount"]=999m;row["debits"]=999m;ErrorAfterCommitNextPut=true;}
+                if(ErrorAfterCommitNextPut){ErrorAfterCommitNextPut=false;return new(HttpStatusCode.BadRequest){Content=new StringContent("{\"isSuccess\":false,\"data\":[]}")};}
                 if(LoseNextPut){LoseNextPut=false;throw new HttpRequestException("Lost successful move reply");}data=JsonValue.Create(true)!;
             }
             return new(HttpStatusCode.OK){Content=new StringContent(new JsonObject{["isSuccess"]=true,["data"]=data}.ToJsonString(),Encoding.UTF8,"application/json")};
