@@ -28,4 +28,43 @@ document.addEventListener('DOMContentLoaded', () => {
             userName.textContent = userName.textContent.slice(separatorIndex + 1).trim();
         }
     });
+
+    // Open navigation on arrival at the student dashboard. Subsequent pages keep
+    // their content visible, and closing the menu is respected for this visit.
+    if (document.querySelector('[data-auto-open-mobile-menu="true"]')) {
+        const toggle = document.querySelector('[data-lpx-toggle="mobile-navbar"]');
+        const menu = document.getElementById('mobile-navbar');
+        if (!toggle || !menu) return;
+        let interacted = false;
+        const isOpen = () => !menu.classList.contains('d-none');
+        const sync = () => {
+            toggle.setAttribute('aria-expanded', String(isOpen()));
+            toggle.setAttribute('aria-label', isOpen() ? 'Close navigation menu' : 'Open navigation menu');
+        };
+        toggle.removeAttribute('aria-hidden');
+        toggle.setAttribute('role', 'button');
+        toggle.setAttribute('tabindex', '0');
+        toggle.setAttribute('aria-controls', menu.id);
+        sync();
+        new MutationObserver(sync).observe(menu, { attributes: true, attributeFilter: ['class'] });
+        toggle.addEventListener('click', () => { interacted = true; });
+        toggle.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggle.click();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && isOpen() && toggle.getClientRects().length) {
+                toggle.click();
+                toggle.focus();
+            }
+        });
+        const openOnArrival = () => {
+            // LeptonX binds its own toggle during DOMContentLoaded.
+            if (!interacted && window.matchMedia('(max-width: 767px)').matches && !isOpen()) toggle.click();
+        };
+        if (document.readyState === 'complete') openOnArrival();
+        else window.addEventListener('load', openOnArrival, { once: true });
+    }
 });
