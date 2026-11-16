@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using CampusFlow.StudentInformationSystems;
 using CampusFlow.Students;
 using CampusFlow.BillApprovals;
+using CampusFlow.MealPlanTaxes;
 using Volo.Abp.Timing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
@@ -29,6 +30,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
     private readonly IBillApprovalCompletionLookup _completion;
     private readonly IStudentInformationSystemMealPlanRemovalService _assignments;
     private readonly IMealPlanRemovalCoordinator _removals;
+    private readonly IMealPlanTaxCoordinator _tax;
 
     public MealPlanAppService(IRepository<StudentProfile, Guid> profiles,
         ICurrentStudentView currentStudentView,
@@ -37,7 +39,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         IEnumerable<IStudentInformationSystemMealPlanService> services,
         ILogger<MealPlanAppService> logger, IElementsHousingReader housing,
         IRepository<BillApprovalTermConfiguration, Guid> terms, IClock clock, IBillApprovalCompletionLookup completion,
-        IStudentInformationSystemMealPlanRemovalService assignments, IMealPlanRemovalCoordinator removals)
+        IStudentInformationSystemMealPlanRemovalService assignments, IMealPlanRemovalCoordinator removals, IMealPlanTaxCoordinator tax)
     {
         _profiles = profiles;
         _currentStudentView = currentStudentView;
@@ -51,6 +53,7 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
         _completion = completion;
         _assignments = assignments;
         _removals = removals;
+        _tax = tax;
     }
 
     public async Task<MealPlanSelectionDto> GetAsync(string? externalTermId = null)
@@ -177,6 +180,11 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
 
         if (string.IsNullOrWhiteSpace(view.TermName))
             throw new UserFriendlyException("A housing selection period is not available.");
+        if(!option.IsNoPlanOption)
+        {
+            try { await _services.Single(x=>x.Provider==profile.Provider).VerifyAssignmentAsync(profile.ExternalStudentId,option.ExternalMealPlanId!.Value); }
+            catch(MealPlanBillingSetupException) { throw new UserFriendlyException(MealPlanBillingSetupException.StudentMessage); }
+        }
         var selection = await _selections.FindAsync(x =>
             x.StudentProfileId == profile.Id && x.TermName == view.TermName);
         if (profile.Provider == StudentInformationSystemProvider.ThesisElements)
@@ -212,6 +220,8 @@ public class MealPlanAppService : CampusFlowAppService, IMealPlanAppService
             {
                 var service = _services.Single(x => x.Provider == profile.Provider);
                 await service.AssignAsync(profile.ExternalStudentId, option.ExternalMealPlanId!.Value);
+                if(profile.Provider == StudentInformationSystemProvider.ThesisElements)
+                    await _tax.EnsureForSelectionAsync(profile.ExternalStudentId,view.ExternalTermId!);
                 selection.MarkSynced();
             }
             catch (Exception exception)

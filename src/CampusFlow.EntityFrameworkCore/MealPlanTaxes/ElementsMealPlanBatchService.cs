@@ -18,6 +18,7 @@ namespace CampusFlow.MealPlanTaxes;
 
 public interface IElementsMealPlanBatchService
 {
+    Task VerifyDestinationAsync(CancellationToken ct=default);
     Task AfterAssignmentAsync(int studentUid,int mealPlanId,CancellationToken ct=default);
     Task EnsureAsync(MealPlanTaxTarget target,CancellationToken ct=default);
 }
@@ -39,12 +40,28 @@ public sealed class ElementsMealPlanBatchService : IElementsMealPlanBatchService
         IElementsMealPlanTaxReadModel tax,IElementsMealPlanBatchReadModel read,HttpClient http)
     {_config=config;_cache=cache;_assignments=assignments;_tax=tax;_read=read;_http=http;}
     private bool Enabled=>_config.GetValue<int>("MealPlans:SharedBatchMasterId")>0;
+    public async Task VerifyDestinationAsync(CancellationToken ct=default)
+    {
+        if(!Enabled)return;
+        MealPlanTaxEnvironment.Validate(_config);
+        await _tax.DestinationAsync(ct);
+    }
     public async Task AfterAssignmentAsync(int studentUid,int mealPlanId,CancellationToken ct=default)
     {
         if(!Enabled)return;
         MealPlanTaxEnvironment.Validate(_config);
-        var assigned=(await _assignments.GetAssignmentsAsync(studentUid.ToString(CultureInfo.InvariantCulture),ct)).Where(x=>x.MealPlanId==mealPlanId).ToList();
-        if(assigned.Count!=1 || assigned[0].Amount is not decimal amount || amount<0)
+        List<StudentMealPlanAssignment>? assigned=null;
+        for(var attempt=0;attempt<6;attempt++)
+        {
+            try
+            {
+                assigned=(await _assignments.GetAssignmentsAsync(studentUid.ToString(CultureInfo.InvariantCulture),ct)).Where(x=>x.MealPlanId==mealPlanId).ToList();
+                if(assigned.Count>0)break;
+            }
+            catch(InvalidOperationException) when(attempt<5) { }
+            if(attempt<5)await Task.Delay(1000,ct);
+        }
+        if(assigned is null || assigned.Count!=1 || assigned[0].Amount is not decimal amount || amount<0)
             throw new InvalidOperationException("The meal assignment must be confirmed before batching.");
         if(amount==0)return;
         var row=assigned[0]; await EnsureAsync(new(studentUid,row.TermCalendarId,row.AssignmentId,row.MealPlanId,amount),ct);
@@ -77,7 +94,12 @@ public sealed class ElementsMealPlanBatchService : IElementsMealPlanBatchService
             if(!JsonNode.DeepEquals(body,move.Body))throw new InvalidOperationException("The meal charge fields changed before its batch move.");
             using var request=Request(HttpMethod.Put,"/api/billing/batch/student/batch",token);
             request.Content=new StringContent(body.ToJsonString(),Encoding.UTF8,"application/json");
-            using var response=await _http.SendAsync(request,ct);await Read(response,ct);
+            Exception? responseError=null;
+            try { using var response=await _http.SendAsync(request,ct);await Read(response,ct); }
+            catch(Exception error) when(error is HttpRequestException or InvalidOperationException)
+            { responseError=error; }
+            // Elements can commit an edit and then fail while preparing its reply.
+            // Read back this same ID and every reviewed field; never send a second edit here.
             var confirmed=false;
             for(var attempt=0;attempt<5;attempt++)
             {
@@ -91,7 +113,7 @@ public sealed class ElementsMealPlanBatchService : IElementsMealPlanBatchService
                 }
                 if(attempt<4)await Task.Delay(1000,ct);
             }
-            if(!confirmed)throw new InvalidOperationException("The meal-plan batch move is unconfirmed. Refresh and review the existing charge; do not add another charge.");
+            if(!confirmed)throw new InvalidOperationException("The meal-plan batch move is unconfirmed. Refresh and review the existing charge; do not add another charge.",responseError);
         }
     }
     internal static JsonObject MoveBody(JsonObject row,MealPlanTaxTarget target,MealPlanRemovalEntry entry,int destination)
@@ -116,7 +138,16 @@ public sealed class ElementsMealPlanBatchService : IElementsMealPlanBatchService
         {
             if(!row.ContainsKey(pair.Item2) || pair.Item2=="transDate" && row[pair.Item2] is null)
                 throw new InvalidOperationException("Elements omitted a meal billing field; no move was sent.");
-            result[pair.Item1]=row[pair.Item2]?.DeepClone();
+            if(pair.Item1=="paymentPlanID")
+            {
+                // The read API uses null for an unassigned plan; the edit API requires int32 zero.
+                // A positive existing plan is retained, and an omitted/invalid value still blocks the move.
+                if(row[pair.Item2] is null)result[pair.Item1]=0;
+                else if(row[pair.Item2] is JsonValue value && value.TryGetValue<int>(out var plan) && plan>=0)
+                    result[pair.Item1]=plan;
+                else throw new InvalidOperationException("The meal charge payment-plan identity is invalid; no move was sent.");
+            }
+            else result[pair.Item1]=row[pair.Item2]?.DeepClone();
         }
         return result;
     }

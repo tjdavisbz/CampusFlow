@@ -369,6 +369,8 @@ public class BillApprovalModel : CampusFlowPageModel
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
             IsUnavailable = true;
+            if(exception is CampusFlow.MealPlanTaxes.MealPlanBillingSetupException)
+                UnavailableReason = CampusFlow.MealPlanTaxes.MealPlanBillingSetupException.StudentMessage;
             _logger.LogWarning(exception, "Unable to prepare bill approval review for the current student.");
         }
     }

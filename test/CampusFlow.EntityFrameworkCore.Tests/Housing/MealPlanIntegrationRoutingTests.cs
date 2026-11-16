@@ -11,6 +11,16 @@ using Xunit;
 namespace CampusFlow.EntityFrameworkCore.Tests.Housing;
 public class MealPlanIntegrationRoutingTests
 {
+    [Fact]public async Task Missing_destination_prevents_the_assignment_POST()
+    {
+        var handler=new Handler();using var cache=new MemoryCache(new MemoryCacheOptions());
+        var batches=Substitute.For<IElementsMealPlanBatchService>();
+        batches.VerifyDestinationAsync(Arg.Any<CancellationToken>()).Returns(Task.FromException(new MealPlanBillingSetupException("Missing batch")));
+        var service=new ThesisElementsMealPlanService(HousingCapacityWriterTests.Config(),cache,new HttpClient(handler),batches);
+        await Assert.ThrowsAsync<MealPlanBillingSetupException>(()=>service.AssignAsync("123",20));
+        Assert.Equal(0,handler.Calls);
+        await batches.DidNotReceiveWithAnyArgs().AfterAssignmentAsync(default,default,default);
+    }
     [Fact]public async Task Assignment_uses_integration_API_instead_of_the_incompatible_gateway()
     {
         var handler=new Handler();var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:MealPlan:IntegrationToken","test");

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
@@ -12,11 +13,15 @@ public class MealPlanTaxCoordinatorTests
 {
     private static readonly MealPlanTaxTarget Target=new(10,269,42,8,2475m);
     private static MealPlanTaxCoordinator Service(FakeGateway gateway,FakeStore store,string name="nelson")
-    {var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());tenant.Name.Returns(name);return new(gateway,store,tenant,Microsoft.Extensions.Logging.Abstractions.NullLogger<MealPlanTaxCoordinator>.Instance);}
+    {var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(Guid.NewGuid());tenant.Name.Returns(name);return new(gateway,store,tenant,Microsoft.Extensions.Logging.Abstractions.NullLogger<MealPlanTaxCoordinator>.Instance,new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?>{["MealPlanTax:Enabled"]="true"}).Build());}
     [Fact]public async Task Repeated_reviews_post_once_and_verify_the_same_reference()
     {var g=new FakeGateway();var s=new FakeStore();var service=Service(g,s);await service.EnsureForBillReviewAsync("10","269");await service.EnsureForBillReviewAsync("10","269");Assert.Equal(1,g.Posts);Assert.Equal(2,s.Verified);Assert.Equal(2,g.ReportingChecks);}
-    [Theory][InlineData(false)][InlineData(true)]public async Task Unknown_post_is_never_resent_and_can_be_recovered_by_its_exact_reference(bool committed)
-    {var g=new FakeGateway{LoseResponse=true,CommitBeforeFailure=committed};var s=new FakeStore();var service=Service(g,s);await Assert.ThrowsAsync<UserFriendlyException>(()=>service.EnsureForBillReviewAsync("10","269"));Assert.True(s.Uncertain);g.LoseResponse=false;if(committed)await service.EnsureForBillReviewAsync("10","269");else await Assert.ThrowsAsync<UserFriendlyException>(()=>service.EnsureForBillReviewAsync("10","269"));Assert.Equal(1,g.Posts);Assert.Equal(committed?1:0,s.Verified);}
+    [Fact]public async Task Selection_confirms_tax_immediately_and_later_bill_review_does_not_post_again()
+    {var g=new FakeGateway();var s=new FakeStore();var service=Service(g,s);await service.EnsureForSelectionAsync("10","269");Assert.Equal(1,g.Posts);Assert.Equal(1,s.Verified);await service.EnsureForBillReviewAsync("10","269");Assert.Equal(1,g.Posts);Assert.Equal(2,s.Verified);}
+    [Fact]public async Task A_committed_write_with_an_error_reply_is_confirmed_without_resending()
+    {var g=new FakeGateway{LoseResponse=true,CommitBeforeFailure=true};var store=new FakeStore();var service=Service(g,store);await service.EnsureForSelectionAsync("10","269");Assert.Equal(1,g.Posts);Assert.Equal(1,store.Verified);Assert.False(store.Uncertain);await service.EnsureForBillReviewAsync("10","269");Assert.Equal(1,g.Posts);Assert.Equal(2,store.Verified);}
+    [Fact]public async Task An_uncommitted_write_is_never_blindly_resent()
+    {var g=new FakeGateway{LoseResponse=true};var store=new FakeStore();var service=Service(g,store);await Assert.ThrowsAsync<UserFriendlyException>(()=>service.EnsureForBillReviewAsync("10","269"));Assert.True(store.Uncertain);g.LoseResponse=false;await Assert.ThrowsAsync<UserFriendlyException>(()=>service.EnsureForBillReviewAsync("10","269"));Assert.Equal(1,g.Posts);Assert.Equal(0,store.Verified);}
     [Fact]public async Task Reporting_lag_blocks_review_and_later_confirms_without_a_second_post()
     {var g=new FakeGateway{ReportingUnavailable=true};var s=new FakeStore();var service=Service(g,s);await Assert.ThrowsAsync<UserFriendlyException>(()=>service.EnsureForBillReviewAsync("10","269"));g.ReportingUnavailable=false;await service.EnsureForBillReviewAsync("10","269");Assert.Equal(1,g.Posts);Assert.Equal(1,s.Verified);}
     [Fact]public async Task Another_tenant_cannot_read_or_post_Nelson_tax()
@@ -50,7 +55,7 @@ public class MealPlanTaxCoordinatorTests
         public bool NoTargets,LoseResponse,CommitBeforeFailure,ReportingUnavailable,ReadUnavailable;public int Posts,Reads,ReportingChecks;public MealPlanTaxTarget? TargetOverride;public Func<Task>? BeforePost;private string? entry;
         public Task<IReadOnlyList<MealPlanTaxTarget>> TargetsAsync(int student,int term,CancellationToken ct=default){Reads++;return Task.FromResult<IReadOnlyList<MealPlanTaxTarget>>(NoTargets?[]:[TargetOverride??Target]);}
         public Task<string?> FindAsync(MealPlanTaxTarget t,CancellationToken ct=default){if(ReadUnavailable)throw new InvalidOperationException("Preflight unavailable");return Task.FromResult(entry);}
-        public async Task CreateAsync(MealPlanTaxTarget t,CancellationToken ct=default){Posts++;if(BeforePost is not null)await BeforePost();if(LoseResponse){if(CommitBeforeFailure)entry="Batch:123";throw new HttpRequestException("Unknown response");}entry="Batch:123";}
+        public async Task CreateAsync(MealPlanTaxTarget t,CancellationToken ct=default){Posts++;if(BeforePost is not null)await BeforePost();if(LoseResponse){if(CommitBeforeFailure)entry="Batch:123";throw new MealPlanTaxWriteUnconfirmedException(new HttpRequestException("Unknown response"));}entry="Batch:123";}
         public Task ConfirmReportingAsync(MealPlanTaxTarget t,CancellationToken ct=default){ReportingChecks++;if(ReportingUnavailable)throw new InvalidOperationException("Reporting not ready");return Task.CompletedTask;}
     }
 }

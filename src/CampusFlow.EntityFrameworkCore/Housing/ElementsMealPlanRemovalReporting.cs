@@ -39,7 +39,7 @@ public sealed partial class ElementsMealPlanRemovalGateway
     }
     private async Task<ReportedReview> Reported(MealPlanRemovalTarget target)
     {
-        Guard(target); var tax = await _tax.DestinationAsync();
+        Guard(target); var tax = await _tax.DestinationAsync(requireOpenBatch:false);
         await using var connection = new SqlConnection(_config.GetConnectionString("ThesisElementsReadOnly")); await connection.OpenAsync();
         int baseDocument;
         await using (var lookup = new SqlCommand("SELECT TransDocID,Amount,MealPlanName FROM StudentLife.MealPlans WHERE MealPlanID=@Plan AND TermCalendarID=@Term", connection))

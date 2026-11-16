@@ -38,14 +38,23 @@ public interface IElementsMealPlanTaxGateway
 }
 public interface IMealPlanTaxCoordinator
 {
+    Task EnsureForSelectionAsync(string studentUid,string termId,CancellationToken ct=default);
     Task EnsureForBillReviewAsync(string studentUid,string termId,CancellationToken ct=default);
 }
+
+public sealed class MealPlanBillingSetupException(string message) : InvalidOperationException(message)
+{
+    public const string StudentMessage = "Meal-plan billing is awaiting a Student Billing setup correction. Your existing selection is retained. Contact Student Billing before approving your bill.";
+}
+
+public sealed class MealPlanTaxWriteUnconfirmedException(Exception error)
+    : InvalidOperationException("Elements did not confirm the meal-plan tax write.",error);
 
 public sealed record MealPlanTaxDestination(int BatchId,int DocumentId,int ArTypeId,int SharedBatchId=0,int LegacyBatchId=0);
 public sealed record MealPlanTaxReportedCharge(string? PostedId,string? BatchId);
 public interface IElementsMealPlanTaxReadModel
 {
     Task<bool> IsInScopeAsync(int termId,CancellationToken ct=default);
-    Task<MealPlanTaxDestination> DestinationAsync(CancellationToken ct=default);
+    Task<MealPlanTaxDestination> DestinationAsync(CancellationToken ct=default,bool requireOpenBatch=true);
     Task<MealPlanTaxReportedCharge> ReadAsync(MealPlanTaxTarget target,MealPlanTaxDestination destination,CancellationToken ct=default);
 }

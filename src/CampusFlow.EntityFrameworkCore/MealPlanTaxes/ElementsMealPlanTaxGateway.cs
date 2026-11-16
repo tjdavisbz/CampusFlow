@@ -64,7 +64,10 @@ public sealed class ElementsMealPlanTaxGateway:IElementsMealPlanTaxGateway,ITran
             var reference=row["refNo"]?.GetValue<string>()?.Trim()??"";
             if(reference!=target.Reference)continue;
             if(Int(row,"termCalendarID")!=target.TermId||Int(row,"transDOCID")!=destination.DocumentId||
-                !decimal.TryParse(row["amount"]?.ToString(),NumberStyles.Number,CultureInfo.InvariantCulture,out var amount)||amount!=target.TaxAmount)
+                Int(row,"arTypeID")!=destination.ArTypeId||row["description"]?.GetValue<string>()!="Meal plan sales tax (8.25%)"||
+                !decimal.TryParse(row["amount"]?.ToString(),NumberStyles.Number,CultureInfo.InvariantCulture,out var amount)||amount!=target.TaxAmount||
+                !decimal.TryParse(row["debits"]?.ToString(),NumberStyles.Number,CultureInfo.InvariantCulture,out var debit)||debit!=target.TaxAmount||
+                !decimal.TryParse(row["credits"]?.ToString(),NumberStyles.Number,CultureInfo.InvariantCulture,out var credit)||credit!=0)
                 throw new InvalidOperationException("The existing tax reference has a different term, document or amount.");
             matches.Add("Batch:"+id);
         }
@@ -88,9 +91,14 @@ public sealed class ElementsMealPlanTaxGateway:IElementsMealPlanTaxGateway,ITran
             description="Meal plan sales tax (8.25%)",paymentPlanID=0,refNo=target.Reference
         }),Encoding.UTF8,"application/json");
         // One request only. The coordinator persisted the attempt before this call.
-        using var response=await _client.SendAsync(request,ct);var root=await Read(response,ct);
-        if(root["data"] is not JsonValue value||!value.TryGetValue<int>(out var id)||id<=0)
-            throw new InvalidOperationException("Elements did not confirm creation of the meal-tax charge.");
+        try
+        {
+            using var response=await _client.SendAsync(request,ct);var root=await Read(response,ct);
+            if(root["data"] is not JsonValue value||!value.TryGetValue<int>(out var id)||id<=0)
+                throw new InvalidOperationException("Elements did not confirm creation of the meal-tax charge.");
+        }
+        catch(Exception error) when(error is HttpRequestException or InvalidOperationException)
+        { throw new MealPlanTaxWriteUnconfirmedException(error); }
     }
     public async Task ConfirmReportingAsync(MealPlanTaxTarget target,CancellationToken ct=default)
     {
