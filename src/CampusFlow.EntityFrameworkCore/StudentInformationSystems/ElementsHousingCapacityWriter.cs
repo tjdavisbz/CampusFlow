@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -7,6 +8,8 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using CampusFlow.Housing;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 
 namespace CampusFlow.StudentInformationSystems;
 
@@ -38,6 +41,8 @@ public sealed partial class ElementsHousingAssignmentWriter
             if(ReadInt(property,"housingPeriodID")!=periodId)throw new InvalidOperationException("Property period changed.");
             catalog.AddRange(property["rooms"]!.AsArray().OfType<JsonObject>());
         }
+        ResidentialHousingImport? migrated = null;
+        var migrationRead = false;
         foreach(var room in expected)
         {
             var actual=catalog.Where(x=>ReadInt(x,"housingPeriodRoomID")==room.Id&&ReadInt(x,"housingPeriodID")==periodId).ToList();
@@ -49,11 +54,42 @@ public sealed partial class ElementsHousingAssignmentWriter
             foreach(var occupant in room.Occupants)
             {
                 var assigned=await GetAssignedRoomAsync(occupant.StudentUid,periodId,cancellationToken);
+                // The live API omits migrated CAMS residents. Verify those unchanged
+                // roommates against Elements itself, never the CampusFlow import copy.
+                // A current StudentLife row or a conflicting API room still blocks Apply.
+                // Changed students retain their separate, strict live-API preflight.
+                if (assigned is null)
+                {
+                    if (!migrationRead)
+                    {
+                        migrated = await _migratedHousing.ReadForPeriodAsync(periodId,cancellationToken);
+                        migrated?.Validate();
+                        migrationRead = true;
+                    }
+                    if (migrated is { TermCalendarId:269 } && migrated.PeriodId==periodId &&
+                        migrated.Assignments.Any(x=>x.StudentUid==occupant.StudentUid && x.PeriodRoomId==room.Id &&
+                            string.Equals(x.Building.Trim(),room.Building.Trim(),StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(x.Room.Trim(),room.Name.Trim(),StringComparison.OrdinalIgnoreCase)) &&
+                        !await _currentAssignmentExists(occupant.StudentUid,periodId,cancellationToken))
+                        continue;
+                }
                 if(assigned is null||!string.Equals(assigned.Value.Building.Trim(),room.Building.Trim(),StringComparison.OrdinalIgnoreCase)||
                     !string.Equals(assigned.Value.Room.Trim(),room.Name.Trim(),StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("A room occupant changed in Elements. Refresh before applying.");
             }
         }
+    }
+    private async Task<bool> HasCurrentAssignmentAsync(int studentUid,int periodId,CancellationToken cancellationToken)
+    {
+        await using var connection=new SqlConnection(_configuration.GetConnectionString("ThesisElementsReadOnly"));
+        await connection.OpenAsync(cancellationToken);
+        await using var command=new SqlCommand("""
+            SELECT COUNT(*) FROM StudentLife.HousingPeriodRoomAssignments
+            WHERE StudentUID=@Student AND HousingPeriodID=@Period AND IsDeleted=0;
+            """,connection){CommandTimeout=30};
+        command.Parameters.Add("@Student",SqlDbType.Int).Value=studentUid;
+        command.Parameters.Add("@Period",SqlDbType.Int).Value=periodId;
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken))>0;
     }
     public async Task UpdateCapacitiesAsync(int periodId,IReadOnlyList<HousingCapacityChange> changes,CancellationToken cancellationToken=default)
     {

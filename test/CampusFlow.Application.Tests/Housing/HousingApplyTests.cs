@@ -119,6 +119,27 @@ public class HousingApplyTests
     }
     [Fact]public async Task Fee_revision_change_prevents_all_writes()
     {Desired(x=>x[0].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));var input=Input();input.RateRevision="stale";await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(input));Assert.Empty(_writer.Calls);}
+    [Fact]public async Task Room_verification_failure_is_actionable_before_claim_and_preserves_the_entire_saved_plan()
+    {
+        Desired(x=>x[0].Occupants.Add(new(){StudentUid=10,Rate="Standard"}));
+        var baseline=_draft.BaselineJson;var desired=_draft.RoomsJson;_writer.FailRoomVerification=true;
+        var error=await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input()));
+        Assert.Contains("No assignments or charges were changed",error.Message);
+        Assert.DoesNotContain("private internal",error.Message);
+        Assert.Equal(baseline,_draft.BaselineJson);Assert.Equal(desired,_draft.RoomsJson);
+        Assert.Null(HousingApplyProgress.Read(_draft));Assert.Empty(_writer.Calls);
+        await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
+    }
+    [Fact]public async Task A_migrated_changed_student_still_requires_a_current_live_assignment_before_removal()
+    {
+        _before[0].Occupants.Add(new(){StudentUid=11,Name="Migrated resident",Rate="Unreviewed"});
+        _draft.Refresh(JsonSerializer.Serialize(_before),DateTime.UtcNow);Desired(x=>x[0].Occupants.Clear());
+        var desired=_draft.RoomsJson;
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.ApplyAssignmentsAsync(Input(false)));
+        Assert.Equal(desired,_draft.RoomsJson);Assert.Empty(_writer.Calls);
+        Assert.Null(HousingApplyProgress.Read(_draft));
+        await _billing.DidNotReceiveWithAnyArgs().ReconcileAsync(default,default,default!,default!);
+    }
     private void SavedCommuterBatch()
     {
         _before.Clear();
@@ -297,7 +318,9 @@ public class HousingApplyTests
         public Task ClearHistoricalAssignmentAsync(HousingHistoricalAssignment row,CancellationToken ct=default)
         {Claimed();if(FailHistorical)throw new InvalidOperationException("Historical deallocation unconfirmed");Calls.Add("historical");return Task.CompletedTask;}
         public Task<(string Building,string Room)?> GetAssignedRoomAsync(int studentUid,int periodId,CancellationToken ct=default){OnRead?.Invoke(studentUid);return Task.FromResult(Assigned.TryGetValue(studentUid,out var r)?((string,string)?)r:null);}
-        public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>Task.CompletedTask;
+        public bool FailRoomVerification;
+        public Task VerifyRoomsAsync(int p,IReadOnlyList<HousingWorkspaceRoom> rooms,CancellationToken ct=default)=>FailRoomVerification
+            ?Task.FromException(new InvalidOperationException("private internal verification detail")):Task.CompletedTask;
         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}
         public Task UpdateCapacitiesAsync(int p,IReadOnlyList<HousingCapacityChange> changes,CancellationToken ct=default){Claimed();Calls.Add(changes[0].Capacity>changes[0].PreviousCapacity?"increase":"decrease");return Task.CompletedTask;}
         public Task AssignAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("assign");if(Fail||FailAtStudent==id)throw new InvalidOperationException();if(!SuppressAssignment)Assigned[id]=RoomNames.TryGetValue(room,out var named)?named:room==1?("Bridges Hall","101"):("Commuter",room==2?"000":"001");return Task.CompletedTask;}
