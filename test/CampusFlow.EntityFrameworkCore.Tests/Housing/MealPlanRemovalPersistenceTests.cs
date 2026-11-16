@@ -19,16 +19,17 @@ namespace CampusFlow.EntityFrameworkCore.Tests.Housing;
 [Collection(CampusFlowTestConsts.CollectionDefinitionName)]
 public class MealPlanRemovalPersistenceTests:CampusFlowEntityFrameworkCoreTestBase
 {
-    [Theory][InlineData(false)][InlineData(true)]
-    public async Task Removal_persists_review_before_writes_and_recovers_a_lost_success_without_duplicate_deletions(bool lostReply)
+    [Theory][InlineData(false,715)][InlineData(true,715)][InlineData(false,0)][InlineData(true,0)]
+    public async Task Removal_persists_review_before_writes_and_recovers_a_lost_success_without_duplicate_deletions(bool lostReply,int baseAmount)
     {
         var owner=Guid.NewGuid();using var tenant=GetRequiredService<ICurrentTenant>().Change(owner,"nelson");
         var repository=GetRequiredService<IRepository<MealPlanRemovalOperation,Guid>>();var units=GetRequiredService<IUnitOfWorkManager>();
-        var target=new MealPlanRemovalTarget(10,269,42,14,"Plan",715m);
-        var remaining=new List<MealPlanRemovalEntry>{new(1,100,165,0,715,"","Meal Plan","meal plan"),new(2,200,261,8047,58.99m,"CFMT-269-10-42","Meal plan sales tax (8.25%)","sales tax")};
+        var target=new MealPlanRemovalTarget(10,269,42,14,baseAmount==0?"No Meals":"Plan",baseAmount);
+        var remaining=new List<MealPlanRemovalEntry>{new(1,100,165,0,baseAmount,"","Meal Plan","meal plan")};
+        if(baseAmount>0)remaining.Add(new(2,200,261,8047,58.99m,"CFMT-269-10-42","Meal plan sales tax (8.25%)","sales tax"));
         var original=JsonSerializer.Serialize(remaining);bool assigned=true,lost=false;var deleted=new List<int>();
         var assignments=Substitute.For<IStudentInformationSystemMealPlanRemovalService>();
-        assignments.GetAssignmentsAsync("10",Arg.Any<CancellationToken>()).Returns(_=>Task.FromResult<IReadOnlyList<StudentMealPlanAssignment>>(assigned?[new(42,14,269,"Plan",715)]:[]));
+        assignments.GetAssignmentsAsync("10",Arg.Any<CancellationToken>()).Returns(_=>Task.FromResult<IReadOnlyList<StudentMealPlanAssignment>>(assigned?[new(42,14,269,target.Name,baseAmount)]:[]));
         assignments.RemoveAsync("10",269,42,14,Arg.Any<CancellationToken>()).Returns(async _=>{
             using var read=units.Begin(requiresNew:true,isTransactional:false);
             var operation=Assert.Single(await repository.GetListAsync());Assert.Equal(original,operation.EntriesJson);Assert.Equal("Pending",operation.State);assigned=false;
@@ -45,11 +46,11 @@ public class MealPlanRemovalPersistenceTests:CampusFlowEntityFrameworkCoreTestBa
         if(lostReply)
         {
             await Assert.ThrowsAsync<UserFriendlyException>(()=>coordinator.RemoveAsync(target,preview.Revision,"Student requested removal"));
-            Assert.Single(await coordinator.PendingAsync(10,269));Assert.False(assigned);Assert.Single(remaining);
+            Assert.Single(await coordinator.PendingAsync(10,269));Assert.False(assigned);Assert.Equal(baseAmount>0?1:0,remaining.Count);
             preview=await coordinator.ReviewAsync(target);
         }
         await coordinator.RemoveAsync(target,preview.Revision,"Reviewed cleanup after student request");
-        Assert.Empty(remaining);Assert.Empty(await coordinator.PendingAsync(10,269));Assert.Equal(new[]{1,2},deleted);
+        Assert.Empty(remaining);Assert.Empty(await coordinator.PendingAsync(10,269));Assert.Equal(baseAmount>0?new[]{1,2}:new[]{1},deleted);
         await assignments.Received(1).RemoveAsync("10",269,42,14,Arg.Any<CancellationToken>());
         await WithUnitOfWorkAsync(async()=>{var row=Assert.Single(await repository.GetListAsync());Assert.Equal("Completed",row.State);Assert.Equal(original,row.EntriesJson);Assert.Equal(JsonSerializer.Serialize(target),row.TargetJson);});
     }
