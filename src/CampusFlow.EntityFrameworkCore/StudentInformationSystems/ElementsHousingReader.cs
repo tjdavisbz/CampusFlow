@@ -12,7 +12,8 @@ using Volo.Abp.DependencyInjection;
 namespace CampusFlow.StudentInformationSystems;
 
 // The replica is suitable for planning. A future sync must recheck authoritative API state.
-public class ElementsHousingReader(IConfiguration configuration) : IElementsHousingReader, ITransientDependency
+public class ElementsHousingReader(IConfiguration configuration, IElementsMigratedHousingReader? migrated = null)
+    : IElementsHousingReader, ITransientDependency
 {
     private SqlConnection Connection() => new(configuration.GetConnectionString("ThesisElementsReadOnly")
         ?? throw new InvalidOperationException("The Elements read-only connection is not configured."));
@@ -50,6 +51,8 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
             reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3));
         if (await reader.ReadAsync(cancellationToken))
             throw new InvalidOperationException("The student has multiple status records for this term.");
+        if (!result.HasAssignment && await MigratedStudentAssignmentAsync(studentUid, termCalendarId, cancellationToken) is { } imported)
+            result = result with { Building = imported.Building };
         return result;
     }
 
@@ -176,7 +179,10 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
             throw new InvalidOperationException("Some assignments reference unavailable rooms, or data changed during refresh. The draft was not replaced.");
         if (rooms.Count == 0)
             throw new InvalidOperationException("No rooms are configured for this period. The existing draft was not replaced.");
-        return rooms.Values.ToList();
+        var result = rooms.Values.ToList();
+        var imported = migrated is null ? null : await migrated.ReadForPeriodAsync(periodId, cancellationToken);
+        imported?.MergeInto(periodId, result);
+        return result;
     }
 
     public async Task<HousingPricingContext> GetPricingAsync(int periodId,
@@ -289,6 +295,14 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
                 CurrentRoom = reader.IsDBNull(7) ? "Not assigned" : $"{Value(7)} / {Value(8)}"
             });
         }
+        var imported = migrated is null ? null : await migrated.ReadForPeriodAsync(periodId, cancellationToken);
+        if (imported is not null)
+        {
+            var assignments = imported.Assignments.ToDictionary(x => x.StudentUid);
+            foreach (var student in results.Where(x => x.CurrentRoom == "Not assigned"))
+                if (assignments.TryGetValue(student.StudentUid, out var assignment))
+                    student.CurrentRoom = assignment.Building + " / " + assignment.Room;
+        }
         return results;
     }
 
@@ -323,7 +337,8 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         StudentHousingAssignment result;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            if (!await reader.ReadAsync(cancellationToken)) return null;
+            if (!await reader.ReadAsync(cancellationToken))
+                return termCalendarId is { } term ? await MigratedStudentAssignmentAsync(studentUid, term, cancellationToken) : null;
             periodId = reader.GetInt32(0); roomId = reader.GetInt32(1);
             result = new StudentHousingAssignment
             {
@@ -331,6 +346,13 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
             };
         }
         if (StudentHousingEligibility.IsCommuterBuilding(result.Building)) return result;
+        if (migrated is not null && await migrated.ReadForPeriodAsync(periodId, cancellationToken) is not null)
+        {
+            var room = (await GetRoomsAsync(periodId, cancellationToken)).Single(x => x.Id == roomId);
+            result.Roommates = room.Occupants.Where(x => x.StudentUid != studentUid)
+                .OrderBy(x => x.Name).Select(x => x.Name).ToList();
+            return result;
+        }
         await using var roommates = new SqlCommand("""
             SELECT s.FirstName, s.LastName
             FROM StudentLife.HousingPeriodRoomAssignments a
@@ -346,5 +368,20 @@ public class ElementsHousingReader(IConfiguration configuration) : IElementsHous
         while (await roommateReader.ReadAsync(cancellationToken))
             result.Roommates.Add($"{roommateReader.GetString(0)} {roommateReader.GetString(1)}".Trim());
         return result;
+    }
+
+    private async Task<StudentHousingAssignment?> MigratedStudentAssignmentAsync(int studentUid, int termCalendarId,
+        CancellationToken cancellationToken)
+    {
+        var imported = migrated is null ? null : await migrated.ReadForTermAsync(termCalendarId, cancellationToken);
+        if (imported is null || !imported.Assignments.Any(x => x.StudentUid == studentUid)) return null;
+        var rooms = await GetRoomsAsync(imported.PeriodId, cancellationToken);
+        var room = rooms.SingleOrDefault(x => x.Occupants.Any(o => o.StudentUid == studentUid));
+        return room is null ? null : new StudentHousingAssignment
+        {
+            PeriodName = imported.PeriodName, Building = room.Building, Room = room.Name,
+            Roommates = StudentHousingEligibility.IsCommuterBuilding(room.Building) ? [] : room.Occupants
+                .Where(x => x.StudentUid != studentUid).OrderBy(x => x.Name).Select(x => x.Name).ToList()
+        };
     }
 }
