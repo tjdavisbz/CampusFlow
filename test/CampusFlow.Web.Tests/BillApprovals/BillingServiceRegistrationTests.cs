@@ -11,6 +11,8 @@ public class BillingServiceRegistrationTests : CampusFlowWebTestBase
     public void New_billing_services_resolve_once_through_the_application_container()
     {
         Assert.NotNull(GetRequiredService<IStudentTermSelection>());
+        Assert.NotNull(GetRequiredService<IBillApprovalCourseReadiness>());
+        Assert.NotNull(GetRequiredService<IPaymentPlanFeeService>());
         Assert.Single(GetRequiredService<IEnumerable<IStudentInformationSystemBillingRecalculationService>>(),
             x=>x.Provider==StudentInformationSystemProvider.ThesisElements);
     }
