@@ -22,9 +22,11 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
 {
     private const string Graph = "https://graph.microsoft.com/v1.0/";
     private const string PasswordMethod = "28c10230-6103-485e-b985-444c60001490";
-    private static readonly HttpClient SharedClient = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
+    private static readonly HttpClient SharedClient = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
     private readonly WritebackRecoverySettings _settings;
     private readonly Action<string, int?>? _diagnostic;
+    private readonly TimeSpan _lookupTimeout;
+    private readonly TimeSpan _operationTimeout;
     private readonly HttpClient _http;
     private readonly Func<CancellationToken, Task<RecoveryAccessToken>> _token;
     private readonly Func<bool> _authorized;
@@ -34,14 +36,19 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
         : this(config, SharedClient, credential.TokenAsync, () => credential.HasAuthorization, Task.Delay,
             (stage, status) => logger?.LogWarning("Account recovery provider confirmation diagnostic: Stage={Stage}, HttpStatus={HttpStatus}", stage, status)) { }
     internal MicrosoftWritebackAccountRecoveryDirectory(IConfiguration config, HttpClient http, Func<CancellationToken, Task<RecoveryAccessToken>> token,
-        Func<bool> authorized, Func<TimeSpan, CancellationToken, Task> delay, Action<string, int?>? diagnostic = null)
-    { _settings = new(config); _http = http; _token = token; _authorized = authorized; _delay = delay; _diagnostic = diagnostic; }
+        Func<bool> authorized, Func<TimeSpan, CancellationToken, Task> delay, Action<string, int?>? diagnostic = null,
+        TimeSpan? lookupTimeout = null, TimeSpan? operationTimeout = null)
+    { _settings = new(config); _http = http; _token = token; _authorized = authorized; _delay = delay; _diagnostic = diagnostic;
+        _lookupTimeout = lookupTimeout ?? TimeSpan.FromSeconds(20);
+        _operationTimeout = operationTimeout ?? TimeSpan.FromMinutes(2);
+    }
     public bool IsConfigured => _settings.RuntimeConfigured && _authorized();
     public bool SupportsSynchronizedAccounts => IsConfigured;
     public async Task<RecoveryDirectoryAccount?> FindAsync(string upn, CancellationToken ct = default)
     {
         if (!IsConfigured || !_settings.Allowed(upn)) return null;
-        try { return await ReadAsync(Uri.EscapeDataString(upn), upn, null, await TokenAsync(ct), ct); }
+        using var lookup = CancellationTokenSource.CreateLinkedTokenSource(ct); lookup.CancelAfter(_lookupTimeout);
+        try { return await ReadAsync(Uri.EscapeDataString(upn), upn, null, await TokenAsync(lookup.Token), lookup.Token); }
         catch (Exception ex) when (Expected(ex)) { return null; }
     }
     private async Task<RecoveryAccessToken> TokenAsync(CancellationToken ct)
@@ -78,10 +85,11 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
             !account.Enabled || !account.IsMember || account.IsPrivileged) return RecoveryPasswordWriteResult.Unavailable;
         if (string.IsNullOrEmpty(password) || password.Length > 256) return RecoveryPasswordWriteResult.PolicyRejected;
         RecoveryAccessToken token;
+        using var preflight = CancellationTokenSource.CreateLinkedTokenSource(ct); preflight.CancelAfter(_lookupTimeout);
         try
         {
-            token = await TokenAsync(ct);
-            if (await ReadAsync(account.ObjectId.ToString("D"), account.UserPrincipalName, account.ObjectId, token, ct) != account)
+            token = await TokenAsync(preflight.Token);
+            if (await ReadAsync(account.ObjectId.ToString("D"), account.UserPrincipalName, account.ObjectId, token, preflight.Token) != account)
                 return RecoveryPasswordWriteResult.Unavailable;
         }
         catch (Exception ex) when (Expected(ex)) { return RecoveryPasswordWriteResult.Unavailable; }
@@ -90,12 +98,14 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
         if (ct.IsCancellationRequested) return RecoveryPasswordWriteResult.Unavailable;
         // Once a reset can be submitted, finish its status check independently
         // of a browser disconnect, without retrying the POST.
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        using var deadline = new CancellationTokenSource(_operationTimeout);
         using var write = Request(HttpMethod.Post, Graph + "users/" + account.ObjectId.ToString("D") + "/authentication/methods/" + PasswordMethod + "/resetPassword", token);
         write.Content = new StringContent(JsonSerializer.Serialize(new { newPassword = password }), Encoding.UTF8, "application/json");
+        var phase = "reset-response";
         try
         {
-            using var response = await _http.SendAsync(write, deadline.Token);
+            using var response = await _http.SendAsync(write, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+            phase = "reset-body";
             if (response.StatusCode == HttpStatusCode.BadRequest && MicrosoftAccountRecoveryDirectory.IsPasswordPolicyError(await response.Content.ReadAsStringAsync(deadline.Token)))
                 return RecoveryPasswordWriteResult.PolicyRejected;
             if (response.StatusCode != HttpStatusCode.Accepted)
@@ -106,10 +116,13 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
             var delay = RetryDelay(response);
             for (var attempt = 0; attempt < 12; attempt++)
             {
+                phase = "confirmation-wait";
                 await _delay(delay, deadline.Token);
                 using var poll = Request(HttpMethod.Get, location!.AbsoluteUri, token);
-                using var statusResponse = await _http.SendAsync(poll, deadline.Token);
+                phase = "confirmation-response";
+                using var statusResponse = await _http.SendAsync(poll, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
                 if (statusResponse.StatusCode != HttpStatusCode.OK) return Unconfirmed("confirmation-http", (int)statusResponse.StatusCode);
+                phase = "confirmation-body";
                 var body = await statusResponse.Content.ReadAsStringAsync(deadline.Token);
                 var state = JsonNode.Parse(body) as JsonObject;
                 if (state?["id"] is JsonValue operationId && operationId.GetValue<string>() != location.Segments.Last()) return Unconfirmed("operation-id");
@@ -123,7 +136,11 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
             }
             return Unconfirmed("confirmation-timeout");
         }
-        catch (Exception ex) when (Expected(ex)) { return Unconfirmed("confirmation-transport"); }
+        catch (Exception ex) when (Expected(ex))
+        {
+            var kind = ex is OperationCanceledException ? "timeout" : ex is JsonException or InvalidOperationException or FormatException or ArgumentException ? "format" : "transport";
+            return Unconfirmed(phase + "-" + kind);
+        }
     }
     private RecoveryPasswordWriteResult Unconfirmed(string stage, int? status = null)
     { _diagnostic?.Invoke(stage, status); return RecoveryPasswordWriteResult.Unknown; }

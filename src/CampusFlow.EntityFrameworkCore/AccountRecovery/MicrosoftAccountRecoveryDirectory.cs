@@ -267,8 +267,9 @@ public sealed class MicrosoftAccountRecoveryDirectory : IAccountRecoveryDirector
                     "PasswordBanned", "PasswordInHistory", "PasswordSameAsOldPassword", "InvalidPassword", "PasswordPolicyError" }
                 .Contains(code, StringComparer.OrdinalIgnoreCase)) return true;
             var message = error?["message"]?.GetValue<string>() ?? "";
-            return code == "Request_BadRequest" && message.Contains("password", StringComparison.OrdinalIgnoreCase) &&
-                new[] { "complexity", "policy", "banned", "weak", "history", "reuse", "length", "too short" }
+            return (string.Equals(code, "Request_BadRequest", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(code, "BadRequest", StringComparison.OrdinalIgnoreCase)) && message.Contains("password", StringComparison.OrdinalIgnoreCase) &&
+                new[] { "complexity", "policy", "banned", "weak", "history", "reuse", "length", "too short", "restriction", "minimum age", "too recent" }
                     .Any(word => message.Contains(word, StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)

@@ -39,9 +39,45 @@ public sealed class MicrosoftWritebackRecoveryTests
         changed=="aud" ? "https://untrusted.invalid" : "https://graph.microsoft.com",
         changed=="app-only" ? [] : changed=="scp" ? ["User.Read.All"] : ["User.Read.All", "UserAuthenticationMethod.ReadWrite.All"],
         DateTimeOffset.UtcNow.AddMinutes(changed=="exp" ? -1 : 60));
-    private static (MicrosoftWritebackAccountRecoveryDirectory Adapter, Handler Http) Setup(IConfiguration? config=null,string? changedToken=null,bool authorized=true)
+    private static (MicrosoftWritebackAccountRecoveryDirectory Adapter, Handler Http) Setup(IConfiguration? config=null,string? changedToken=null,bool authorized=true, TimeSpan? lookupTimeout=null, TimeSpan? operationTimeout=null, Action<string,int?>? diagnostic=null)
     {
-        var http=new Handler();return(new(config??Configuration(),new HttpClient(http),_=>Task.FromResult(Token(changedToken)),()=>authorized,(_,_)=>Task.CompletedTask),http);
+        var http=new Handler();return(new(config??Configuration(),new HttpClient(http){Timeout=Timeout.InfiniteTimeSpan},_=>Task.FromResult(Token(changedToken)),()=>authorized,(_,_)=>Task.CompletedTask,diagnostic,lookupTimeout,operationTimeout),http);
+    }
+    [Fact]
+    public async Task A_slow_reset_uses_the_operation_budget_and_returns_the_confirmed_policy_rejection()
+    {
+        var (adapter, http) = Setup(lookupTimeout:TimeSpan.FromMilliseconds(100), operationTimeout:TimeSpan.FromSeconds(2));
+        http.WriteDelay = TimeSpan.FromMilliseconds(300); http.FallbackState = "failed"; http.StatusDetail = "PasswordPolicyError";
+        Assert.Equal(RecoveryPasswordWriteResult.PolicyRejected, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(1,http.Writes); Assert.Equal(1,http.Polls);
+    }
+    [Theory]
+    [InlineData("BadRequest")]
+    [InlineData("badRequest")]
+    [InlineData("Request_BadRequest")]
+    public async Task A_slow_bad_request_returns_the_university_password_restriction_without_a_hold(string code)
+    {
+        var (adapter, http) = Setup(lookupTimeout:TimeSpan.FromMilliseconds(100), operationTimeout:TimeSpan.FromSeconds(2));
+        http.WriteDelay = TimeSpan.FromMilliseconds(300); http.WriteStatus = HttpStatusCode.BadRequest;
+        http.ErrorCode = code; http.ErrorMessage = "A restriction prevents the password from being changed to the current one specified.";
+        Assert.Equal(RecoveryPasswordWriteResult.PolicyRejected, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(1,http.Writes); Assert.Equal(0,http.Polls);
+    }
+    [Fact]
+    public async Task An_exhausted_operation_budget_remains_unconfirmed_and_never_resubmits()
+    {
+        var diagnostics = new List<string>();
+        var (adapter, http) = Setup(operationTimeout:TimeSpan.FromMilliseconds(50), diagnostic:(stage,_)=>diagnostics.Add(stage));
+        http.WriteDelay = TimeSpan.FromSeconds(5);
+        Assert.Equal(RecoveryPasswordWriteResult.Unknown, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(1,http.Writes); Assert.Equal(0,http.Polls); Assert.Equal("reset-response-timeout", Assert.Single(diagnostics));
+    }
+    [Fact]
+    public async Task Slow_identity_lookups_keep_the_short_budget_and_never_start_a_reset()
+    {
+        var (adapter, http) = Setup(lookupTimeout:TimeSpan.FromMilliseconds(50)); http.ReadDelay = TimeSpan.FromSeconds(5);
+        Assert.Equal(RecoveryPasswordWriteResult.Unavailable, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(0,http.Writes);
     }
     [Fact] public async Task Synced_student_is_reset_once_and_running_operation_is_polled_to_success()
     {
@@ -165,7 +201,8 @@ public sealed class MicrosoftWritebackRecoveryTests
     {
         internal int Calls,Writes,Polls;internal string? WritePath,PollQuery;internal JsonObject? Body;internal bool LoseWrite,CancelWrite;
         internal string? Location="https://graph.microsoft.com/v1.0/users/"+Student.ToString("D")+"/authentication/operations/synthetic-op";
-        internal string? StatusDetail; internal string ErrorCode="PasswordTooWeak";
+        internal TimeSpan WriteDelay, ReadDelay;
+        internal string? StatusDetail; internal string ErrorCode="PasswordTooWeak",ErrorMessage="Synthetic policy rejection";
         internal string OperationId="synthetic-op",FallbackState="succeeded";internal Queue<string> States=new();
         internal HttpStatusCode WriteStatus=HttpStatusCode.Accepted,RoleStatus=HttpStatusCode.OK,PollStatus=HttpStatusCode.OK;
         internal Action? AfterRoleRead, AfterWrite;
@@ -176,11 +213,12 @@ public sealed class MicrosoftWritebackRecoveryTests
             Calls++;Assert.Equal("graph.microsoft.com",request.RequestUri!.Host);
             if(request.Method==HttpMethod.Post)
             {
-                Writes++;WritePath=request.RequestUri.AbsolutePath;Body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject();
+                Writes++;if(WriteDelay>TimeSpan.Zero)await Task.Delay(WriteDelay,ct);WritePath=request.RequestUri.AbsolutePath;Body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject();
                 if(LoseWrite)throw new HttpRequestException("Synthetic lost response");if(CancelWrite)throw new OperationCanceledException();
-                var response=Response(WriteStatus,new(){["error"]=new JsonObject{["code"]=ErrorCode,["message"]="Synthetic policy rejection"}});
+                var response=Response(WriteStatus,new(){["error"]=new JsonObject{["code"]=ErrorCode,["message"]=ErrorMessage}});
                 if(Location is not null)response.Headers.Location=new Uri(Location);AfterWrite?.Invoke();return response;
             }
+            if(ReadDelay>TimeSpan.Zero)await Task.Delay(ReadDelay,ct);
             if(request.RequestUri.AbsolutePath.Contains("/authentication/operations/")){Polls++;PollQuery=request.RequestUri.Query;return Response(PollStatus,new(){["id"]=OperationId,["status"]=States.Count>0?States.Dequeue():FallbackState,["statusDetail"]=StatusDetail});}
             if(request.RequestUri.AbsolutePath.EndsWith("/transitiveMemberOf")){AfterRoleRead?.Invoke();return Response(RoleStatus,Roles);}
             return Response(HttpStatusCode.OK,User);
