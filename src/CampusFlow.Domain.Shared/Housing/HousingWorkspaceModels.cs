@@ -51,7 +51,7 @@ public class HousingWorkspaceOccupant
     public int StudentUid { get; set; }
     public string Name { get; set; } = "";
     public bool IntentionalSingle { get; set; }
-    public string Rate { get; set; } = "Unreviewed";
+    public string Rate { get; set; } = "Standard";
     public string Notes { get; set; } = "";
 }
 
@@ -72,6 +72,8 @@ public class HousingWorkspaceState
     public string? RecoveryJobMessage { get; set; }
     public int RecoveryAssignmentsVerified { get; set; }
     public List<HousingWorkspaceRoom> Rooms { get; set; } = [];
+    // Server-owned refresh baseline, retained when an occupant is removed in the draft.
+    public List<HousingWorkspaceRoom> BaselineRooms { get; set; } = [];
 }
 
 public class HousingWorkspaceChange

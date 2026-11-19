@@ -160,9 +160,75 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         CancellationToken cancellationToken = default) =>
         ChangeAsync("assign", studentUid, periodId, periodRoomId, cancellationToken);
 
-    public Task DeallocateAsync(int studentUid, int periodId, int periodRoomId,
-        CancellationToken cancellationToken = default) =>
-        ChangeAsync("deallocate", studentUid, periodId, periodRoomId, cancellationToken);
+    public async Task<(string Building, string Room)?> GetEffectiveAssignedRoomAsync(int studentUid, int periodId,
+        CancellationToken cancellationToken = default)
+    {
+        var native = await GetAssignedRoomAsync(studentUid, periodId, cancellationToken);
+        if (native is not null) return native;
+        var source = await _migratedHousing.ReadForPeriodAsync(periodId, cancellationToken);
+        source?.Validate();
+        var assignment = source?.Assignments.SingleOrDefault(x => x.StudentUid == studentUid);
+        if (assignment is null) return null;
+        if (await _currentAssignmentExists(studentUid, periodId, cancellationToken))
+            throw new InvalidOperationException("The current Elements assignment is not visible through the live API. Review before applying.");
+        return (assignment.Building, assignment.Room);
+    }
+
+    public async Task DeallocateAsync(int studentUid, int periodId, int periodRoomId,
+        CancellationToken cancellationToken = default)
+    {
+        var converted = false;
+        // CAMS residents need an explicit current-catalog allocation before the vendor
+        // can record their deallocation. Every step uses supported housing APIs, never
+        // writes the replica, and requires zero vendor rent to avoid new automatic charges.
+        if (await GetAssignedRoomAsync(studentUid, periodId, cancellationToken) is null)
+        {
+            var source = await _migratedHousing.ReadForPeriodAsync(periodId, cancellationToken);
+            source?.Validate();
+            var migrated = source?.Assignments.SingleOrDefault(x => x.StudentUid == studentUid);
+            if (migrated is not null)
+            {
+                if (migrated.PeriodRoomId != periodRoomId || await _currentAssignmentExists(studentUid, periodId, cancellationToken))
+                    throw new InvalidOperationException("The migrated baseline changed. No deallocation was sent.");
+                await VerifyZeroRentMigrationRoomAsync(periodId, periodRoomId, cancellationToken);
+                await AssignAsync(studentUid, periodId, periodRoomId, cancellationToken);
+                var assigned = await GetAssignedRoomAsync(studentUid, periodId, cancellationToken);
+                if (assigned is null || !string.Equals(assigned.Value.Building.Trim(), migrated.Building.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(assigned.Value.Room.Trim(), migrated.Room.Trim(), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("The migrated assignment conversion could not be confirmed. Review before retrying.");
+                converted = true;
+            }
+        }
+        await ChangeAsync("deallocate", studentUid, periodId, periodRoomId, cancellationToken);
+        if (converted)
+        {
+            // The live API confirms the removal before the replica sees the new
+            // catalog-history marker. Wait only for readback; never repeat a write.
+            using var readback = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            readback.CancelAfter(TimeSpan.FromSeconds(20));
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                if (await GetEffectiveAssignedRoomAsync(studentUid, periodId, readback.Token) is null) return;
+                await Task.Delay(1000, readback.Token);
+            }
+            throw new InvalidOperationException("The migrated deallocation is still updating in Elements. Review the saved operation before retrying.");
+        }
+    }
+
+    private async Task VerifyZeroRentMigrationRoomAsync(int periodId, int roomId, CancellationToken ct)
+    {
+        var properties = (await HousingDataAsync($"/api/student-life/housing/housing-periods/housing-period-properties/search/{periodId}", ct)).AsArray();
+        var matches = new List<JsonObject>();
+        foreach (var item in properties.OfType<JsonObject>())
+        {
+            var property = (await HousingDataAsync($"/api/student-life/housing/housing-periods/housing-period-properties/{ReadInt(item,"housingPeriodPropertyID")}", ct)).AsObject();
+            if (ReadInt(property,"housingPeriodID") != periodId) throw new InvalidOperationException("Housing period changed.");
+            matches.AddRange(property["rooms"]!.AsArray().OfType<JsonObject>().Where(x => ReadInt(x,"housingPeriodRoomID") == roomId));
+        }
+        if (matches.Count != 1 || matches[0]["roomRate"] is null || matches[0]["perPersonRate"] is null ||
+            matches[0]["roomRate"]!.GetValue<decimal>() != 0 || matches[0]["perPersonRate"]!.GetValue<decimal>() != 0)
+            throw new InvalidOperationException("Migrated assignment conversion requires a verified zero-rent room. Review Elements room pricing first.");
+    }
 
     private async Task ChangeAsync(string action, int studentUid, int periodId, int periodRoomId,
         CancellationToken cancellationToken)

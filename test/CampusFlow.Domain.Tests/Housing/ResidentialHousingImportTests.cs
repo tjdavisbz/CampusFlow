@@ -19,7 +19,7 @@ public class ResidentialHousingImportTests
         var rooms = Rooms(); var commuter = rooms[1].Occupants[0];
         Import().MergeInto(2, rooms);
         Assert.Equal(100, rooms[0].Occupants.Single().StudentUid);
-        Assert.Equal("Unreviewed", rooms[0].Occupants[0].Rate);
+        Assert.Equal("Standard", rooms[0].Occupants[0].Rate);
         Assert.Same(commuter, rooms[1].Occupants.Single()); Assert.Equal("Retain me", commuter.Notes);
         Assert.Equal(2, rooms[0].Capacity);
     }
