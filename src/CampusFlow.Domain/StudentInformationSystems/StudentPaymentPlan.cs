@@ -20,7 +20,8 @@ public sealed record StudentPaymentInstallment(int Number, decimal Amount, strin
 public sealed record StudentPaymentPlanContext(
     string FullTimeStatus,
     string AttendanceType,
-    bool IsCommuter);
+    bool IsCommuter,
+    bool OverridePaymentPlan = false);
 
 public sealed record StudentPaymentPlanPolicy(
     decimal EnrollmentFee,

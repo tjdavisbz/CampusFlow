@@ -63,19 +63,9 @@
         </div>
     </section>
 
-    @if (Model.HasStudentAccess && (Model.VisibleAnnouncements.Count > 0 || Model.AnnouncementTerms.Count > 0))
+    @if (Model.HasStudentAccess && (Model.VisibleAnnouncements.Count > 0 || Model.AnnouncementTerms.Count > 0) && !Model.PrioritizeRegistration)
     {
-        <section class="dashboard-announcements" aria-labelledby="announcements-heading">
-            <div class="dashboard-announcements-heading"><span class="summary-label">Campus news</span><h2 id="announcements-heading">Announcements</h2></div>
-            @if (Model.AnnouncementTerms.Count > 0)
-            {
-                <p class="dashboard-announcement-terms">Also available for @foreach (var option in Model.AnnouncementTerms){<a asp-page="/Index" asp-route-term="@option.ExternalTermId">@option.DisplayName</a>}</p>
-            }
-            @foreach (var announcement in Model.VisibleAnnouncements)
-            {
-                <article class="dashboard-announcement"><h3>@announcement.Title</h3><div>@Html.Raw(AnnouncementHtml.Sanitize(announcement.ContentHtml))</div></article>
-            }
-        </section>
+        <partial name="_DashboardAnnouncements" model="Model" />
     }
 
     @if (Model.HasAdvisorAccess)
@@ -171,6 +161,11 @@
                 }
             </section>
         }
+
+    @if (Model.HasStudentAccess && (Model.VisibleAnnouncements.Count > 0 || Model.AnnouncementTerms.Count > 0) && Model.PrioritizeRegistration)
+    {
+        <partial name="_DashboardAnnouncements" model="Model" />
+    }
 
         @if (Model.RegistrationJourney is not null)
         {
