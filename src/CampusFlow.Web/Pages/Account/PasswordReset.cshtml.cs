@@ -9,6 +9,7 @@ using CampusFlow.Web.Portals;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using CampusFlow.Web.AccountRecovery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -21,7 +22,7 @@ namespace CampusFlow.Web.Pages.Account;
 [DisableAuditing]
 [AutoValidateAntiforgeryToken]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class PasswordResetModel(IAccountRecoveryWorkflow workflow, IConfiguration? config = null) : PageModel
+public sealed class PasswordResetModel(IAccountRecoveryWorkflow workflow, IConfiguration? config = null, ILogger<PasswordResetModel>? logger = null) : PageModel
 {
     public const string RecoveryCookieName = "__Host-CFRecovery";
     [BindProperty] public RecoveryInput Input { get; set; } = new();
@@ -91,8 +92,14 @@ public sealed class PasswordResetModel(IAccountRecoveryWorkflow workflow, IConfi
         Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
         Response.Headers["X-Frame-Options"] = "DENY";
         Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
-        return !IsImpersonating() && workflow.IsAvailable &&
-            (!RecoveryClientAddress.RequiresTrustedProxy(config) || RecoveryClientAddress.Resolve(HttpContext, config!) is not null);
+        var available = workflow.IsAvailable;
+        var trustedClient = !RecoveryClientAddress.RequiresTrustedProxy(config) || RecoveryClientAddress.Resolve(HttpContext, config!) is not null;
+        var impersonating = IsImpersonating();
+        if (HttpMethods.IsGet(Request.Method) && config?.GetValue<bool>("PasswordRecovery:Enabled") == true &&
+            (!available || !trustedClient || impersonating))
+            logger?.LogWarning("Account recovery request blocked: BackendAvailable={BackendAvailable}, TrustedClientResolved={TrustedClientResolved}, Impersonating={Impersonating}",
+                available, trustedClient, impersonating);
+        return !impersonating && available && trustedClient;
     }
 
     private IActionResult DeniedOrUnavailable()

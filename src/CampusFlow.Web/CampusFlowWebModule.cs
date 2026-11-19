@@ -187,6 +187,13 @@ public class CampusFlowWebModule : AbpModule
             });
         }
 
+        if (CampusFlow.Web.AccountRecovery.RecoveryClientAddress.RequiresTrustedProxy(configuration) &&
+            CampusFlow.Web.AccountRecovery.RecoveryClientAddress.HasConfiguration(configuration))
+        {
+            Configure<ForwardedHeadersOptions>(options =>
+                CampusFlow.Web.AccountRecovery.RecoveryClientAddress.ConfigureForwarding(options, configuration));
+        }
+
         if (hostingEnvironment.IsDevelopment())
         {
             context.Services.AddRazorPages()

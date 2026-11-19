@@ -21,11 +21,23 @@ public sealed class AccountRecoveryWorkflow(IConfiguration config, IAccountRecov
     TimeProvider? time = null) : IAccountRecoveryWorkflow, ITransientDependency
 {
     private DateTime Now => (time ?? TimeProvider.System).GetUtcNow().UtcDateTime;
-    public bool IsAvailable => config.GetValue<bool>("PasswordRecovery:Enabled") &&
-        config.GetValue<bool>("PasswordRecovery:VerificationImportReady") &&
-        Guid.TryParse(config["PasswordRecovery:CampusFlowTenantId"], out var id) && id != Guid.Empty &&
-        identity.IsConfigured && directory.IsConfigured &&
-        (!RecoveryClientAddress.RequiresTrustedProxy(config) || RecoveryClientAddress.HasConfiguration(config));
+    public bool IsAvailable
+    {
+        get
+        {
+            if (!config.GetValue<bool>("PasswordRecovery:Enabled")) return false;
+            var imported = config.GetValue<bool>("PasswordRecovery:VerificationImportReady");
+            var tenantConfigured = Guid.TryParse(config["PasswordRecovery:CampusFlowTenantId"], out var id) && id != Guid.Empty;
+            var identityReady = identity.IsConfigured;
+            var directoryReady = directory.IsConfigured;
+            var proxyReady = !RecoveryClientAddress.RequiresTrustedProxy(config) || RecoveryClientAddress.HasConfiguration(config);
+            var ready = imported && tenantConfigured && identityReady && directoryReady && proxyReady;
+            if (!ready)
+                logger.LogWarning("Account recovery setup blocked: ImportReady={ImportReady}, TenantConfigured={TenantConfigured}, IdentitySourceReady={IdentitySourceReady}, DirectoryReady={DirectoryReady}, ProxyReady={ProxyReady}, DirectoryBackend={DirectoryBackend}",
+                    imported, tenantConfigured, identityReady, directoryReady, proxyReady, directory.GetType().Name);
+            return ready;
+        }
+    }
     private static AccountRecoveryResult Result(RecoveryStep step, RecoveryNotice notice = RecoveryNotice.None, string? token = null, string? question = null)
         => new() { Step = step, Notice = notice, Ticket = token, Question = question };
     private static string Digest(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
@@ -35,7 +47,12 @@ public sealed class AccountRecoveryWorkflow(IConfiguration config, IAccountRecov
         if (!IsAvailable) return null;
         TenantConfiguration? named;
         using (tenant.Change(null)) named = await tenants.FindAsync(normalizer.NormalizeName("nelson") ?? "");
-        if (named is null || named.Id != Guid.Parse(config["PasswordRecovery:CampusFlowTenantId"]!) || !string.Equals(named.Name,"nelson",StringComparison.OrdinalIgnoreCase)) return null;
+        if (named is null || named.Id != Guid.Parse(config["PasswordRecovery:CampusFlowTenantId"]!) || !string.Equals(named.Name,"nelson",StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning("Account recovery tenant guard blocked: TenantFound={TenantFound}, TenantIdMatches={TenantIdMatches}, TenantNameMatches={TenantNameMatches}",
+                named is not null, named?.Id == Guid.Parse(config["PasswordRecovery:CampusFlowTenantId"]!), string.Equals(named?.Name, "nelson", StringComparison.OrdinalIgnoreCase));
+            return null;
+        }
         return tenant.Change(named.Id, named.Name);
     }
     private async Task<AccountRecoveryResult> Safe(Func<Task<AccountRecoveryResult>> action)
