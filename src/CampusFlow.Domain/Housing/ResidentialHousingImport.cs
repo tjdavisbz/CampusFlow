@@ -49,7 +49,7 @@ public sealed class ResidentialHousingImport
         }
         foreach (var (room, assignment) in additions)
             room.Occupants.Add(new HousingWorkspaceOccupant { StudentUid = assignment.StudentUid, Name = assignment.Name,
-                Rate = "Unreviewed" });
+                Rate = "Standard" });
     }
 }
 

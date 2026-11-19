@@ -270,7 +270,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             .ToDictionary(x => x.o.StudentUid);
         foreach (var id in changedIds)
         {
-            var actual = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
+            var actual = await _writer.GetEffectiveAssignedRoomAsync(id, input.PeriodId);
             if (!expectedAssignments.TryGetValue(id, out var old))
             {
                 if (actual is not null)
@@ -331,7 +331,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             foreach(var id in roomWriteIds.Where(oldAssignments.ContainsKey))
             {
                 await Record($"Starting room removal for {id}");await _writer.DeallocateAsync(id,input.PeriodId,oldAssignments[id].room.Id);
-                if(await _writer.GetAssignedRoomAsync(id,input.PeriodId) is not null)throw new InvalidOperationException("Room removal was not confirmed.");
+                if(await _writer.GetEffectiveAssignedRoomAsync(id,input.PeriodId) is not null)throw new InvalidOperationException("Room removal was not confirmed.");
                 await Record($"Room removal verified for {id}");
             }
             var decreases=capacityChanges.Where(x=>x.Capacity<x.PreviousCapacity).ToList();
@@ -345,7 +345,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                     await Record($"Historical room deallocation acknowledged for {id}, deleted room {historical.PeriodRoomId}");
                 }
                 await Record($"Starting room assignment for {id}");var room=newAssignments[id].room;await _writer.AssignAsync(id,input.PeriodId,room.Id);
-                var confirmed=await _writer.GetAssignedRoomAsync(id,input.PeriodId);
+                var confirmed=await _writer.GetEffectiveAssignedRoomAsync(id,input.PeriodId);
                 if(confirmed is null||!SameRoom(confirmed.Value,room))throw new InvalidOperationException("New room assignment was not confirmed.");
                 await Record($"Room assignment verified for {id}");
             }
@@ -353,7 +353,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             {
                 if (recovery is not null)
                 {
-                    var assigned = await _writer.GetAssignedRoomAsync(id, input.PeriodId);
+                    var assigned = await _writer.GetEffectiveAssignedRoomAsync(id, input.PeriodId);
                     if (assigned is null || !SameRoom(assigned.Value, newAssignments[id].room))
                         throw new InvalidOperationException("The recovered commuter assignment changed before charge reconciliation.");
                     await Record($"Existing billing preserved for {id}; zero-charge commuter recovery");
@@ -507,7 +507,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
         var progress=HousingApplyProgress.Read(x);var dispatch=HousingRecoveryDispatch.Read(x);
         var active=dispatch?.IsActive(x,Clock.Now)==true;
         return new()
-        { Id=x.Id,PeriodId=x.PeriodId,Revision=x.ConcurrencyStamp,RefreshedAt=x.RefreshedAt,Rooms=Read(x.RoomsJson),
+        { Id=x.Id,PeriodId=x.PeriodId,Revision=x.ConcurrencyStamp,RefreshedAt=x.RefreshedAt,Rooms=Read(x.RoomsJson),BaselineRooms=Read(x.BaselineJson),
             ApplyStatus=active?"Running":progress?.Status,ApplyRunId=progress?.RunId,
             ApplyFailure=progress?.IsInterrupted(Clock.Now)==true?"The previous recovery stopped reporting progress. Review the live assignments before resuming the saved plan.":progress?.Status=="Needs review"?HousingApplyFailure.Description(progress.FailureCode):null,
             RecoveryAvailable=!active && progress?.CanRecover(Clock.Now)==true,

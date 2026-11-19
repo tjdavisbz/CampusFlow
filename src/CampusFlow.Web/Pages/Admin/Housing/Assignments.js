@@ -6,6 +6,7 @@
     let recovery = null;
     const blocked = () => ['Queued','Running','Needs review'].includes(state?.applyStatus);
     const selected = new Set();
+    const removedOccupants = new Map();
     const rates = ['Unreviewed','Standard','AIC Triple Room','Savell Triple Occupancy'];
     function message(text, error = false) { el('message').textContent = text; el('message').dataset.error = error; }
     function overCapacityRooms() { return state ? state.rooms.filter(room => room.occupants.length > room.capacity) : []; }
@@ -140,6 +141,7 @@
                 remove.setAttribute('aria-label', 'Remove ' + occupant.name + ' from ' + room.building + ' ' + room.name);
                 remove.onclick = () => {
                     if (!confirm(`Remove ${occupant.name} from ${room.building} / ${room.name} in this draft? Elements will not change until you apply the draft.`)) return;
+                    removedOccupants.set(occupant.studentUid, { ...occupant });
                     room.occupants = room.occupants.filter(o => o.studentUid !== occupant.studentUid);
                     selected.delete(occupant.studentUid); changed(); render();
                 };
@@ -176,7 +178,7 @@
         resetRecovery();
         try {
             const draft = next ? await request('Draft', undefined, {periodId:next}) : null;
-            state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next);
+            removedOccupants.clear(); state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next);
             if (state?.recoveryJobStatus === 'Running' && !state.recoveryAvailable)
                 await watchRecovery({dispatchId:state.recoveryJobId,periodId:state.periodId});
         }
@@ -184,7 +186,7 @@
     });
     el('refresh').onclick = () => run(async () => {
         if (!confirm('Refresh from Elements will replace this CampusFlow draft. Any changes not applied—including saved draft assignments, rate choices, notes, and unsaved edits—will be lost. Rate choices and intentional-single flags from the last successful Apply will be kept. This action will not change Elements. Continue?')) return;
-        state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.'); await showSetup(el('period').value);
+        removedOccupants.clear(); state = await request('Refresh', { periodId:Number(el('period').value), revision:state?.revision, confirmed:true }); dirty = false; selected.clear(); render(); message('Refreshed from Elements. No Elements data was changed.'); await showSetup(el('period').value);
     });
     async function save() { state = await request('Save', state); dirty = false; render(); message('Draft saved in CampusFlow. Elements is unchanged.'); }
     function resetRecovery() {
@@ -292,7 +294,7 @@
     });
     el('clear').onclick = () => {
         if (!selected.size || !confirm(`Clear ${selected.size} selected assignments from the draft? Students remain assigned in Elements until you apply the draft.`)) return;
-        state.rooms.forEach(r => r.occupants = r.occupants.filter(o => !selected.has(o.studentUid))); selected.clear(); changed(); render();
+        state.rooms.forEach(r => { r.occupants.filter(o => selected.has(o.studentUid)).forEach(o => removedOccupants.set(o.studentUid, { ...o })); r.occupants = r.occupants.filter(o => !selected.has(o.studentUid)); }); selected.clear(); changed(); render();
     };
     el('filter').oninput = render;
     el('select-all').onchange = () => {
@@ -324,14 +326,17 @@
             button.onclick = () => {
                 const uid = Number(s.studentUid);
                 const previousRoom = state.rooms.find(r => r.occupants.some(o => o.studentUid === uid));
+                const baselineRoom = state.baselineRooms?.find(r => r.occupants.some(o => o.studentUid === uid));
                 if (previousRoom === selectedRoom) { results.textContent = 'This student is already assigned to this room.'; return; }
-                if (!previousRoom && s.currentRoom !== 'Not assigned') {
+                if (!previousRoom && !baselineRoom && s.currentRoom !== 'Not assigned') {
                     results.textContent = 'This student has an Elements assignment missing from the draft. Refresh from Elements before moving them.';
                     return;
                 }
                 if (selectedRoom.occupants.length >= selectedRoom.capacity) { results.textContent = 'This room is full. Increase capacity first.'; return; }
                 if (previousRoom && !confirm(`Move ${s.name} from ${previousRoom.building} / ${previousRoom.name} to ${selectedRoom.building} / ${selectedRoom.name} in this draft? Elements will not change until you apply the draft.`)) return;
-                const existing = previousRoom?.occupants.find(o => o.studentUid === uid);
+                const original = previousRoom?.occupants.find(o => o.studentUid === uid) ?? removedOccupants.get(uid) ??
+                    baselineRoom?.occupants.find(o => o.studentUid === uid);
+                const existing = original ? { ...original, rate: original.rate === 'Unreviewed' ? 'Standard' : original.rate } : null;
                 if (previousRoom) previousRoom.occupants = previousRoom.occupants.filter(o => o.studentUid !== uid);
                 selectedRoom.occupants.push(existing ?? {studentUid:uid,name:s.name,intentionalSingle:false,rate:'Standard',notes:''});
                 changed(); el('students').close(); render();

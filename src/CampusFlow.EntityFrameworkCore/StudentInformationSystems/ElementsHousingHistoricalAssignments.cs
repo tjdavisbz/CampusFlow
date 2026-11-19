@@ -38,7 +38,7 @@ public sealed partial class ElementsHousingAssignmentWriter
             throw new InvalidOperationException("A live room assignment now exists. Historical recovery cannot deallocate an active assignment.");
         // Reinitialization marks the old row deleted but leaves a vendor-side allocation
         // conflict. Explicitly deallocating that exact old room clears the conflict.
-        await DeallocateAsync(reviewed.StudentUid, reviewed.PeriodId, reviewed.PeriodRoomId, cancellationToken);
+        await ChangeAsync("deallocate", reviewed.StudentUid, reviewed.PeriodId, reviewed.PeriodRoomId, cancellationToken);
         if (await GetAssignedRoomAsync(reviewed.StudentUid, reviewed.PeriodId, cancellationToken) is not null)
             throw new InvalidOperationException("A live assignment changed during historical recovery. Check Elements before retrying.");
     }
