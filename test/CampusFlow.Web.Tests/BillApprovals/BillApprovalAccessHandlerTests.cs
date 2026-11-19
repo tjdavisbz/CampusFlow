@@ -36,6 +36,7 @@ public class BillApprovalAccessHandlerTests
     private readonly CampusFlow.Web.Pages.BillApprovalModel _model;
     private readonly IConfigurationRoot _taxConfiguration=new ConfigurationBuilder().AddInMemoryCollection().Build();
     private readonly CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator _tax=Substitute.For<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>();
+    private readonly IPaymentPlanFeeService _feeService=Substitute.For<IPaymentPlanFeeService>();
     private readonly IBillApprovalCourseReadiness _readiness=Substitute.For<IBillApprovalCourseReadiness>();
     private readonly ICurrentStudentView _current=Substitute.For<ICurrentStudentView>();
     private readonly IBillApprovalCompletionLookup _completion=Substitute.For<IBillApprovalCompletionLookup>();
@@ -56,7 +57,7 @@ public class BillApprovalAccessHandlerTests
     {
         var owner=Guid.NewGuid();var userId=Guid.NewGuid();var user=Substitute.For<ICurrentUser>();user.Id.Returns(userId);
         var tenant=Substitute.For<ICurrentTenant>();tenant.Id.Returns(owner);tenant.Name.Returns("nelson");
-        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<IBillApprovalCourseReadiness>().Returns(_readiness);var protection=Substitute.For<CampusFlow.ClearanceResets.IClearanceResetProtection>();protection.AcquireAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<CancellationToken>()).Returns(Task.FromResult<IAsyncDisposable>(new MealLease()));lazy.LazyGetRequiredService<CampusFlow.ClearanceResets.IClearanceResetProtection>().Returns(protection);lazy.LazyGetRequiredService<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>().Returns(_tax);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
+        var lazy=Substitute.For<IAbpLazyServiceProvider>();lazy.LazyGetRequiredService<IPaymentPlanFeeService>().Returns(_feeService);lazy.LazyGetRequiredService<IBillApprovalCourseReadiness>().Returns(_readiness);var protection=Substitute.For<CampusFlow.ClearanceResets.IClearanceResetProtection>();protection.AcquireAsync(Arg.Any<int>(),Arg.Any<int>(),Arg.Any<CancellationToken>()).Returns(Task.FromResult<IAsyncDisposable>(new MealLease()));lazy.LazyGetRequiredService<CampusFlow.ClearanceResets.IClearanceResetProtection>().Returns(protection);lazy.LazyGetRequiredService<CampusFlow.MealPlanTaxes.IMealPlanTaxCoordinator>().Returns(_tax);lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
         var current=_current;
         current.GetProfileAsync(Arg.Any<CancellationToken>()).Returns(new StudentProfile(Guid.NewGuid(),owner,userId,new(StudentInformationSystemProvider.ThesisElements,"10","100","student@example.test","Test",null,"Student")));
         var termLookup=Substitute.For<IStudentInformationSystemTermLookup>();termLookup.Provider.Returns(StudentInformationSystemProvider.ThesisElements);
@@ -375,6 +376,7 @@ public class BillApprovalAccessHandlerTests
         Assert.Equal(125m,_model.PaymentPlanFee);Assert.Equal(1125m,_model.DeferredBalance);
         _model.ReviewVersion=_model.CurrentReviewVersion;_model.AgreementAcceptedInput=true;_model.PaymentChoiceInput="Deferred";
         await _model.OnPostAsync("B27S");
+        await _feeService.Received(1).EnsureAsync(10,269,125m,Arg.Any<CancellationToken>());
         Assert.NotNull(saved);Assert.Equal(125m,saved.PaymentPlanFee);Assert.Equal(1125m,saved.RemainingBalance);
         Assert.Equal(1125m,JsonSerializer.Deserialize<List<StudentPaymentInstallment>>(saved.PaymentScheduleJson)!.Sum(x=>x.Amount));
         Assert.Empty(_gateway.ReceivedCalls());
@@ -446,5 +448,34 @@ public class BillApprovalAccessHandlerTests
         Assert.False(_model.IsUnavailable); Assert.True(_model.OverridePaymentPlan);
         Assert.False(_model.RequiresPaymentChoice); Assert.Equal(0m,_model.PaymentPlanFee);
         Assert.Equal(1000m,_model.RemainingBalance);
+    }
+    [Fact]
+    public async Task An_existing_fee_is_not_added_to_the_deferred_balance_again()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(new[] {
+            new StudentBillingTransaction(StudentInformationSystemProvider.ThesisElements,"one","269","B27S","Spring 2027",DateTime.UtcNow,"Tuition and previously charged fee",1100m,0m,1100m,false,false) });
+        _planLookup.GetPaymentPlanContextAsync("10","269",Arg.Any<CancellationToken>()).Returns(new StudentPaymentPlanContext("Full Time","Residential",false));
+        _feeService.ExistingAmountAsync(10,269,100m,Arg.Any<CancellationToken>()).Returns(100m);
+        await _model.OnGetAsync("B27S");
+        Assert.False(_model.IsUnavailable); Assert.Equal(1100m,_model.DeferredBalance);
+        Assert.Equal(100m,_model.PaymentPlanFee);
+        Assert.Equal(_model.DeferredBalance,_model.PaymentPlan!.Installments.Sum(x=>x.Amount));
+        await _feeService.DidNotReceiveWithAnyArgs().EnsureAsync(default,default,default,default);
+    }
+    [Fact]
+    public async Task Override_approval_preserves_balance_and_never_posts_a_plan_fee()
+    {
+        _term.ConfigureTestAccess(true,new[]{"100"});
+        _billing.GetTransactionsAsync("10",Arg.Any<CancellationToken>()).Returns(new[]{new StudentBillingTransaction(StudentInformationSystemProvider.ThesisElements,"one","269","B27S","Spring 2027",DateTime.Today,"Tuition",1000m,0m,1000m,false,false)});
+        _planLookup.GetPaymentPlanContextAsync("10","269",Arg.Any<CancellationToken>()).Returns(new StudentPaymentPlanContext("Full Time","Graduate",true,true));
+        _agreements.GetAsync(_term.AgreementTemplateId,Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(new AgreementTemplate(_term.AgreementTemplateId,null,"Test",1,DateTime.Today,"Agreement","[]",true));
+        BillApproval? saved=null;
+        _approvals.InsertAsync(Arg.Do<BillApproval>(row=>saved=row),Arg.Any<bool>(),Arg.Any<CancellationToken>()).Returns(c=>c.Arg<BillApproval>());
+        await _model.OnGetAsync("B27S");_model.ReviewVersion=_model.CurrentReviewVersion;_model.AgreementAcceptedInput=true;_model.PaymentChoiceInput="Deferred";
+        await _model.OnPostAsync("B27S");
+        Assert.NotNull(saved);Assert.Equal(BillPaymentChoice.PaymentPlanOverride,saved.PaymentChoice);
+        Assert.Equal(1000m,saved.RemainingBalance);Assert.Equal(0m,saved.PaymentPlanFee);
+        await _feeService.DidNotReceiveWithAnyArgs().EnsureAsync(default,default,default,default);Assert.Empty(_gateway.ReceivedCalls());
     }
 }

@@ -137,6 +137,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public string? TermCode { get; private set; }
     public string? ExternalTermId { get; private set; }
     private CampusFlow.Housing.MealPlanSelectionDto? _reviewedMealChoice;
+    private decimal _expectedPaymentPlanFee;
     public bool IsUnavailable { get; private set; }
     public string? UnavailableReason { get; private set; }
     public IReadOnlyList<BillApprovalTermConfiguration> AvailableTerms { get; private set; } = [];
@@ -338,7 +339,13 @@ public class BillApprovalModel : CampusFlowPageModel
                     var policy = await GetCurrentPaymentPlanPolicyAsync(termConfiguration?.PaymentPlanPolicyId);
                     OverridePaymentPlan = context.OverridePaymentPlan;
                     if (!OverridePaymentPlan)
-                        PaymentPlan = StudentPaymentPlanCalculator.Calculate(AccountBalance, PendingAidTotal, TermName, context, policy);
+                    {
+                        _expectedPaymentPlanFee = policy.EnrollmentFee;
+                        var existingFee = await LazyServiceProvider.LazyGetRequiredService<IPaymentPlanFeeService>()
+                            .ExistingAmountAsync(int.Parse(profile.ExternalStudentId), int.Parse(ExternalTermId), policy.EnrollmentFee, HttpContext.RequestAborted);
+                        PaymentPlan = StudentPaymentPlanCalculator.Calculate(AccountBalance, PendingAidTotal, TermName, context,
+                            policy with { EnrollmentFee = policy.EnrollmentFee - existingFee }) with { PaymentPlanFee = policy.EnrollmentFee };
+                    }
                 }
             }
 
@@ -571,6 +578,20 @@ public class BillApprovalModel : CampusFlowPageModel
             return RedirectToPage(new { term });
         }
 
+        if (paymentChoice == BillPaymentChoice.DeferredPaymentPlan)
+        {
+            try
+            {
+                await LazyServiceProvider.LazyGetRequiredService<IPaymentPlanFeeService>()
+                    .EnsureAsync(int.Parse(profile.ExternalStudentId), int.Parse(ExternalTermId), _expectedPaymentPlanFee, HttpContext.RequestAborted);
+            }
+            catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                _logger.LogWarning(exception, "Payment-plan fee posting could not be confirmed for bill approval.");
+                ModelState.AddModelError(string.Empty, "The payment-plan fee could not be confirmed. Reload your bill before trying again, or contact Student Billing. Your bill has not been approved.");
+                return Page();
+            }
+        }
         var isNew = approval is null;
         approval ??= new BillApproval(_guidGenerator.Create(), CurrentTenant.Id, CurrentUser.Id.Value, profile.Id,
             profile.ExternalStudentId, profile.StudentId, ExternalTermId, TermCode ?? "", TermName);
