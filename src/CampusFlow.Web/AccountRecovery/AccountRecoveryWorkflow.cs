@@ -103,7 +103,13 @@ public sealed class AccountRecoveryWorkflow(IConfiguration config, IAccountRecov
             { await requests.RejectAsync(row.Id,ct); return Result(RecoveryStep.Identity, RecoveryNotice.NotVerified); }
             var account = await directory.FindAsync(person.UserPrincipalName, ct);
             if (!Allowed(account, person)) { await requests.RejectAsync(row.Id,ct); return Result(RecoveryStep.Unavailable); }
-            if (!await requests.BindAsync(row.Id, person, account!, question, Now, ct)) return Result(RecoveryStep.Identity, RecoveryNotice.RateLimited);
+            var binding = await requests.BindAsync(row.Id, person, account!, question, Now, ct);
+            if (binding != RecoveryBindResult.Bound)
+                return binding switch {
+                    RecoveryBindResult.PendingReset => Result(RecoveryStep.Unknown),
+                    RecoveryBindResult.RateLimited => Result(RecoveryStep.Identity, RecoveryNotice.RateLimited),
+                    _ => Result(RecoveryStep.Identity, RecoveryNotice.Expired)
+                };
             var bound = await requests.FindAsync(Digest(token), ct) ?? throw new InvalidOperationException("Recovery state missing.");
             return await View(bound, token, ct);
         });
@@ -141,7 +147,7 @@ public sealed class AccountRecoveryWorkflow(IConfiguration config, IAccountRecov
             catch { outcome=RecoveryPasswordWriteResult.Unknown; }
             // Once a write is claimed, persist its outcome independently of request cancellation.
             try { await requests.FinishAsync(row.Id,outcome,CancellationToken.None); }
-            catch { logger.LogWarning("Account recovery outcome could not be recorded; the one-use request remains locked."); return Result(RecoveryStep.Unknown); }
+            catch (Exception ex) { logger.LogWarning("Account recovery outcome could not be recorded; the one-use request remains locked. ErrorType={ErrorType}, InnerErrorType={InnerErrorType}", ex.GetType().Name, ex.InnerException?.GetType().Name); return Result(RecoveryStep.Unknown); }
             logger.LogInformation("Account recovery password operation finished with outcome {Outcome}.",outcome);
             if (outcome == RecoveryPasswordWriteResult.PolicyRejected)
             {

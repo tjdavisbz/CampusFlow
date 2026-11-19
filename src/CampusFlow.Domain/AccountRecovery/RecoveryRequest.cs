@@ -68,11 +68,13 @@ public sealed class RecoveryRequest : AuditedAggregateRoot<Guid>, IMultiTenant
     public override string ToString() => $"Account recovery request: {State} [details redacted]";
 }
 
+public enum RecoveryBindResult { Bound, RateLimited, PendingReset, Expired }
+
 public interface IAccountRecoveryRequestStore
 {
     Task<bool> AddAsync(RecoveryRequest request, DateTime now, CancellationToken ct = default);
     Task<RecoveryRequest?> FindAsync(string ticketHash, CancellationToken ct = default);
-    Task<bool> BindAsync(Guid id, RecoveryPerson person, RecoveryDirectoryAccount account, RecoveryQuestion question, DateTime now, CancellationToken ct = default);
+    Task<RecoveryBindResult> BindAsync(Guid id, RecoveryPerson person, RecoveryDirectoryAccount account, RecoveryQuestion question, DateTime now, CancellationToken ct = default);
     Task<bool> BeginAnswerAsync(Guid id, DateTime now, CancellationToken ct = default);
     Task FinishAnswerAsync(Guid id, bool verified, CancellationToken ct = default);
     Task<bool> ClaimResetAsync(Guid id, DateTime now, CancellationToken ct = default);

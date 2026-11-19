@@ -9,6 +9,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Uow;
+using Volo.Abp.Threading;
 
 namespace CampusFlow.AccountRecovery;
 
@@ -33,7 +34,7 @@ internal static class RecoveryStoreScope
 }
 
 public sealed class AccountRecoveryRequestStore(IRepository<RecoveryRequest, Guid> rows,
-    IDbContextProvider<CampusFlowDbContext> contexts, ICurrentTenant tenant, IUnitOfWorkManager units, TimeProvider? time = null)
+    IDbContextProvider<CampusFlowDbContext> contexts, ICurrentTenant tenant, IUnitOfWorkManager units, ICancellationTokenProvider cancellationTokens, TimeProvider? time = null)
     : IAccountRecoveryRequestStore, ITransientDependency
 {
     private DateTime Now => (time ?? TimeProvider.System).GetUtcNow().UtcDateTime;
@@ -79,15 +80,18 @@ public sealed class AccountRecoveryRequestStore(IRepository<RecoveryRequest, Gui
     private static Task<bool> AccountBlocked(IQueryable<RecoveryRequest> account, RecoveryRequest row, CancellationToken ct)
         => account.AnyAsync(x => x.Id != row.Id && (x.State == "Applying" || x.State == "Unknown" ||
             x.State == "Complete" && (!x.PasswordWriteFinishedAtUtc.HasValue || x.PasswordWriteFinishedAtUtc >= row.CreationTime)), ct);
-    public Task<bool> BindAsync(Guid id, RecoveryPerson person, RecoveryDirectoryAccount account, RecoveryQuestion question, DateTime now, CancellationToken ct = default)
+    public Task<RecoveryBindResult> BindAsync(Guid id, RecoveryPerson person, RecoveryDirectoryAccount account, RecoveryQuestion question, DateTime now, CancellationToken ct = default)
         => Change(id, async row => {
             var owner = RecoveryStoreScope.Owner(tenant);
             await LockAccount(owner, person.StudentUid, account.ObjectId, ct);
             var existing = await AccountRequests(owner, person.StudentUid, account.ObjectId);
-            if (await AccountBlocked(existing, row, ct) ||
-                await existing.CountAsync(x => x.StudentUid == person.StudentUid && x.CreationTime > now.AddMinutes(-15), ct) >= 3)
-            { row.Reject(); return false; }
-            return row.Bind(person, account, question, now);
+            if (await existing.AnyAsync(x => x.Id != row.Id && (x.State == "Applying" || x.State == "Unknown"), ct))
+            { row.Reject(); return RecoveryBindResult.PendingReset; }
+            if (await AccountBlocked(existing, row, ct))
+            { row.Reject(); return RecoveryBindResult.Expired; }
+            if (await existing.CountAsync(x => x.StudentUid == person.StudentUid && x.CreationTime > now.AddMinutes(-15), ct) >= 3)
+            { row.Reject(); return RecoveryBindResult.RateLimited; }
+            return row.Bind(person, account, question, now) ? RecoveryBindResult.Bound : RecoveryBindResult.Expired;
         }, ct);
     public Task<bool> BeginAnswerAsync(Guid id, DateTime now, CancellationToken ct = default) => Change(id, row => Task.FromResult(row.BeginAnswer(now)), ct);
     public async Task FinishAnswerAsync(Guid id, bool verified, CancellationToken ct = default) => await Change(id, row => { row.FinishAnswer(verified); return Task.FromResult(true); }, ct);
@@ -101,7 +105,15 @@ public sealed class AccountRecoveryRequestStore(IRepository<RecoveryRequest, Gui
             return row.ClaimReset(now);
         }, ct);
     public async Task FinishAsync(Guid id, RecoveryPasswordWriteResult outcome, CancellationToken ct = default)
-        => await Change(id, async row => {
+    {
+        // ABP treats CancellationToken.None as a request-token fallback. Override
+        // that ambient token too so a disconnected browser cannot cancel recording
+        // the outcome of an already-claimed external write. Keep completion bounded.
+        using var completion = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        completion.CancelAfter(TimeSpan.FromSeconds(15));
+        using var independent = cancellationTokens.Use(completion.Token);
+        ct = completion.Token;
+        await Change(id, async row => {
             if (row.StudentUid is not int studentUid || row.DirectoryObjectId is not Guid accountId || row.State != "Applying") return false;
             var owner = RecoveryStoreScope.Owner(tenant);
             await LockAccount(owner, studentUid, accountId, ct);
@@ -114,6 +126,7 @@ public sealed class AccountRecoveryRequestStore(IRepository<RecoveryRequest, Gui
                 foreach (var other in others) { other.Reject(); await rows.UpdateAsync(other, false, ct); }
             }
             return true;
-        }, ct);
+        }, completion.Token);
+    }
     public async Task RejectAsync(Guid id, CancellationToken ct = default) => await Change(id, row => { row.Reject(); return Task.FromResult(true); }, ct);
 }

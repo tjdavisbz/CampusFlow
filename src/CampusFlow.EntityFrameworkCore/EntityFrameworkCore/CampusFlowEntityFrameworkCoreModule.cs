@@ -98,7 +98,7 @@ public class CampusFlowEntityFrameworkCoreModule : AbpModule
         context.Services.AddTransient<CampusFlow.AccountRecovery.IAccountRecoveryIdentitySource, CampusFlow.AccountRecovery.LegacyAccountRecoveryIdentitySource>();
         context.Services.AddTransient<CampusFlow.AccountRecovery.IAccountRecoveryDirectory>(services =>
             string.Equals(services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>()["PasswordRecovery:Backend"], "MicrosoftWriteback", StringComparison.Ordinal)
-                ? new CampusFlow.AccountRecovery.MicrosoftWritebackAccountRecoveryDirectory(services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>())
+                ? new CampusFlow.AccountRecovery.MicrosoftWritebackAccountRecoveryDirectory(services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(), services.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CampusFlow.AccountRecovery.MicrosoftWritebackAccountRecoveryDirectory>>())
                 : new CampusFlow.AccountRecovery.MicrosoftAccountRecoveryDirectory(services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>()));
         context.Services.AddTransient<CampusFlow.AccountRecovery.IAccountRecoveryVerificationStore, CampusFlow.AccountRecovery.AccountRecoveryVerificationStore>();
         context.Services.AddTransient<CampusFlow.AccountRecovery.IAccountRecoveryRequestStore, CampusFlow.AccountRecovery.AccountRecoveryRequestStore>();

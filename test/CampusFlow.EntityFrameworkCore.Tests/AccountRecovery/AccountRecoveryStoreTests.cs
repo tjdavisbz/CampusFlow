@@ -18,12 +18,12 @@ public sealed class AccountRecoveryStoreTests:CampusFlowEntityFrameworkCoreTestB
     [Fact]public async Task Account_throttling_counts_verified_identity_attempts_across_clients()
     {
         var id=Guid.NewGuid();using var owner=GetRequiredService<ICurrentTenant>().Change(id,"nelson");var now=DateTime.UtcNow;var p=new RecoveryPerson(10,20,"synthetic@my.nelson.edu");var a=new RecoveryDirectoryAccount(Guid.NewGuid(),p.UserPrincipalName,true,true,false,false);
-        for(int i=0;i<4;i++){var r=new RecoveryRequest(Guid.NewGuid(),id,i.ToString().PadLeft(64,'0'),i.ToString().PadLeft(64,'0'),now);Assert.True(await GetRequiredService<IAccountRecoveryRequestStore>().AddAsync(r,now));Assert.Equal(i<3,await GetRequiredService<IAccountRecoveryRequestStore>().BindAsync(r.Id,p,a,new(true,null,null,true,new('c',64)),now));}
+        for(int i=0;i<4;i++){var r=new RecoveryRequest(Guid.NewGuid(),id,i.ToString().PadLeft(64,'0'),i.ToString().PadLeft(64,'0'),now);Assert.True(await GetRequiredService<IAccountRecoveryRequestStore>().AddAsync(r,now));Assert.Equal(i<3 ? RecoveryBindResult.Bound : RecoveryBindResult.RateLimited,await GetRequiredService<IAccountRecoveryRequestStore>().BindAsync(r.Id,p,a,new(true,null,null,true,new('c',64)),now));}
     }
     [Fact]public async Task A_persisted_unknown_request_cannot_send_again_and_does_not_store_secrets()
     {
         var id=Guid.NewGuid();using var owner=GetRequiredService<ICurrentTenant>().Change(id,"nelson");var now=DateTime.UtcNow;var r=new RecoveryRequest(Guid.NewGuid(),id,new('a',64),new('b',64),now);var p=new RecoveryPerson(10,20,"synthetic@my.nelson.edu");
-        Assert.True(await GetRequiredService<IAccountRecoveryRequestStore>().AddAsync(r,now));Assert.True(await GetRequiredService<IAccountRecoveryRequestStore>().BindAsync(r.Id,p,new(Guid.NewGuid(),p.UserPrincipalName,true,true,false,false),new(true,null,null,true,new('c',64)),now));
+        Assert.True(await GetRequiredService<IAccountRecoveryRequestStore>().AddAsync(r,now));Assert.Equal(RecoveryBindResult.Bound, await GetRequiredService<IAccountRecoveryRequestStore>().BindAsync(r.Id,p,new(Guid.NewGuid(),p.UserPrincipalName,true,true,false,false),new(true,null,null,true,new('c',64)),now));
         Assert.True(await GetRequiredService<IAccountRecoveryRequestStore>().ClaimResetAsync(r.Id,now));Assert.False(await GetRequiredService<IAccountRecoveryRequestStore>().ClaimResetAsync(r.Id,now));await GetRequiredService<IAccountRecoveryRequestStore>().FinishAsync(r.Id,RecoveryPasswordWriteResult.Unknown);Assert.Equal("Unknown",(await GetRequiredService<IAccountRecoveryRequestStore>().FindAsync(new('a',64)))!.State);Assert.False(await GetRequiredService<IAccountRecoveryRequestStore>().ClaimResetAsync(r.Id,now));
         var type=typeof(RecoveryRequest);foreach(var name in new[]{"Password","Ssn","BirthDate","Answer","Ticket"})Assert.Null(type.GetProperty(name));
     }
@@ -49,7 +49,7 @@ public sealed class AccountRecoveryStoreTests:CampusFlowEntityFrameworkCoreTestB
     private async Task<RecoveryRequest> Verified(Guid tenantId, RecoveryPerson person, RecoveryDirectoryAccount account, DateTime now)
     {
         var request = await Started(tenantId, now);
-        Assert.True(await Store.BindAsync(request.Id, person, account, Question, now));
+        Assert.Equal(RecoveryBindResult.Bound, await Store.BindAsync(request.Id, person, account, Question, now));
         return request;
     }
     [Fact]
@@ -89,7 +89,7 @@ public sealed class AccountRecoveryStoreTests:CampusFlowEntityFrameworkCoreTestB
         Assert.False(await Store.ClaimResetAsync(second.Id, now));
         var later = now.AddMinutes(31);
         var fresh = await Started(tenantId, later);
-        Assert.False(await Store.BindAsync(fresh.Id, person, account, Question, later));
+        Assert.Equal(RecoveryBindResult.PendingReset, await Store.BindAsync(fresh.Id, person, account, Question, later));
         Assert.False(await Store.ClaimResetAsync(fresh.Id, later));
         Assert.Equal("Unknown", (await Store.FindAsync(first.TicketHash))!.State);
     }
@@ -105,7 +105,7 @@ public sealed class AccountRecoveryStoreTests:CampusFlowEntityFrameworkCoreTestB
         var oldStarted = await Started(tenantId, now);
         Assert.True(await Store.ClaimResetAsync(first.Id, now));
         await Store.FinishAsync(first.Id, RecoveryPasswordWriteResult.Accepted);
-        Assert.False(await Store.BindAsync(oldStarted.Id, person, account, Question, now));
+        Assert.Equal(RecoveryBindResult.Expired, await Store.BindAsync(oldStarted.Id, person, account, Question, now));
         var completedAt = (await Store.FindAsync(first.TicketHash))!.PasswordWriteFinishedAtUtc!.Value;
         var fresh = await Verified(tenantId, person, account, completedAt.AddMinutes(1));
         Assert.True(await Store.ClaimResetAsync(fresh.Id, completedAt.AddMinutes(1)));
@@ -123,6 +123,26 @@ public sealed class AccountRecoveryStoreTests:CampusFlowEntityFrameworkCoreTestB
         await Store.FinishAsync(first.Id, RecoveryPasswordWriteResult.PolicyRejected);
         Assert.Null((await Store.FindAsync(first.TicketHash))!.PasswordWriteFinishedAtUtc);
         Assert.True(await Store.ClaimResetAsync(first.Id, now));
+    }
+    [Theory]
+    [InlineData(RecoveryPasswordWriteResult.Accepted, "Complete")]
+    [InlineData(RecoveryPasswordWriteResult.PolicyRejected, "Verified")]
+    [InlineData(RecoveryPasswordWriteResult.Unknown, "Unknown")]
+    public async Task A_finished_write_is_persisted_even_when_the_browser_request_was_cancelled(RecoveryPasswordWriteResult outcome, string expected)
+    {
+        var tenantId = Guid.NewGuid();
+        using var owner = GetRequiredService<ICurrentTenant>().Change(tenantId, "nelson");
+        var now = DateTime.UtcNow;
+        var person = new RecoveryPerson(10,20,"synthetic@my.nelson.edu");
+        var first = await Verified(tenantId, person, new(Guid.NewGuid(), person.UserPrincipalName, true, true, false, false), now);
+        Assert.True(await Store.ClaimResetAsync(first.Id, now));
+        using (var disconnected = new System.Threading.CancellationTokenSource())
+        {
+            disconnected.Cancel();
+            using var request = GetRequiredService<Volo.Abp.Threading.ICancellationTokenProvider>().Use(disconnected.Token);
+            await Store.FinishAsync(first.Id, outcome, System.Threading.CancellationToken.None);
+        }
+        Assert.Equal(expected, (await Store.FindAsync(first.TicketHash))!.State);
     }
     [Fact]
     public async Task The_same_directory_account_cannot_escape_a_claim_through_a_different_student_mapping()

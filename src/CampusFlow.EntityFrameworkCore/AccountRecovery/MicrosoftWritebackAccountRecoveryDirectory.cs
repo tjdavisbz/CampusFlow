@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Volo.Abp.Auditing;
 
 namespace CampusFlow.AccountRecovery;
@@ -23,16 +24,18 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
     private const string PasswordMethod = "28c10230-6103-485e-b985-444c60001490";
     private static readonly HttpClient SharedClient = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
     private readonly WritebackRecoverySettings _settings;
+    private readonly Action<string, int?>? _diagnostic;
     private readonly HttpClient _http;
     private readonly Func<CancellationToken, Task<RecoveryAccessToken>> _token;
     private readonly Func<bool> _authorized;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
-    public MicrosoftWritebackAccountRecoveryDirectory(IConfiguration config) : this(config, new DelegatedRecoveryCredential(config)) { }
-    private MicrosoftWritebackAccountRecoveryDirectory(IConfiguration config, DelegatedRecoveryCredential credential)
-        : this(config, SharedClient, credential.TokenAsync, () => credential.HasAuthorization, Task.Delay) { }
+    public MicrosoftWritebackAccountRecoveryDirectory(IConfiguration config, ILogger<MicrosoftWritebackAccountRecoveryDirectory>? logger = null) : this(config, new DelegatedRecoveryCredential(config), logger) { }
+    private MicrosoftWritebackAccountRecoveryDirectory(IConfiguration config, DelegatedRecoveryCredential credential, ILogger<MicrosoftWritebackAccountRecoveryDirectory>? logger)
+        : this(config, SharedClient, credential.TokenAsync, () => credential.HasAuthorization, Task.Delay,
+            (stage, status) => logger?.LogWarning("Account recovery provider confirmation diagnostic: Stage={Stage}, HttpStatus={HttpStatus}", stage, status)) { }
     internal MicrosoftWritebackAccountRecoveryDirectory(IConfiguration config, HttpClient http, Func<CancellationToken, Task<RecoveryAccessToken>> token,
-        Func<bool> authorized, Func<TimeSpan, CancellationToken, Task> delay)
-    { _settings = new(config); _http = http; _token = token; _authorized = authorized; _delay = delay; }
+        Func<bool> authorized, Func<TimeSpan, CancellationToken, Task> delay, Action<string, int?>? diagnostic = null)
+    { _settings = new(config); _http = http; _token = token; _authorized = authorized; _delay = delay; _diagnostic = diagnostic; }
     public bool IsConfigured => _settings.RuntimeConfigured && _authorized();
     public bool SupportsSynchronizedAccounts => IsConfigured;
     public async Task<RecoveryDirectoryAccount?> FindAsync(string upn, CancellationToken ct = default)
@@ -84,7 +87,10 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
         catch (Exception ex) when (Expected(ex)) { return RecoveryPasswordWriteResult.Unavailable; }
         if (!IsConfigured || !_settings.Allowed(account.UserPrincipalName) || !DelegatedRecoveryCredential.TokenMatches(token, _settings))
             return RecoveryPasswordWriteResult.Unavailable;
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct); deadline.CancelAfter(TimeSpan.FromSeconds(45));
+        if (ct.IsCancellationRequested) return RecoveryPasswordWriteResult.Unavailable;
+        // Once a reset can be submitted, finish its status check independently
+        // of a browser disconnect, without retrying the POST.
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(45));
         using var write = Request(HttpMethod.Post, Graph + "users/" + account.ObjectId.ToString("D") + "/authentication/methods/" + PasswordMethod + "/resetPassword", token);
         write.Content = new StringContent(JsonSerializer.Serialize(new { newPassword = password }), Encoding.UTF8, "application/json");
         try
@@ -96,28 +102,39 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
                 return response.IsSuccessStatusCode || (int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout
                     ? RecoveryPasswordWriteResult.Unknown : RecoveryPasswordWriteResult.Unavailable;
             var location = response.Headers.Location;
-            if (!ValidOperation(location, account.ObjectId)) return RecoveryPasswordWriteResult.Unknown;
+            if (!ValidOperation(location, account.ObjectId)) return Unconfirmed("operation-location");
             var delay = RetryDelay(response);
             for (var attempt = 0; attempt < 12; attempt++)
             {
                 await _delay(delay, deadline.Token);
                 using var poll = Request(HttpMethod.Get, location!.AbsoluteUri, token);
                 using var statusResponse = await _http.SendAsync(poll, deadline.Token);
-                if (statusResponse.StatusCode != HttpStatusCode.OK) return RecoveryPasswordWriteResult.Unknown;
+                if (statusResponse.StatusCode != HttpStatusCode.OK) return Unconfirmed("confirmation-http", (int)statusResponse.StatusCode);
                 var body = await statusResponse.Content.ReadAsStringAsync(deadline.Token);
                 var state = JsonNode.Parse(body) as JsonObject;
-                if (state?["id"] is JsonValue operationId && operationId.GetValue<string>() != location.Segments.Last()) return RecoveryPasswordWriteResult.Unknown;
+                if (state?["id"] is JsonValue operationId && operationId.GetValue<string>() != location.Segments.Last()) return Unconfirmed("operation-id");
                 switch (state?["status"]?.GetValue<string>())
                 {
                     case "succeeded": return RecoveryPasswordWriteResult.Accepted;
-                    case "failed": return MicrosoftAccountRecoveryDirectory.IsPasswordPolicyError(body) ? RecoveryPasswordWriteResult.PolicyRejected : RecoveryPasswordWriteResult.Unknown;
+                    case "failed": return IsOperationPolicyRejection(state!, body) ? RecoveryPasswordWriteResult.PolicyRejected : Unconfirmed("operation-failed");
                     case "notStarted": case "running": delay = RetryDelay(statusResponse); break;
-                    default: return RecoveryPasswordWriteResult.Unknown;
+                    default: return Unconfirmed("operation-status");
                 }
             }
-            return RecoveryPasswordWriteResult.Unknown;
+            return Unconfirmed("confirmation-timeout");
         }
-        catch (Exception ex) when (Expected(ex)) { return RecoveryPasswordWriteResult.Unknown; }
+        catch (Exception ex) when (Expected(ex)) { return Unconfirmed("confirmation-transport"); }
+    }
+    private RecoveryPasswordWriteResult Unconfirmed(string stage, int? status = null)
+    { _diagnostic?.Invoke(stage, status); return RecoveryPasswordWriteResult.Unknown; }
+    private static bool IsOperationPolicyRejection(JsonObject state, string body)
+    {
+        if (MicrosoftAccountRecoveryDirectory.IsPasswordPolicyError(body)) return true;
+        // Password-reset operations use statusDetail, rather than the normal
+        // Graph error envelope. Only recognize a specific policy failure code.
+        return state["statusDetail"] is JsonValue detail && detail.TryGetValue<string>(out var text) &&
+            (MicrosoftAccountRecoveryDirectory.IsPasswordPolicyError(text) ||
+             Regex.IsMatch(text, "(?<![A-Za-z0-9_])PasswordPolicyError(?![A-Za-z0-9_])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
     }
     internal static bool ValidOperation(Uri? location, Guid student) => location is { IsAbsoluteUri: true } &&
         location.Scheme == "https" && location.Host == "graph.microsoft.com" && location.IsDefaultPort && location.UserInfo == "" &&

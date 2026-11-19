@@ -50,6 +50,15 @@ public sealed class MicrosoftWritebackRecoveryTests
         Assert.EndsWith("/authentication/methods/28c10230-6103-485e-b985-444c60001490/resetPassword",h.WritePath);
         Assert.Equal("newPassword",Assert.Single(h.Body!).Key);Assert.Equal("Synthetic-Password-947!",h.Body!["newPassword"]!.GetValue<string>());
     }
+    [Fact]
+    public async Task A_browser_disconnect_after_submission_does_not_cancel_confirmation_or_send_again()
+    {
+        using var browser = new CancellationTokenSource();
+        var (adapter, http) = Setup(); http.AfterWrite = () => browser.Cancel();
+        http.States.Enqueue("running"); http.States.Enqueue("succeeded");
+        Assert.Equal(RecoveryPasswordWriteResult.Accepted, await adapter.ResetAsync(Account(), "Synthetic-Password-947!", browser.Token));
+        Assert.Equal(1, http.Writes); Assert.Equal(2, http.Polls);
+    }
     [Theory]
     [InlineData("?aadgdc=DUB02P&aadgsu=ssprprod-a")]
     [InlineData("?aadgsu=ssprprod-a&aadgdc=DUB02P")]
@@ -70,6 +79,31 @@ public sealed class MicrosoftWritebackRecoveryTests
         var(a,h)=Setup();h.Location+=query;
         Assert.Equal(RecoveryPasswordWriteResult.Unknown,await a.ResetAsync(Account(),"Synthetic-Password-947!"));
         Assert.Equal(1,h.Writes);Assert.Equal(0,h.Polls);
+    }
+    [Theory]
+    [InlineData("PasswordPolicyError")]
+    [InlineData("{\"error\":{\"code\":\"PasswordPolicyError\"}}")]
+    public async Task A_failed_operation_with_a_confirmed_policy_code_is_retryable(string detail)
+    {
+        var (adapter, http) = Setup(); http.FallbackState = "failed"; http.StatusDetail = detail;
+        Assert.Equal(RecoveryPasswordWriteResult.PolicyRejected, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(1, http.Writes); Assert.Equal(1, http.Polls);
+    }
+    [Fact]
+    public async Task A_direct_policy_failure_is_not_reported_as_an_unconfirmed_reset()
+    {
+        var (adapter, http) = Setup(); http.WriteStatus = HttpStatusCode.BadRequest; http.ErrorCode = "PasswordPolicyError";
+        Assert.Equal(RecoveryPasswordWriteResult.PolicyRejected, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(1, http.Writes); Assert.Equal(0, http.Polls);
+    }
+    [Theory]
+    [InlineData("UnknownPasswordPolicyErrorCode")]
+    [InlineData("Upstream service unavailable")]
+    public async Task An_unrecognized_failure_does_not_release_the_reset_hold(string detail)
+    {
+        var (adapter, http) = Setup(); http.FallbackState = "failed"; http.StatusDetail = detail;
+        Assert.Equal(RecoveryPasswordWriteResult.Unknown, await adapter.ResetAsync(Account(), "Synthetic-Password-947!"));
+        Assert.Equal(1, http.Writes);
     }
     [Theory]
     [InlineData("PasswordRecovery:Enabled","false")][InlineData("PasswordRecovery:Backend","Cloud")]
@@ -131,9 +165,10 @@ public sealed class MicrosoftWritebackRecoveryTests
     {
         internal int Calls,Writes,Polls;internal string? WritePath,PollQuery;internal JsonObject? Body;internal bool LoseWrite,CancelWrite;
         internal string? Location="https://graph.microsoft.com/v1.0/users/"+Student.ToString("D")+"/authentication/operations/synthetic-op";
+        internal string? StatusDetail; internal string ErrorCode="PasswordTooWeak";
         internal string OperationId="synthetic-op",FallbackState="succeeded";internal Queue<string> States=new();
         internal HttpStatusCode WriteStatus=HttpStatusCode.Accepted,RoleStatus=HttpStatusCode.OK,PollStatus=HttpStatusCode.OK;
-        internal Action? AfterRoleRead;
+        internal Action? AfterRoleRead, AfterWrite;
         internal JsonObject User=new(){["id"]=Student.ToString("D"),["userPrincipalName"]=Upn,["accountEnabled"]=true,["userType"]="Member",["onPremisesSyncEnabled"]=true};
         internal JsonObject Roles=new(){["value"]=new JsonArray()};
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
@@ -143,10 +178,10 @@ public sealed class MicrosoftWritebackRecoveryTests
             {
                 Writes++;WritePath=request.RequestUri.AbsolutePath;Body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!.AsObject();
                 if(LoseWrite)throw new HttpRequestException("Synthetic lost response");if(CancelWrite)throw new OperationCanceledException();
-                var response=Response(WriteStatus,new(){["error"]=new JsonObject{["code"]="PasswordTooWeak",["message"]="Synthetic policy rejection"}});
-                if(Location is not null)response.Headers.Location=new Uri(Location);return response;
+                var response=Response(WriteStatus,new(){["error"]=new JsonObject{["code"]=ErrorCode,["message"]="Synthetic policy rejection"}});
+                if(Location is not null)response.Headers.Location=new Uri(Location);AfterWrite?.Invoke();return response;
             }
-            if(request.RequestUri.AbsolutePath.Contains("/authentication/operations/")){Polls++;PollQuery=request.RequestUri.Query;return Response(PollStatus,new(){["id"]=OperationId,["status"]=States.Count>0?States.Dequeue():FallbackState});}
+            if(request.RequestUri.AbsolutePath.Contains("/authentication/operations/")){Polls++;PollQuery=request.RequestUri.Query;return Response(PollStatus,new(){["id"]=OperationId,["status"]=States.Count>0?States.Dequeue():FallbackState,["statusDetail"]=StatusDetail});}
             if(request.RequestUri.AbsolutePath.EndsWith("/transitiveMemberOf")){AfterRoleRead?.Invoke();return Response(RoleStatus,Roles);}
             return Response(HttpStatusCode.OK,User);
         }

@@ -264,7 +264,7 @@ public sealed class MicrosoftAccountRecoveryDirectory : IAccountRecoveryDirector
             var error = JsonNode.Parse(body)?["error"];
             var code = error?["code"]?.GetValue<string>() ?? "";
             if (new[] { "PasswordTooShort", "PasswordTooWeak", "PasswordDoesNotComplyComplexity", "PasswordDoesNotMeetRequirements",
-                    "PasswordBanned", "PasswordInHistory", "PasswordSameAsOldPassword", "InvalidPassword" }
+                    "PasswordBanned", "PasswordInHistory", "PasswordSameAsOldPassword", "InvalidPassword", "PasswordPolicyError" }
                 .Contains(code, StringComparer.OrdinalIgnoreCase)) return true;
             var message = error?["message"]?.GetValue<string>() ?? "";
             return code == "Request_BadRequest" && message.Contains("password", StringComparison.OrdinalIgnoreCase) &&

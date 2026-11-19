@@ -103,13 +103,24 @@ public sealed class AccountRecoveryWorkflowTests
     {var f=new Fixture();f.Store.Full=true;Assert.Equal(RecoveryNotice.RateLimited,(await f.Flow.StartAsync(Identity(),"192.0.2.1")).Notice);await f.IdentitySource.DidNotReceive().VerifyIdentityAsync(Arg.Any<AccountRecoveryIdentity>(),Arg.Any<CancellationToken>());}
     [Fact]public async Task Import_and_transient_failures_do_not_echo_sensitive_details()
     {var f=new Fixture();f.IdentitySource.VerifyIdentityAsync(Arg.Any<AccountRecoveryIdentity>(),Arg.Any<CancellationToken>()).Returns<RecoveryPerson?>(_=>throw new InvalidOperationException("synthetic sensitive value"));var r=await f.Flow.StartAsync(Identity(),"192.0.2.1");Assert.Equal(RecoveryStep.Unavailable,r.Step);Assert.Null(r.Message);Assert.DoesNotContain("000000000",Identity().ToString());}
+    [Theory]
+    [InlineData(RecoveryBindResult.PendingReset, RecoveryStep.Unknown, RecoveryNotice.None)]
+    [InlineData(RecoveryBindResult.RateLimited, RecoveryStep.Identity, RecoveryNotice.RateLimited)]
+    [InlineData(RecoveryBindResult.Expired, RecoveryStep.Identity, RecoveryNotice.Expired)]
+    public async Task A_pending_reset_is_not_reported_as_too_many_identity_attempts(RecoveryBindResult binding, RecoveryStep step, RecoveryNotice notice)
+    {
+        var f = new Fixture(); f.Store.BindResult = binding;
+        var result = await f.Flow.StartAsync(Identity(), "192.0.2.1");
+        Assert.Equal(step, result.Step); Assert.Equal(notice, result.Notice);
+        await f.Directory.DidNotReceive().ResetAsync(Arg.Any<RecoveryDirectoryAccount>(),Arg.Any<string>(),Arg.Any<CancellationToken>());
+    }
     private sealed class Clock:TimeProvider {public DateTimeOffset Utc=new(2026,11,10,12,0,0,TimeSpan.Zero);public override DateTimeOffset GetUtcNow()=>Utc;}
     private sealed class MemoryStore:IAccountRecoveryRequestStore
     {
-        public readonly Dictionary<Guid,RecoveryRequest> Rows=[];public bool Full;
+        public readonly Dictionary<Guid,RecoveryRequest> Rows=[];public bool Full; public RecoveryBindResult BindResult = RecoveryBindResult.Bound;
         public Task<bool> AddAsync(RecoveryRequest row,DateTime now,CancellationToken ct=default){if(Full)return Task.FromResult(false);Rows.Add(row.Id,row);return Task.FromResult(true);}
         public Task<RecoveryRequest?> FindAsync(string hash,CancellationToken ct=default)=>Task.FromResult(Rows.Values.SingleOrDefault(x=>x.TicketHash==hash));
-        public Task<bool> BindAsync(Guid id,RecoveryPerson p,RecoveryDirectoryAccount a,RecoveryQuestion q,DateTime now,CancellationToken ct=default)=>Task.FromResult(Rows[id].Bind(p,a,q,now));
+        public Task<RecoveryBindResult> BindAsync(Guid id,RecoveryPerson p,RecoveryDirectoryAccount a,RecoveryQuestion q,DateTime now,CancellationToken ct=default)=>Task.FromResult(BindResult != RecoveryBindResult.Bound ? BindResult : Rows[id].Bind(p,a,q,now) ? RecoveryBindResult.Bound : RecoveryBindResult.Expired);
         public Task<bool> BeginAnswerAsync(Guid id,DateTime now,CancellationToken ct=default)=>Task.FromResult(Rows[id].BeginAnswer(now));
         public Task FinishAnswerAsync(Guid id,bool v,CancellationToken ct=default){Rows[id].FinishAnswer(v);return Task.CompletedTask;}
         public Task<bool> ClaimResetAsync(Guid id,DateTime now,CancellationToken ct=default)=>Task.FromResult(Rows[id].ClaimReset(now));
