@@ -66,11 +66,11 @@ public sealed class ElementsMigratedHousingReader(IConfiguration configuration)
                 AND property.OriginalPropertyID=crosswalk.PropertyID
             WHERE v.TermCalendarID=@TermId AND v.Type='Student'
                 AND LTRIM(RTRIM(legacyRoom.Building)) NOT IN ('Commuter','Commuter Dorm')
-                -- A deliberate assignment/deallocation in the current room catalog
-                -- supersedes the original CAMS assignment. Old reinitialization
-                -- tombstones belong to deleted rooms and do not suppress migrations.
+                -- Deallocation hard-deletes the current row. Elements' temporal
+                -- history retains its authority over stale CAMS data. Only the
+                -- current room catalog counts; reinitialized old rooms do not.
                 AND NOT EXISTS (
-                    SELECT 1 FROM StudentLife.HousingPeriodRoomAssignments currentAssignment
+                    SELECT 1 FROM StudentLife.HousingPeriodRoomAssignments FOR SYSTEM_TIME ALL AS currentAssignment
                     JOIN StudentLife.HousingPeriodRooms currentRoom
                       ON currentRoom.HousingPeriodRoomID=currentAssignment.HousingPeriodRoomID
                      AND currentRoom.HousingPeriodID=@PeriodId AND currentRoom.IsDeleted=0
