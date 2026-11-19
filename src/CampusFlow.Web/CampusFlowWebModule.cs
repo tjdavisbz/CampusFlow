@@ -151,6 +151,7 @@ public class CampusFlowWebModule : AbpModule
         context.Services.AddTransient<IBillApprovalMailSender, AzureBillApprovalMailSender>();
         context.Services.AddTransient<ICurrentStudentView, CurrentStudentView>();
         context.Services.AddTransient<CampusFlow.AdvisorPortal.ICurrentSchedulerView, CurrentSchedulerView>();
+        context.Services.AddTransient<CampusFlow.AccountRecovery.IAccountRecoveryWorkflow, CampusFlow.Web.AccountRecovery.AccountRecoveryWorkflow>();
         context.Services.AddHttpContextAccessor();
         context.Services.AddTransient<CampusFlow.Web.Students.IStudentTermSelection, CampusFlow.Web.Students.StudentTermSelection>();
         context.Services.Configure<PayflowOptions>(configuration.GetSection(PayflowOptions.SectionName));

@@ -1,4 +1,5 @@
 using CampusFlow.CostTypes;
+using CampusFlow.AccountRecovery;
 using CampusFlow.ClearanceResets;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
@@ -35,6 +36,8 @@ public class CampusFlowDbContext :
     ITenantManagementDbContext,
     IIdentityDbContext
 {
+    public DbSet<RecoveryRequest> AccountRecoveryRequests { get; set; }
+    public DbSet<RecoveryVerification> AccountRecoveryVerifications { get; set; }
     public DbSet<ClearanceResetConfiguration> ClearanceResetConfigurations { get; set; }
     public DbSet<ClearanceResetRun> ClearanceResetRuns { get; set; }
     public DbSet<BibliuConfiguration> BibliuConfigurations { get; set; }
@@ -433,6 +436,31 @@ public class CampusFlowDbContext :
             b.Property(x => x.ExternalTermId).IsRequired().HasMaxLength(64);
             b.HasOne<StudentProfile>().WithMany().HasForeignKey(x => x.StudentProfileId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.TenantId, x.StudentProfileId, x.ExternalTermId }).IsUnique();
+        });
+
+        builder.Entity<RecoveryVerification>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "AccountRecoveryVerifications", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Question).HasMaxLength(500);
+            b.Property(x => x.AnswerHash).HasMaxLength(160);
+            b.Property(x => x.SourceFingerprint).IsRequired().HasMaxLength(64);
+            b.HasIndex(x => new { x.TenantId, x.StudentUid }).IsUnique();
+        });
+        builder.Entity<RecoveryRequest>(b =>
+        {
+            b.ToTable(CampusFlowConsts.DbTablePrefix + "AccountRecoveryRequests", CampusFlowConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.TicketHash).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ClientHash).IsRequired().HasMaxLength(64);
+            b.Property(x => x.UserPrincipalName).HasMaxLength(254);
+            b.Property(x => x.VerificationFingerprint).HasMaxLength(64);
+            b.Property(x => x.State).IsRequired().HasMaxLength(24);
+            b.Ignore(x => x.Person);
+            b.HasIndex(x => new { x.TenantId, x.TicketHash }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.ClientHash, x.CreationTime });
+            b.HasIndex(x => new { x.TenantId, x.StudentUid, x.CreationTime });
+            b.HasIndex(x => new { x.TenantId, x.DirectoryObjectId, x.CreationTime });
         });
 
         builder.Entity<CampusFlow.MealPlanTaxes.MealPlanTaxCharge>(b =>
