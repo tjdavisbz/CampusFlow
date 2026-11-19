@@ -225,9 +225,15 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
             if (ReadInt(property,"housingPeriodID") != periodId) throw new InvalidOperationException("Housing period changed.");
             matches.AddRange(property["rooms"]!.AsArray().OfType<JsonObject>().Where(x => ReadInt(x,"housingPeriodRoomID") == roomId));
         }
-        if (matches.Count != 1 || matches[0]["roomRate"] is null || matches[0]["perPersonRate"] is null ||
-            matches[0]["roomRate"]!.GetValue<decimal>() != 0 || matches[0]["perPersonRate"]!.GetValue<decimal>() != 0)
-            throw new InvalidOperationException("Migrated assignment conversion requires a verified zero-rent room. Review Elements room pricing first.");
+        // Elements leaves the unused rate component null for some room types.
+        // Require both fields, at least one explicit zero, and no nonzero component.
+        // Two missing/null values are not evidence of free rent.
+        static bool ZeroOrUnused(JsonNode? value) => value is null ||
+            value is JsonValue number && number.TryGetValue<decimal>(out var rate) && rate == 0;
+        if (matches.Count != 1 || !matches[0].ContainsKey("roomRate") || !matches[0].ContainsKey("perPersonRate") ||
+            matches[0]["roomRate"] is null && matches[0]["perPersonRate"] is null ||
+            !ZeroOrUnused(matches[0]["roomRate"]) || !ZeroOrUnused(matches[0]["perPersonRate"]))
+            throw new HousingPreflightException("rent-setup");
     }
 
     private async Task ChangeAsync(string action, int studentUid, int periodId, int periodRoomId,

@@ -37,7 +37,41 @@ public class MigratedAssignmentChangeTests
     public async Task Nonzero_vendor_rent_blocks_conversion_before_assignment()
     {
         var http = new Handler { Rent = 100 };
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Writer(http).DeallocateAsync(11, 2, 31));
+        await Assert.ThrowsAsync<HousingPreflightException>(() => Writer(http).DeallocateAsync(11, 2, 31));
+        Assert.Empty(http.Writes);
+    }
+
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(null, 0, true)]
+    [InlineData(0, null, true)]
+    [InlineData(null, null, false)]
+    [InlineData(1, 0, false)]
+    [InlineData(null, 1, false)]
+    [InlineData(1, null, false)]
+    [InlineData(-1, 0, false)]
+    [InlineData(0, -1, false)]
+    public async Task Conversion_requires_explicit_zero_and_no_nonzero_component(int? roomRate, int? personRate, bool allowed)
+    {
+        var http = new Handler { RoomRent = roomRate, PersonRent = personRate };
+        if (allowed)
+        {
+            await Writer(http).DeallocateAsync(11, 2, 31);
+            Assert.Equal(new[] { "assign", "deallocate" }, http.Writes);
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<HousingPreflightException>(() => Writer(http).DeallocateAsync(11, 2, 31));
+            Assert.Equal("rent-setup", HousingApplyFailure.Code(error));
+            Assert.Empty(http.Writes);
+        }
+    }
+
+    [Fact]
+    public async Task Missing_rate_field_is_not_a_verified_zero()
+    {
+        var http = new Handler { MissingRoomRate = true };
+        await Assert.ThrowsAsync<HousingPreflightException>(() => Writer(http).DeallocateAsync(11, 2, 31));
         Assert.Empty(http.Writes);
     }
 
@@ -55,7 +89,8 @@ public class MigratedAssignmentChangeTests
 
     private sealed class Handler : HttpMessageHandler
     {
-        public bool Assigned, EverAssigned; public decimal Rent; public List<string> Writes = [];
+        public bool Assigned, EverAssigned, MissingRoomRate; public decimal Rent;
+        public decimal? RoomRent = 0, PersonRent = 0; public List<string> Writes = [];
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             var path = request.RequestUri!.AbsolutePath; string data;
@@ -67,7 +102,13 @@ public class MigratedAssignmentChangeTests
             else if (path.Contains("/get-assigned-rooms/"))
                 data = Assigned ? """[{"housingPeriodID":2,"housingPeriodPropertyID":21,"building":"Savell Hall","roomName":"101"}]""" : "[]";
             else if (path.Contains("/search/")) data = """[{"housingPeriodID":2,"housingPeriodPropertyID":21}]""";
-            else data = """{"housingPeriodID":2,"housingPeriodPropertyID":21,"propertyName":"Savell Hall","rooms":[{"housingPeriodRoomID":31,"housingPeriodID":2,"roomName":"101","occupancy":2,"roomRate":RENT,"perPersonRate":0}]}""".Replace("RENT", Rent.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            else
+            {
+                data = """{"housingPeriodID":2,"housingPeriodPropertyID":21,"propertyName":"Savell Hall","rooms":[{"housingPeriodRoomID":31,"housingPeriodID":2,"roomName":"101","occupancy":2,"roomRate":ROOM_RENT,"perPersonRate":PERSON_RENT}]}""";
+                if (MissingRoomRate) data = data.Replace("\"roomRate\":ROOM_RENT,", "");
+                data = data.Replace("ROOM_RENT", (Rent != 0 ? Rent : RoomRent)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null")
+                    .Replace("PERSON_RENT", PersonRent?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null");
+            }
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"isSuccess\":true,\"data\":" + data + "}", Encoding.UTF8, "application/json") });
         }
     }

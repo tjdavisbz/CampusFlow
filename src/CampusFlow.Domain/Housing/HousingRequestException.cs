@@ -12,6 +12,13 @@ public sealed class HousingRequestException(string failureCode, int statusCode)
     public int StatusCode { get; } = statusCode;
 }
 
+// Validation before a vendor write is distinct from an HTTP response.
+public sealed class HousingPreflightException(string failureCode)
+    : InvalidOperationException(HousingApplyFailure.Description(failureCode))
+{
+    public string FailureCode { get; } = failureCode;
+}
+
 public static class HousingApplyFailure
 {
     public static string ResponseCode(int status, string body) =>
@@ -23,6 +30,7 @@ public static class HousingApplyFailure
     public static string Code(Exception error) => error switch
     {
         HousingRequestException request => request.FailureCode,
+        HousingPreflightException validation => validation.FailureCode,
         OperationCanceledException => "interrupted",
         TimeoutException => "timeout",
         HttpRequestException => "connection",
