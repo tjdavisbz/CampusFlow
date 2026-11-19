@@ -219,6 +219,7 @@
             state = status.state; render();
             if (state.recoveryJobId === ticket.dispatchId) {
                 if (state.recoveryJobStatus === 'Completed' && state.applyStatus === 'Completed') {
+                    removedOccupants.clear();
                     message('The saved commuter plan was applied and verified. Existing billing and prior run history were preserved. No separate Apply is needed.');
                     return;
                 }
@@ -289,7 +290,7 @@
             await reloadAfterFailure();
             throw error;
         }
-        dirty = false; selected.clear(); render();
+        removedOccupants.clear(); dirty = false; selected.clear(); render();
         message(`Room assignments and CampusFlow housing charges were applied to ${root.dataset.environment} Elements and verified.`);
     });
     el('clear').onclick = () => {
