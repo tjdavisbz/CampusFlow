@@ -100,11 +100,38 @@ public sealed class ElementsPaymentPlanFeeService(IConfiguration configuration,
             throw new InvalidOperationException("Elements returned fee entries outside the requested student/batch.");
         return rows;
     }
-    private static int? Batch(List<JsonObject> rows)
+    internal static bool ValidateBatch(string comment, string status, int sourceModule, bool termBased)
     {
-        var matches = rows.Where(x => x["comment"]?.GetValue<string>() == BatchComment).ToList();
-        if (matches.Count > 1) throw new InvalidOperationException("Multiple payment-plan fee batches need review.");
-        return matches.SingleOrDefault()?["batchMasterID"]?.GetValue<int>();
+        if (!string.Equals(comment.Trim(), BatchComment, StringComparison.OrdinalIgnoreCase) || sourceModule != 2 || !termBased)
+            throw new InvalidOperationException("The payment-plan fee batch identity needs Student Billing review.");
+        return status == "Open";
+    }
+    private async Task<int?> Batch(List<JsonObject> rows, CancellationToken ct)
+    {
+        var matches = rows.Where(x => string.Equals(x["comment"]?.GetValue<string>()?.Trim(), BatchComment, StringComparison.OrdinalIgnoreCase))
+            .Select(x => x["batchMasterID"]?.GetValue<int>() ?? 0).Distinct().ToList();
+        var open = new List<int>();
+        foreach (var id in matches)
+        {
+            if (id <= 0) throw new InvalidOperationException("Invalid fee batch identifier.");
+            var found = false;
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                await using var c = await Open(ct);
+                await using var q = new SqlCommand("SELECT Comment,Status,SourceModuleID,TermBased FROM dbo.BatchMaster WHERE BatchMasterID=@Id", c) { CommandTimeout = 15 };
+                q.Parameters.AddWithValue("@Id", id);
+                await using var row = await q.ExecuteReaderAsync(ct);
+                if (await row.ReadAsync(ct))
+                {
+                    if (ValidateBatch(row.GetString(0), row.GetString(1), row.GetInt32(2), Convert.ToBoolean(row.GetValue(3)))) open.Add(id);
+                    found = true; break;
+                }
+                await Task.Delay(500, ct);
+            }
+            if (!found) throw new InvalidOperationException("The new fee batch is still updating. Reload your bill before retrying; no fee was added.");
+        }
+        if (open.Count > 1) throw new InvalidOperationException("Multiple open payment-plan fee batches need review.");
+        return open.Count == 0 ? null : open[0];
     }
     public async Task EnsureAsync(int studentUid, int termId, decimal expectedFee, CancellationToken ct = default)
     {
@@ -116,11 +143,11 @@ public sealed class ElementsPaymentPlanFeeService(IConfiguration configuration,
         await using var pg = new NpgsqlConnection(configuration.GetConnectionString("Default")); await pg.OpenAsync(ct);
         await using var tx = await pg.BeginTransactionAsync(ct);
         await using (var gate = new NpgsqlCommand("SELECT pg_advisory_xact_lock(534653,55)", pg, tx)) await gate.ExecuteNonQueryAsync(ct);
-        var batch = Batch(await Batches(token, ct));
+        var batch = await Batch(await Batches(token, ct), ct);
         if (batch is null)
         {
             await Send(HttpMethod.Post, "/api/billing/cashier-entry/batches/batch-master", token, new { campus = 0, comment = BatchComment, mod = 2, termBased = true }, ct);
-            batch = Batch(await Batches(token, ct)) ?? throw new InvalidOperationException("The fee batch creation could not be confirmed. No fee was sent.");
+            batch = await Batch(await Batches(token, ct), ct) ?? throw new InvalidOperationException("The fee batch creation could not be confirmed. No fee was sent.");
         }
         if (batch <= 0) throw new InvalidOperationException("Invalid fee batch identity.");
         await tx.CommitAsync(ct);
