@@ -25,7 +25,7 @@
         <div>
             <span class="eyebrow">Registration checkout</span>
             <h1>@(Model.IsAlreadyAccepted ? (Model.RegistrationComplete ? "Your registration is complete!" : "Your bill has been approved") : "Review and approve your bill")</h1>
-            @if (!Model.IsAlreadyAccepted) { <p>Confirm your classes, funding@(Model.RemainingBalance > 0 ? ", payment choice," : ",") and agreement in one guided review.</p> }
+            @if (!Model.IsAlreadyAccepted) { <p>Confirm your classes, funding@(Model.RequiresPaymentChoice ? ", payment choice," : ",") and agreement in one guided review.</p> }
             <a asp-page="/BillApprovalHistory">View bill approval history</a>
         </div>
         <div class="student-chip"><span>@Model.StudentName</span><strong>ID @Model.StudentId</strong></div>
@@ -79,14 +79,14 @@
             <section class="notice success" role="status"><i class="fa-regular fa-circle-check"></i><div><h2>Bill approval status</h2><p>@Model.StatusMessage</p></div></section>
         }
         <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
-        <nav class="stepper @(Model.RemainingBalance <= 0 ? "no-payment" : null)" aria-label="Bill approval progress">
+        <nav class="stepper @(!Model.RequiresPaymentChoice ? "no-payment" : null)" aria-label="Bill approval progress">
             <button class="active" type="button" data-step-target="review"><b>1</b><span>Review bill</span></button>
-            @if (Model.RemainingBalance > 0)
+            @if (Model.RequiresPaymentChoice)
             {
                 <button type="button" data-step-target="payment"><b>2</b><span>Payment choice</span></button>
             }
-            <button type="button" data-step-target="agreement"><b>@(Model.RemainingBalance > 0 ? 3 : 2)</b><span>Agreement</span></button>
-            <button type="button" data-step-target="finish"><b>@(Model.RemainingBalance > 0 ? 4 : 3)</b><span>Finish</span></button>
+            <button type="button" data-step-target="agreement"><b>@(Model.RequiresPaymentChoice ? 3 : 2)</b><span>Agreement</span></button>
+            <button type="button" data-step-target="finish"><b>@(Model.RequiresPaymentChoice ? 4 : 3)</b><span>Finish</span></button>
         </nav>
 
         <section class="term-banner"><div><span>Selected term</span><h2>@Model.TermName</h2></div><div><span>Registration</span><strong>@BillApprovalModel.Credits(Model.TotalCredits) credits · @Model.Courses.Count classes</strong></div></section>
@@ -94,7 +94,7 @@
         <div class="approval-layout">
             <div class="approval-main">
                 <section class="approval-step active" data-step="review">
-                    <div class="section-title"><div><span>Step 1</span><h2>Review your semester</h2></div><p>@(Model.RemainingBalance > 0 ? "Verify these details before choosing how to cover the balance." : "Verify these details before reviewing your agreement.")</p></div>
+                    <div class="section-title"><div><span>Step 1</span><h2>Review your semester</h2></div><p>@(Model.RequiresPaymentChoice ? "Verify these details before choosing how to cover the balance." : "Verify these details before reviewing your agreement.")</p></div>
                     <details open><summary><span><i class="fa-solid fa-calendar-days"></i>Class schedule</span><strong>@BillApprovalModel.Credits(Model.TotalCredits) credits</strong></summary>
                         <div class="review-list">@foreach (var course in Model.Courses) { <article><div><strong>@course.Department @course.CourseNumber-@course.Section</strong><span>@course.CourseName</span></div><b>@BillApprovalModel.Credits(course.Credits) cr</b></article> }</div>
                     </details>
@@ -117,10 +117,11 @@
                             <p>Contact Financial Aid if you need help reviewing or accepting an award.</p>
                         </aside>
                     }
-                    <button class="primary next" type="button" data-next="@(Model.RemainingBalance > 0 ? "payment" : "agreement")">@(Model.RemainingBalance > 0 ? "Continue to payment choice" : "Review agreement") <i class="fa-solid fa-arrow-right"></i></button>
+                    @if (Model.OverridePaymentPlan) { <p class="notice">Student Billing has approved your payment arrangements. Review your agreement to continue.</p> }
+                    <button class="primary next" type="button" data-next="@(Model.RequiresPaymentChoice ? "payment" : "agreement")">@(Model.RequiresPaymentChoice ? "Continue to payment choice" : "Review agreement") <i class="fa-solid fa-arrow-right"></i></button>
                 </section>
 
-                @if (Model.RemainingBalance > 0)
+                @if (Model.RequiresPaymentChoice)
                 {
                 <section class="approval-step" data-step="payment" hidden>
                     <div class="section-title"><div><span>Step 2</span><h2>Choose how to cover your balance</h2></div><p>Your selection will be recorded with this approval.</p></div>
@@ -200,7 +201,7 @@
                 }
 
                 <section class="approval-step" data-step="agreement" hidden>
-                    <div class="section-title"><div><span>Step @(Model.RemainingBalance > 0 ? 3 : 2)</span><h2>Terms and conditions</h2></div><p>A copy of this exact agreement will be preserved with your approval.</p></div>
+                    <div class="section-title"><div><span>Step @(Model.RequiresPaymentChoice ? 3 : 2)</span><h2>Terms and conditions</h2></div><p>A copy of this exact agreement will be preserved with your approval.</p></div>
                     <div class="agreement-copy">
                         @if (Model.Agreement is null)
                         {
@@ -213,16 +214,16 @@
                         }
                     </div>
                     <label class="agree-check"><input type="checkbox" id="agreementAccepted"><span>I have reviewed and agree to the terms and conditions for @Model.TermName.</span></label>
-                    <div class="step-actions"><button class="secondary" type="button" data-next="@(Model.RemainingBalance > 0 ? "payment" : "review")">Back</button><button class="primary" type="button" data-next="finish" disabled id="agreementContinue">Continue <i class="fa-solid fa-arrow-right"></i></button></div>
+                    <div class="step-actions"><button class="secondary" type="button" data-next="@(Model.RequiresPaymentChoice ? "payment" : "review")">Back</button><button class="primary" type="button" data-next="finish" disabled id="agreementContinue">Continue <i class="fa-solid fa-arrow-right"></i></button></div>
                 </section>
 
                 <section class="approval-step" data-step="finish" hidden>
-                    <div class="finish-icon"><i class="fa-solid fa-file-circle-check"></i></div><span class="eyebrow">Step @(Model.RemainingBalance > 0 ? 4 : 3)</span><h2>Ready for final approval</h2><p>Your review is complete. Final approval will securely record your agreement and prepare a copy for your records.</p>
+                    <div class="finish-icon"><i class="fa-solid fa-file-circle-check"></i></div><span class="eyebrow">Step @(Model.RequiresPaymentChoice ? 4 : 3)</span><h2>Ready for final approval</h2><p>Your review is complete. Final approval will securely record your agreement and prepare a copy for your records.</p>
                     <form method="post" data-processing-form>
                         <input type="hidden" name="ReviewVersion" value="@Model.CurrentReviewVersion" />
-                        <input type="hidden" asp-for="PaymentChoiceInput" id="paymentChoiceInput" value="@(Model.RemainingBalance <= 0 ? "NoBalanceDue" : "PayNow")" />
+                        <input type="hidden" asp-for="PaymentChoiceInput" id="paymentChoiceInput" value="@(!Model.RequiresPaymentChoice ? "NoBalanceDue" : "PayNow")" />
                         <input type="hidden" asp-for="AgreementAcceptedInput" id="agreementAcceptedInput" value="false" />
-                        <button class="primary final-button" type="submit" id="finalApprovalButton" data-has-balance="@(Model.RemainingBalance > 0 ? "true" : "false")" disabled><i class="fa-solid fa-lock"></i> Click Here to Approve Your Bill &amp; Complete Registration!</button>
+                        <button class="primary final-button" type="submit" id="finalApprovalButton" data-has-balance="@(Model.RequiresPaymentChoice ? "true" : "false")" disabled><i class="fa-solid fa-lock"></i> Click Here to Approve Your Bill &amp; Complete Registration!</button>
                     </form>
                     <small class="final-help">Please keep this page open while your agreement is recorded.</small>
                     <button class="link-button" type="button" data-next="agreement">Back to agreement</button>

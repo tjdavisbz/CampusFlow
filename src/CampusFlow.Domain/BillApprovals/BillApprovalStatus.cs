@@ -15,7 +15,8 @@ public enum BillPaymentChoice
     None = 0,
     PayNow = 1,
     DeferredPaymentPlan = 2,
-    NoBalanceDue = 3
+    NoBalanceDue = 3,
+    PaymentPlanOverride = 4
 }
 
 public enum BillArtifactOperationStatus

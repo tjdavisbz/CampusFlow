@@ -120,6 +120,7 @@ public class IndexModel : CampusFlowPageModel
     public StudentInformationSystemTerm? CurrentTerm { get; private set; }
     public IReadOnlyList<DashboardTermOption> DashboardTerms { get; private set; } = [];
     public IReadOnlyList<BillApprovalTermOption> OpenBillApprovalTerms { get; private set; } = [];
+    public bool PrioritizeRegistration => OpenBillApprovalTerms.Count > 0;
     public IEnumerable<BillApprovalTermOption> OtherBillApprovalTerms =>
         OpenBillApprovalTerms.Where(x => x.ExternalTermId != CurrentTerm?.ExternalTermId);
 
@@ -377,6 +378,8 @@ public class IndexModel : CampusFlowPageModel
                 journey.BookstoreUrl = CampusStoreLinks.ForCourses(
                     _configuration, CurrentTenant.Name, term.DisplayName, scheduledCourses);
             }
+            journey.IsAwaitingAdvisor = await LazyServiceProvider.LazyGetRequiredService<IBillApprovalCourseReadiness>()
+                .HasPendingAsync(profile.Id, profile.ExternalStudentId, term.ExternalTermId, HttpContext.RequestAborted);
             var eligibleTerms = await _courseSelection.GetEligibleTermsAsync();
             journey.CourseSelectionEnabled = eligibleTerms.Any(x => x.ExternalTermId == term.ExternalTermId);
             if (journey.CourseSelectionEnabled)
@@ -385,7 +388,7 @@ public class IndexModel : CampusFlowPageModel
                 // A course-selection response must not erase enrollment already reported
                 // by the schedule, including courses entered directly in Elements.
                 journey.HasSelectedCourses |= selection.Registrations.Count > 0;
-                journey.IsAwaitingAdvisor = selection.Registrations.Any(x => x.NeedsReview);
+                journey.IsAwaitingAdvisor |= selection.Registrations.Any(x => x.NeedsReview);
             }
         }
         catch (Exception exception) when (!HttpContext.RequestAborted.IsCancellationRequested)
@@ -515,6 +518,10 @@ public class IndexModel : CampusFlowPageModel
                 ? UnavailableBillStep("Bill approval")
                 : BillApproved
                 ? new("Bill approval", RegistrationComplete ? BillApprovalStudentCompletion.CompleteMessage : BillApprovalStudentCompletion.PendingMessage, "complete", billUrl, "View agreement")
+                : HasUnavailableData
+                ? new("Bill approval", "Registration information could not be verified. Please try again.", "disabled", null, "Try again later")
+                : IsAwaitingAdvisor
+                ? new("Bill approval", "Your selected courses are awaiting scheduler approval.", "disabled", null, "Scheduler approval required")
                 : BillApprovalAccessRules.HasBlockingPreviousBalance(PreviousBalance)
                 ? new("Bill approval", "Your previous balance needs attention before bill approval.", "disabled", null, "Balance required")
                 : HousingRequired && !HasHousingAssignment

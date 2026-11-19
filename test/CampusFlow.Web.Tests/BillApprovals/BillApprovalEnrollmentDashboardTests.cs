@@ -52,6 +52,7 @@ public class BillApprovalEnrollmentDashboardTests
         var user = Substitute.For<ICurrentUser>(); user.Id.Returns(Guid.NewGuid());
         var clock = Substitute.For<IClock>(); clock.Now.Returns(new DateTime(2026, 11, 5));
         var lazy = Substitute.For<IAbpLazyServiceProvider>();
+        lazy.LazyGetRequiredService<IBillApprovalCourseReadiness>().Returns(Substitute.For<IBillApprovalCourseReadiness>());
         lazy.LazyGetRequiredService<ICurrentTenant>().Returns(tenant);
         lazy.LazyGetRequiredService<ICurrentUser>().Returns(user);
         lazy.LazyGetRequiredService<IClock>().Returns(clock);

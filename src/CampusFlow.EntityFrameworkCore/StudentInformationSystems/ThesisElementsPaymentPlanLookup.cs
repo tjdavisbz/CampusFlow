@@ -26,9 +26,12 @@ public sealed class ThesisElementsPaymentPlanLookup : IStudentInformationSystemP
             SELECT
                 ISNULL(FTPT.DisplayText, '') AS FTPTStatus,
                 ISNULL(Attendance.DisplayText, '') AS AttendanceType,
-                CASE WHEN Resident.DisplayText = 'Commuter' THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS Commuter
+                CASE WHEN Resident.DisplayText = 'Commuter' THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS Commuter,
+                ISNULL(U.uDefBit3, CAST(0 AS bit)) AS OverridePaymentPlan,
+                (SELECT FieldDisplayName FROM dbo.CAMSUserDefinedRefFlds WHERE CAMSModuleID=12 AND FieldPhysicalName='uDefBit3') AS OverrideLabel
             FROM Student S
             LEFT JOIN StudentStatus SS ON SS.StudentUID = S.StudentUID AND SS.TermCalendarID = @TermCalendarID
+            LEFT JOIN dbo.StudentStatusUDef U ON U.StudentStatusID=SS.StudentStatusID
             LEFT JOIN Glossary FTPT ON FTPT.UniqueID = SS.FTPTStatusID
             LEFT JOIN Glossary Attendance ON Attendance.UniqueID = S.AttendanceTypeID
             LEFT JOIN Glossary Resident ON Resident.UniqueID = SS.ResidentCommuterID
@@ -41,6 +44,10 @@ public sealed class ThesisElementsPaymentPlanLookup : IStudentInformationSystemP
         command.Parameters.Add("@TermCalendarID", SqlDbType.Int).Value = termId;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken)) return null;
-        return new StudentPaymentPlanContext(reader.GetString(0).Trim(), reader.GetString(1).Trim(), reader.GetBoolean(2));
+        if (reader.IsDBNull(4) || !string.Equals(reader.GetString(4).Trim(), "Override Pay Plan?", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The payment-plan override field mapping needs review.");
+        var result = new StudentPaymentPlanContext(reader.GetString(0).Trim(), reader.GetString(1).Trim(), reader.GetBoolean(2), reader.GetBoolean(3));
+        if (await reader.ReadAsync(cancellationToken)) throw new InvalidOperationException("Multiple student term status records require review.");
+        return result;
     }
 }

@@ -174,6 +174,8 @@ public class BillApprovalModel : CampusFlowPageModel
     public decimal ConvenienceFeePercent => _payflowOptions.ConvenienceFeeRate * 100m;
     [BindProperty] public string? ReviewVersion { get; set; }
     public string CurrentReviewVersion { get; private set; } = string.Empty;
+    public bool OverridePaymentPlan { get; private set; }
+    public bool RequiresPaymentChoice => RemainingBalance > 0 && !OverridePaymentPlan;
     public decimal PaymentPlanFee => PaymentPlan?.PaymentPlanFee ?? 0m;
     public decimal DeferredBalance => PaymentPlan?.RemainingBalance ?? RemainingBalance;
     public decimal DeferredDueToday => PaymentPlan?.Installments.FirstOrDefault()?.Amount ?? 0m;
@@ -261,6 +263,13 @@ public class BillApprovalModel : CampusFlowPageModel
             if (ExternalTermId is not null)
                 await _selectedTerm.ResolveAsync(profile, termLookup, ExternalTermId, cancellationToken: HttpContext.RequestAborted);
             var alreadyApproved = ExternalTermId is not null && approvedTerms.Contains(ExternalTermId);
+            if (!alreadyApproved && await LazyServiceProvider.LazyGetRequiredService<IBillApprovalCourseReadiness>()
+                .HasPendingAsync(profile.Id, profile.ExternalStudentId, ExternalTermId!, HttpContext.RequestAborted))
+            {
+                IsUnavailable = true;
+                UnavailableReason = "Your selected courses are awaiting scheduler approval. Your scheduler must finish reviewing them before you can approve your bill.";
+                return;
+            }
             var housing = !alreadyApproved && profile.Provider == StudentInformationSystemProvider.ThesisElements
                 ? await _mealPlans.GetAsync(ExternalTermId) : null;
             _reviewedMealChoice = housing;
@@ -327,8 +336,9 @@ public class BillApprovalModel : CampusFlowPageModel
                 if (context is not null)
                 {
                     var policy = await GetCurrentPaymentPlanPolicyAsync(termConfiguration?.PaymentPlanPolicyId);
-                    PaymentPlan = StudentPaymentPlanCalculator.Calculate(
-                        AccountBalance, PendingAidTotal, TermName, context, policy);
+                    OverridePaymentPlan = context.OverridePaymentPlan;
+                    if (!OverridePaymentPlan)
+                        PaymentPlan = StudentPaymentPlanCalculator.Calculate(AccountBalance, PendingAidTotal, TermName, context, policy);
                 }
             }
 
@@ -339,7 +349,7 @@ public class BillApprovalModel : CampusFlowPageModel
                 Charges = Charges.Where(x => !x.IsVoided).OrderBy(x => x.Description).ThenBy(x => x.BalanceChange)
                     .Select(x => new { x.Description, Date = x.TransactionDate.Date, x.Debit, x.Credit, x.BalanceChange, x.IsPending }),
                 Aid = Aid.Where(IsEligibleAid).OrderBy(x => x.Description).ThenBy(x => x.Amount).Select(x => new { x.Description, x.Amount, x.AwardStatus }),
-                PaymentPlan, AgreementId = Agreement?.Id, AgreementVersion = Agreement?.Version, AgreementHtml = Agreement?.ContentHtml }))));
+                PaymentPlan, OverridePaymentPlan, AgreementId = Agreement?.Id, AgreementVersion = Agreement?.Version, AgreementHtml = Agreement?.ContentHtml }))));
             if (!string.IsNullOrWhiteSpace(ExternalTermId))
             {
                 IsAlreadyAccepted = await _billApprovals.AnyAsync(x =>
@@ -414,6 +424,7 @@ public class BillApprovalModel : CampusFlowPageModel
             ModelState.AddModelError(string.Empty, "Online payments are not configured yet.");
         if (RemainingBalance <= 0)
             ModelState.AddModelError(string.Empty, "There is no remaining balance to pay.");
+        if (OverridePaymentPlan) return BadRequest("A payment is not required to approve this bill.");
         if (PaymentPurposeInput == "Deferred" && PaymentPlan is null)
             ModelState.AddModelError(string.Empty, "The deferred payment plan could not be calculated. No payment was made.");
         if (!int.TryParse(ExternalTermId, out var termCalendarId))
@@ -529,12 +540,14 @@ public class BillApprovalModel : CampusFlowPageModel
             return Page();
         }
 
-        var paymentChoice = RemainingBalance <= 0
+        var paymentChoice = OverridePaymentPlan
+            ? BillPaymentChoice.PaymentPlanOverride
+            : RemainingBalance <= 0
             ? BillPaymentChoice.NoBalanceDue
             : PaymentChoiceInput == "Deferred"
                 ? BillPaymentChoice.DeferredPaymentPlan
                 : BillPaymentChoice.PayNow;
-        if (RemainingBalance > 0 && paymentChoice == BillPaymentChoice.PayNow)
+        if (RequiresPaymentChoice && paymentChoice == BillPaymentChoice.PayNow)
         {
             ModelState.AddModelError(string.Empty, "The remaining balance must be paid before the bill can be approved.");
             return Page();

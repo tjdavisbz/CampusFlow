@@ -45,4 +45,21 @@ public class BillApprovalJourneyControlsTests
         Assert.NotNull(journey.Steps.Single(x => x.Title == "Course selection").Url);
         Assert.NotNull(journey.Steps.Single(x => x.Title == "Meal plan").Url);
     }
+    [Fact]
+    public void Pending_scheduler_review_blocks_bill_even_when_course_selection_is_closed()
+    {
+        var journey = Journey(); journey.BillApprovalEnabled = true; journey.MealPlanSelected = true;
+        journey.CourseSelectionEnabled = false; journey.HasSelectedCourses = true; journey.IsAwaitingAdvisor = true;
+        journey.BuildSteps();
+        Assert.Null(journey.Steps.Single(x => x.Title == "Bill approval").Url);
+        Assert.Equal("Scheduler approval required", journey.Steps.Single(x => x.Title == "Bill approval").ActionLabel);
+    }
+
+    [Fact]
+    public void Approved_courses_and_open_bill_keep_approval_available()
+    {
+        var journey = Journey(); journey.BillApprovalEnabled = true; journey.MealPlanSelected = true;
+        journey.HasSelectedCourses = true; journey.BuildSteps();
+        Assert.NotNull(journey.Steps.Single(x => x.Title == "Bill approval").Url);
+    }
 }
