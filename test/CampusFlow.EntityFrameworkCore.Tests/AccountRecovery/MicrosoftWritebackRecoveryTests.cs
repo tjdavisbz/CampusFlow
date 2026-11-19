@@ -51,6 +51,27 @@ public sealed class MicrosoftWritebackRecoveryTests
         Assert.Equal("newPassword",Assert.Single(h.Body!).Key);Assert.Equal("Synthetic-Password-947!",h.Body!["newPassword"]!.GetValue<string>());
     }
     [Theory]
+    [InlineData("?aadgdc=DUB02P&aadgsu=ssprprod-a")]
+    [InlineData("?aadgsu=ssprprod-a&aadgdc=DUB02P")]
+    [InlineData("?aadgdc=AM6")]
+    [InlineData("?aadgsu=ssprprod-a")]
+    public async Task Documented_status_routing_is_preserved_and_confirmation_never_resubmits(string query)
+    {
+        var(a,h)=Setup();h.Location+=query;h.States.Enqueue("running");h.States.Enqueue("succeeded");
+        Assert.Equal(RecoveryPasswordWriteResult.Accepted,await a.ResetAsync(Account(),"Synthetic-Password-947!"));
+        Assert.Equal(1,h.Writes);Assert.Equal(2,h.Polls);Assert.Equal(query,h.PollQuery);
+    }
+    [Theory]
+    [InlineData("?token=secret")][InlineData("?aadgdc=A&aadgdc=B")][InlineData("?aadgsu=x&redirect_uri=https://untrusted.invalid")]
+    [InlineData("?aadgdc=")][InlineData("?aadgdc=%0d%0aHost:evil")][InlineData("?aadgsu=https%3A%2F%2Fevil.invalid")]
+    [InlineData("?AADGDC=A")][InlineData("?aadgdc=A&")]
+    public async Task Unrecognized_or_unsafe_routing_never_triggers_a_status_request(string query)
+    {
+        var(a,h)=Setup();h.Location+=query;
+        Assert.Equal(RecoveryPasswordWriteResult.Unknown,await a.ResetAsync(Account(),"Synthetic-Password-947!"));
+        Assert.Equal(1,h.Writes);Assert.Equal(0,h.Polls);
+    }
+    [Theory]
     [InlineData("PasswordRecovery:Enabled","false")][InlineData("PasswordRecovery:Backend","Cloud")]
     [InlineData("PasswordRecovery:EnableNonProductionWrites","false")][InlineData("PasswordRecovery:EnableProductionWrites","true")]
     [InlineData("ASPNETCORE_ENVIRONMENT","Production")]
@@ -108,7 +129,7 @@ public sealed class MicrosoftWritebackRecoveryTests
 
     private sealed class Handler:HttpMessageHandler
     {
-        internal int Calls,Writes,Polls;internal string? WritePath;internal JsonObject? Body;internal bool LoseWrite,CancelWrite;
+        internal int Calls,Writes,Polls;internal string? WritePath,PollQuery;internal JsonObject? Body;internal bool LoseWrite,CancelWrite;
         internal string? Location="https://graph.microsoft.com/v1.0/users/"+Student.ToString("D")+"/authentication/operations/synthetic-op";
         internal string OperationId="synthetic-op",FallbackState="succeeded";internal Queue<string> States=new();
         internal HttpStatusCode WriteStatus=HttpStatusCode.Accepted,RoleStatus=HttpStatusCode.OK,PollStatus=HttpStatusCode.OK;
@@ -125,7 +146,7 @@ public sealed class MicrosoftWritebackRecoveryTests
                 var response=Response(WriteStatus,new(){["error"]=new JsonObject{["code"]="PasswordTooWeak",["message"]="Synthetic policy rejection"}});
                 if(Location is not null)response.Headers.Location=new Uri(Location);return response;
             }
-            if(request.RequestUri.AbsolutePath.Contains("/authentication/operations/")){Polls++;return Response(PollStatus,new(){["id"]=OperationId,["status"]=States.Count>0?States.Dequeue():FallbackState});}
+            if(request.RequestUri.AbsolutePath.Contains("/authentication/operations/")){Polls++;PollQuery=request.RequestUri.Query;return Response(PollStatus,new(){["id"]=OperationId,["status"]=States.Count>0?States.Dequeue():FallbackState});}
             if(request.RequestUri.AbsolutePath.EndsWith("/transitiveMemberOf")){AfterRoleRead?.Invoke();return Response(RoleStatus,Roles);}
             return Response(HttpStatusCode.OK,User);
         }

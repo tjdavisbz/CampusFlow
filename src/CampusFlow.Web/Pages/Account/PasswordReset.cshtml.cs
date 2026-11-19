@@ -151,7 +151,7 @@ public sealed class PasswordResetModel(IAccountRecoveryWorkflow workflow, IConfi
             RecoveryNotice.NotVerified => "We could not verify those details. Check the information and try again, or contact Nelson IT for help.",
             RecoveryNotice.RateLimited => "Too many attempts were made. Wait before trying again, or contact Nelson IT for help.",
             RecoveryNotice.PasswordMismatch => "Enter the same new password in both password fields.",
-            RecoveryNotice.PasswordPolicy => "Microsoft did not accept that password. Choose a different password that meets the university password policy.",
+            RecoveryNotice.PasswordPolicy => "That password does not meet the university password requirements. Choose a different password.",
             RecoveryNotice.Expired => "Your verification has expired. Enter your details again to continue.",
             _ => null
         };

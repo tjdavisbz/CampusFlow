@@ -210,6 +210,7 @@ public sealed class AccountRecoveryRenderedPageTests : CampusFlowWebTestBase
         Assert.Equal(HttpStatusCode.OK,response.StatusCode);var html=await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain(Secret,html);Assert.DoesNotContain(CookieTicket,html);Assert.DoesNotContain("__Host-CFRecovery",html);
         var doc=new HtmlDocument();doc.LoadHtml(html);var forms=doc.DocumentNode.SelectNodes("//form");
+        Assert.DoesNotContain("Microsoft", HtmlEntity.DeEntitize(doc.DocumentNode.InnerText), StringComparison.OrdinalIgnoreCase);
         var style = Assert.Single(doc.DocumentNode.SelectNodes("//link[@rel='stylesheet']")!);
         var styleUrl = style.GetAttributeValue("href", "");
         Assert.Matches(@"^/css/account-recovery(?:\.[a-zA-Z0-9]+)?\.css(?:\?v=[a-zA-Z0-9_-]+)?$", styleUrl);
@@ -242,7 +243,7 @@ public sealed class AccountRecoveryRenderedPageTests : CampusFlowWebTestBase
         var token=doc.DocumentNode.SelectSingleNode("//input[@name='__RequestVerificationToken']")!.GetAttributeValue("value","");
         var posted=await Client.PostAsync("/Account/PasswordReset?handler=Reset",new FormUrlEncodedContent(new Dictionary<string,string>{["__RequestVerificationToken"]=token,["Input.Password"]=Secret,["Input.Confirmation"]=Secret}));
         Assert.Equal(HttpStatusCode.OK,posted.StatusCode);var html=await posted.Content.ReadAsStringAsync();
-        Assert.Contains("Your password update was accepted",html);Assert.DoesNotContain(Secret,html);Assert.DoesNotContain(CookieTicket,html);
+        Assert.Contains("Your password was updated",html);Assert.DoesNotContain(Secret,html);Assert.DoesNotContain(CookieTicket,html);
         Assert.Contains(posted.Headers.GetValues("Set-Cookie"),x=>x.StartsWith("__Host-CFRecovery=",StringComparison.Ordinal)&&x.Contains("expires=",StringComparison.Ordinal));
     }
     private sealed class RenderWorkflow(IHttpContextAccessor contexts):IAccountRecoveryWorkflow

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -120,8 +121,27 @@ public sealed class MicrosoftWritebackAccountRecoveryDirectory : IAccountRecover
     }
     internal static bool ValidOperation(Uri? location, Guid student) => location is { IsAbsoluteUri: true } &&
         location.Scheme == "https" && location.Host == "graph.microsoft.com" && location.IsDefaultPort && location.UserInfo == "" &&
-        location.Query == "" && location.Fragment == "" && Regex.IsMatch(location.AbsolutePath,
+        ValidRoutingQuery(location.Query) && location.Fragment == "" && Regex.IsMatch(location.AbsolutePath,
             "^/v1\\.0/users/" + student.ToString("D") + "/authentication/operations/[A-Za-z0-9_-]{1,256}$", RegexOptions.CultureInvariant);
+    // The reset API's documented Location includes these datacenter routing
+    // parameters. Preserve them when polling, while rejecting all other query
+    // keys, duplicates, control characters and redirect-like values.
+    private static bool ValidRoutingQuery(string query)
+    {
+        if (query.Length == 0) return true;
+        if (query.Length > 256 || query[0] != '?') return false;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in query[1..].Split('&'))
+        {
+            var pair = item.Split('=', 2);
+            if (pair.Length != 2 || pair[0] is not ("aadgdc" or "aadgsu") || !seen.Add(pair[0])) return false;
+            string value;
+            try { value = Uri.UnescapeDataString(pair[1]); }
+            catch (UriFormatException) { return false; }
+            if (!Regex.IsMatch(value, "^[A-Za-z0-9_-]{1,64}$", RegexOptions.CultureInvariant)) return false;
+        }
+        return true;
+    }
     private static TimeSpan RetryDelay(HttpResponseMessage response) => TimeSpan.FromSeconds(Math.Clamp(response.Headers.RetryAfter?.Delta?.TotalSeconds ?? 2, 1, 5));
     private static HttpRequestMessage Request(HttpMethod method, string url, RecoveryAccessToken token)
     { var message = new HttpRequestMessage(method, url); message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value); return message; }
