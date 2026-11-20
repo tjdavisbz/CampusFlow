@@ -29,6 +29,7 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
     private readonly Func<int,int,int,int,string,CancellationToken,Task<bool>> _deletedAssignment;
     private readonly Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>> _historicalAssignments;
     private readonly IElementsMigratedHousingReader _migratedHousing;
+    private readonly Func<int,CancellationToken,Task<string>> _migrationBillingSnapshot;
     private readonly Func<int,int,CancellationToken,Task<bool>> _currentAssignmentExists;
 
     public ElementsHousingAssignmentWriter(IConfiguration configuration, IMemoryCache cache)
@@ -38,7 +39,8 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         Func<int,int,int,int,string,CancellationToken,Task<bool>>? deletedAssignment = null,
         Func<int,IReadOnlyCollection<int>,CancellationToken,Task<List<HousingHistoricalAssignment>>>? historicalAssignments = null,
         IElementsMigratedHousingReader? migratedHousing = null,
-        Func<int,int,CancellationToken,Task<bool>>? currentAssignmentExists = null)
+        Func<int,int,CancellationToken,Task<bool>>? currentAssignmentExists = null,
+        Func<int,CancellationToken,Task<string>>? migrationBillingSnapshot = null)
     {
         _configuration = configuration;
         _cache = cache;
@@ -47,6 +49,7 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         _historicalAssignments = historicalAssignments ?? ReadHistoricalAssignmentsAsync;
         _migratedHousing = migratedHousing ?? new ElementsMigratedHousingReader(configuration);
         _currentAssignmentExists = currentAssignmentExists ?? HasCurrentAssignmentAsync;
+        _migrationBillingSnapshot = migrationBillingSnapshot ?? ReadMigrationBillingSnapshotAsync;
     }
 
     public void EnsureWriteEnabled()
@@ -190,7 +193,8 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
             {
                 if (migrated.PeriodRoomId != periodRoomId || await _currentAssignmentExists(studentUid, periodId, cancellationToken))
                     throw new InvalidOperationException("The migrated baseline changed. No deallocation was sent.");
-                await VerifyZeroRentMigrationRoomAsync(periodId, periodRoomId, cancellationToken);
+                var originalRoomId = await VerifyZeroRentMigrationRoomAsync(periodId, periodRoomId, cancellationToken);
+                await ClearMigratedTombstoneAsync(source!, migrated, originalRoomId, cancellationToken);
                 await AssignAsync(studentUid, periodId, periodRoomId, cancellationToken);
                 var assigned = await GetAssignedRoomAsync(studentUid, periodId, cancellationToken);
                 if (assigned is null || !string.Equals(assigned.Value.Building.Trim(), migrated.Building.Trim(), StringComparison.OrdinalIgnoreCase) ||
@@ -215,7 +219,7 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         }
     }
 
-    private async Task VerifyZeroRentMigrationRoomAsync(int periodId, int roomId, CancellationToken ct)
+    private async Task<int> VerifyZeroRentMigrationRoomAsync(int periodId, int roomId, CancellationToken ct)
     {
         var properties = (await HousingDataAsync($"/api/student-life/housing/housing-periods/housing-period-properties/search/{periodId}", ct)).AsArray();
         var matches = new List<JsonObject>();
@@ -234,6 +238,7 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
             matches[0]["roomRate"] is null && matches[0]["perPersonRate"] is null ||
             !ZeroOrUnused(matches[0]["roomRate"]) || !ZeroOrUnused(matches[0]["perPersonRate"]))
             throw new HousingPreflightException("rent-setup");
+        return ReadInt(matches[0], "originalRoomID");
     }
 
     private async Task ChangeAsync(string action, int studentUid, int periodId, int periodRoomId,
