@@ -208,3 +208,9 @@
     }
     .section-heading p { text-align: left; }
 }
+
+.billing-term-picker { position: relative; margin-block: .5rem; font-size: .95rem; }
+.billing-term-picker summary { cursor: pointer; text-decoration: underline; font-weight: 600; }
+.billing-term-options { display: flex; flex-direction: column; max-height: 18rem; overflow-y: auto; margin-top: .5rem; padding: .4rem; border: 1px solid #d8dce7; border-radius: .5rem; background: white; }
+.billing-term-options a { color: var(--tenant-primary-dark); padding: .55rem .75rem; border-radius: .3rem; text-decoration: none; }
+.billing-term-options a:hover, .billing-term-options a:focus-visible, .billing-term-options a[aria-current="page"] { background: #f0edf7; text-decoration: underline; }

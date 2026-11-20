@@ -187,6 +187,7 @@ public class BillApprovalModel : CampusFlowPageModel
     public decimal CreditsTotal => Charges.Where(x => !x.IsVoided).Sum(x => x.Credit);
     public decimal PendingAidTotal => Aid.Where(IsEligibleAid).Sum(x => x.Amount);
     public decimal AccountBalance { get; private set; }
+    public decimal PreviousBalance { get; private set; }
     public decimal RemainingBalance => AccountBalance - PendingAidTotal;
 
     public static string Currency(decimal value) => CampusFlow.Web.Formatting.UsdCurrency.Format(value);
@@ -312,9 +313,9 @@ public class BillApprovalModel : CampusFlowPageModel
             var allTransactions = await billingLookup.GetTransactionsAsync(profile.ExternalStudentId, HttpContext.RequestAborted);
             Charges = allTransactions.Where(x => x.TermCode == TermCode)
                 .OrderBy(x => x.TransactionDate).ThenBy(x => x.ExternalTransactionId).ToArray();
-            AccountBalance = allTransactions
-                .Where(x => !x.IsVoided && string.CompareOrdinal(x.TermCode, TermCode) <= 0)
-                .Sum(x => x.BalanceChange);
+            var balance = StudentBillingBalance.Calculate(allTransactions, TermCode);
+            AccountBalance = balance.ThroughSelectedTerm;
+            PreviousBalance = balance.PreviousTerms;
             var termAid = (await aidTask).Where(x => x.ExternalTermId == ExternalTermId).ToArray();
             var decisionReader = _aidDecisions.SingleOrDefault(x => x.Provider == profile.Provider);
             if (decisionReader is not null)
