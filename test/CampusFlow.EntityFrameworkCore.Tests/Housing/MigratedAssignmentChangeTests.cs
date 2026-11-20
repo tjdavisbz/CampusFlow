@@ -83,7 +83,7 @@ public class MigratedAssignmentChangeTests
             Assignments = http.EverAssigned ? [] : [new(11,31,101,201,"Savell Hall","101","Test resident")]
         });
         var cache = new MemoryCache(new MemoryCacheOptions()); cache.Set("ThesisElements:Housing:IntegrationToken", "test");
-        return new(HousingCapacityWriterTests.Config(), cache, new HttpClient(http), migratedHousing: source,
+        return new(HousingCapacityWriterTests.Config(), cache, new HttpClient(http), historicalAssignments: (_,_,_) => Task.FromResult(new List<HousingHistoricalAssignment>()), migratedHousing: source,
             currentAssignmentExists: (_,_,_) => Task.FromResult(http.Assigned));
     }
 
