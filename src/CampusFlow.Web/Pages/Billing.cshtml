@@ -58,6 +58,18 @@
         <section class="balance-grid" aria-label="Account balances">
             <article class="balance-card balance-primary">
                 <div class="balance-details"><span>Balance through @(Model.SelectedTermName ?? "selected term")</span>
+                    @if (Model.AvailableTerms.Count > 0)
+                    {
+                        <details class="billing-term-picker">
+                            <summary>View another term</summary>
+                            <div class="billing-term-options">
+                                @foreach (var option in Model.AvailableTerms)
+                                {
+                                    <a asp-page="/Billing" asp-route-term="@option.ExternalTermId" aria-current="@(option.ExternalTermId == Model.SelectedTermId ? "page" : null)">@option.DisplayName</a>
+                                }
+                            </div>
+                        </details>
+                    }
                     <strong>@Model.FormatCurrency(Model.CurrentBalance)</strong>
                     <small>Includes selected and previous terms; excludes future terms.</small></div>
                 <div class="balance-payment">

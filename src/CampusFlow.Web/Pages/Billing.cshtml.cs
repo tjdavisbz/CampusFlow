@@ -52,6 +52,7 @@ public class BillingModel : CampusFlowPageModel
     public decimal PostedBalance { get; private set; }
     public decimal PendingBalance { get; private set; }
     public decimal CurrentBalance { get; private set; }
+    public IReadOnlyList<StudentInformationSystemTerm> AvailableTerms { get; private set; } = [];
     public string? SelectedTermName { get; private set; }
     public string? SelectedTermId { get; private set; }
     public bool CanPaySelectedTerm => CanMakePayment && CurrentBalance > 0;
@@ -101,6 +102,9 @@ public class BillingModel : CampusFlowPageModel
             var currentTerm = termLookup is null
                 ? null
                 : await _selectedTerm.ResolveAsync(profile, termLookup, term, cancellationToken: HttpContext.RequestAborted);
+            if (termLookup is not null)
+                AvailableTerms = (await termLookup.GetTermsAsync(HttpContext.RequestAborted))
+                    .OrderByDescending(x => x.TermCode).ToArray();
             CurrentTermCode = currentTerm?.TermCode;
             SelectedTermName = currentTerm?.DisplayName;
             SelectedTermId = currentTerm?.ExternalTermId;
