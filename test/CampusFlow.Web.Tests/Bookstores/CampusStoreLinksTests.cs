@@ -10,7 +10,7 @@ namespace CampusFlow.Bookstores;
 public class CampusStoreLinksTests
 {
     [Fact]
-    public void Course_link_uses_registration_CRN_instead_of_POS_export_padding()
+    public void Course_link_matches_the_POS_export_CourseID()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -27,7 +27,7 @@ public class CampusStoreLinksTests
 
         var link = CampusStoreLinks.ForCourses(configuration, "nelson", "Spring 2027", courses);
 
-        Assert.Equal("https://judahsoutfitters.bibliucampus.com/SelectCourses?src=2&type=2&stoid=241&trm=Spring%2027&cid=123456", link);
+        Assert.Equal("https://judahsoutfitters.bibliucampus.com/SelectCourses?src=2&type=2&stoid=241&trm=Spring%2027&cid=000000000123456", link);
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class CampusStoreLinksTests
         var link = CampusStoreLinks.ForCourses(Configuration(), "nelson", "Spring 2027",
             new[] { Course("73313"), Course("000000000073313"), Course("73332") });
 
-        Assert.EndsWith("&cid=73313,73332", link);
+        Assert.EndsWith("&cid=000000000073313,000000000073332", link);
     }
 
     [Theory]
@@ -47,7 +47,7 @@ public class CampusStoreLinksTests
     {
         var link = CampusStoreLinks.ForCourses(Configuration(), "nelson", term, new[] { Course("73313") });
 
-        Assert.Contains("&trm=" + encodedTerm + "&cid=73313", link);
+        Assert.Contains("&trm=" + encodedTerm + "&cid=000000000073313", link);
     }
 
     [Theory]
@@ -56,6 +56,7 @@ public class CampusStoreLinksTests
     [InlineData("+73313")]
     [InlineData("73313&cid=999")]
     [InlineData("9223372036854775808")]
+    [InlineData("1000000000000000")]
     public void Does_not_offer_a_course_link_without_a_valid_positive_CRN(string id)
     {
         Assert.Null(CampusStoreLinks.ForCourses(Configuration(), "nelson", "Spring 2027", new[] { Course(id) }));

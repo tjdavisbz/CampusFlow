@@ -17,11 +17,11 @@ public static class CampusStoreLinks
         var storeId = section["StoreId"];
         if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(storeId)) return null;
 
-        // Online lookup uses registration CRNs. The POS export's fixed-width
-        // zero padding is a different contract and prevents Spring course lookup.
+        // Match the 15-character CourseID published by our POS course export.
+        // The current bookstore catalog matches these identifiers exactly.
         var offeringIds = courses.Select(x =>
-                long.TryParse(x.ExternalCourseOfferingId, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0
-                    ? id.ToString(CultureInfo.InvariantCulture) : null)
+                long.TryParse(x.ExternalCourseOfferingId, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 && id.ToString(CultureInfo.InvariantCulture).Length <= 15
+                    ? id.ToString(CultureInfo.InvariantCulture).PadLeft(15, '0') : null)
             .OfType<string>()
             .Distinct(StringComparer.Ordinal)
             .ToArray();
