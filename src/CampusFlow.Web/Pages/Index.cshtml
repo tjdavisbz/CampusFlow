@@ -162,11 +162,6 @@
             </section>
         }
 
-    @if (Model.HasStudentAccess && (Model.VisibleAnnouncements.Count > 0 || Model.AnnouncementTerms.Count > 0) && Model.PrioritizeRegistration)
-    {
-        <partial name="_DashboardAnnouncements" model="Model" />
-    }
-
         @if (Model.RegistrationJourney is not null)
         {
             <section class="term-snapshot" aria-label="Current term summary">
@@ -181,6 +176,12 @@
                 }
             </section>
         }
+
+        @if (Model.HasStudentAccess && (Model.VisibleAnnouncements.Count > 0 || Model.AnnouncementTerms.Count > 0) && Model.PrioritizeRegistration)
+        {
+            <partial name="_DashboardAnnouncements" model="Model" />
+        }
+
     }
 
     <section class="support-card">
