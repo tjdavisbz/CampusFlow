@@ -191,15 +191,20 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
         List<HousingWorkspaceRoom>? recoveryCurrent = null;
         List<int>? recoveryRemaining = null;
         List<HousingHistoricalAssignment> recoveryHistorical = [];
+        Dictionary<int,string> recoveryBilling = [];
+        var billingRecovery = false;
         if (recovery is null) EnsureEditable(draft);
         else
         {
             var review = await PrepareRecoveryAsync(draft);
-            if (review.Preview.RunId != recovery.RunId || review.Preview.RecoveryRevision != recovery.RecoveryRevision)
+            if (review.Preview.RunId != recovery.RunId || review.Preview.RecoveryRevision != recovery.RecoveryRevision || review.Preview.Mode != recovery.Mode ||
+                review.Preview.RateRevision != recovery.RateRevision)
                 throw new UserFriendlyException("The recovery preview changed. Review the live assignments again; the saved plan is unchanged.");
             recoveryCurrent = review.Current;
             recoveryRemaining = review.Remaining;
             recoveryHistorical = review.Historical;
+            recoveryBilling = review.Billing;
+            billingRecovery = review.Preview.Mode == "billing";
         }
         var before = Read(draft.BaselineJson);
         var after = Read(draft.RoomsJson);
@@ -246,7 +251,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                 catch (ArgumentException e) { throw new UserFriendlyException(e.Message); }
             }
             else proposedCharges[id] = [];
-            if (recovery is not null)
+            if (recovery is not null && !billingRecovery)
             {
                 if (proposedCharges[id].Count != 0)
                     throw new UserFriendlyException("Commuter recovery cannot change charges. Review this housing plan separately.");
@@ -312,7 +317,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                 (needsRates && (await SavedRatesAsync(input.PeriodId,pricing.TermCalendarId)).Revision!=input.RateRevision))
                 throw new UserFriendlyException("The housing draft or fees changed. Review again.");
             new HousingApplyProgress{RunId=run,StartedAt=Clock.Now,UserId=CurrentUser.Id,BeforeJson=latest.BaselineJson,DesiredJson=latest.RoomsJson,
-                RecoveryOfRunId=recovery?.RunId,ReviewReason=recovery?.Reason.Trim()}.Save(latest);
+                RecoveryOfRunId=recovery?.RunId,RecoveryMode=recovery?.Mode,ReviewReason=recovery?.Reason.Trim()}.Save(latest);
             await _drafts.UpdateAsync(latest,autoSave:true);await claim.CompleteAsync();
         }
         async Task Record(string operation)
@@ -351,7 +356,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             }
             foreach(var id in changedIds)
             {
-                if (recovery is not null)
+                if (recovery is not null && !billingRecovery)
                 {
                     var assigned = await _writer.GetEffectiveAssignedRoomAsync(id, input.PeriodId);
                     if (assigned is null || !SameRoom(assigned.Value, newAssignments[id].room))
@@ -360,7 +365,18 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                     continue;
                 }
                 await Record($"Starting charge reconciliation for {id}");
-                await _billingWriter.ReconcileAsync(id,pricing.TermCalendarId,proposedCharges[id],documents);await Record($"Charges verified for {id}");
+                try
+                {
+                    if (billingRecovery)
+                        await _billingWriter.ReconcileReviewedAsync(id,pricing.TermCalendarId,proposedCharges[id],documents,recoveryBilling[id]);
+                    else await _billingWriter.ReconcileAsync(id,pricing.TermCalendarId,proposedCharges[id],documents);
+                }
+                catch (InvalidOperationException error)
+                {
+                    Logger.LogWarning(error,"Housing billing reconciliation stopped for run {RunId}.",run);
+                    throw new HousingPreflightException("billing-review");
+                }
+                await Record($"Charges verified for {id}");
             }
             using var finish=_unitOfWorkManager.Begin(requiresNew:true,isTransactional:true);
             var latest=await Find(input.PeriodId)??throw new InvalidOperationException("The draft disappeared.");

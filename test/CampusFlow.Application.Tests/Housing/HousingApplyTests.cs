@@ -18,7 +18,7 @@ using Volo.Abp.Uow;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 namespace CampusFlow.Application.Tests.Housing;
-public class HousingApplyTests
+public partial class HousingApplyTests
 {
     private readonly Guid _tenant=Guid.NewGuid();
     private readonly HousingAssignmentDraft _draft;
@@ -182,7 +182,7 @@ public class HousingApplyTests
         return await _service.PreviewRecoveryAsync(1);
     }
     private static RecoverHousingDraftInput Recover(HousingRecoveryPreview preview)=>new()
-    {PeriodId=preview.PeriodId,RunId=preview.RunId,Revision=preview.Revision,RecoveryRevision=preview.RecoveryRevision,Confirmed=true,Reason="Reviewed the live rooms and housing batch"};
+    {PeriodId=preview.PeriodId,RunId=preview.RunId,Revision=preview.Revision,RecoveryRevision=preview.RecoveryRevision,Confirmed=true,Mode=preview.Mode,RateRevision=preview.RateRevision,Reason="Reviewed the live rooms and housing batch"};
     [Fact] public async Task Reviewed_deleted_history_is_acknowledged_before_assignment_with_all_113_preserved()
     {
         await FailedCommuterRun();

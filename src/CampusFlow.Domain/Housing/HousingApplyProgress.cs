@@ -12,6 +12,7 @@ public class HousingApplyProgress
     public DateTime? UpdatedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
     public Guid? UserId { get; set; }
+    public string? RecoveryMode { get; set; }
     public Guid? RecoveryOfRunId { get; set; }
     public string? ReviewReason { get; set; }
     public string? FailureCode { get; set; }

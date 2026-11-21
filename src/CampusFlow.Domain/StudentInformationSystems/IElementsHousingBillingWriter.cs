@@ -9,6 +9,12 @@ public interface IElementsHousingBillingWriter
 {
     Task VerifyCanReconcileAsync(int studentUid, int termCalendarId,
         IReadOnlyCollection<int> housingDocumentIds, CancellationToken cancellationToken = default);
+    Task<HousingBillingReview> ReviewAsync(int studentUid, int termCalendarId,
+        IReadOnlyList<HousingChargeLine> desired, IReadOnlyCollection<int> housingDocumentIds,
+        CancellationToken cancellationToken = default);
+    Task ReconcileReviewedAsync(int studentUid, int termCalendarId,
+        IReadOnlyList<HousingChargeLine> desired, IReadOnlyCollection<int> housingDocumentIds,
+        string reviewRevision, CancellationToken cancellationToken = default);
     Task ReconcileAsync(int studentUid, int termCalendarId,
         IReadOnlyList<HousingChargeLine> desired, IReadOnlyCollection<int> housingDocumentIds,
         CancellationToken cancellationToken = default);

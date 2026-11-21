@@ -4,6 +4,7 @@
     const el = name => document.getElementById('housing-' + name);
     let state = null, dirty = false, busy = false, selectedRoom = null, loadedPeriod = '';
     let recovery = null;
+    const money = value => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(value);
     const blocked = () => ['Queued','Running','Needs review'].includes(state?.applyStatus);
     const selected = new Set();
     const removedOccupants = new Map();
@@ -206,7 +207,7 @@
     }
     async function watchRecovery(ticket) {
         const periodId = ticket.periodId ?? state.periodId;
-        message('Commuter recovery is running in the background. You may leave and return. No separate Apply is needed.');
+        message('Housing recovery is running in the background. You may leave and return. No separate Apply is needed.');
         for (let poll = 0; poll < 600; poll++) {
             await new Promise(resolve => setTimeout(resolve, 3000));
             let status;
@@ -220,7 +221,7 @@
             if (state.recoveryJobId === ticket.dispatchId) {
                 if (state.recoveryJobStatus === 'Completed' && state.applyStatus === 'Completed') {
                     removedOccupants.clear();
-                    message('The saved commuter plan was applied and verified. Existing billing and prior run history were preserved. No separate Apply is needed.');
+                    message('The reviewed housing recovery completed and was verified. The saved plan and prior run history were preserved. No separate Apply is needed.');
                     return;
                 }
                 if (state.recoveryJobStatus === 'Failed') {
@@ -231,11 +232,11 @@
                     resetRecovery();render();
                     throw new Error('Recovery stopped reporting progress. Review the live assignments before resuming the retained saved plan.');
                 }
-                message(`Commuter recovery is running in the background. ${state.recoveryAssignmentsVerified || 0} assignments verified in this run; earlier completed assignments are skipped. No separate Apply is needed.`);
+                message(`Housing recovery is running in the background. Completed work is checked before continuing. No separate Apply is needed.`);
             } else if (ticket.jobId && !status.pending) {
                 resetRecovery();render();
                 throw new Error('Recovery could not start because the saved run or your access changed. The plan is retained. Review recovery again.');
-            } else message('Commuter recovery is queued. The saved plan is retained. You may leave and return; no separate Apply is needed.');
+            } else message('Housing recovery is queued. The saved plan is retained. You may leave and return; no separate Apply is needed.');
         }
         throw new Error('Recovery is taking longer than expected. Work may still be running. Your saved plan is retained; reload this period to check its status.');
     }
@@ -247,15 +248,33 @@
             const preview = await request('Recovery', undefined, {periodId:state.periodId});
             if (preview.revision !== state.revision) { await reloadAfterFailure(); throw new Error('The saved run changed. Review recovery again.'); }
             recovery = preview;
-            el('recovery-counts').textContent = `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining · ${preview.historicalAssignmentsToClear || 0} deleted historical room records to deallocate first. This recovery changes room assignments only; all existing billing charges are preserved.`;
+            const billingOnly = preview.mode === 'billing';
+            el('resume').textContent = billingOnly ? 'Resume pending housing charges' : 'Resume remaining commuter assignments';
+            el('recovery-counts').textContent = billingOnly
+                ? `${preview.savedAssignments} saved assignments retained · all room changes complete · ${(preview.billingChanges || []).length} students with pending charge reconciliation.`
+                : `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining · ${preview.historicalAssignmentsToClear || 0} deleted historical room records to deallocate first.`;
+            el('recovery-explanation').textContent = billingOnly
+                ? 'Only the reviewed housing charges below will be reconciled. Completed room assignments will be checked and preserved. Posted charges and unrelated billing are protected. Recovery runs in the background; no separate Apply is needed.'
+                : 'Only remaining commuter assignments will be completed. All existing billing charges are preserved. Recovery runs in the background; no separate Apply is needed.';
+            const billingList = el('recovery-billing-lines');
+            billingList.replaceChildren(); billingList.hidden = !billingOnly;
+            (preview.billingChanges || []).forEach(line => {
+                const li = document.createElement('li');
+                li.textContent = `${line.studentName || line.studentUid}: ${money(line.currentAmount)} currently in housing charges → ${money(line.proposedAmount)} after reconciliation`;
+                billingList.append(li);
+            });
             el('recovery-preview').hidden = false;
             message('Recovery reviewed. No Elements data was changed.');
         });
         el('resume').onclick = () => run(async () => {
             if (!recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim()) return;
-            if (!confirm(`Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. No billing charges will be added, replaced or deleted. The saved plan and prior run history will be retained.`)) return;
+            const billingOnly = recovery.mode === 'billing';
+            const confirmation = billingOnly
+                ? `Reconcile the reviewed housing charges for ${(recovery.billingChanges || []).length} students in ${root.dataset.environment} Elements? This may replace or remove their unposted housing charges as shown in the preview. Completed room assignments will not be repeated. The saved plan and prior history will be retained.`
+                : `Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. No billing charges will be changed. The saved plan and prior run history will be retained.`;
+            if (!confirm(confirmation)) return;
             let ticket;
-            message('Starting commuter recovery in the background. No separate Apply is needed.');
+            message('Starting reviewed housing recovery in the background. No separate Apply is needed.');
             try { ticket = await request('Resume', {...recovery, reason:el('recovery-reason').value.trim(), confirmed:true}); }
             catch (error) { await reloadAfterFailure(); throw error; }
             state = ticket.state; resetRecovery(); dirty = false; selected.clear(); render();

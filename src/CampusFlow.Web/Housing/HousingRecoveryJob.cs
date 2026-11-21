@@ -28,7 +28,7 @@ public sealed class HousingRecoveryJobArgs
     public Guid? ActorTenantId { get; set; }
     public RecoverHousingDraftInput Input { get; set; } = new();
 }
-public sealed record QueuedHousingRecovery(string JobId,Guid DispatchId,HousingWorkspaceState State);
+public sealed record QueuedHousingRecovery(string JobId,Guid DispatchId,HousingWorkspaceState State, string Mode = "commuter");
 public interface IHousingRecoveryDispatcher
 {
     Task<QueuedHousingRecovery> QueueAsync(RecoverHousingDraftInput input);
@@ -42,7 +42,7 @@ public sealed class HousingRecoveryDispatcher(IBackgroundJobManager jobs,IReposi
     {
         writer.EnsureWriteEnabled();
         if(tenant.Id is not Guid tenantId || user.Id is not Guid userId || !input.Confirmed || input.PeriodId<=0 ||
-            input.RunId==Guid.Empty || string.IsNullOrWhiteSpace(input.RecoveryRevision) || string.IsNullOrWhiteSpace(input.Reason) || input.Reason.Trim().Length>500)
+            input.Mode is not ("commuter" or "billing") || input.RunId==Guid.Empty || string.IsNullOrWhiteSpace(input.RecoveryRevision) || string.IsNullOrWhiteSpace(input.Reason) || input.Reason.Trim().Length>500)
             throw new UserFriendlyException("Review recovery, confirm the saved plan and enter a reason before resuming.");
         using var unit=units.Begin(requiresNew:true,isTransactional:true);
         var draft=await drafts.FindAsync(x=>x.TenantId==tenantId && x.PeriodId==input.PeriodId)
@@ -54,7 +54,7 @@ public sealed class HousingRecoveryDispatcher(IBackgroundJobManager jobs,IReposi
         var dispatch=Guid.NewGuid();
         var id=await jobs.EnqueueAsync(new HousingRecoveryJobArgs{DispatchId=dispatch,TenantId=tenantId,UserId=userId,ActorTenantId=user.TenantId,Input=input});
         await unit.CompleteAsync();
-        return new(id,dispatch,await workspace.GetAsync(input.PeriodId)??throw new UserFriendlyException("The saved plan could not be loaded."));
+        return new(id,dispatch,await workspace.GetAsync(input.PeriodId)??throw new UserFriendlyException("The saved plan could not be loaded."),input.Mode);
     }
 }
 
@@ -102,8 +102,14 @@ public sealed class HousingRecoveryJob(IRepository<HousingAssignmentDraft,Guid> 
                 args.Input.Revision=draft.ConcurrencyStamp;claimed=true;
             }
             using(HousingRecoveryDispatch.EnterExecution(args.DispatchId))
-                await workspace.ResumeCommuterAssignmentsAsync(args.Input);
-            await Finish(args,"Completed","The saved commuter plan was applied and verified. Existing billing was preserved.");
+            {
+                if(args.Input.Mode=="billing") await workspace.ResumeBillingReconciliationAsync(args.Input);
+                else if(args.Input.Mode=="commuter") await workspace.ResumeCommuterAssignmentsAsync(args.Input);
+                else throw new UserFriendlyException("The recovery mode is invalid.");
+            }
+            await Finish(args,"Completed",args.Input.Mode=="billing"
+                ? "The saved housing charges were reconciled and verified. Completed room changes were preserved."
+                : "The saved commuter plan was applied and verified. Existing billing was preserved.");
         }
         catch(Exception exception)
         {

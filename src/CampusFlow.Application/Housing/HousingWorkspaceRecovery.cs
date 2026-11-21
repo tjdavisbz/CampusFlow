@@ -17,6 +17,16 @@ public partial class HousingWorkspaceAppService
     {
         var draft = await Find(periodId) ?? throw new UserFriendlyException("There is no saved draft to recover.");
         var review = await PrepareRecoveryAsync(draft);
+        if (review.Preview.Mode == "billing")
+        {
+            foreach (var room in review.Current)
+                foreach (var occupant in room.Occupants.Where(o => review.Billing.ContainsKey(o.StudentUid)))
+                {
+                    var live = await _writer.GetEffectiveAssignedRoomAsync(occupant.StudentUid, periodId);
+                    if (live is null || !SameRoom(live.Value, room)) throw new UserFriendlyException("The live assignment changed during billing review.");
+                }
+            return review.Preview;
+        }
         var expected = review.Current.SelectMany(room => room.Occupants.Select(o => (room, o)))
             .ToDictionary(x => x.o.StudentUid);
         var added = Read(draft.RoomsJson).SelectMany(x => x.Occupants).Select(x => x.StudentUid)
@@ -34,6 +44,7 @@ public partial class HousingWorkspaceAppService
     [UnitOfWork(IsDisabled = true)]
     public Task<HousingWorkspaceState> ResumeCommuterAssignmentsAsync(RecoverHousingDraftInput input)
     {
+        if (input.Mode != "commuter") throw new UserFriendlyException("Use the reviewed billing recovery action for billing changes.");
         if (!input.Confirmed || string.IsNullOrWhiteSpace(input.Reason) || input.Reason.Trim().Length > 500 ||
             input.RunId == Guid.Empty || string.IsNullOrWhiteSpace(input.RecoveryRevision))
             throw new UserFriendlyException("Review the recovery preview, confirm the live assignments and housing batch, and enter a reason (maximum 500 characters).");
@@ -43,7 +54,18 @@ public partial class HousingWorkspaceAppService
         }, input);
     }
 
-    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining, List<HousingHistoricalAssignment> Historical)>
+    [Audited]
+    [UnitOfWork(IsDisabled = true)]
+    public Task<HousingWorkspaceState> ResumeBillingReconciliationAsync(RecoverHousingDraftInput input)
+    {
+        if (input.Mode != "billing" || !input.Confirmed || string.IsNullOrWhiteSpace(input.Reason) ||
+            input.Reason.Trim().Length > 500 || input.RunId == Guid.Empty || string.IsNullOrWhiteSpace(input.RecoveryRevision))
+            throw new UserFriendlyException("Review the pending billing, confirm it and enter a reason before resuming.");
+        return ApplyCoreAsync(new ApplyHousingDraftInput { PeriodId=input.PeriodId,Revision=input.Revision,
+            RateRevision=input.RateRevision,Confirmed=true },input);
+    }
+
+    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining, List<HousingHistoricalAssignment> Historical, Dictionary<int,string> Billing)>
         PrepareRecoveryAsync(HousingAssignmentDraft draft)
     {
         _writer.EnsureWriteEnabled();
@@ -58,7 +80,7 @@ public partial class HousingWorkspaceAppService
         var current = await _elements.GetRoomsAsync(draft.PeriodId);
         (List<int> Added, List<int> Remaining) plan;
         try { plan = HousingCommuterRecovery.Review(before, desired, current); }
-        catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
+        catch (ArgumentException) { return await PrepareBillingRecoveryAsync(draft, progress, before, desired, current); }
         List<HousingHistoricalAssignment> historical;
         try { historical = await _writer.GetHistoricalAssignmentsAsync(draft.PeriodId, plan.Remaining); }
         catch (ArgumentException error) { throw new UserFriendlyException(error.Message); }
@@ -83,6 +105,6 @@ public partial class HousingWorkspaceAppService
             SavedAssignments = desired.Sum(x => x.Occupants.Count), AlreadyAssigned = plan.Added.Count - plan.Remaining.Count,
             RemainingAssignments = plan.Remaining.Count, HistoricalAssignmentsToClear = historical.Count,
             Failure = HousingApplyFailure.Description(progress.FailureCode)
-        }, current, plan.Remaining, historical);
+        }, current, plan.Remaining, historical, []);
     }
 }
