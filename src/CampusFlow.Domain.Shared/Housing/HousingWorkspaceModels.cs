@@ -101,6 +101,9 @@ public class HousingRecoveryPreview
     public int RemainingAssignments { get; set; }
     public int HistoricalAssignmentsToClear { get; set; }
     public string Failure { get; set; } = "";
+    public string Mode { get; set; } = "commuter";
+    public string RateRevision { get; set; } = "";
+    public List<HousingBillingRecoveryLine> BillingChanges { get; set; } = [];
 }
 
 public class RecoverHousingDraftInput
@@ -110,6 +113,8 @@ public class RecoverHousingDraftInput
     public string Revision { get; set; } = "";
     public string RecoveryRevision { get; set; } = "";
     public string Reason { get; set; } = "";
+    public string Mode { get; set; } = "commuter";
+    public string RateRevision { get; set; } = "";
     public bool Confirmed { get; set; }
 }
 
@@ -145,3 +150,8 @@ public class CopyHousingTermInput
     public string ExpectedCopyRevision { get; set; } = "";
     public bool Confirmed { get; set; }
 }
+
+public sealed record HousingBillingReview(int StudentUid, int TermCalendarId, decimal CurrentAmount,
+    decimal ProposedAmount, string Revision);
+public sealed record HousingBillingRecoveryLine(int StudentUid, string StudentName,
+    decimal CurrentAmount, decimal ProposedAmount);

@@ -39,6 +39,7 @@ public static class HousingApplyFailure
 
     public static string Description(string? code) => code switch
     {
+        "billing-review" => "Room changes completed, but housing charges need review. Use Review recovery to check the pending charges before resuming.",
         "rent-setup" => "Elements requires rent setup for the selected room. Review the housing period configuration.",
         "capacity" => "Elements rejected the room capacity. Review the live room and its occupants.",
         "conflict" => "Elements reported a housing conflict. Review its room assignment screen before resuming.",
