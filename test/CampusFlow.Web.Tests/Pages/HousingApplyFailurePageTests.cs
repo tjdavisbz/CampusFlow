@@ -30,12 +30,12 @@ public class HousingApplyFailurePageTests
     }
     [Fact]public async Task Known_preflight_failure_is_actionable_and_never_refreshes_or_saves_the_draft()
     {
-        var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new UserFriendlyException("A student has a new Elements assignment. Review the saved draft.")));
-        var page=Page(service);var result=await page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true});Assert.Equal(409,result.StatusCode);Assert.Contains("new Elements assignment",System.Text.Json.JsonSerializer.Serialize(result.Value));await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
+        var service=Substitute.For<IHousingWorkspaceAppService>();var dispatcher=Substitute.For<IHousingRecoveryDispatcher>();dispatcher.QueueApplyAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<QueuedHousingRecovery>(new UserFriendlyException("A student has a new Elements assignment. Review the saved draft.")));
+        var page=Page(service,dispatcher);var result=await page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true});Assert.Equal(409,result.StatusCode);Assert.Contains("new Elements assignment",System.Text.Json.JsonSerializer.Serialize(result.Value));await service.DidNotReceiveWithAnyArgs().RefreshAsync(default,default);await service.DidNotReceiveWithAnyArgs().SaveAsync(default!);
     }
     [Fact]public async Task Unexpected_failures_are_not_exposed_to_the_browser()
     {
-        var service=Substitute.For<IHousingWorkspaceAppService>();service.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<HousingWorkspaceState>(new System.InvalidOperationException("private internal detail")));var page=Page(service);await Assert.ThrowsAsync<System.InvalidOperationException>(()=>page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true}));
+        var service=Substitute.For<IHousingWorkspaceAppService>();var dispatcher=Substitute.For<IHousingRecoveryDispatcher>();dispatcher.QueueApplyAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Task.FromException<QueuedHousingRecovery>(new System.InvalidOperationException("private internal detail")));var page=Page(service,dispatcher);await Assert.ThrowsAsync<System.InvalidOperationException>(()=>page.OnPostApplyAsync(new(){PeriodId=2,Confirmed=true}));
     }
 }
 public class MealPlanSearchMetadataTests:CampusFlowWebTestBase

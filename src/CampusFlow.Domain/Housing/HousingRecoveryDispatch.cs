@@ -15,6 +15,7 @@ public sealed class HousingRecoveryDispatch
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string Status { get; set; } = "Running";
+    public string Mode { get; set; } = "recovery";
     public DateTime StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
     public string? Message { get; set; }
@@ -26,6 +27,6 @@ public sealed class HousingRecoveryDispatch
     {
         var updated=HousingApplyProgress.Read(draft)?.UpdatedAt;
         var heartbeat=updated is not null && updated>StartedAt?updated.Value:StartedAt;
-        return Status=="Running" && now-heartbeat<TimeSpan.FromMinutes(30);
+        return Status is "Queued" or "Running" && now-heartbeat<TimeSpan.FromMinutes(30);
     }
 }

@@ -49,7 +49,7 @@ public class AssignmentsModel(IHousingWorkspaceAppService workspace, IConfigurat
     public async Task<JsonResult> OnPostSaveAsync([FromBody] HousingWorkspaceState input) => new(await workspace.SaveAsync(input));
     public async Task<JsonResult> OnPostApplyAsync([FromBody] ApplyHousingDraftInput input)
     {
-        try { return new(await workspace.ApplyAssignmentsAsync(input)); }
+        try { return new(await recovery.QueueApplyAsync(input)); }
         catch (UserFriendlyException error)
         {
             return new(new { error = new { message = error.Message } }) { StatusCode = 409 };

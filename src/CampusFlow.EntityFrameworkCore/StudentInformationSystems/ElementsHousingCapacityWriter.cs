@@ -25,7 +25,7 @@ public sealed partial class ElementsHousingAssignmentWriter
         EnsureWriteEnabled();var token=await GetTokenAsync(cancellationToken);
         using var request=Request(search is null?HttpMethod.Get:HttpMethod.Post,route,token);
         if(search is not null)request.Content=new StringContent(search.ToJsonString(),Encoding.UTF8,"application/json");
-        using var response=await _client.SendAsync(request,cancellationToken);
+        using var response=await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         return (await ReadAsync(response,cancellationToken))["data"]??throw new InvalidOperationException("Elements returned no housing data.");
     }
     public async Task VerifyRoomsAsync(int periodId,IReadOnlyList<HousingWorkspaceRoom> expected,CancellationToken cancellationToken=default)
@@ -119,7 +119,7 @@ public sealed partial class ElementsHousingAssignmentWriter
             if(!JsonNode.DeepEquals(snapshot,current)||!JsonNode.DeepEquals(body,BuildCapacityUpdate(current,periodId,selected)))throw new InvalidOperationException("Property settings changed before the capacity update.");
             using var request=Request(HttpMethod.Post,"/api/student-life/housing/housing-periods/housing-period-properties/save",await GetTokenAsync(cancellationToken));
             request.Content=new StringContent(body.ToJsonString(),Encoding.UTF8,"application/json");
-            using var response=await _client.SendAsync(request,cancellationToken);await ReadAsync(response,cancellationToken);
+            using var response=await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);await ReadAsync(response,cancellationToken);
             var after=(await HousingDataAsync($"/api/student-life/housing/housing-periods/housing-period-properties/{id}",cancellationToken)).AsObject();
             var expected=(JsonObject)snapshot.DeepClone();
             foreach(var change in selected)expected["rooms"]!.AsArray().OfType<JsonObject>().Single(x=>ReadInt(x,"housingPeriodRoomID")==change.RoomId)["occupancy"]=change.Capacity;

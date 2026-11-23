@@ -176,7 +176,7 @@ public class HousingCapacityWriterTests
     [Theory][InlineData(false)][InlineData(true)]
     public async Task Capacity_save_uses_period_property_endpoint_and_verifies_every_field(bool corruptReadback)
     {
-        var handler=new Handler(corruptReadback);var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:Housing:IntegrationToken","test");
+        var handler=new Handler(corruptReadback);var cache=new MemoryCache(new MemoryCacheOptions());cache.Set(ElementsHousingAuthentication.Key(Config()),"test");
         var writer=new ElementsHousingAssignmentWriter(Config(),cache,new HttpClient(handler));
         if(corruptReadback)await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.UpdateCapacitiesAsync(1,[new(31,10,9)]));
         else await writer.UpdateCapacitiesAsync(1,[new(31,10,9)]);
@@ -184,7 +184,7 @@ public class HousingCapacityWriterTests
     }
     [Fact]public async Task Stale_capacity_does_not_make_a_save_request()
     {
-        var handler=new Handler(false);var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:Housing:IntegrationToken","test");var writer=new ElementsHousingAssignmentWriter(Config(),cache,new HttpClient(handler));
+        var handler=new Handler(false);var cache=new MemoryCache(new MemoryCacheOptions());cache.Set(ElementsHousingAuthentication.Key(Config()),"test");var writer=new ElementsHousingAssignmentWriter(Config(),cache,new HttpClient(handler));
         await Assert.ThrowsAsync<InvalidOperationException>(()=>writer.UpdateCapacitiesAsync(1,[new(31,9,8)]));Assert.Equal(0,handler.Writes);
     }
     private sealed class Handler(bool corrupt):HttpMessageHandler

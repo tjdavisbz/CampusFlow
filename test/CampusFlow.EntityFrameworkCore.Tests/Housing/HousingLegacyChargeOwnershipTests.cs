@@ -27,4 +27,12 @@ public class HousingLegacyChargeOwnershipTests
     }
     [Fact] public void Exact_owned_references_remain_idempotent_and_other_terms_are_preserved()
     {var owned=Legacy() with{Reference="CFH-269-10-BASE"};var other=Legacy() with{Id=101,TermCalendarId=268};var review=ElementsHousingBillingWriter.ReviewOwnership([owned,other],[],10,269,200,[137]);Assert.Empty(review.Legacy);Assert.Equal(owned,Assert.Single(review.Entries));}
+    [Fact]public void Expected_zero_rent_entries_do_not_invalidate_a_review_but_new_money_does()
+    {
+        var row=Legacy();var original=ElementsHousingBillingWriter.BuildReview(10,269,[],[row],[row]);
+        var zero=new Entry(101,201,"",137,0,10,269,0,"Rent Per Person");
+        var noNewMoney=ElementsHousingBillingWriter.BuildReview(10,269,[],[row],[row],[zero]);
+        var changed=ElementsHousingBillingWriter.BuildReview(10,269,[],[row],[row],[zero with{Amount=1}]);
+        Assert.Equal(original.Revision,noNewMoney.Revision);Assert.NotEqual(original.Revision,changed.Revision);
+    }
 }

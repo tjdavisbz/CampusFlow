@@ -69,6 +69,8 @@ public class HousingWorkspaceState
     public bool RecoveryAvailable { get; set; }
     public Guid? RecoveryJobId { get; set; }
     public string? RecoveryJobStatus { get; set; }
+    public string? RecoveryJobMode { get; set; }
+    public int VerifiedRoomOperations { get; set; }
     public string? RecoveryJobMessage { get; set; }
     public int RecoveryAssignmentsVerified { get; set; }
     public List<HousingWorkspaceRoom> Rooms { get; set; } = [];
@@ -99,6 +101,8 @@ public class HousingRecoveryPreview
     public int SavedAssignments { get; set; }
     public int AlreadyAssigned { get; set; }
     public int RemainingAssignments { get; set; }
+    public int RemainingRemovals { get; set; }
+    public List<HousingRoomRecoveryLine> RoomChanges { get; set; } = [];
     public int HistoricalAssignmentsToClear { get; set; }
     public string Failure { get; set; } = "";
     public string Mode { get; set; } = "commuter";
@@ -155,3 +159,5 @@ public sealed record HousingBillingReview(int StudentUid, int TermCalendarId, de
     decimal ProposedAmount, string Revision);
 public sealed record HousingBillingRecoveryLine(int StudentUid, string StudentName,
     decimal CurrentAmount, decimal ProposedAmount);
+
+public sealed record HousingRoomRecoveryLine(int StudentUid,string StudentName,string CurrentRoom,string ProposedRoom);

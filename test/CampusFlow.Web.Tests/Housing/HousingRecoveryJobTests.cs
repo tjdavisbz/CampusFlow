@@ -30,7 +30,7 @@ public class HousingRecoveryJobTests : CampusFlowWebTestBase
 {
     private sealed record Fixture(Guid Tenant,Guid User,Guid Draft,string Plan,ClaimsPrincipal Principal,
         RecoverHousingDraftInput Input,HousingRecoveryDispatcher Dispatcher,HousingRecoveryJob Job,IHousingWorkspaceAppService Workspace);
-    private async Task<Fixture> Setup(bool fail=false,bool permission=true,bool billing=false)
+    private async Task<Fixture> Setup(bool fail=false,bool permission=true,bool billing=false,bool apply=false,bool partial=false)
     {
         var tenant=GetRequiredService<ICurrentTenant>();var units=GetRequiredService<IUnitOfWorkManager>();
         var actors=GetRequiredService<IRepository<IdentityUser,Guid>>();var drafts=GetRequiredService<IRepository<HousingAssignmentDraft,Guid>>();
@@ -49,28 +49,30 @@ public class HousingRecoveryJobTests : CampusFlowWebTestBase
         using(tenant.Change(university,"nelson"))
         using(var unit=units.Begin(requiresNew:true,isTransactional:true))
         {
-            draft=new(Guid.NewGuid(),university,2,"[]",DateTime.UtcNow);draft.Save(plan);
-            new HousingApplyProgress{RunId=Guid.NewGuid(),Status="Needs review",StartedAt=DateTime.UtcNow.AddHours(-1),FinishedAt=DateTime.UtcNow,BeforeJson=draft.BaselineJson,DesiredJson=plan}.Save(draft);
+            draft=new(Guid.NewGuid(),university,2,apply?JsonSerializer.Serialize(rooms.Select(r=>new HousingWorkspaceRoom{Id=r.Id,Name=r.Name,Building=r.Building,Capacity=r.Capacity})):"[]",DateTime.UtcNow);draft.Save(plan);
+            new HousingApplyProgress{RunId=Guid.NewGuid(),Status=apply?"Completed":"Needs review",StartedAt=DateTime.UtcNow.AddHours(-1),FinishedAt=DateTime.UtcNow,BeforeJson=draft.BaselineJson,DesiredJson=plan}.Save(draft);
             await drafts.InsertAsync(draft,autoSave:true);await unit.CompleteAsync();
         }
         var input=new RecoverHousingDraftInput{PeriodId=2,Revision=draft.ConcurrencyStamp,RunId=HousingApplyProgress.Read(draft)!.RunId,
-            Mode=billing?"billing":"commuter",RateRevision=billing?"reviewed-rates":"",RecoveryRevision="reviewed-live-snapshot",Confirmed=true,Reason="Reviewed the retained plan"};
+            Mode=partial?"partial":billing?"billing":"commuter",RateRevision=billing?"reviewed-rates":"",RecoveryRevision="reviewed-live-snapshot",Confirmed=true,Reason="Reviewed the retained plan"};
         var workspace=Substitute.For<IHousingWorkspaceAppService>();
         workspace.GetAsync(2).Returns(new HousingWorkspaceState{Id=draft.Id,PeriodId=2,Rooms=rooms,ApplyStatus="Needs review"});
         async Task<HousingWorkspaceState> Complete(NSubstitute.Core.CallInfo c)
         {
             Assert.Equal(actorId,GetRequiredService<ICurrentUser>().Id);Assert.Equal(university,tenant.Id);
             Assert.NotNull(HousingRecoveryDispatch.CurrentExecutionId);
-            Assert.Equal("reviewed-live-snapshot",c.Arg<RecoverHousingDraftInput>().RecoveryRevision);
+            if(!apply)Assert.Equal("reviewed-live-snapshot",c.Arg<RecoverHousingDraftInput>().RecoveryRevision);
             using var unit=units.Begin(requiresNew:true,isTransactional:true);var row=await drafts.GetAsync(draft.Id);
-            Assert.Equal(row.ConcurrencyStamp,c.Arg<RecoverHousingDraftInput>().Revision);Assert.Equal(plan,row.RoomsJson);
+            Assert.Equal(row.ConcurrencyStamp,apply?c.Arg<ApplyHousingDraftInput>().Revision:c.Arg<RecoverHousingDraftInput>().Revision);Assert.Equal(plan,row.RoomsJson);
             var progress=HousingApplyProgress.Read(row)!;progress.Status=fail?"Needs review":"Completed";progress.FinishedAt=DateTime.UtcNow;progress.Save(row);
             if(!fail)row.Refresh(plan,DateTime.UtcNow);
             await drafts.UpdateAsync(row,autoSave:true);await unit.CompleteAsync();
             if(fail)throw new UserFriendlyException("Assignment outcome needs review. The saved plan is retained.");
             return new HousingWorkspaceState{Id=row.Id,PeriodId=2,ApplyStatus="Completed",Rooms=rooms};
         }
-        if(billing)workspace.ResumeBillingReconciliationAsync(Arg.Any<RecoverHousingDraftInput>()).Returns(Complete);
+        if(apply)workspace.ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>()).Returns(Complete);
+        else if(partial)workspace.ResumePartialAssignmentsAsync(Arg.Any<RecoverHousingDraftInput>()).Returns(Complete);
+        else if(billing)workspace.ResumeBillingReconciliationAsync(Arg.Any<RecoverHousingDraftInput>()).Returns(Complete);
         else workspace.ResumeCommuterAssignmentsAsync(Arg.Any<RecoverHousingDraftInput>()).Returns(Complete);
         var store=Substitute.For<ITenantStore>();store.FindAsync(university).Returns(new TenantConfiguration(university,"nelson"));
         var auth=Substitute.For<IAuthorizationService>();auth.AuthorizeAsync(Arg.Any<ClaimsPrincipal>(),Arg.Any<object?>(),CampusFlowPermissions.Admin.HousingAssignments)
@@ -126,6 +128,29 @@ public class HousingRecoveryJobTests : CampusFlowWebTestBase
         var ticket=await f.Dispatcher.QueueAsync(f.Input);await f.Job.ExecuteAsync(await StoredArgs(ticket.JobId));
         Assert.Equal(f.Plan,(await Draft(f)).RoomsJson);Assert.Null(HousingRecoveryDispatch.Read(await Draft(f)));
         await f.Workspace.DidNotReceiveWithAnyArgs().ResumeCommuterAssignmentsAsync(default!);
+    }
+    [Theory][InlineData(false)][InlineData(true)]public async Task Normal_apply_is_queued_once_and_never_replayed_after_a_failure_or_completion(bool fail)
+    {
+        var f=await Setup(apply:true,fail:fail);using var tenant=GetRequiredService<ICurrentTenant>().Change(f.Tenant,"nelson");using var actor=GetRequiredService<ICurrentPrincipalAccessor>().Change(f.Principal);
+        var input=new ApplyHousingDraftInput{PeriodId=2,Revision=f.Input.Revision,Confirmed=true};
+        var ticket=await f.Dispatcher.QueueApplyAsync(input);Assert.Equal("apply",ticket.Mode);Assert.Equal("Queued",HousingRecoveryDispatch.Read(await Draft(f))!.Status);
+        await f.Workspace.DidNotReceiveWithAnyArgs().ApplyAssignmentsAsync(default!);
+        await Assert.ThrowsAsync<UserFriendlyException>(()=>f.Dispatcher.QueueApplyAsync(input));
+        await f.Job.ExecuteAsync(await StoredArgs(ticket.JobId));await f.Job.ExecuteAsync(await StoredArgs(ticket.JobId));
+        await f.Workspace.Received(1).ApplyAssignmentsAsync(Arg.Any<ApplyHousingDraftInput>());
+        Assert.Equal(fail?"Failed":"Completed",HousingRecoveryDispatch.Read(await Draft(f))!.Status);Assert.Equal(f.Plan,(await Draft(f)).RoomsJson);
+    }
+    [Fact]public async Task Normal_apply_rechecks_permission_and_releases_its_queue_without_writing_rooms()
+    {
+        var f=await Setup(apply:true,permission:false);using var tenant=GetRequiredService<ICurrentTenant>().Change(f.Tenant,"nelson");using var actor=GetRequiredService<ICurrentPrincipalAccessor>().Change(f.Principal);
+        var ticket=await f.Dispatcher.QueueApplyAsync(new(){PeriodId=2,Revision=f.Input.Revision,Confirmed=true});await f.Job.ExecuteAsync(await StoredArgs(ticket.JobId));
+        await f.Workspace.DidNotReceiveWithAnyArgs().ApplyAssignmentsAsync(default!);Assert.Equal("Failed",HousingRecoveryDispatch.Read(await Draft(f))!.Status);Assert.Equal(f.Plan,(await Draft(f)).RoomsJson);
+    }
+    [Fact]public async Task Partial_recovery_uses_the_reviewed_partial_action_and_never_the_commuter_action()
+    {
+        var f=await Setup(partial:true);using var tenant=GetRequiredService<ICurrentTenant>().Change(f.Tenant,"nelson");using var actor=GetRequiredService<ICurrentPrincipalAccessor>().Change(f.Principal);
+        var ticket=await f.Dispatcher.QueueAsync(f.Input);await f.Job.ExecuteAsync(await StoredArgs(ticket.JobId));
+        await f.Workspace.Received(1).ResumePartialAssignmentsAsync(Arg.Any<RecoverHousingDraftInput>());await f.Workspace.DidNotReceiveWithAnyArgs().ResumeCommuterAssignmentsAsync(default!);Assert.Equal("Completed",HousingRecoveryDispatch.Read(await Draft(f))!.Status);
     }
     [Fact]public void Production_dependency_registration_includes_the_dispatcher_worker_and_actor_factory()
     {

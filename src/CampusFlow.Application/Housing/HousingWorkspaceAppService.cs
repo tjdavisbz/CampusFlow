@@ -190,6 +190,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
         CheckRevision(draft, input.Revision);
         List<HousingWorkspaceRoom>? recoveryCurrent = null;
         List<int>? recoveryRemaining = null;
+        List<int>? recoveryRemovals = null;
         List<HousingHistoricalAssignment> recoveryHistorical = [];
         Dictionary<int,string> recoveryBilling = [];
         var billingRecovery = false;
@@ -204,7 +205,8 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             recoveryRemaining = review.Remaining;
             recoveryHistorical = review.Historical;
             recoveryBilling = review.Billing;
-            billingRecovery = review.Preview.Mode == "billing";
+            recoveryRemovals = review.Removals;
+            billingRecovery = review.Preview.Mode is "billing" or "partial";
         }
         var before = Read(draft.BaselineJson);
         var after = Read(draft.RoomsJson);
@@ -227,6 +229,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                          oldAssignments[id].o.IntentionalSingle != newAssignments[id].o.IntentionalSingle)
             .Order().ToList();
         var roomWriteIds = recoveryRemaining ?? roomChangedIds;
+        var roomRemovalIds = recoveryRemovals ?? roomChangedIds;
         if (changedIds.Count == 0 && capacityChanges.Count == 0) return Map(draft);
 
         var pricing = changedIds.Count>0 ? await _elements.GetPricingAsync(input.PeriodId) : new HousingPricingContext(0,Array.Empty<HousingTermFee>(),0);
@@ -333,7 +336,7 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
             // Expand capacities before assignment; shrink only after students have been removed.
             var increases=capacityChanges.Where(x=>x.Capacity>x.PreviousCapacity).ToList();
             if(increases.Count>0){await Record("Starting capacity increases");await _writer.UpdateCapacitiesAsync(input.PeriodId,increases);await Record("Capacity increases verified");}
-            foreach(var id in roomWriteIds.Where(oldAssignments.ContainsKey))
+            foreach(var id in roomRemovalIds.Where(oldAssignments.ContainsKey))
             {
                 await Record($"Starting room removal for {id}");await _writer.DeallocateAsync(id,input.PeriodId,oldAssignments[id].room.Id);
                 if(await _writer.GetEffectiveAssignedRoomAsync(id,input.PeriodId) is not null)throw new InvalidOperationException("Room removal was not confirmed.");
@@ -368,7 +371,12 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
                 try
                 {
                     if (billingRecovery)
+                    {
+                        var live=await _writer.GetEffectiveAssignedRoomAsync(id,input.PeriodId);
+                        if(newAssignments.TryGetValue(id,out var target) ? live is null||!SameRoom(live.Value,target.room) : live is not null)
+                            throw new InvalidOperationException("The completed assignment changed before reviewed billing reconciliation.");
                         await _billingWriter.ReconcileReviewedAsync(id,pricing.TermCalendarId,proposedCharges[id],documents,recoveryBilling[id]);
+                    }
                     else await _billingWriter.ReconcileAsync(id,pricing.TermCalendarId,proposedCharges[id],documents);
                 }
                 catch (InvalidOperationException error)
@@ -493,7 +501,13 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
     }
     private void EnsureEditable(HousingAssignmentDraft draft,bool refreshing=false)
     {
-        try { HousingApplyProgress.EnsureEditable(draft,Clock.Now,refreshing); }
+        try
+        {
+            var dispatch=HousingRecoveryDispatch.Read(draft);
+            if(dispatch?.IsActive(draft,Clock.Now)==true && dispatch.Id!=HousingRecoveryDispatch.CurrentExecutionId)
+                throw new InvalidOperationException("Housing work is queued or running. Wait for its status before editing or refreshing the saved plan.");
+            HousingApplyProgress.EnsureEditable(draft,Clock.Now,refreshing);
+        }
         catch(InvalidOperationException e) { throw new UserFriendlyException(e.Message); }
     }
     private static void CheckRevision(HousingAssignmentDraft draft, string? revision)
@@ -524,10 +538,10 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
         var active=dispatch?.IsActive(x,Clock.Now)==true;
         return new()
         { Id=x.Id,PeriodId=x.PeriodId,Revision=x.ConcurrencyStamp,RefreshedAt=x.RefreshedAt,Rooms=Read(x.RoomsJson),BaselineRooms=Read(x.BaselineJson),
-            ApplyStatus=active?"Running":progress?.Status,ApplyRunId=progress?.RunId,
+            ApplyStatus=active?dispatch!.Status:progress?.Status,ApplyRunId=progress?.RunId,
             ApplyFailure=progress?.IsInterrupted(Clock.Now)==true?"The previous recovery stopped reporting progress. Review the live assignments before resuming the saved plan.":progress?.Status=="Needs review"?HousingApplyFailure.Description(progress.FailureCode):null,
             RecoveryAvailable=!active && progress?.CanRecover(Clock.Now)==true,
-            RecoveryJobId=dispatch?.Id,RecoveryJobStatus=dispatch?.Status,RecoveryJobMessage=dispatch?.Message,
+            RecoveryJobId=dispatch?.Id,RecoveryJobMode=dispatch?.Mode,VerifiedRoomOperations=progress?.Operations.Count(o=>o.StartsWith("Room removal verified for ",StringComparison.Ordinal)||o.StartsWith("Room assignment verified for ",StringComparison.Ordinal))??0,RecoveryJobStatus=dispatch?.Status,RecoveryJobMessage=dispatch?.Message,
             RecoveryAssignmentsVerified=progress?.Operations.Count(o=>o.StartsWith("Room assignment verified for ",StringComparison.Ordinal))??0
         };
     }

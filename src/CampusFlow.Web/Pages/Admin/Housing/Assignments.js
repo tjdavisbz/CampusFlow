@@ -180,8 +180,8 @@
         try {
             const draft = next ? await request('Draft', undefined, {periodId:next}) : null;
             removedOccupants.clear(); state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next);
-            if (state?.recoveryJobStatus === 'Running' && !state.recoveryAvailable)
-                await watchRecovery({dispatchId:state.recoveryJobId,periodId:state.periodId});
+            if (['Queued','Running'].includes(state?.recoveryJobStatus) && !state.recoveryAvailable)
+                await watchRecovery({dispatchId:state.recoveryJobId,periodId:state.periodId,mode:state.recoveryJobMode});
         }
         catch (e) { el('period').value = loadedPeriod; throw e; }
     });
@@ -207,21 +207,21 @@
     }
     async function watchRecovery(ticket) {
         const periodId = ticket.periodId ?? state.periodId;
-        message('Housing recovery is running in the background. You may leave and return. No separate Apply is needed.');
+        message('Housing work is running in the background. You may leave and return. No separate Apply is needed.');
         for (let poll = 0; poll < 600; poll++) {
             await new Promise(resolve => setTimeout(resolve, 3000));
             let status;
             try { status = await request('RecoveryStatus', undefined, {periodId, ...(ticket.jobId ? {jobId:ticket.jobId} : {})}); }
             catch {
                 await reloadAfterFailure();
-                throw new Error('Recovery status could not be checked. Work may still be running in the background. Your saved plan is retained; reload this period to check before trying again.');
+                throw new Error('Housing work status could not be checked. Work may still be running in the background. Your saved plan is retained; reload this period to check before trying again.');
             }
             if (!status.state || status.state.id !== state.id) throw new Error('The saved recovery plan changed. Reload this period before continuing.');
             state = status.state; render();
             if (state.recoveryJobId === ticket.dispatchId) {
                 if (state.recoveryJobStatus === 'Completed' && state.applyStatus === 'Completed') {
                     removedOccupants.clear();
-                    message('The reviewed housing recovery completed and was verified. The saved plan and prior run history were preserved. No separate Apply is needed.');
+                    message('The reviewed housing work completed and was verified. The saved plan and prior run history were preserved. No separate Apply is needed.');
                     return;
                 }
                 if (state.recoveryJobStatus === 'Failed') {
@@ -232,11 +232,11 @@
                     resetRecovery();render();
                     throw new Error('Recovery stopped reporting progress. Review the live assignments before resuming the retained saved plan.');
                 }
-                message(`Housing recovery is running in the background. Completed work is checked before continuing. No separate Apply is needed.`);
+                message(`Housing work is running in the background · ${state.verifiedRoomOperations || 0} room operations verified. You may leave and return to check progress. No separate Apply is needed.`);
             } else if (ticket.jobId && !status.pending) {
                 resetRecovery();render();
                 throw new Error('Recovery could not start because the saved run or your access changed. The plan is retained. Review recovery again.');
-            } else message('Housing recovery is queued. The saved plan is retained. You may leave and return; no separate Apply is needed.');
+            } else message('Housing work is queued. The saved plan is retained. You may leave and return; no separate Apply is needed.');
         }
         throw new Error('Recovery is taking longer than expected. Work may still be running. Your saved plan is retained; reload this period to check its status.');
     }
@@ -248,16 +248,22 @@
             const preview = await request('Recovery', undefined, {periodId:state.periodId});
             if (preview.revision !== state.revision) { await reloadAfterFailure(); throw new Error('The saved run changed. Review recovery again.'); }
             recovery = preview;
-            const billingOnly = preview.mode === 'billing';
-            el('resume').textContent = billingOnly ? 'Resume pending housing charges' : 'Resume remaining commuter assignments';
-            el('recovery-counts').textContent = billingOnly
+            const billingOnly = preview.mode === 'billing', partial = preview.mode === 'partial';
+            el('resume').textContent = partial ? 'Resume remaining housing changes' : billingOnly ? 'Resume pending housing charges' : 'Resume remaining commuter assignments';
+            el('recovery-counts').textContent = partial
+                ? `${preview.savedAssignments} saved assignments retained · ${preview.remainingRemovals} remaining removals · ${preview.remainingAssignments} remaining assignments · ${(preview.billingChanges || []).length} students with reviewed charges.`
+                : billingOnly
                 ? `${preview.savedAssignments} saved assignments retained · all room changes complete · ${(preview.billingChanges || []).length} students with pending charge reconciliation.`
                 : `${preview.savedAssignments} saved assignments retained · ${preview.alreadyAssigned} added commuter assignments already complete · ${preview.remainingAssignments} remaining · ${preview.historicalAssignmentsToClear || 0} deleted historical room records to deallocate first.`;
-            el('recovery-explanation').textContent = billingOnly
+            el('recovery-explanation').textContent = partial
+                ? 'Only the remaining room changes and reviewed charges below will be completed. Completed operations and the saved plan are preserved. Posted charges and unrelated billing are protected. No separate Apply is needed.'
+                : billingOnly
                 ? 'Only the reviewed housing charges below will be reconciled. Completed room assignments will be checked and preserved. Posted charges and unrelated billing are protected. Recovery runs in the background; no separate Apply is needed.'
                 : 'Only remaining commuter assignments will be completed. All existing billing charges are preserved. Recovery runs in the background; no separate Apply is needed.';
             const billingList = el('recovery-billing-lines');
-            billingList.replaceChildren(); billingList.hidden = !billingOnly;
+            billingList.replaceChildren(); billingList.hidden = !(billingOnly || partial);
+            const roomList = el('recovery-room-lines'); roomList.replaceChildren(); roomList.hidden = !partial;
+            (preview.roomChanges || []).forEach(line => { const li=document.createElement('li'); li.textContent=`${line.studentName || line.studentUid}: ${line.currentRoom} → ${line.proposedRoom}`; roomList.append(li); });
             (preview.billingChanges || []).forEach(line => {
                 const li = document.createElement('li');
                 li.textContent = `${line.studentName || line.studentUid}: ${money(line.currentAmount)} currently in housing charges → ${money(line.proposedAmount)} after reconciliation`;
@@ -268,8 +274,10 @@
         });
         el('resume').onclick = () => run(async () => {
             if (!recovery || !el('recovery-confirmed').checked || !el('recovery-reason').value.trim()) return;
-            const billingOnly = recovery.mode === 'billing';
-            const confirmation = billingOnly
+            const billingOnly = recovery.mode === 'billing', partial = recovery.mode === 'partial';
+            const confirmation = partial
+                ? `Resume ${recovery.remainingRemovals} remaining removals, ${recovery.remainingAssignments} remaining assignments and the reviewed housing charges in ${root.dataset.environment} Elements? Only unfinished room operations will be performed. Review every charge shown; the saved plan and history will be retained.`
+                : billingOnly
                 ? `Reconcile the reviewed housing charges for ${(recovery.billingChanges || []).length} students in ${root.dataset.environment} Elements? This may replace or remove their unposted housing charges as shown in the preview. Completed room assignments will not be repeated. The saved plan and prior history will be retained.`
                 : `Resume ${recovery.remainingAssignments} remaining commuter assignments in ${root.dataset.environment} Elements? ${recovery.historicalAssignmentsToClear || 0} reviewed deleted historical room records will be explicitly deallocated first. Already completed assignments will be checked and skipped. No billing charges will be changed. The saved plan and prior run history will be retained.`;
             if (!confirm(confirmation)) return;
@@ -300,8 +308,9 @@
         const listed = changes.slice(0, 16).map(x => `${x.action}: ${x.detail}`).join('\n');
         const more = changes.length > 16 ? `\n…and ${changes.length - 16} more changes.` : '';
         if (!confirm(`Apply ${actionable.length} assignment/rate/capacity change(s) to ${root.dataset.environment} Elements?\n\n${listed}${more}\n\nFor each affected student, CampusFlow will replace matching unposted housing batch charges with its proposed charges. Posted ledger transactions and other students' entries will not be changed. Continue?`)) return;
+        let ticket;
         try {
-            state = await request('Apply', {periodId:state.periodId, revision:state.revision,
+            ticket = await request('Apply', {periodId:state.periodId, revision:state.revision,
                 rateRevision, confirmed:true});
         } catch (error) {
             // Read the saved draft, never Refresh from Elements: a failed/uncertain apply
@@ -309,8 +318,8 @@
             await reloadAfterFailure();
             throw error;
         }
-        removedOccupants.clear(); dirty = false; selected.clear(); render();
-        message(`Room assignments and CampusFlow housing charges were applied to ${root.dataset.environment} Elements and verified.`);
+        state = ticket.state; dirty = false; selected.clear(); render();
+        await watchRecovery(ticket);
     });
     el('clear').onclick = () => {
         if (!selected.size || !confirm(`Clear ${selected.size} selected assignments from the draft? Students remain assigned in Elements until you apply the draft.`)) return;
