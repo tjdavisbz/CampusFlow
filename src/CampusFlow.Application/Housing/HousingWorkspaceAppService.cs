@@ -536,10 +536,12 @@ public partial class HousingWorkspaceAppService : CampusFlowAppService, IHousing
     {
         var progress=HousingApplyProgress.Read(x);var dispatch=HousingRecoveryDispatch.Read(x);
         var active=dispatch?.IsActive(x,Clock.Now)==true;
+        var failedBeforeApply=dispatch is {Status:"Failed",Mode:"apply"} &&
+            (progress is null || progress.StartedAt<dispatch.StartedAt);
         return new()
         { Id=x.Id,PeriodId=x.PeriodId,Revision=x.ConcurrencyStamp,RefreshedAt=x.RefreshedAt,Rooms=Read(x.RoomsJson),BaselineRooms=Read(x.BaselineJson),
-            ApplyStatus=active?dispatch!.Status:progress?.Status,ApplyRunId=progress?.RunId,
-            ApplyFailure=progress?.IsInterrupted(Clock.Now)==true?"The previous recovery stopped reporting progress. Review the live assignments before resuming the saved plan.":progress?.Status=="Needs review"?HousingApplyFailure.Description(progress.FailureCode):null,
+            ApplyStatus=active?dispatch!.Status:failedBeforeApply?"Failed":progress?.Status,ApplyRunId=progress?.RunId,
+            ApplyFailure=failedBeforeApply?dispatch!.Message??"Housing checks failed before any room or charge was changed. Review the saved plan before trying again.":progress?.IsInterrupted(Clock.Now)==true?"The previous recovery stopped reporting progress. Review the live assignments before resuming the saved plan.":progress?.Status=="Needs review"?HousingApplyFailure.Description(progress.FailureCode):null,
             RecoveryAvailable=!active && progress?.CanRecover(Clock.Now)==true,
             RecoveryJobId=dispatch?.Id,RecoveryJobMode=dispatch?.Mode,VerifiedRoomOperations=progress?.Operations.Count(o=>o.StartsWith("Room removal verified for ",StringComparison.Ordinal)||o.StartsWith("Room assignment verified for ",StringComparison.Ordinal))??0,RecoveryJobStatus=dispatch?.Status,RecoveryJobMessage=dispatch?.Message,
             RecoveryAssignmentsVerified=progress?.Operations.Count(o=>o.StartsWith("Room assignment verified for ",StringComparison.Ordinal))??0

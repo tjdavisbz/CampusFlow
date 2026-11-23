@@ -66,4 +66,18 @@ public partial class HousingApplyTests
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.SaveAsync(state));
         await Assert.ThrowsAsync<UserFriendlyException>(()=>_service.RefreshAsync(1,_draft.ConcurrencyStamp));Assert.Empty(_writer.Calls);
     }
+    [Fact]public async Task A_failed_background_preflight_never_displays_the_older_completed_run_as_the_latest_status()
+    {
+        var started=new DateTime(2026,11,5,12,0,0,DateTimeKind.Utc);
+        new HousingApplyProgress{RunId=Guid.NewGuid(),Status="Completed",StartedAt=started.AddHours(-1),FinishedAt=started.AddMinutes(-30)}.Save(_draft);
+        new HousingRecoveryDispatch{Id=Guid.NewGuid(),UserId=Guid.NewGuid(),Status="Failed",Mode="apply",StartedAt=started,FinishedAt=started.AddSeconds(2),Message="Elements authentication failed before any assignment changed."}.Save(_draft);
+        var state=(await _service.GetAsync(1))!;Assert.Equal("Failed",state.ApplyStatus);Assert.Contains("authentication failed",state.ApplyFailure);Assert.False(state.RecoveryAvailable);
+    }
+    [Fact]public async Task A_failed_background_apply_that_started_writes_still_requires_review()
+    {
+        var started=new DateTime(2026,11,5,12,0,0,DateTimeKind.Utc);
+        new HousingApplyProgress{RunId=Guid.NewGuid(),Status="Needs review",StartedAt=started,FinishedAt=started.AddSeconds(2),FailureCode="unconfirmed"}.Save(_draft);
+        new HousingRecoveryDispatch{Id=Guid.NewGuid(),UserId=Guid.NewGuid(),Status="Failed",Mode="apply",StartedAt=started,FinishedAt=started.AddSeconds(2)}.Save(_draft);
+        var state=(await _service.GetAsync(1))!;Assert.Equal("Needs review",state.ApplyStatus);Assert.True(state.RecoveryAvailable);
+    }
 }

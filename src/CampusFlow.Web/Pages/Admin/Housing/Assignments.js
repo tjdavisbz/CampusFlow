@@ -179,7 +179,7 @@
         resetRecovery();
         try {
             const draft = next ? await request('Draft', undefined, {periodId:next}) : null;
-            removedOccupants.clear(); state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(''); await showSetup(next);
+            removedOccupants.clear(); state = draft; loadedPeriod = next; dirty = false; selected.clear(); render(); message(state?.applyFailure || '', !!state?.applyFailure); await showSetup(next);
             if (['Queued','Running'].includes(state?.recoveryJobStatus) && !state.recoveryAvailable)
                 await watchRecovery({dispatchId:state.recoveryJobId,periodId:state.periodId,mode:state.recoveryJobMode});
         }
