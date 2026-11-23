@@ -310,7 +310,7 @@ public partial class HousingApplyTests
 
     private sealed class Writer(Func<HousingApplyProgress?> progress):IElementsHousingAssignmentWriter
     {
-        public Action<int>? OnRead;public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
+        public Action<int>? OnRead;public bool Fail;public bool SuppressAssignment;public int? FailAtStudent;public int? FailRemovalAtStudent;public Dictionary<int,(string,string)> RoomNames=[];public List<string> Calls=[];public readonly Dictionary<int,(string,string)> Assigned=[];
         public void EnsureWriteEnabled(){}
         public List<HousingHistoricalAssignment> Historical=[];
         public bool FailHistorical;
@@ -324,6 +324,6 @@ public partial class HousingApplyTests
         private void Claimed(){Assert.Equal("Running",progress()!.Status);Assert.StartsWith("Starting",progress()!.Operations.Last());}
         public Task UpdateCapacitiesAsync(int p,IReadOnlyList<HousingCapacityChange> changes,CancellationToken ct=default){Claimed();Calls.Add(changes[0].Capacity>changes[0].PreviousCapacity?"increase":"decrease");return Task.CompletedTask;}
         public Task AssignAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("assign");if(Fail||FailAtStudent==id)throw new InvalidOperationException();if(!SuppressAssignment)Assigned[id]=RoomNames.TryGetValue(room,out var named)?named:room==1?("Bridges Hall","101"):("Commuter",room==2?"000":"001");return Task.CompletedTask;}
-        public Task DeallocateAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("remove");Assigned.Remove(id);return Task.CompletedTask;}
+        public Task DeallocateAsync(int id,int p,int room,CancellationToken ct=default){Claimed();Calls.Add("remove");if(FailRemovalAtStudent==id)throw new InvalidOperationException("Removal interrupted");Assigned.Remove(id);return Task.CompletedTask;}
     }
 }

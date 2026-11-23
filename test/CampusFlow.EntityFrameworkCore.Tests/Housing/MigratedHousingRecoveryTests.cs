@@ -82,7 +82,7 @@ public class MigratedHousingRecoveryTests
         source.ReadForPeriodAsync(2,Arg.Any<CancellationToken>()).Returns(_=>new ResidentialHousingImport {
             PeriodId=2,TermCalendarId=269,PeriodName="Spring 2027",Assignments=http.EverAssigned?[]:[Migrated]
         });
-        var cache = new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:Housing:IntegrationToken","test");
+        var cache = new MemoryCache(new MemoryCacheOptions());cache.Set(ElementsHousingAuthentication.Key(HousingCapacityWriterTests.Config()),"test");
         return new(HousingCapacityWriterTests.Config(),cache,new HttpClient(http),
             historicalAssignments:(_,_,_)=>Task.FromResult(http.HistoricalRemoved?new List<HousingHistoricalAssignment>():history??[Old()]),
             migratedHousing:source,currentAssignmentExists:(_,_,_)=>Task.FromResult(currentExists?.Invoke()??http.Assigned),

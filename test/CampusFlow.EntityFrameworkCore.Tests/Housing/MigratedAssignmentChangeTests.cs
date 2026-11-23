@@ -82,7 +82,7 @@ public class MigratedAssignmentChangeTests
             PeriodId = 2, TermCalendarId = 269, PeriodName = "Spring 2027",
             Assignments = http.EverAssigned ? [] : [new(11,31,101,201,"Savell Hall","101","Test resident")]
         });
-        var cache = new MemoryCache(new MemoryCacheOptions()); cache.Set("ThesisElements:Housing:IntegrationToken", "test");
+        var cache = new MemoryCache(new MemoryCacheOptions()); cache.Set(ElementsHousingAuthentication.Key(HousingCapacityWriterTests.Config()), "test");
         return new(HousingCapacityWriterTests.Config(), cache, new HttpClient(http), historicalAssignments: (_,_,_) => Task.FromResult(new List<HousingHistoricalAssignment>()), migratedHousing: source,
             currentAssignmentExists: (_,_,_) => Task.FromResult(http.Assigned));
     }

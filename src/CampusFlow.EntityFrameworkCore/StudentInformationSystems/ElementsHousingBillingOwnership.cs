@@ -87,12 +87,14 @@ public sealed partial class ElementsHousingBillingWriter
         return result;
     }
 
-    private static HousingBillingReview BuildReview(int studentUid, int termId, IReadOnlyList<HousingChargeLine> desired,
+    internal static HousingBillingReview BuildReview(int studentUid, int termId, IReadOnlyList<HousingChargeLine> desired,
         List<BatchEntry> entries, List<BatchEntry> legacy, IReadOnlyList<BatchEntry>? generated = null)
     {
         var all = entries.Concat(generated ?? []).OrderBy(x => x.BatchMasterId).ThenBy(x => x.Id).ToArray();
-        var identity = JsonSerializer.Serialize(new { Policy="reviewed-housing-billing-v1", studentUid,termId,
-            Entries=all, Legacy=legacy.Select(x=>x.Id).Order().ToArray(),Desired=desired });
+        // A verified zero-rent conversion can create new zero-value vendor entries.
+        // They do not change the reviewed financial outcome; nonzero entries stay bound.
+        var identity = JsonSerializer.Serialize(new { Policy="reviewed-housing-billing-v2", studentUid,termId,
+            Entries=all.Where(x=>x.Amount!=0), Legacy=legacy.Select(x=>x.Id).Order().ToArray(),Desired=desired });
         return new(studentUid,termId,all.Sum(x=>x.Amount),desired.Sum(x=>x.Amount),
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))));
     }

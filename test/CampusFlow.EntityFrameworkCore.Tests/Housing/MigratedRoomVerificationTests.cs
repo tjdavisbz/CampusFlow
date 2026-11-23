@@ -32,7 +32,7 @@ public class MigratedRoomVerificationTests
     private ElementsHousingAssignmentWriter Writer(bool currentExists=false)
     {
         _source.ReadForPeriodAsync(2,Arg.Any<CancellationToken>()).Returns(_migration);
-        var cache=new MemoryCache(new MemoryCacheOptions());cache.Set("ThesisElements:Housing:IntegrationToken","test");
+        var cache=new MemoryCache(new MemoryCacheOptions());cache.Set(ElementsHousingAuthentication.Key(HousingCapacityWriterTests.Config()),"test");
         return new(HousingCapacityWriterTests.Config(),cache,new HttpClient(_http),
             migratedHousing:_source,currentAssignmentExists:(_,_,_)=>Task.FromResult(currentExists));
     }

@@ -9,7 +9,7 @@
         <p>Plan room assignments together. Save changes here before reviewing what needs to change in Elements.</p></header>
     @if (Model.CanApplyToElements)
     {
-        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Reviewed capacity changes are saved to this housing period in Elements. Notes stay in CampusFlow. A partial apply preserves the saved plan and requires review before recovery.</div>
+        <div class="alert alert-warning">Applying a draft changes room assignments in Elements and replaces the affected students' unposted housing batch charges with separate CampusFlow-calculated charges. Posted transactions and other students' charges are not changed. Reviewed capacity changes are saved to this housing period in Elements. Notes stay in CampusFlow. Apply runs in the background; you may leave this page and return to check its progress. A partial apply preserves the saved plan and requires review before recovery.</div>
     }
     else
     {
@@ -32,11 +32,12 @@
         <section id="housing-recovery" class="alert alert-warning" hidden aria-labelledby="housing-recovery-title">
             <h2 id="housing-recovery-title">Review an interrupted apply</h2>
             <p id="housing-recovery-failure"></p>
-            <p>The saved assignments are retained. Recovery supports remaining zero-charge commuter assignments, or pending housing charges after every room change has been verified complete. Other partial room changes or live conflicts need administrator review.</p>
+            <p>The saved assignments are retained. Review recovery checks completed work and shows the remaining room changes and housing charges. Completed operations will not be repeated. Conflicting live changes stop recovery for review.</p>
             <p>If a period was reinitialized, recovery can explicitly deallocate its reviewed deleted commuter records before applying the remaining assignments. Active room assignments are preserved. The preview shows how many historical records require this step.</p>
             <button id="housing-review-recovery" type="button" class="btn btn-outline-primary">Review recovery</button>
             <div id="housing-recovery-preview" hidden>
                 <p id="housing-recovery-counts"></p>
+                <ul id="housing-recovery-room-lines" hidden></ul>
                 <ul id="housing-recovery-billing-lines" hidden></ul>
                 <p id="housing-recovery-explanation">Recovery runs in the background. You may leave this page and return to check progress. No separate Apply is needed.</p>
                 <label>Review reason <textarea id="housing-recovery-reason" class="form-control" maxlength="500" rows="2"></textarea></label>

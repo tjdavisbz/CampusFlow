@@ -21,7 +21,6 @@ namespace CampusFlow.StudentInformationSystems;
 public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAssignmentWriter, ITransientDependency
 {
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
-    private const string TokenCacheKey = "ThesisElements:Housing:IntegrationToken";
     private static readonly HttpClient SharedHttpClient = new();
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
@@ -85,7 +84,7 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
         var token = await GetTokenAsync(cancellationToken);
         using var request = Request(HttpMethod.Get,
             $"/api/student-life/housing/assign-room/get-assigned-rooms/{studentUid}", token);
-        using var response = await _client.SendAsync(request, cancellationToken);
+        using var response = await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         var data = root["data"] as JsonArray;
         if (data is null) throw new InvalidOperationException("Elements returned an invalid assignment list.");
@@ -255,7 +254,7 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
             studentUIds = new[] { studentUid }, housingPeriodRoomId = periodRoomId,
             housingPeriodId = periodId, housingApplicationFormId = 0
         }), Encoding.UTF8, "application/json");
-        using var response = await _client.SendAsync(request, cancellationToken);
+        using var response = await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         // Some vendor responses add a second business outcome inside the envelope.
         // Honor an explicit failure; older/minimal envelopes still require the caller's
@@ -266,24 +265,10 @@ public sealed partial class ElementsHousingAssignmentWriter : IElementsHousingAs
                 root["data"]?.ToJsonString() ?? ""), (int)response.StatusCode);
     }
 
-    private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
+    private Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
         EnsureWriteEnabled();
-        if (_cache.TryGetValue(TokenCacheKey, out string? cached) && !string.IsNullOrWhiteSpace(cached)) return cached;
-        using var request = new HttpRequestMessage(HttpMethod.Get,
-            $"{Setting("BaseUrl").TrimEnd('/')}/api/Login/Authenticate");
-        request.Headers.Add("TenantHost", Setting("TenantHost"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
-        using var response = await _client.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("Elements housing authentication failed.");
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        var token = JsonNode.Parse(body)?["data"]?["token"]?.GetValue<string>();
-        if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Elements did not return a housing authentication token.");
-        _cache.Set(TokenCacheKey, token, TimeSpan.FromMinutes(10));
-        return token;
+        return ElementsHousingAuthentication.GetAsync(_configuration,_cache,_client,cancellationToken);
     }
 
     private HttpRequestMessage Request(HttpMethod method, string route, string token)

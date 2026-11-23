@@ -17,14 +17,8 @@ public partial class HousingWorkspaceAppService
     {
         var draft = await Find(periodId) ?? throw new UserFriendlyException("There is no saved draft to recover.");
         var review = await PrepareRecoveryAsync(draft);
-        if (review.Preview.Mode == "billing")
+        if (review.Preview.Mode is "billing" or "partial")
         {
-            foreach (var room in review.Current)
-                foreach (var occupant in room.Occupants.Where(o => review.Billing.ContainsKey(o.StudentUid)))
-                {
-                    var live = await _writer.GetEffectiveAssignedRoomAsync(occupant.StudentUid, periodId);
-                    if (live is null || !SameRoom(live.Value, room)) throw new UserFriendlyException("The live assignment changed during billing review.");
-                }
             return review.Preview;
         }
         var expected = review.Current.SelectMany(room => room.Occupants.Select(o => (room, o)))
@@ -65,7 +59,17 @@ public partial class HousingWorkspaceAppService
             RateRevision=input.RateRevision,Confirmed=true },input);
     }
 
-    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining, List<HousingHistoricalAssignment> Historical, Dictionary<int,string> Billing)>
+    [Audited]
+    [UnitOfWork(IsDisabled = true)]
+    public Task<HousingWorkspaceState> ResumePartialAssignmentsAsync(RecoverHousingDraftInput input)
+    {
+        if(input.Mode!="partial"||!input.Confirmed||string.IsNullOrWhiteSpace(input.Reason)||input.Reason.Trim().Length>500||
+            input.RunId==Guid.Empty||string.IsNullOrWhiteSpace(input.RecoveryRevision))
+            throw new UserFriendlyException("Review the remaining room changes and charges, confirm them and enter a reason before resuming.");
+        return ApplyCoreAsync(new ApplyHousingDraftInput{PeriodId=input.PeriodId,Revision=input.Revision,RateRevision=input.RateRevision,Confirmed=true},input);
+    }
+
+    private async Task<(HousingRecoveryPreview Preview, List<HousingWorkspaceRoom> Current, List<int> Remaining, List<HousingHistoricalAssignment> Historical, Dictionary<int,string> Billing, List<int> Removals)>
         PrepareRecoveryAsync(HousingAssignmentDraft draft)
     {
         _writer.EnsureWriteEnabled();
@@ -105,6 +109,6 @@ public partial class HousingWorkspaceAppService
             SavedAssignments = desired.Sum(x => x.Occupants.Count), AlreadyAssigned = plan.Added.Count - plan.Remaining.Count,
             RemainingAssignments = plan.Remaining.Count, HistoricalAssignmentsToClear = historical.Count,
             Failure = HousingApplyFailure.Description(progress.FailureCode)
-        }, current, plan.Remaining, historical, []);
+        }, current, plan.Remaining, historical, [], []);
     }
 }

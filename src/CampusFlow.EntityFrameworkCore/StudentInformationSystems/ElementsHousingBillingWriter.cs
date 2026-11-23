@@ -26,7 +26,6 @@ public sealed partial class ElementsHousingBillingWriter : IElementsHousingBilli
     private const string BatchComment = "Housing Charges";
     private const string ElementsRentBatchComment = "Housing charges Rent and Security Deposit";
     private const string ApiPath = "StudentInformationSystems:Providers:ThesisElements:Api:";
-    private const string TokenCacheKey = "ThesisElements:Housing:BillingToken";
     private static readonly HttpClient SharedClient = new();
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
@@ -204,7 +203,7 @@ public sealed partial class ElementsHousingBillingWriter : IElementsHousingBilli
         CancellationToken cancellationToken)
     {
         using var request = Request(HttpMethod.Get, "/api/billing/cashier-entry/select-items", token);
-        using var response = await _client.SendAsync(request, cancellationToken);
+        using var response = await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         if (root["data"]?["batchMasterList"] is not JsonArray batches)
             throw new InvalidOperationException("Elements returned an invalid housing batch list.");
@@ -261,7 +260,7 @@ public sealed partial class ElementsHousingBillingWriter : IElementsHousingBilli
     {
         using var request = Request(HttpMethod.Get,
             $"/api/billing/cashier-entry/batches/batch-entries-list/{studentUid}/{batchId}", token);
-        using var response = await _client.SendAsync(request, cancellationToken);
+        using var response = await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         if (root["data"] is not JsonObject)
             throw new InvalidOperationException("Elements returned an invalid housing charge list.");
@@ -300,7 +299,7 @@ public sealed partial class ElementsHousingBillingWriter : IElementsHousingBilli
             currencyTypeAmt = (decimal?)null, arTypeID = line.AccountsReceivableTypeId,
             description = line.Description, paymentPlanID = 0, refNo = reference
         });
-        using var response = await _client.SendAsync(request, cancellationToken);
+        using var response = await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         if (method == HttpMethod.Post && (root["data"]?.GetValue<int>() ?? 0) <= 0)
             throw new InvalidOperationException("Elements did not create the CampusFlow housing charge.");
@@ -313,30 +312,16 @@ public sealed partial class ElementsHousingBillingWriter : IElementsHousingBilli
         if (entryId <= 0) throw new InvalidOperationException("The housing batch entry ID is invalid.");
         using var request = Request(HttpMethod.Delete,
             $"/api/billing/cashier-entry/batches/batch-entry/{entryId}", token);
-        using var response = await _client.SendAsync(request, cancellationToken);
+        using var response = await ElementsHousingAuthentication.SendAsync(_configuration,_cache,_client,request,cancellationToken);
         var root = await ReadAsync(response, cancellationToken);
         if (root["data"]?.GetValue<bool>() != true)
             throw new InvalidOperationException("Elements did not delete the housing batch entry.");
     }
 
-    private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
+    private Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
         _assignmentWriter.EnsureWriteEnabled();
-        if (_cache.TryGetValue(TokenCacheKey, out string? cached) && !string.IsNullOrWhiteSpace(cached)) return cached;
-        using var request = new HttpRequestMessage(HttpMethod.Get,
-            $"{Setting("BaseUrl").TrimEnd('/')}/api/Login/Authenticate");
-        request.Headers.Add("TenantHost", Setting("TenantHost"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-            Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Setting("Username")}:{Setting("Password")}")));
-        using var response = await _client.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("Elements housing billing authentication failed.");
-        var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-        var token = root?["data"]?["token"]?.GetValue<string>();
-        if (string.IsNullOrWhiteSpace(token))
-            throw new InvalidOperationException("Elements did not return a housing billing token.");
-        _cache.Set(TokenCacheKey, token, TimeSpan.FromMinutes(10));
-        return token;
+        return ElementsHousingAuthentication.GetAsync(_configuration,_cache,_client,cancellationToken);
     }
 
     private HttpRequestMessage Request(HttpMethod method, string route, string token)
