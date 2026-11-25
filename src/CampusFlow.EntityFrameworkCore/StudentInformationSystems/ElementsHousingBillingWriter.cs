@@ -140,7 +140,8 @@ public sealed partial class ElementsHousingBillingWriter : IElementsHousingBilli
         var replaceable = owned.Entries;
         for (var i = 0; i < references.Length; i++)
         {
-            var matches = replaceable.Where(x => string.Equals(x.Reference, references[i], StringComparison.OrdinalIgnoreCase) || i == 0 && owned.Legacy.Contains(x)).ToList();
+            var matches = replaceable.Where(x => string.Equals(x.Reference, references[i], StringComparison.OrdinalIgnoreCase) ||
+                owned.Legacy.Contains(x) && x.TransactionDocumentId == (i == 0 ? 137 : 243)).ToList();
             var prior = matches.SingleOrDefault();
             var wanted = i < desired.Count ? desired[i] : null;
             if (prior is null && wanted is null) continue;

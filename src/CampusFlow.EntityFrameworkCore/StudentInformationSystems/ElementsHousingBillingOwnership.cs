@@ -38,12 +38,16 @@ public sealed partial class ElementsHousingBillingWriter
             throw new InvalidOperationException("An unrecognized CampusFlow housing reference requires review.");
         var scoped = sameTerm.Where(x => documents.Contains(x.TransactionDocumentId)).ToList();
         if (scoped.Any(x => x.Amount < 0)) throw new InvalidOperationException("A housing credit requires manual review.");
-        var legacy = scoped.Where(x => string.IsNullOrWhiteSpace(x.Reference) && x.Amount > 0 && x.TransactionDocumentId == 137 &&
-            x.AccountsReceivableTypeId == 8047 && x.Description.Equals("Housing",StringComparison.OrdinalIgnoreCase) && evidence.Contains(x)).ToList();
-        // Only the single original base charge can be adopted. Never guess how to
-        // associate duplicate imports, a single-room surcharge or manual adjustments.
-        if (legacy.Count > 1 || legacy.Count == 1 && scoped.Any(x => x.Reference.Equals(references[0], StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("Duplicate imported or CampusFlow base charges require manual review.");
+        var legacy = scoped.Where(x => string.IsNullOrWhiteSpace(x.Reference) && x.Amount > 0 &&
+            (x.TransactionDocumentId == 137 && x.AccountsReceivableTypeId == 8047 && x.Description.Equals("Housing",StringComparison.OrdinalIgnoreCase) ||
+             x.TransactionDocumentId == 243 && x.AccountsReceivableTypeId == 0 && x.Description.Equals("Single Room",StringComparison.OrdinalIgnoreCase)) &&
+            evidence.Contains(x)).ToList();
+        // Each component needs its own exact preserved import evidence. A single-room
+        // surcharge is never treated as a second base charge or inferred from its amount.
+        foreach (var component in legacy.GroupBy(x => x.TransactionDocumentId))
+            if (component.Count() > 1 || scoped.Any(x => x.Reference.Equals(
+                    references[component.Key == 137 ? 0 : 1], StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Duplicate imported or CampusFlow housing charges require manual review.");
         RequireOwnedReferences(scoped.Except(legacy).Select(x => x.Reference), references);
         if (references.Any(r => scoped.Count(x => x.Reference.Equals(r, StringComparison.OrdinalIgnoreCase)) > 1))
             throw new InvalidOperationException("Duplicate CampusFlow housing references require manual review.");
@@ -72,7 +76,9 @@ public sealed partial class ElementsHousingBillingWriter
              AND original.InsertTime=b.InsertTime
              AND (original.UpdateTime=b.UpdateTime OR original.UpdateTime IS NULL AND b.UpdateTime IS NULL)
             WHERE b.OwnerUID=@Student AND b.TermCalendarID=@Term AND b.BatchMasterID=@Batch
-              AND b.Credits=0 AND b.Debits>0 AND b.TransDocID=137 AND b.ARTypeID=8047 AND b.Description='Housing'
+              AND b.Credits=0 AND b.Debits>0
+              AND ((b.TransDocID=137 AND b.ARTypeID=8047 AND b.Description='Housing')
+                OR (b.TransDocID=243 AND b.ARTypeID=0 AND b.Description='Single Room'))
               AND NULLIF(LTRIM(RTRIM(b.RefNo)),'') IS NULL
               AND NULLIF(LTRIM(RTRIM(original.RefNo)),'') IS NULL
             """, connection) { CommandTimeout = 60 };
