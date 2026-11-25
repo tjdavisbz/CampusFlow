@@ -7,6 +7,27 @@ namespace CampusFlow.EntityFrameworkCore.Tests.Housing;
 public class HousingLegacyChargeOwnershipTests
 {
     private static Entry Legacy()=>new(100,200,"",137,2750,10,269,8047,"Housing");
+    private static Entry Single()=>new(101,200,"",243,2125,10,269,0,"Single Room");
+    [Fact] public void Exact_imported_base_and_single_room_are_separate_owned_components()
+    {
+        var rows=new[]{Legacy(),Single()};
+        var review=ElementsHousingBillingWriter.ReviewOwnership(rows,rows,10,269,200,[137,243]);
+        Assert.Equal(rows,review.Legacy);Assert.Equal(rows,review.Entries);
+        Assert.Equal(4875,ElementsHousingBillingWriter.BuildReview(10,269,[],review.Entries,review.Legacy).CurrentAmount);
+    }
+    [Theory][InlineData("amount")][InlineData("account")][InlineData("description")][InlineData("reference")][InlineData("id")][InlineData("no-evidence")]
+    public void Unverified_or_changed_single_room_surcharges_still_block_all_writes(string problem)
+    {
+        var original=Single();var row=problem switch{"amount"=>original with{Amount=1},"account"=>original with{AccountsReceivableTypeId=8047},"description"=>original with{Description="Manual single room"},"reference"=>original with{Reference="Manual"},"id"=>original with{Id=102},_=>original};
+        Assert.Throws<InvalidOperationException>(()=>ElementsHousingBillingWriter.ReviewOwnership([Legacy(),row],problem=="no-evidence"?[Legacy()]:[Legacy(),original],10,269,200,[137,243]));
+    }
+    [Fact] public void Duplicate_imported_single_or_owned_single_is_never_merged()
+    {
+        var row=Single();var duplicate=row with{Id=102};
+        Assert.Throws<InvalidOperationException>(()=>ElementsHousingBillingWriter.ReviewOwnership([row,duplicate],[row,duplicate],10,269,200,[137,243]));
+        var owned=duplicate with{Reference="CFH-269-10-SINGLE"};
+        Assert.Throws<InvalidOperationException>(()=>ElementsHousingBillingWriter.ReviewOwnership([row,owned],[row],10,269,200,[137,243]));
+    }
     [Fact] public void Only_the_exact_unchanged_import_entry_can_be_adopted()
     {var row=Legacy();var review=ElementsHousingBillingWriter.ReviewOwnership([row],[row],10,269,200,[137,243]);Assert.Equal(row,Assert.Single(review.Legacy));}
     [Theory][InlineData("amount")][InlineData("account")][InlineData("document")][InlineData("description")][InlineData("reference")][InlineData("id")][InlineData("no-evidence")]
